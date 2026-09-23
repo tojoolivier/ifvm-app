@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { autresNonAffichees, laPlusGrave, useErrorStore } from '@/lib/error-store';
 import { useErrorAction } from '@/hooks/use-error-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { LienVersLeJournal } from './erreurs/lien-vers-le-journal';
 import {
   AMBER_BG,
@@ -35,6 +38,9 @@ export function ErrorBanner() {
   // La modale montre la sienne : on ne la recompte pas dans « +N autres ».
   const bloquante = laPlusGrave(erreurs.filter((e) => e.traitement === 'BLOQUER'));
   const action = useErrorAction(courante);
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   if (!courante) return null;
 
@@ -81,25 +87,38 @@ export function ErrorBanner() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 999 },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: AMBER_BG,
-    borderBottomWidth: 1,
-    borderColor: AMBER_BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  corps: { flex: 1, gap: 3 },
-  message: { color: AMBER_TEXT, fontSize: 13, fontWeight: '600' },
-  pied: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  compteur: { color: FOREGROUND_TERTIARY, fontSize: 12, fontWeight: '600' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: AMBER_TEXT },
-  actionText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  closeBtn: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
-  closeText: { color: AMBER_TEXT, fontSize: 15, fontWeight: '700' },
-});
+const BASE_TYPE_SIZES = {
+  message: 13,
+  compteur: 12,
+  actionText: 12,
+  closeText: 15,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    safe: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 999 },
+    banner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: AMBER_BG,
+      borderBottomWidth: 1,
+      borderColor: AMBER_BORDER,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      gap: 10,
+    },
+    corps: { flex: 1, gap: 3 },
+    message: { color: AMBER_TEXT, fontSize: typeSizes.message, fontWeight: '600' },
+    pied: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    compteur: { color: FOREGROUND_TERTIARY, fontSize: typeSizes.compteur, fontWeight: '600' },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    actionBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: AMBER_TEXT },
+    actionText: { color: '#fff', fontSize: typeSizes.actionText, fontWeight: '700' },
+    closeBtn: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+    closeText: { color: AMBER_TEXT, fontSize: typeSizes.closeText, fontWeight: '700' },
+  });
+}

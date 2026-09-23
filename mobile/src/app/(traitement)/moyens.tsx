@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 
 const KIT_ROWS: { key: 'kit_combinaison' | 'kit_gants' | 'kit_lunettes' | 'kit_masques' | 'kit_botte'; label: string }[] = [
   { key: 'kit_combinaison', label: 'Combinaison' },
@@ -102,6 +102,8 @@ export default function MoyensScreen() {
   const [prospectionId, setProspectionId] = useState<string | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('moyens');
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   useEffect(() => {
     if (!traitementId) return;
@@ -519,72 +521,74 @@ export default function MoyensScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  keyboardAvoidingView: { flex: 1 },
-  content: { padding: 16, gap: 10 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  bannerTextOk: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.vertPrincipal },
-  bannerTextWarn: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.avertissementTexte },
-  hint: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel, fontStyle: 'italic' },
-  kitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44, paddingVertical: 6 },
-  kitLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  counterButton: {
-    width: 32,
-    height: 32,
-    borderRadius: traitementRadii.chip,
-    backgroundColor: '#efeada',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  counterButtonAdd: { backgroundColor: traitementColors.vertPrincipal },
-  counterButtonText: { fontFamily: traitementFonts.uiBold, fontSize: 17, color: traitementColors.texteLabel },
-  counterButtonAddText: { color: '#fff' },
-  counterValue: {
-    fontFamily: traitementFonts.monoBold,
-    fontSize: traitementTypeSizes.corps + 1,
-    color: traitementColors.texteTitre,
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
-  // visibles sur les fiches de traitement.
-  label: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  // Titre de section (Efficacité, Végétation) : centré, agrandi et en gras —
-  // même hiérarchie visuelle que les valeurs de l'écran Cibles (cibles.tsx),
-  // sur demande explicite, sans toucher au `label` partagé (utilisé aussi par
-  // « Zones exposées », qui reste inchangé).
-  sectionLabel: {
-    fontFamily: traitementFonts.uiBold,
-    fontSize: traitementTypeSizes.corps + 3,
-    color: traitementColors.texteTitre,
-    textAlign: 'center',
-  },
-  fieldLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  input: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
-    paddingHorizontal: 10,
-    fontFamily: traitementFonts.ui,
-    fontSize: traitementTypeSizes.corps,
-    color: traitementColors.texteTitre,
-    backgroundColor: '#fff',
-  },
-  error: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.erreurTexte },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    keyboardAvoidingView: { flex: 1 },
+    content: { padding: 16, gap: 10 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    bannerTextOk: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.vertPrincipal },
+    bannerTextWarn: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.avertissementTexte },
+    hint: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.texteLabel, fontStyle: 'italic' },
+    kitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44, paddingVertical: 6 },
+    kitLabel: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
+    counterRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    counterButton: {
+      width: 32,
+      height: 32,
+      borderRadius: traitementRadii.chip,
+      backgroundColor: '#efeada',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    counterButtonAdd: { backgroundColor: traitementColors.vertPrincipal },
+    counterButtonText: { fontFamily: traitementFonts.uiBold, fontSize: 17, color: traitementColors.texteLabel },
+    counterButtonAddText: { color: '#fff' },
+    counterValue: {
+      fontFamily: traitementFonts.monoBold,
+      fontSize: typeSizes.corps + 1,
+      color: traitementColors.texteTitre,
+      minWidth: 20,
+      textAlign: 'center',
+    },
+    // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
+    // visibles sur les fiches de traitement.
+    label: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.label, color: traitementColors.texteLabel },
+    // Titre de section (Efficacité, Végétation) : centré, agrandi et en gras —
+    // même hiérarchie visuelle que les valeurs de l'écran Cibles (cibles.tsx),
+    // sur demande explicite, sans toucher au `label` partagé (utilisé aussi par
+    // « Zones exposées », qui reste inchangé).
+    sectionLabel: {
+      fontFamily: traitementFonts.uiBold,
+      fontSize: typeSizes.corps + 3,
+      color: traitementColors.texteTitre,
+      textAlign: 'center',
+    },
+    fieldLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.label, color: traitementColors.texteLabel },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    input: {
+      minHeight: 44,
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.chip,
+      paddingHorizontal: 10,
+      fontFamily: traitementFonts.ui,
+      fontSize: typeSizes.corps,
+      color: traitementColors.texteTitre,
+      backgroundColor: '#fff',
+    },
+    error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

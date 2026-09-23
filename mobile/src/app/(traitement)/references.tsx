@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,7 +30,7 @@ import { Card } from '@/components/traitement/Card';
 import { DateField } from '@/components/traitement/DateField';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { SegmentedControl } from '@/components/traitement/SegmentedControl';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 
 function formatDateFr(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -67,6 +67,8 @@ export default function ReferencesScreen() {
   // même ordre de priorité que « Consulter une fiche validée »
   // (prospection-picker.tsx : n_fiche, puis n_message).
   const [prospectionNFiche, setProspectionNFiche] = useState<string | null>(null);
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const readOnly = isValidationView === '1';
   // #zone-a-reprendre-numero-annexe : présence d'`origineId` = fiche démarrée
@@ -491,66 +493,68 @@ export default function ReferencesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  keyboardAvoidingView: { flex: 1 },
-  content: { padding: 16, gap: 14, paddingBottom: 30 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  backChevron: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran + 6, color: traitementColors.texteTitre },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  field: { gap: 5 },
-  row: { flexDirection: 'row', gap: 8 },
-  flex1: { flex: 1 },
-  label: {
-    fontFamily: traitementFonts.uiSemiBold,
-    fontSize: traitementTypeSizes.label,
-    color: traitementColors.texteLabel,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  note: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteNote },
-  input: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
-    paddingHorizontal: 10,
-    fontFamily: traitementFonts.ui,
-    fontSize: traitementTypeSizes.corps,
-    color: traitementColors.texteTitre,
-    backgroundColor: '#fff',
-  },
-  monoReadonly: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire },
-  error: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.erreurTexte },
-  ficheCard: { gap: 4 },
-  prospectionCard: { borderWidth: 2, borderColor: traitementColors.vertPrincipal, gap: 4 },
-  prospectionText: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.valeurDerivee, color: traitementColors.texteTitre },
-  prospectionPickerLink: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.chip,
-  },
-  prospectionPickerLinkText: { fontFamily: traitementFonts.uiBold, color: traitementColors.vertPrincipal, fontSize: traitementTypeSizes.corps },
-  gpsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32 },
-  gpsRowText: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire },
-  gpsStatus: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteLabel },
-  gpsStatusActive: { color: traitementColors.vertPrincipal },
-  coordCard: { gap: 4 },
-  coordValue: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.corps + 1, color: traitementColors.texteTitre },
-  regionCard: { gap: 4 },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    keyboardAvoidingView: { flex: 1 },
+    content: { padding: 16, gap: 14, paddingBottom: 30 },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    backChevron: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran + 6, color: traitementColors.texteTitre },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    field: { gap: 5 },
+    row: { flexDirection: 'row', gap: 8 },
+    flex1: { flex: 1 },
+    label: {
+      fontFamily: traitementFonts.uiSemiBold,
+      fontSize: typeSizes.label,
+      color: traitementColors.texteLabel,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    note: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.texteNote },
+    input: {
+      minHeight: 44,
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.chip,
+      paddingHorizontal: 10,
+      fontFamily: traitementFonts.ui,
+      fontSize: typeSizes.corps,
+      color: traitementColors.texteTitre,
+      backgroundColor: '#fff',
+    },
+    monoReadonly: { fontFamily: traitementFonts.mono, fontSize: typeSizes.corps, color: traitementColors.texteSecondaire },
+    error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },
+    ficheCard: { gap: 4 },
+    prospectionCard: { borderWidth: 2, borderColor: traitementColors.vertPrincipal, gap: 4 },
+    prospectionText: { fontFamily: traitementFonts.monoBold, fontSize: typeSizes.valeurDerivee, color: traitementColors.texteTitre },
+    prospectionPickerLink: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.chip,
+    },
+    prospectionPickerLinkText: { fontFamily: traitementFonts.uiBold, color: traitementColors.vertPrincipal, fontSize: typeSizes.corps },
+    gpsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32 },
+    gpsRowText: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteSecondaire },
+    gpsStatus: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.corps, color: traitementColors.texteLabel },
+    gpsStatusActive: { color: traitementColors.vertPrincipal },
+    coordCard: { gap: 4 },
+    coordValue: { fontFamily: traitementFonts.monoBold, fontSize: typeSizes.corps + 1, color: traitementColors.texteTitre },
+    regionCard: { gap: 4 },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

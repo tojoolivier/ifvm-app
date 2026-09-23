@@ -1,3 +1,7 @@
+import { useMemo } from 'react';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
+
 /**
  * Design tokens pour le module "fiche de traitement" (Lot 2).
  * Transcrits verbatim du hand-off design (voir prompt de l'agent) — raw hex,
@@ -59,7 +63,13 @@ export const traitementSpacing = {
   paddingCarte: 10,
 } as const;
 
-export const traitementTypeSizes = {
+/**
+ * Base non mise à l'échelle — jamais consommée directement par un écran
+ * (`traitementTypeSizes` en gardait l'habitude, retiré : #taille-police-par-
+ * utilisateur exige une valeur réactive au réglage courant). Utiliser
+ * `useTraitementTypeSizes()` ci-dessous.
+ */
+const BASE_TRAITEMENT_TYPE_SIZES = {
   // Agrandi de 9 à 12 (demande explicite : les titres de champ des fiches de
   // traitement étaient trop petits/peu visibles, l'écran devait se sentir
   // « bien occupé » plutôt que clairsemé). Ce token est partagé par les
@@ -71,3 +81,16 @@ export const traitementTypeSizes = {
   titreEcran: 15,
   valeurDerivee: 17.5,
 } as const;
+
+/**
+ * Tailles du module « traitement » mises à l'échelle du réglage « Taille de
+ * police » courant (#taille-police-par-utilisateur, `hooks/use-font-scale.ts`).
+ * Chaque écran qui consommait `traitementTypeSizes` (constante figée à
+ * l'import) appelle désormais ce hook, et déplace son `StyleSheet.create`
+ * dans le corps du composant (`useMemo(() => StyleSheet.create({...}),
+ * [typeSizes])`) pour que le recalcul soit pris en compte sans relancer l'app.
+ */
+export function useTraitementTypeSizes() {
+  const { scale } = useFontScale();
+  return useMemo(() => scaleTypeSizes(BASE_TRAITEMENT_TYPE_SIZES, scale), [scale]);
+}

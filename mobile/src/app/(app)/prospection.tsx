@@ -23,6 +23,8 @@ import {
   STATUT_BADGE_CONFIG,
 } from '@/components/fiches/tokens';
 import { statutFicheAffiche, StatutFicheAffiche } from '@/lib/prospection-statut';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] };
 
@@ -68,6 +70,9 @@ interface FicheListItem {
 
 export default function ProspectionScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const { justSaved, syncWarning } = useLocalSearchParams<{ justSaved?: string; syncWarning?: string }>();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
@@ -420,82 +425,100 @@ export default function ProspectionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: FICHES_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 22 },
-  offlineRow: { paddingTop: 8 },
-  offlineText: { color: '#FFD27A', fontSize: 12, fontWeight: '700' },
-  headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
-  logo: { width: 40, height: 40, borderRadius: 8 },
-  headerTextContainer: { flex: 1, marginLeft: 12 },
-  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  headerSub: { color: '#FFFFFFAA', fontSize: 12, marginTop: 1 },
-  content: { flex: 1 },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFF7E6',
-    borderRadius: 12,
-    padding: 14,
-    marginTop: -22,
-    marginBottom: 16,
-  },
-  bannerIcon: { fontSize: 18 },
-  bannerText: { flex: 1, color: '#8A5A00', fontSize: 13 },
-  bannerTextStrong: { fontWeight: '700' },
-  bannerSyncButton: {
-    backgroundColor: '#1D4ED8',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  bannerSyncButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  toast: {
-    backgroundColor: '#DCFCE7',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
-  toastText: { color: '#15803d', fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  toastError: { backgroundColor: '#FEE2E2' },
-  toastTextError: { color: '#DC2626' },
-  draftCard: {
-    backgroundColor: '#DCFCE7',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
-  },
-  draftLabel: { color: '#15803d', fontSize: 12, fontWeight: '700', marginBottom: 4 },
-  draftTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
-  list: { gap: 8, marginBottom: 20 },
-  emptyText: { color: '#6B7280', fontSize: 13, textAlign: 'center', paddingVertical: 24 },
-  deleteAction: {
-    backgroundColor: '#DC2626',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  deleteActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  errorText: { color: '#dc2626', fontSize: 13, marginBottom: 12, textAlign: 'center' },
-  footer: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  btnNouvelle: {
-    backgroundColor: FICHES_ORANGE,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  btnDisabled: { opacity: 0.6 },
-  btnNouvelleText: { color: '#3D2200', fontSize: 15, fontWeight: '700' },
-});
+const BASE_TYPE_SIZES = {
+  offlineText: 12,
+  headerTitle: 18,
+  headerSub: 12,
+  bannerIcon: 18,
+  bannerText: 13,
+  bannerSyncButtonText: 12,
+  toastText: 13,
+  draftLabel: 12,
+  draftTitle: 14,
+  emptyText: 13,
+  deleteActionText: 13,
+  errorText: 13,
+  btnNouvelleText: 15,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: '#F3F4F6' },
+    header: { backgroundColor: FICHES_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 22 },
+    offlineRow: { paddingTop: 8 },
+    offlineText: { color: '#FFD27A', fontSize: typeSizes.offlineText, fontWeight: '700' },
+    headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
+    logo: { width: 40, height: 40, borderRadius: 8 },
+    headerTextContainer: { flex: 1, marginLeft: 12 },
+    headerTitle: { color: '#FFFFFF', fontSize: typeSizes.headerTitle, fontWeight: '700' },
+    headerSub: { color: '#FFFFFFAA', fontSize: typeSizes.headerSub, marginTop: 1 },
+    content: { flex: 1 },
+    banner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: '#FFF7E6',
+      borderRadius: 12,
+      padding: 14,
+      marginTop: -22,
+      marginBottom: 16,
+    },
+    bannerIcon: { fontSize: typeSizes.bannerIcon },
+    bannerText: { flex: 1, color: '#8A5A00', fontSize: typeSizes.bannerText },
+    bannerTextStrong: { fontWeight: '700' },
+    bannerSyncButton: {
+      backgroundColor: '#1D4ED8',
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    bannerSyncButtonText: { color: '#FFFFFF', fontSize: typeSizes.bannerSyncButtonText, fontWeight: '700' },
+    toast: {
+      backgroundColor: '#DCFCE7',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 12,
+    },
+    toastText: { color: '#15803d', fontSize: typeSizes.toastText, fontWeight: '600', textAlign: 'center' },
+    toastError: { backgroundColor: '#FEE2E2' },
+    toastTextError: { color: '#DC2626' },
+    draftCard: {
+      backgroundColor: '#DCFCE7',
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 16,
+    },
+    draftLabel: { color: '#15803d', fontSize: typeSizes.draftLabel, fontWeight: '700', marginBottom: 4 },
+    draftTitle: { color: '#111827', fontSize: typeSizes.draftTitle, fontWeight: '600' },
+    list: { gap: 8, marginBottom: 20 },
+    emptyText: { color: '#6B7280', fontSize: typeSizes.emptyText, textAlign: 'center', paddingVertical: 24 },
+    deleteAction: {
+      backgroundColor: '#DC2626',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      borderRadius: 10,
+      marginLeft: 8,
+    },
+    deleteActionText: { color: '#FFFFFF', fontSize: typeSizes.deleteActionText, fontWeight: '700' },
+    errorText: { color: '#dc2626', fontSize: typeSizes.errorText, marginBottom: 12, textAlign: 'center' },
+    footer: {
+      backgroundColor: '#F3F4F6',
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: '#E5E7EB',
+    },
+    btnNouvelle: {
+      backgroundColor: FICHES_ORANGE,
+      borderRadius: 10,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    btnDisabled: { opacity: 0.6 },
+    btnNouvelleText: { color: '#3D2200', fontSize: typeSizes.btnNouvelleText, fontWeight: '700' },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

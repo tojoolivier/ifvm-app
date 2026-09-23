@@ -8,7 +8,7 @@ import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
 import { ProduitSelectField } from '@/components/traitement/ProduitSelectField';
 import { TimeField } from '@/components/traitement/TimeField';
-import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
+import { useFormStyles } from '@/components/traitement/TraitementFormStyles';
 
 const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 
@@ -70,6 +70,7 @@ export function TerrestreForm({
   errors,
 }: TerrestreFormProps) {
   const store = useTraitementCaptureStore();
+  const styles = useFormStyles();
   // Unité pour toute la section « Produits utilisés » (#produits-unite-l-kg) —
   // un seul choix pour toute la fiche, gouverne les 5 libellés ci-dessous.
   const unite = store.terrestre.pesticideUnite ?? 'L';

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useUpdates } from 'expo-updates';
 import * as Clipboard from 'expo-clipboard';
 
 import { ThemedText } from '@/components/themed-text';
 import { logger } from '@/lib/logger';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import {
   buildNatif,
   deriverEtat,
@@ -67,6 +69,9 @@ export function OtaSection() {
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState<{ texte: string; erreur: boolean } | null>(null);
   const [techOuvert, setTechOuvert] = useState(false);
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   useEffect(() => {
     if (!actif) return;
@@ -196,6 +201,10 @@ export function OtaSection() {
 }
 
 function TechLigne({ label, value }: { label: string; value: string }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+
   return (
     <View style={styles.techLigne}>
       <ThemedText style={styles.techLabel}>{label}</ThemedText>
@@ -206,57 +215,78 @@ function TechLigne({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  section: { paddingHorizontal: 16, marginBottom: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1A237E', marginBottom: 10 },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  headerTexts: { flex: 1 },
-  version: { fontSize: 14, fontWeight: '600', color: '#1A237E' },
-  date: { fontSize: 12, color: FOREGROUND_TERTIARY, marginTop: 2 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  dernierCheck: { fontSize: 12, color: FOREGROUND_TERTIARY, marginTop: 10 },
-  bouton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  boutonText: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
-  boutonTextOff: { color: '#9E9E9E' },
-  fleche: { fontSize: 18, color: '#9E9E9E' },
-  hint: { fontSize: 12, color: FOREGROUND_TERTIARY, marginTop: 8 },
-  hintErreur: { color: DANGER_TEXT },
-  techToggle: { marginTop: 12 },
-  techToggleText: { fontSize: 12, color: '#31567f', fontWeight: '600' },
-  techBloc: { marginTop: 8, gap: 6 },
-  techLigne: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  techLabel: { fontSize: 12, color: FOREGROUND_TERTIARY },
-  techValue: {
-    flex: 1,
-    textAlign: 'right',
-    fontSize: 12,
-    color: '#1A237E',
-    fontFamily: 'monospace',
-  },
-  copier: { marginTop: 8, alignSelf: 'flex-start', paddingVertical: 6 },
-  copierText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
-});
+const BASE_TYPE_SIZES = {
+  sectionTitle: 16,
+  version: 14,
+  date: 12,
+  badgeText: 11,
+  dernierCheck: 12,
+  boutonText: 14,
+  fleche: 18,
+  hint: 12,
+  techToggleText: 12,
+  techLabel: 12,
+  techValue: 12,
+  copierText: 12,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    section: { paddingHorizontal: 16, marginBottom: 16 },
+    sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '600', color: '#1A237E', marginBottom: 10 },
+    card: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 14,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 10,
+      paddingBottom: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F0F0F0',
+    },
+    headerTexts: { flex: 1 },
+    version: { fontSize: typeSizes.version, fontWeight: '600', color: '#1A237E' },
+    date: { fontSize: typeSizes.date, color: FOREGROUND_TERTIARY, marginTop: 2 },
+    badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+    badgeText: { fontSize: typeSizes.badgeText, fontWeight: '700' },
+    dernierCheck: { fontSize: typeSizes.dernierCheck, color: FOREGROUND_TERTIARY, marginTop: 10 },
+    bouton: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 12,
+    },
+    boutonText: { fontSize: typeSizes.boutonText, color: PRIMARY, fontWeight: '600' },
+    boutonTextOff: { color: '#9E9E9E' },
+    fleche: { fontSize: typeSizes.fleche, color: '#9E9E9E' },
+    hint: { fontSize: typeSizes.hint, color: FOREGROUND_TERTIARY, marginTop: 8 },
+    hintErreur: { color: DANGER_TEXT },
+    techToggle: { marginTop: 12 },
+    techToggleText: { fontSize: typeSizes.techToggleText, color: '#31567f', fontWeight: '600' },
+    techBloc: { marginTop: 8, gap: 6 },
+    techLigne: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+    techLabel: { fontSize: typeSizes.techLabel, color: FOREGROUND_TERTIARY },
+    techValue: {
+      flex: 1,
+      textAlign: 'right',
+      fontSize: typeSizes.techValue,
+      color: '#1A237E',
+      fontFamily: 'monospace',
+    },
+    copier: { marginTop: 8, alignSelf: 'flex-start', paddingVertical: 6 },
+    copierText: { fontSize: typeSizes.copierText, color: PRIMARY, fontWeight: '600' },
+  });
+}

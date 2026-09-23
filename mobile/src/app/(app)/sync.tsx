@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,8 @@ import { LIBELLE_ACTION, toFriendlyError, type ActionErreur } from '@/lib/friend
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -61,6 +63,9 @@ const STYLE_STATUT: Record<StatutFiche, { icone: string; couleur: string }> = {
 
 export default function SyncScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   // Domaine « traitement » (#erreur-sync-fiche-introuvable) — absent de cet
@@ -431,323 +436,352 @@ export default function SyncScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  header: {
-    backgroundColor: IFVM_GREEN_DARK,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '300',
-    lineHeight: 26,
-    marginTop: -2,
-  },
-  headerTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '700',
-  },
-  headerSub: {
-    color: '#FFFFFFAA',
-    fontSize: isSmallScreen ? 10 : 12,
-    marginTop: 1,
-  },
-  headerRight: {
-    width: 32,
-  },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  statLabel: {
-    fontSize: isSmallScreen ? 10 : 11,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  progressLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  statusBanner: {
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-  statusSuccess: {
-    backgroundColor: '#DCFCE7',
-    borderWidth: 1,
-    borderColor: '#86EFAC',
-  },
-  statusError: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  /** Partiel ≠ échec : l'ambre dit « à finir », le rouge disait « c'est cassé ». */
-  statusPartiel: {
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  statusBannerText: {
-    fontSize: isSmallScreen ? 14 : 15,
-    fontWeight: '600',
-    textAlign: 'center',
-    color: '#111827',
-  },
-  // #lisibilite-terrain-sync : le motif exact du serveur (souvent une longue
-  // phrase technique, cf. resumeLigne) doit rester lisible en plein soleil —
-  // même bascule que fieldLabel dans intensive-imagos.tsx (9.5→11), ici sur un
-  // texte encore plus consulté (l'écran de synchronisation).
-  resumeLigne: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#374151',
-    marginTop: 6,
-    lineHeight: isSmallScreen ? 19 : 20,
-  },
-  retryCible: {
-    marginBottom: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D97706',
-    alignItems: 'center',
-  },
-  retryCibleText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#B45309',
-  },
-  referentielEtat: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e7e0cd',
-  },
-  // #lisibilite-terrain-sync : même bascule que resumeLigne ci-dessus — ce
-  // bloc (compteurs par table de référentiel) était le plus petit texte de
-  // l'écran (11.5px, gris) alors qu'il sert justement à diagnostiquer un
-  // référentiel manquant sur le terrain.
-  referentielEtatTitre: {
-    fontSize: isSmallScreen ? 13 : 14,
-    fontWeight: '800',
-    color: IFVM_GREEN,
-    marginBottom: 6,
-  },
-  referentielEtatLigne: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  referentielEtatTable: { fontSize: isSmallScreen ? 13 : 14, color: '#6f6a59' },
-  referentielEtatNombre: { fontSize: isSmallScreen ? 13 : 14, fontWeight: '700', color: '#16201a' },
-  referentielEtatVide: { color: '#c0412b' },
-  lastSyncContainer: {
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  lastSyncText: {
-    fontSize: isSmallScreen ? 12 : 13,
-    color: '#9CA3AF',
-  },
-  syncListContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  syncListHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  syncListTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  syncListCount: {
-    fontSize: 12,
-    color: '#6B7280',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  syncItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  syncItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 8,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    minWidth: 40,
-    alignItems: 'center',
-  },
-  // #lisibilite-terrain-sync : « Fiches en attente » — badge/date/statut
-  // tombaient jusqu'à 9px, illisibles en plein soleil (même raison que
-  // resumeLigne/referentielEtat* ci-dessus).
-  typeBadgeText: {
-    fontSize: isSmallScreen ? 10 : 11,
-    fontWeight: '700',
-  },
-  syncItemInfo: {
-    flex: 1,
-  },
-  syncItemCode: {
-    fontSize: isSmallScreen ? 13 : 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  syncItemDate: {
-    fontSize: isSmallScreen ? 11 : 12,
-    color: '#9CA3AF',
-    marginTop: 1,
-  },
-  syncItemRight: {
-    alignItems: 'flex-end',
-  },
-  syncItemStatus: {
-    fontSize: 16,
-  },
-  syncItemStatusLabel: {
-    fontSize: isSmallScreen ? 10 : 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 30,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
-  syncButton: {
-    backgroundColor: IFVM_GREEN,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 20,
-    ...(isTablet && {
-      maxWidth: 600,
-      alignSelf: 'center',
-      width: '100%',
-    }),
-  },
-  syncButtonDisabled: {
-    opacity: 0.6,
-  },
-  syncButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  syncButtonText: {
-    color: '#FFFFFF',
-    fontSize: isSmallScreen ? 14 : 15,
-    fontWeight: '600',
-  },
-});
+const BASE_TYPE_SIZES = {
+  backIcon: 22,
+  headerTitle: isSmallScreen ? 16 : 18,
+  headerSub: isSmallScreen ? 10 : 12,
+  statNumber: isSmallScreen ? 18 : 20,
+  statLabel: isSmallScreen ? 10 : 11,
+  progressLabel: 13,
+  statusBannerText: isSmallScreen ? 14 : 15,
+  resumeLigne: isSmallScreen ? 13 : 14,
+  retryCibleText: 13,
+  referentielEtatTitre: isSmallScreen ? 13 : 14,
+  referentielEtatTable: isSmallScreen ? 13 : 14,
+  referentielEtatNombre: isSmallScreen ? 13 : 14,
+  lastSyncText: isSmallScreen ? 12 : 13,
+  syncListTitle: 14,
+  syncListCount: 12,
+  typeBadgeText: isSmallScreen ? 10 : 11,
+  syncItemCode: isSmallScreen ? 13 : 14,
+  syncItemDate: isSmallScreen ? 11 : 12,
+  syncItemStatus: 16,
+  syncItemStatusLabel: isSmallScreen ? 10 : 11,
+  emptyIcon: 40,
+  emptyTitle: 16,
+  emptySub: 13,
+  syncButtonText: isSmallScreen ? 14 : 15,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: '#F3F4F6',
+    },
+    header: {
+      backgroundColor: IFVM_GREEN_DARK,
+      paddingHorizontal: 16,
+      paddingBottom: 14,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: 8,
+    },
+    backBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: '#FFFFFF22',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backIcon: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.backIcon,
+      fontWeight: '300',
+      lineHeight: 26,
+      marginTop: -2,
+    },
+    headerTextContainer: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.headerTitle,
+      fontWeight: '700',
+    },
+    headerSub: {
+      color: '#FFFFFFAA',
+      fontSize: typeSizes.headerSub,
+      marginTop: 1,
+    },
+    headerRight: {
+      width: 32,
+    },
+    container: {
+      flex: 1,
+    },
+    contentContainer: {
+      padding: 16,
+      paddingBottom: 100,
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      paddingVertical: 16,
+      paddingHorizontal: 12,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statNumber: {
+      fontSize: typeSizes.statNumber,
+      fontWeight: '700',
+      color: '#111827',
+    },
+    statLabel: {
+      fontSize: typeSizes.statLabel,
+      color: '#6B7280',
+      marginTop: 2,
+    },
+    statDivider: {
+      width: 1,
+      backgroundColor: '#E5E7EB',
+    },
+    progressContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    progressLabel: {
+      fontSize: typeSizes.progressLabel,
+      color: '#6B7280',
+      fontWeight: '500',
+    },
+    statusBanner: {
+      padding: 12,
+      borderRadius: 10,
+      marginBottom: 16,
+    },
+    statusSuccess: {
+      backgroundColor: '#DCFCE7',
+      borderWidth: 1,
+      borderColor: '#86EFAC',
+    },
+    statusError: {
+      backgroundColor: '#FEE2E2',
+      borderWidth: 1,
+      borderColor: '#FCA5A5',
+    },
+    /** Partiel ≠ échec : l'ambre dit « à finir », le rouge disait « c'est cassé ». */
+    statusPartiel: {
+      backgroundColor: '#FEF3C7',
+      borderWidth: 1,
+      borderColor: '#FDE68A',
+    },
+    statusBannerText: {
+      fontSize: typeSizes.statusBannerText,
+      fontWeight: '600',
+      textAlign: 'center',
+      color: '#111827',
+    },
+    // #lisibilite-terrain-sync : le motif exact du serveur (souvent une longue
+    // phrase technique, cf. resumeLigne) doit rester lisible en plein soleil —
+    // même bascule que fieldLabel dans intensive-imagos.tsx (9.5→11), ici sur un
+    // texte encore plus consulté (l'écran de synchronisation).
+    resumeLigne: {
+      fontSize: typeSizes.resumeLigne,
+      color: '#374151',
+      marginTop: 6,
+      lineHeight: isSmallScreen ? 19 : 20,
+    },
+    retryCible: {
+      marginBottom: 16,
+      paddingVertical: 10,
+      borderRadius: 8,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#D97706',
+      alignItems: 'center',
+    },
+    retryCibleText: {
+      fontSize: typeSizes.retryCibleText,
+      fontWeight: '700',
+      color: '#B45309',
+    },
+    referentielEtat: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      padding: 12,
+      backgroundColor: '#fff',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#e7e0cd',
+    },
+    // #lisibilite-terrain-sync : même bascule que resumeLigne ci-dessus — ce
+    // bloc (compteurs par table de référentiel) était le plus petit texte de
+    // l'écran (11.5px, gris) alors qu'il sert justement à diagnostiquer un
+    // référentiel manquant sur le terrain.
+    referentielEtatTitre: {
+      fontSize: typeSizes.referentielEtatTitre,
+      fontWeight: '800',
+      color: IFVM_GREEN,
+      marginBottom: 6,
+    },
+    referentielEtatLigne: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+    referentielEtatTable: { fontSize: typeSizes.referentielEtatTable, color: '#6f6a59' },
+    referentielEtatNombre: { fontSize: typeSizes.referentielEtatNombre, fontWeight: '700', color: '#16201a' },
+    referentielEtatVide: { color: '#c0412b' },
+    lastSyncContainer: {
+      marginBottom: 16,
+      alignItems: 'center',
+    },
+    lastSyncText: {
+      fontSize: typeSizes.lastSyncText,
+      color: '#9CA3AF',
+    },
+    syncListContainer: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    syncListHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    syncListTitle: {
+      fontSize: typeSizes.syncListTitle,
+      fontWeight: '600',
+      color: '#111827',
+    },
+    syncListCount: {
+      fontSize: typeSizes.syncListCount,
+      color: '#6B7280',
+      backgroundColor: '#F3F4F6',
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 12,
+    },
+    syncItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F3F4F6',
+    },
+    syncItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: 8,
+    },
+    typeBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      minWidth: 40,
+      alignItems: 'center',
+    },
+    // #lisibilite-terrain-sync : « Fiches en attente » — badge/date/statut
+    // tombaient jusqu'à 9px, illisibles en plein soleil (même raison que
+    // resumeLigne/referentielEtat* ci-dessus).
+    typeBadgeText: {
+      fontSize: typeSizes.typeBadgeText,
+      fontWeight: '700',
+    },
+    syncItemInfo: {
+      flex: 1,
+    },
+    syncItemCode: {
+      fontSize: typeSizes.syncItemCode,
+      fontWeight: '600',
+      color: '#111827',
+    },
+    syncItemDate: {
+      fontSize: typeSizes.syncItemDate,
+      color: '#9CA3AF',
+      marginTop: 1,
+    },
+    syncItemRight: {
+      alignItems: 'flex-end',
+    },
+    syncItemStatus: {
+      fontSize: typeSizes.syncItemStatus,
+    },
+    syncItemStatusLabel: {
+      fontSize: typeSizes.syncItemStatusLabel,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: 30,
+    },
+    emptyIcon: {
+      fontSize: typeSizes.emptyIcon,
+      marginBottom: 8,
+    },
+    emptyTitle: {
+      fontSize: typeSizes.emptyTitle,
+      fontWeight: '600',
+      color: '#111827',
+      marginBottom: 4,
+    },
+    emptySub: {
+      fontSize: typeSizes.emptySub,
+      color: '#9CA3AF',
+    },
+    syncButton: {
+      backgroundColor: IFVM_GREEN,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 4,
+      marginBottom: 20,
+      ...(isTablet && {
+        maxWidth: 600,
+        alignSelf: 'center',
+        width: '100%',
+      }),
+    },
+    syncButtonDisabled: {
+      opacity: 0.6,
+    },
+    syncButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    syncButtonText: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.syncButtonText,
+      fontWeight: '600',
+    },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

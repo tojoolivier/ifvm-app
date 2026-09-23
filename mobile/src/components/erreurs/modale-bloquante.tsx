@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { autresNonAffichees, laPlusGrave, useErrorStore } from '@/lib/error-store';
 import { useErrorAction } from '@/hooks/use-error-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { LienVersLeJournal } from './lien-vers-le-journal';
 import {
   DANGER,
@@ -35,6 +38,9 @@ export function ModaleBloquante() {
   // La bannière montre le plus grave des INFORMER : lui non plus n'est pas « autre ».
   const informante = laPlusGrave(erreurs.filter((e) => e.traitement === 'INFORMER'));
   const action = useErrorAction(courante);
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   return (
     <Modal transparent animationType="fade" visible={courante !== null} onRequestClose={() => courante && dismiss(courante.classe)}>
@@ -74,23 +80,37 @@ export function ModaleBloquante() {
   );
 }
 
-const styles = StyleSheet.create({
-  fond: { flex: 1, backgroundColor: VOILE, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  carte: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: SURFACE,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: DANGER_BORDER,
-    padding: 20,
-    gap: 10,
-  },
-  titre: { fontSize: 16, fontWeight: '800', color: DANGER_TEXT },
-  texte: { fontSize: 13, fontWeight: '500', color: FOREGROUND_SECONDARY, lineHeight: 19 },
-  compteur: { fontSize: 12, fontWeight: '600', color: FOREGROUND_TERTIARY },
-  bouton: { backgroundColor: DANGER, borderRadius: 13, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
-  boutonText: { color: SUR_FOND_COLORE, fontWeight: '800', fontSize: 14 },
-  lien: { color: FOREGROUND_TERTIARY, fontSize: 12, fontWeight: '700', textAlign: 'center', paddingVertical: 6 },
-  pied: { alignItems: 'center' },
-});
+const BASE_TYPE_SIZES = {
+  titre: 16,
+  texte: 13,
+  compteur: 12,
+  boutonText: 14,
+  lien: 12,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    fond: { flex: 1, backgroundColor: VOILE, alignItems: 'center', justifyContent: 'center', padding: 24 },
+    carte: {
+      width: '100%',
+      maxWidth: 380,
+      backgroundColor: SURFACE,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: DANGER_BORDER,
+      padding: 20,
+      gap: 10,
+    },
+    titre: { fontSize: typeSizes.titre, fontWeight: '800', color: DANGER_TEXT },
+    texte: { fontSize: typeSizes.texte, fontWeight: '500', color: FOREGROUND_SECONDARY, lineHeight: 19 },
+    compteur: { fontSize: typeSizes.compteur, fontWeight: '600', color: FOREGROUND_TERTIARY },
+    bouton: { backgroundColor: DANGER, borderRadius: 13, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+    boutonText: { color: SUR_FOND_COLORE, fontWeight: '800', fontSize: typeSizes.boutonText },
+    lien: { color: FOREGROUND_TERTIARY, fontSize: typeSizes.lien, fontWeight: '700', textAlign: 'center', paddingVertical: 6 },
+    pied: { alignItems: 'center' },
+  });
+}

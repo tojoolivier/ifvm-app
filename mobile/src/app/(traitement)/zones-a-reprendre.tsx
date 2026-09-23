@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { listReprenableTraitements, ReprenableTraitementRow } from '@/lib/traitement-repository';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
@@ -22,6 +22,8 @@ export default function TraitementZonesAReprendreScreen() {
   const [fiches, setFiches] = useState<ReprenableTraitementRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const charger = useCallback(() => {
     void runTask(() => listReprenableTraitements(), {
@@ -93,51 +95,53 @@ export default function TraitementZonesAReprendreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
-  title: {
-    fontFamily: traitementFonts.uiExtraBold,
-    fontSize: traitementTypeSizes.titreEcran,
-    color: traitementColors.texteTitre,
-  },
-  list: { flex: 1 },
-  emptyText: { fontFamily: traitementFonts.ui, color: traitementColors.texteLabel, textAlign: 'center', marginTop: 20 },
-  row: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.carte,
-    padding: 10,
-    marginBottom: 8,
-    gap: 2,
-  },
-  rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rowTitle: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  insigne: {
-    backgroundColor: traitementColors.avertissementFond,
-    borderRadius: traitementRadii.chip,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  insigneText: { fontFamily: traitementFonts.uiExtraBold, fontSize: 10, color: traitementColors.avertissementTexte },
-  rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
-  rowSurface: {
-    fontFamily: traitementFonts.uiMedium,
-    fontSize: traitementTypeSizes.label,
-    color: traitementColors.texteTitre,
-  },
-  backLink: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: traitementColors.dashedBordure,
-    borderRadius: traitementRadii.chip,
-    padding: 10,
-    alignItems: 'center',
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  backLinkText: { fontFamily: traitementFonts.uiMedium, color: traitementColors.texteSecondaire },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
+    title: {
+      fontFamily: traitementFonts.uiExtraBold,
+      fontSize: typeSizes.titreEcran,
+      color: traitementColors.texteTitre,
+    },
+    list: { flex: 1 },
+    emptyText: { fontFamily: traitementFonts.ui, color: traitementColors.texteLabel, textAlign: 'center', marginTop: 20 },
+    row: {
+      backgroundColor: '#fff',
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.carte,
+      padding: 10,
+      marginBottom: 8,
+      gap: 2,
+    },
+    rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    rowTitle: { fontFamily: traitementFonts.mono, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
+    insigne: {
+      backgroundColor: traitementColors.avertissementFond,
+      borderRadius: traitementRadii.chip,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    insigneText: { fontFamily: traitementFonts.uiExtraBold, fontSize: 10, color: traitementColors.avertissementTexte },
+    rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.texteSecondaire },
+    rowSurface: {
+      fontFamily: traitementFonts.uiMedium,
+      fontSize: typeSizes.label,
+      color: traitementColors.texteTitre,
+    },
+    backLink: {
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: traitementColors.dashedBordure,
+      borderRadius: traitementRadii.chip,
+      padding: 10,
+      alignItems: 'center',
+      minHeight: 44,
+      justifyContent: 'center',
+    },
+    backLinkText: { fontFamily: traitementFonts.uiMedium, color: traitementColors.texteSecondaire },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

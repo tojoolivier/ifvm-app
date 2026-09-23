@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, Platform, Modal, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 interface DateFieldProps {
   /** Date au format ISO "AAAA-MM-JJ", ou null/vide si non renseignée. */
@@ -55,6 +57,9 @@ export function DateField({
 }: DateFieldProps) {
   const [show, setShow] = useState(false);
   const isoValue = value && value.trim().length > 0 ? value : null;
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const defaultStyles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const onValueChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
     setShow(false);
@@ -107,28 +112,39 @@ export function DateField({
   );
 }
 
-const defaultStyles = StyleSheet.create({
-  input: {
-    minHeight: 44,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e7e0cd',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    backgroundColor: '#fff',
-  },
-  value: { fontSize: 13, fontWeight: '600', color: '#16201a' },
-  placeholder: { fontSize: 13, fontWeight: '600', color: '#6f6a59' },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 8,
-    overflow: 'hidden',
-  },
-});
+const BASE_TYPE_SIZES = {
+  value: 13,
+  placeholder: 13,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    input: {
+      minHeight: 44,
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#e7e0cd',
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      backgroundColor: '#fff',
+    },
+    value: { fontSize: typeSizes.value, fontWeight: '600', color: '#16201a' },
+    placeholder: { fontSize: typeSizes.placeholder, fontWeight: '600', color: '#6f6a59' },
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    calendarCard: {
+      backgroundColor: '#fff',
+      borderRadius: 8,
+      padding: 8,
+      overflow: 'hidden',
+    },
+  });
+}

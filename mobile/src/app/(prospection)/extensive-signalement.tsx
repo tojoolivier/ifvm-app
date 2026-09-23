@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,8 @@ import { updateProspectionSignalement } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { DateField } from '@/components/DateField';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { logger } from '@/lib/logger';
 
 const GREEN = '#235a36';
@@ -30,6 +32,9 @@ export default function ExtensiveSignalementScreen() {
   const [description, setDescription] = useState('');
   const [draftId, setDraftId] = useState<string | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const canContinue = source.trim().length > 0 && description.trim().length > 0;
 
@@ -168,25 +173,40 @@ export default function ExtensiveSignalementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  hint: 11.5,
+  label: 9,
+  input: 13,
+  continueButtonText: 15,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   scroll: { flex: 1 },
-  hint: { fontSize: 11.5, lineHeight: 16, color: TEXT_SECONDARY, marginBottom: 14 },
+  hint: { fontSize: typeSizes.hint, lineHeight: 16, color: TEXT_SECONDARY, marginBottom: 14 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 10 },
-  label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
-  input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
+  label: { fontSize: typeSizes.label, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
+  input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, padding: 0 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   multiline: { minHeight: 60, textAlignVertical: 'top' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,8 @@ import { TimeField } from '@/components/TimeField';
 import { DateField } from '@/components/DateField';
 import { LieuAerienField } from '@/components/referentiel/LieuAerienField';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
@@ -168,6 +170,9 @@ function AerienField({
   keyboardType?: 'default' | 'number-pad';
 }) {
   const isFocused = focusedField === label;
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <View style={[styles.aerienFieldGroup, style]}>
       <Text style={styles.aerienFieldLabel}>{label}</Text>
@@ -200,6 +205,9 @@ function LocalisationBaseField({
   onLocaliser: () => void;
   isLoading: boolean;
 }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <View style={styles.gpsBaseRow}>
       <TouchableOpacity
@@ -325,6 +333,9 @@ export default function ExtensiveReferenceScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const { run: runCapturerPositionBase, isRunning: isRunningCapturerPositionBase } = useAsyncAction();
   const { run: runCapturerPositionBaseSecondaire, isRunning: isRunningCapturerPositionBaseSecondaire } = useAsyncAction();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   // Récupération automatique des coordonnées GPS
   useEffect(() => {
@@ -1048,36 +1059,76 @@ export default function ExtensiveReferenceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  quoteText: 11.5,
+  autoLabel: 9,
+  autoValue: 13,
+  autoValueMono: 13,
+  autoInputMono: 13,
+  label: 9,
+  input: 13,
+  sectionLabel: 10,
+  chip: 11.5,
+  hintText: 10.5,
+  continueButtonText: 15,
+  gpsLoading: 13,
+  gpsErrorText: 10,
+  stationAutoHint: 10,
+  aerienInfoIcon: 14,
+  aerienInfoTitle: 11,
+  aerienSubgroupLabel: 9,
+  aerienFieldLabel: 9,
+  aerienFieldInput: 13,
+  gpsBaseButtonText: 12,
+  gpsBaseValue: 11.5,
+  operationTitle: 11,
+  operationRemove: 11,
+  operationCellLabel: 8.5,
+  operationInput: 13,
+  operationTotalLabel: 11,
+  operationTotalValue: 15,
+  addOperationButtonText: 13,
+  totalJourLabel: 12,
+  totalJourValue: 20,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
   progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
   progressActive: { backgroundColor: GREEN },
   scroll: { flex: 1 },
   quoteBanner: { backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 10, padding: 11, marginBottom: 10 },
-  quoteText: { fontSize: 11.5, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
+  quoteText: { fontSize: typeSizes.quoteText, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
   row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   flex1: { flex: 1 },
   autoCard: { backgroundColor: AUTO_BG, borderRadius: 10, padding: 9, marginBottom: 8 },
-  autoLabel: { fontSize: 9, fontWeight: '600', color: GREEN, textTransform: 'uppercase' },
-  autoValue: { fontSize: 13, fontWeight: '700', color: TEXT },
-  autoValueMono: { fontSize: 13, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
-  autoInputMono: { fontSize: 13, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  autoLabel: { fontSize: typeSizes.autoLabel, fontWeight: '600', color: GREEN, textTransform: 'uppercase' },
+  autoValue: { fontSize: typeSizes.autoValue, fontWeight: '700', color: TEXT },
+  autoValueMono: { fontSize: typeSizes.autoValueMono, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
+  autoInputMono: { fontSize: typeSizes.autoInputMono, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9, marginBottom: 8 },
-  label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
-  input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
+  label: { fontSize: typeSizes.label, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+  input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, padding: 0 },
   // #revalidation-verrouillage-localisation : Station non modifiable.
   inputLocked: { color: TEXT_SECONDARY },
-  sectionLabel: { fontSize: 10, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 7 },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 7 },
   requiredLabel: { color: '#c0412b' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { 
-    fontSize: 11.5, 
+    fontSize: typeSizes.chip, 
     fontWeight: '600', 
     color: TEXT_SECONDARY, 
     backgroundColor: INACTIVE_BG, 
@@ -1091,23 +1142,23 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: '700' 
   },
-  hintText: { fontSize: 10.5, color: '#9a9484', marginTop: 8, marginBottom: 10 },
+  hintText: { fontSize: typeSizes.hintText, color: '#9a9484', marginTop: 8, marginBottom: 10 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
   gpsLoading: { 
-    fontSize: 13, 
+    fontSize: typeSizes.gpsLoading, 
     fontWeight: '600', 
     color: TEXT_SECONDARY,
     fontStyle: 'italic'
   },
   gpsErrorText: {
-    fontSize: 10,
+    fontSize: typeSizes.gpsErrorText,
     color: '#d32f2f',
     marginTop: 2
   },
   stationAutoHint: {
-    fontSize: 10,
+    fontSize: typeSizes.stationAutoHint,
     color: TEXT_SECONDARY,
     fontStyle: 'italic',
     marginTop: 4,
@@ -1118,42 +1169,43 @@ const styles = StyleSheet.create({
   // identifie la zone d'un coup d'œil, plutôt que des champs mêlés au reste.
   aerienInfoBlock: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 12, marginBottom: 10 },
   aerienInfoHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10, paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: BORDER },
-  aerienInfoIcon: { fontSize: 14, color: GREEN },
-  aerienInfoTitle: { fontSize: 11, fontWeight: '800', color: GREEN, letterSpacing: 0.5, textTransform: 'uppercase' },
-  aerienSubgroupLabel: { fontSize: 9, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
+  aerienInfoIcon: { fontSize: typeSizes.aerienInfoIcon, color: GREEN },
+  aerienInfoTitle: { fontSize: typeSizes.aerienInfoTitle, fontWeight: '800', color: GREEN, letterSpacing: 0.5, textTransform: 'uppercase' },
+  aerienSubgroupLabel: { fontSize: typeSizes.aerienSubgroupLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
   // Zone À REMPLIR (vs. les `autoCard`/`card` de lecture ailleurs sur cet écran) :
   // fond FILL_BG, bordure GREEN en focus — cf. commentaire de FILL_BG plus haut.
   aerienFieldGroup: { marginBottom: 10 },
   aerienFieldNoMargin: { marginBottom: 0 },
-  aerienFieldLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
+  aerienFieldLabel: { fontSize: typeSizes.aerienFieldLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
   aerienFieldBox: { backgroundColor: FILL_BG, borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9 },
   aerienFieldBoxFocused: { borderColor: GREEN, borderWidth: 1.5 },
-  aerienFieldInput: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
+  aerienFieldInput: { fontSize: typeSizes.aerienFieldInput, fontWeight: '600', color: TEXT, padding: 0 },
   aerienFieldRowSplit: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   gpsBaseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   gpsBaseButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12 },
-  gpsBaseButtonText: { fontSize: 12, fontWeight: '700', color: '#fff' },
-  gpsBaseValue: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
+  gpsBaseButtonText: { fontSize: typeSizes.gpsBaseButtonText, fontWeight: '700', color: '#fff' },
+  gpsBaseValue: { fontSize: typeSizes.gpsBaseValue, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
   // « Motif du divers » (#ux-aerien) : même style de zone à remplir que le bloc
   // aéronef/équipe, réutilisé ici pour rester cohérent visuellement.
   operationMotifDivers: { marginTop: 4 },
   operationHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  operationTitle: { fontSize: 11, fontWeight: '800', color: GREEN, letterSpacing: 0.4 },
-  operationRemove: { fontSize: 11, fontWeight: '700', color: '#c0412b' },
+  operationTitle: { fontSize: typeSizes.operationTitle, fontWeight: '800', color: GREEN, letterSpacing: 0.4 },
+  operationRemove: { fontSize: typeSizes.operationRemove, fontWeight: '700', color: '#c0412b' },
   operationSubLabel: { marginTop: 10, marginBottom: 6 },
   operationRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   operationCell: { flex: 1, backgroundColor: AUTO_BG, borderRadius: 8, padding: 8 },
-  operationCellLabel: { fontSize: 8.5, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 3 },
-  operationInput: { fontSize: 13, fontWeight: '700', color: TEXT, padding: 0 },
+  operationCellLabel: { fontSize: typeSizes.operationCellLabel, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 3 },
+  operationInput: { fontSize: typeSizes.operationInput, fontWeight: '700', color: TEXT, padding: 0 },
   operationTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: BORDER },
-  operationTotalLabel: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase' },
-  operationTotalValue: { fontSize: 15, fontWeight: '800', color: GREEN, fontFamily: 'monospace' },
+  operationTotalLabel: { fontSize: typeSizes.operationTotalLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase' },
+  operationTotalValue: { fontSize: typeSizes.operationTotalValue, fontWeight: '800', color: GREEN, fontFamily: 'monospace' },
   addOperationButton: { borderWidth: 1.5, borderColor: GREEN, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
-  addOperationButtonText: { fontSize: 13, fontWeight: '700', color: GREEN },
+  addOperationButtonText: { fontSize: typeSizes.addOperationButtonText, fontWeight: '700', color: GREEN },
   totalJourCard: { backgroundColor: GREEN, borderRadius: 12, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  totalJourLabel: { fontSize: 12, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  totalJourValue: { fontSize: 20, fontWeight: '800', color: '#fff', fontFamily: 'monospace' },
+  totalJourLabel: { fontSize: typeSizes.totalJourLabel, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  totalJourValue: { fontSize: typeSizes.totalJourValue, fontWeight: '800', color: '#fff', fontFamily: 'monospace' },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

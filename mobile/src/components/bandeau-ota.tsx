@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUpdates, isEnabled as otaEstActif } from 'expo-updates';
 
 import { appliquerMaintenant } from '@/lib/ota';
 import { logger } from '@/lib/logger';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { PRIMARY, SURFACE, FOREGROUND, FOREGROUND_TERTIARY } from './erreurs/tokens';
 
 /** `bar-fond` de DESIGN.md — piste de barre de progression. */
@@ -34,6 +36,9 @@ export function BandeauOta() {
   const { isDownloading, isUpdatePending, downloadProgress, downloadError } = useUpdates();
   const [phaseRejetee, setPhaseRejetee] = useState<Phase | null>(null);
   const [redemarrage, setRedemarrage] = useState(false);
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   // En Expo Go / dev client, `expo-updates` est inerte : rien à annoncer.
   if (!otaEstActif) return null;
@@ -107,41 +112,54 @@ export function BandeauOta() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 998 },
-  bandeau: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: SURFACE,
-    borderTopWidth: 1,
-    borderColor: BAR_FOND,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  corps: { flex: 1, gap: 6 },
-  titre: { color: FOREGROUND, fontSize: 13, fontWeight: '700' },
-  pisteBarre: {
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: BAR_FOND,
-    overflow: 'hidden',
-  },
-  remplissageBarre: {
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: PRIMARY,
-  },
-  barreIndeterminee: { width: '40%' },
-  pourcent: { color: FOREGROUND_TERTIARY, fontSize: 11, fontWeight: '600' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  boutonRedemarrer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: PRIMARY,
-  },
-  boutonRedemarrerTexte: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  boutonFermer: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
-  boutonFermerTexte: { color: FOREGROUND_TERTIARY, fontSize: 15, fontWeight: '700' },
-});
+const BASE_TYPE_SIZES = {
+  titre: 13,
+  pourcent: 11,
+  boutonRedemarrerTexte: 12,
+  boutonFermerTexte: 15,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    safe: { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 998 },
+    bandeau: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: SURFACE,
+      borderTopWidth: 1,
+      borderColor: BAR_FOND,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    corps: { flex: 1, gap: 6 },
+    titre: { color: FOREGROUND, fontSize: typeSizes.titre, fontWeight: '700' },
+    pisteBarre: {
+      height: 4,
+      borderRadius: 4,
+      backgroundColor: BAR_FOND,
+      overflow: 'hidden',
+    },
+    remplissageBarre: {
+      height: 4,
+      borderRadius: 4,
+      backgroundColor: PRIMARY,
+    },
+    barreIndeterminee: { width: '40%' },
+    pourcent: { color: FOREGROUND_TERTIARY, fontSize: typeSizes.pourcent, fontWeight: '600' },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    boutonRedemarrer: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: PRIMARY,
+    },
+    boutonRedemarrerTexte: { color: '#FFFFFF', fontSize: typeSizes.boutonRedemarrerTexte, fontWeight: '700' },
+    boutonFermer: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+    boutonFermerTexte: { color: FOREGROUND_TERTIARY, fontSize: typeSizes.boutonFermerTexte, fontWeight: '700' },
+  });
+}

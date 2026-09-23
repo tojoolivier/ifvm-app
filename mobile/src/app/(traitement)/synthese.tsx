@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,7 +10,7 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN } from '@/components/traitement/ProgressBar';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 
 function display(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return 'non renseigné';
@@ -125,6 +125,8 @@ export default function SyntheseScreen() {
   const [prospectionId, setProspectionId] = useState<string | null>(null);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('synthese');
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   useEffect(() => {
     if (!traitementId) return;
@@ -353,58 +355,60 @@ export default function SyntheseScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  keyboardAvoidingView: { flex: 1 },
-  content: { padding: 16, gap: 12 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  warningText: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.corps, color: traitementColors.avertissementTexte },
-  field: { gap: 4, alignItems: 'center' },
-  label: {
-    fontFamily: traitementFonts.uiSemiBold,
-    fontSize: traitementTypeSizes.corps + 1,
-    color: traitementColors.texteLabel,
-    textAlign: 'center',
-  },
-  value: {
-    fontFamily: traitementFonts.uiBold,
-    fontSize: traitementTypeSizes.corps + 3,
-    color: traitementColors.texteTitre,
-    textAlign: 'center',
-  },
-  derivedValue: {
-    fontFamily: traitementFonts.monoBold,
-    fontSize: traitementTypeSizes.valeurDerivee,
-    color: traitementColors.vertPrincipal,
-    textAlign: 'center',
-  },
-  deriveeCentree: { alignItems: 'center' },
-  // Semi-gras (au lieu de uiMedium/ui) : demande explicite, titres de champ
-  // plus visibles sur les fiches de traitement.
-  sectionLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  fieldLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  input: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
-    paddingHorizontal: 10,
-    fontFamily: traitementFonts.ui,
-    fontSize: traitementTypeSizes.corps,
-    color: traitementColors.texteTitre,
-    backgroundColor: '#fff',
-  },
-  error: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.erreurTexte },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    keyboardAvoidingView: { flex: 1 },
+    content: { padding: 16, gap: 12 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    warningText: { fontFamily: traitementFonts.uiMedium, fontSize: typeSizes.corps, color: traitementColors.avertissementTexte },
+    field: { gap: 4, alignItems: 'center' },
+    label: {
+      fontFamily: traitementFonts.uiSemiBold,
+      fontSize: typeSizes.corps + 1,
+      color: traitementColors.texteLabel,
+      textAlign: 'center',
+    },
+    value: {
+      fontFamily: traitementFonts.uiBold,
+      fontSize: typeSizes.corps + 3,
+      color: traitementColors.texteTitre,
+      textAlign: 'center',
+    },
+    derivedValue: {
+      fontFamily: traitementFonts.monoBold,
+      fontSize: typeSizes.valeurDerivee,
+      color: traitementColors.vertPrincipal,
+      textAlign: 'center',
+    },
+    deriveeCentree: { alignItems: 'center' },
+    // Semi-gras (au lieu de uiMedium/ui) : demande explicite, titres de champ
+    // plus visibles sur les fiches de traitement.
+    sectionLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.label, color: traitementColors.texteLabel },
+    fieldLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.label, color: traitementColors.texteLabel },
+    input: {
+      minHeight: 44,
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.chip,
+      paddingHorizontal: 10,
+      fontFamily: traitementFonts.ui,
+      fontSize: typeSizes.corps,
+      color: traitementColors.texteTitre,
+      backgroundColor: '#fff',
+    },
+    error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

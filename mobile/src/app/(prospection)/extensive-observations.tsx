@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import {
   ExtensiveObservationsUpdateInput,
   updateProspectionExtensiveObservations,
@@ -215,6 +217,10 @@ export default function ExtensiveObservationsScreen() {
 
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-observations');
+
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   useEffect(() => {
     if (!isAerien) return;
@@ -730,38 +736,62 @@ export default function ExtensiveObservationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  label: 9,
+  input: 13,
+  pourcentageUnit: 15,
+  sectionLabel: 9,
+  chip: 12,
+  chipCompact: 9.5,
+  footerNoteText: 11,
+  continueButtonText: 15,
+  signatureValue: 13,
+  signatureStamp: 10,
+  signButtonText: 12,
+  modifyButtonText: 12,
+  autoLabelVisa: 9,
+  autoValueVisa: 14,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
   progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
   progressActive: { backgroundColor: GREEN },
   scroll: { flex: 1 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 9 },
-  label: { fontSize: 9, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
-  input: { fontSize: 13, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  label: { fontSize: typeSizes.label, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
+  input: { fontSize: typeSizes.input, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   // Verdure strate herbeuse (%) — même principe que le stepper Dégâts d'origine :
   // valeur + unité affichée à côté, dans la carte.
   pourcentageRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   pourcentageInput: { flex: 1 },
-  pourcentageUnit: { fontSize: 15, fontWeight: '700', color: TEXT },
-  sectionLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
+  pourcentageUnit: { fontSize: typeSizes.pourcentageUnit, fontWeight: '700', color: TEXT },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
   chipsRow: { flexDirection: 'row', gap: 6 },
-  chip: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY, backgroundColor: INACTIVE_BG, paddingVertical: 8, textAlign: 'center', borderRadius: 8, overflow: 'hidden' },
-  chipCompact: { fontSize: 9.5, paddingVertical: 6, paddingHorizontal: 2 },
+  chip: { fontSize: typeSizes.chip, fontWeight: '600', color: TEXT_SECONDARY, backgroundColor: INACTIVE_BG, paddingVertical: 8, textAlign: 'center', borderRadius: 8, overflow: 'hidden' },
+  chipCompact: { fontSize: typeSizes.chipCompact, paddingVertical: 6, paddingHorizontal: 2 },
   chipActive: { backgroundColor: GREEN, color: '#fff', fontWeight: '700' },
   row: { flexDirection: 'row', gap: 8, marginTop: 9, marginBottom: 9 },
   flex1: { flex: 1 },
   footerNote: { marginTop: 14, backgroundColor: '#eaf2ec', borderRadius: 10, padding: 11 },
-  footerNoteText: { fontSize: 11, lineHeight: 16, color: GREEN, fontWeight: '500' },
+  footerNoteText: { fontSize: typeSizes.footerNoteText, lineHeight: 16, color: GREEN, fontWeight: '500' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
   // ===== Mode aérien : Signatures =====
   signatureRow: { gap: 6 },
   // Chef de Base : nombre d'agents variable (contrairement aux chips à
@@ -770,21 +800,22 @@ const styles = StyleSheet.create({
   // horizontal plutôt que de compter sur le flex pour se dimensionner.
   agentChipsRow: { flexWrap: 'wrap' },
   agentChip: { paddingHorizontal: 12 },
-  signatureValue: { fontSize: 13, fontWeight: '700', color: TEXT },
-  signatureStamp: { fontSize: 10, color: TEXT_SECONDARY, fontFamily: 'monospace' },
+  signatureValue: { fontSize: typeSizes.signatureValue, fontWeight: '700', color: TEXT },
+  signatureStamp: { fontSize: typeSizes.signatureStamp, color: TEXT_SECONDARY, fontFamily: 'monospace' },
   signButton: { backgroundColor: GREEN, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
   signButtonDone: { backgroundColor: '#9a9484' },
-  signButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  signButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.signButtonText },
   modifyButton: { borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
-  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: 12 },
+  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: typeSizes.modifyButtonText },
   // ===== Signature (auto-signature du prospecteur, après Remarques) =====
   autoCardVisa: { backgroundColor: AUTO_BG, borderRadius: 10, padding: 11, marginBottom: 9 },
-  autoLabelVisa: { fontSize: 9, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
-  autoValueVisa: { fontSize: 14, fontWeight: '700', color: TEXT },
+  autoLabelVisa: { fontSize: typeSizes.autoLabelVisa, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
+  autoValueVisa: { fontSize: typeSizes.autoValueVisa, fontWeight: '700', color: TEXT },
   // ===== Remarques (terrestre + aérien) =====
   remarquesCard: { marginBottom: 9 },
   remarquesInput: { minHeight: 90, fontFamily: 'System', fontWeight: '500' },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 
 /**
  * Écran 0 — point d'entrée du module traitement. `prospectionId` reste accepté
@@ -12,6 +13,8 @@ import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes
 export default function TraitementSelectScreen() {
   const router = useRouter();
   const { prospectionId } = useLocalSearchParams<{ prospectionId?: string }>();
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const handleNouvelleFiche = () => {
     if (prospectionId) {
@@ -57,47 +60,49 @@ export default function TraitementSelectScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
-  title: {
-    fontFamily: traitementFonts.uiExtraBold,
-    fontSize: traitementTypeSizes.titreEcran,
-    color: traitementColors.texteTitre,
-  },
-  primaryCard: {
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.carteAccueil,
-    padding: 18,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  primaryCardText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 2 },
-  secondaryCard: {
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.carteAccueil,
-    padding: 18,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  secondaryCardText: {
-    fontFamily: traitementFonts.uiBold,
-    color: traitementColors.texteTitre,
-    fontSize: traitementTypeSizes.corps + 2,
-  },
-  backLink: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: traitementColors.dashedBordure,
-    borderRadius: traitementRadii.chip,
-    padding: 10,
-    alignItems: 'center',
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  backLinkText: { fontFamily: traitementFonts.uiMedium, color: traitementColors.texteSecondaire },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
+    title: {
+      fontFamily: traitementFonts.uiExtraBold,
+      fontSize: typeSizes.titreEcran,
+      color: traitementColors.texteTitre,
+    },
+    primaryCard: {
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.carteAccueil,
+      padding: 18,
+      minHeight: 44,
+      justifyContent: 'center',
+    },
+    primaryCardText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 2 },
+    secondaryCard: {
+      backgroundColor: '#fff',
+      borderWidth: 1.5,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.carteAccueil,
+      padding: 18,
+      minHeight: 44,
+      justifyContent: 'center',
+    },
+    secondaryCardText: {
+      fontFamily: traitementFonts.uiBold,
+      color: traitementColors.texteTitre,
+      fontSize: typeSizes.corps + 2,
+    },
+    backLink: {
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: traitementColors.dashedBordure,
+      borderRadius: traitementRadii.chip,
+      padding: 10,
+      alignItems: 'center',
+      minHeight: 44,
+      justifyContent: 'center',
+    },
+    backLinkText: { fontFamily: traitementFonts.uiMedium, color: traitementColors.texteSecondaire },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

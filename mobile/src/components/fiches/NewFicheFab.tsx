@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
@@ -6,6 +6,8 @@ import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { FICHES_CARD_BG, FICHES_ORANGE, FICHES_TEXT_DARK, FICHES_TEXT_SECONDARY } from './tokens';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const PROSPECTION_DESTINATIONS = {
   intensive: '/(prospection)/reference',
@@ -19,6 +21,9 @@ const PROSPECTION_DESTINATIONS = {
  */
 export function NewFicheFab() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
@@ -103,91 +108,102 @@ export function NewFicheFab() {
   );
 }
 
-const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: FICHES_ORANGE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabIcon: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '700',
-    lineHeight: 30,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: FICHES_CARD_BG,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 32,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E0E0E0',
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: FICHES_TEXT_DARK,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: FICHES_TEXT_SECONDARY,
-    marginTop: 4,
-    marginBottom: 18,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EDEDED',
-    backgroundColor: FICHES_CARD_BG,
-    marginBottom: 12,
-  },
-  cardLast: {
-    marginBottom: 0,
-  },
-  cardIcon: {
-    fontSize: 24,
-    width: 32,
-    textAlign: 'center',
-  },
-  cardTextWrap: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: FICHES_TEXT_DARK,
-  },
-  cardSubtitle: {
-    fontSize: 12.5,
-    color: FICHES_TEXT_SECONDARY,
-    marginTop: 2,
-  },
-});
+const BASE_TYPE_SIZES = {
+  fabIcon: 28,
+  title: 22,
+  subtitle: 14,
+  cardIcon: 24,
+  cardTitle: 16,
+  cardSubtitle: 12.5,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    fab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 28,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: FICHES_ORANGE,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    fabIcon: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.fabIcon,
+      fontWeight: '700',
+      lineHeight: 30,
+    },
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: FICHES_CARD_BG,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 32,
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: '#E0E0E0',
+      alignSelf: 'center',
+      marginBottom: 14,
+    },
+    title: {
+      fontSize: typeSizes.title,
+      fontWeight: '700',
+      color: FICHES_TEXT_DARK,
+    },
+    subtitle: {
+      fontSize: typeSizes.subtitle,
+      color: FICHES_TEXT_SECONDARY,
+      marginTop: 4,
+      marginBottom: 18,
+    },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#EDEDED',
+      backgroundColor: FICHES_CARD_BG,
+      marginBottom: 12,
+    },
+    cardLast: {
+      marginBottom: 0,
+    },
+    cardIcon: {
+      fontSize: typeSizes.cardIcon,
+      width: 32,
+      textAlign: 'center',
+    },
+    cardTextWrap: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontSize: typeSizes.cardTitle,
+      fontWeight: '700',
+      color: FICHES_TEXT_DARK,
+    },
+    cardSubtitle: {
+      fontSize: typeSizes.cardSubtitle,
+      color: FICHES_TEXT_SECONDARY,
+      marginTop: 2,
+    },
+  });
+}

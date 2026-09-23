@@ -4,7 +4,7 @@ import { UtilisateurEquipe } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { Chip } from '@/components/traitement/Chip';
 import { DateField } from '@/components/traitement/DateField';
-import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
+import { useFormStyles } from '@/components/traitement/TraitementFormStyles';
 
 export interface AerienFormProps {
   readOnly: boolean;
@@ -40,6 +40,7 @@ export function AerienForm({
   errors,
 }: AerienFormProps) {
   const store = useTraitementCaptureStore();
+  const styles = useFormStyles();
 
   return (
     <Fragment>
