@@ -1,9 +1,11 @@
-import { getCurrentPosition } from '../src/lib/location';
+import { getCurrentPosition, reverseGeocode } from '../src/lib/location';
 import { PermissionError, PreconditionError } from '../src/lib/errors';
 import { PRECISION_GPS_CIBLE_M } from '../src/lib/gps-precision';
+import { resoudreZoneHorsLigne } from '../src/lib/geo-administratif';
 
 const requestForegroundPermissionsAsync = jest.fn();
 const watchPositionAsync = jest.fn();
+const reverseGeocodeAsync = jest.fn();
 const remove = jest.fn();
 
 /** Fixes successifs poussés par le mock de `watchPositionAsync`. */
@@ -14,6 +16,11 @@ jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: (...args: unknown[]) =>
     requestForegroundPermissionsAsync(...args),
   watchPositionAsync: (...args: unknown[]) => watchPositionAsync(...args),
+  reverseGeocodeAsync: (...args: unknown[]) => reverseGeocodeAsync(...args),
+}));
+
+jest.mock('../src/lib/geo-administratif', () => ({
+  resoudreZoneHorsLigne: jest.fn(),
 }));
 
 beforeEach(() => {
@@ -135,5 +142,66 @@ describe('getCurrentPosition', () => {
 
     await expect(getCurrentPosition()).rejects.toThrow(PermissionError);
     expect(watchPositionAsync).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #geonames-geocodage-hors-ligne : `resoudreZoneHorsLigne` (jeu de données
+ * GeoNames bundlé) comble, champ par champ, ce que le géocodeur natif
+ * (`Location.reverseGeocodeAsync`, besoin des services Google/Apple — échoue
+ * normalement hors couverture) n'a pas fourni. Le natif reste prioritaire
+ * quand il répond.
+ */
+describe('reverseGeocode', () => {
+  beforeEach(() => {
+    reverseGeocodeAsync.mockReset();
+    jest.mocked(resoudreZoneHorsLigne).mockReset();
+  });
+
+  it('renvoie le résultat natif sans jamais consulter le repli hors ligne quand il est complet', async () => {
+    reverseGeocodeAsync.mockResolvedValue([{ region: 'Androy', subregion: 'Ambovombe', city: 'Ambovombe' }]);
+
+    const zone = await reverseGeocode(-25.17, 46.08);
+
+    expect(zone).toEqual({ region: 'Androy', district: 'Ambovombe', commune: 'Ambovombe' });
+    expect(resoudreZoneHorsLigne).not.toHaveBeenCalled();
+  });
+
+  it('complète avec le repli hors ligne quand le géocodeur natif échoue complètement', async () => {
+    reverseGeocodeAsync.mockRejectedValue(new Error('hors ligne'));
+    jest.mocked(resoudreZoneHorsLigne).mockReturnValue({
+      region: 'Androy',
+      district: 'Ambovombe District',
+      commune: 'Ambovombe',
+    });
+
+    const zone = await reverseGeocode(-25.17, 46.08);
+
+    expect(zone).toEqual({ region: 'Androy', district: 'Ambovombe District', commune: 'Ambovombe' });
+    expect(resoudreZoneHorsLigne).toHaveBeenCalledWith(-25.17, 46.08);
+  });
+
+  it('ne complète que les champs manquants du résultat natif, sans écraser ceux déjà renseignés', async () => {
+    // Natif : seule la région est connue (cas réel observé : le géocodeur OS
+    // remonte parfois un niveau administratif sans les autres).
+    reverseGeocodeAsync.mockResolvedValue([{ region: 'Androy', subregion: null, city: null }]);
+    jest.mocked(resoudreZoneHorsLigne).mockReturnValue({
+      region: 'Autre région (jamais utilisée)',
+      district: 'Ambovombe District',
+      commune: 'Ambovombe',
+    });
+
+    const zone = await reverseGeocode(-25.17, 46.08);
+
+    expect(zone).toEqual({ region: 'Androy', district: 'Ambovombe District', commune: 'Ambovombe' });
+  });
+
+  it('renvoie des null si ni le natif ni le repli hors ligne ne répondent', async () => {
+    reverseGeocodeAsync.mockResolvedValue([]);
+    jest.mocked(resoudreZoneHorsLigne).mockReturnValue(null);
+
+    const zone = await reverseGeocode(-25.17, 46.08);
+
+    expect(zone).toEqual({ region: null, district: null, commune: null });
   });
 });
