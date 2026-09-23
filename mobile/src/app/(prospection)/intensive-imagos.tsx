@@ -908,7 +908,7 @@ export default function IntensiveImagosScreen() {
               </>
             )}
 
-            <Text style={styles.sectionLabel}>Comportement de l&apos;essaim</Text>
+            <Text style={styles.sectionLabel}>Comportement</Text>
             <View style={styles.chipsRow}>
               {(['vol', 'pose'] as const).map((value) => {
                 const active = value === 'vol' ? !!population.essaim_en_vol : !!population.essaim_pose;
@@ -989,7 +989,7 @@ export default function IntensiveImagosScreen() {
                 </Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Comportement de l&apos;essaim :</Text>
+                <Text style={styles.summaryLabel}>Comportement :</Text>
                 <Text style={styles.summaryValue}>
                   {population.essaim_en_vol ? 'En vol' : population.essaim_pose ? 'Posé' : '—'}
                 </Text>

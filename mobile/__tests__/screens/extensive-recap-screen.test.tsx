@@ -114,7 +114,7 @@ describe('ExtensiveRecapScreen — récapitulatif complet (#227)', () => {
     expect(screen.getByText('vers Nord')).toBeVisible();
     expect(screen.getByText('État')).toBeVisible();
     expect(screen.getByText('Déplacement')).toBeVisible();
-    expect(screen.getByText('Comportement de l’essaim')).toBeVisible();
+    expect(screen.getByText('Comportement')).toBeVisible();
     expect(screen.getByText('En vol')).toBeVisible();
     expect(screen.getAllByText('Densité diffuse')[0]).toBeVisible();
     expect(screen.getByText('8 ind./ha')).toBeVisible();
