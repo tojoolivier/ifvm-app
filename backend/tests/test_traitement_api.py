@@ -819,7 +819,7 @@ async def deuxieme_pesticide(db_session: AsyncSession):
     return p
 
 
-async def _approvisionner(client, auth_headers, pesticide_id, site_id, quantite, unite="L"):
+async def _approvisionner(client, headers, pesticide_id, site_id, quantite, unite="L"):
     resp = await client.post(
         "/mouvements-pesticide",
         json={
@@ -829,7 +829,7 @@ async def _approvisionner(client, auth_headers, pesticide_id, site_id, quantite,
             "quantite": quantite,
             "unite": unite,
         },
-        headers=auth_headers,
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
 
@@ -853,6 +853,7 @@ async def _solde(client, auth_headers, site_id, pesticide_id, unite):
 async def test_approvisionnement_puis_traitement_debite_le_solde_exactement(
     client,
     auth_headers,
+    admin_headers,
     db_session,
     campagne_id,
     utilisateur,
@@ -861,7 +862,7 @@ async def test_approvisionnement_puis_traitement_debite_le_solde_exactement(
     pesticide,
     base_aerienne,
 ):
-    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
     traitement_id = await _creer_traitement(
         client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
     )
@@ -880,6 +881,7 @@ async def test_approvisionnement_puis_traitement_debite_le_solde_exactement(
 async def test_traitement_a_deux_produits_debite_chacun_separement(
     client,
     auth_headers,
+    admin_headers,
     db_session,
     campagne_id,
     utilisateur,
@@ -889,8 +891,8 @@ async def test_traitement_a_deux_produits_debite_chacun_separement(
     deuxieme_pesticide,
     base_aerienne,
 ):
-    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
-    await _approvisionner(client, auth_headers, deuxieme_pesticide.id, base_aerienne.id, 50.0)
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
+    await _approvisionner(client, admin_headers, deuxieme_pesticide.id, base_aerienne.id, 50.0)
     traitement_id = await _creer_traitement(
         client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
     )
@@ -914,6 +916,7 @@ async def test_traitement_a_deux_produits_debite_chacun_separement(
 async def test_traitement_melangeant_l_et_kg_genere_deux_mouvements_distincts(
     client,
     auth_headers,
+    admin_headers,
     db_session,
     campagne_id,
     utilisateur,
@@ -922,8 +925,8 @@ async def test_traitement_melangeant_l_et_kg_genere_deux_mouvements_distincts(
     pesticide,
     base_aerienne,
 ):
-    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0, "L")
-    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 50.0, "kg")
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0, "L")
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 50.0, "kg")
     traitement_id = await _creer_traitement(
         client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
     )
@@ -947,6 +950,7 @@ async def test_traitement_melangeant_l_et_kg_genere_deux_mouvements_distincts(
 async def test_modification_rotation_regenere_le_mouvement_sans_double_debit(
     client,
     auth_headers,
+    admin_headers,
     db_session,
     campagne_id,
     utilisateur,
@@ -955,7 +959,7 @@ async def test_modification_rotation_regenere_le_mouvement_sans_double_debit(
     pesticide,
     base_aerienne,
 ):
-    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
     traitement_id = await _creer_traitement(
         client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
     )
@@ -982,6 +986,7 @@ async def test_modification_rotation_regenere_le_mouvement_sans_double_debit(
 async def test_suppression_rotation_ne_laisse_aucun_residu_de_consommation(
     client,
     auth_headers,
+    admin_headers,
     db_session,
     campagne_id,
     utilisateur,
@@ -990,7 +995,7 @@ async def test_suppression_rotation_ne_laisse_aucun_residu_de_consommation(
     pesticide,
     base_aerienne,
 ):
-    await _approvisionner(client, auth_headers, pesticide.id, base_aerienne.id, 100.0)
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
     traitement_id = await _creer_traitement(
         client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
     )

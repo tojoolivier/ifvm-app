@@ -237,6 +237,9 @@ class MouvementPesticideCreate(BaseModel):
     règle que le CHECK `ck_mouvement_pesticide_destination_coherente` (#606), vérifiée
     ici en amont pour un 422 lisible plutôt qu'une violation de contrainte brute."""
 
+    # Identifiant généré côté client (saisie hors-ligne, #639) : un rejeu du même
+    # contenu renvoie la ressource existante, un contenu différent répond 409.
+    id: uuid.UUID | None = None
     type: Literal["approvisionnement", "transfert", "consommation"]
     pesticide_id: uuid.UUID
     site_id: uuid.UUID
@@ -284,6 +287,9 @@ class VolCreate(BaseModel):
     §6/§5.3/§5.5 du document de cadrage) sont vérifiées côté use case, pas ici : le
     message d'erreur y est plus précis qu'un `ValueError` de validateur Pydantic."""
 
+    # Identifiant généré côté client (saisie hors-ligne, #639) — cf.
+    # `MouvementPesticideCreate.id`.
+    id: uuid.UUID | None = None
     type: Literal["mise_en_place", "application", "convoyage", "prospection", "divers"]
     equipe_id: uuid.UUID
     aeronef_id: uuid.UUID

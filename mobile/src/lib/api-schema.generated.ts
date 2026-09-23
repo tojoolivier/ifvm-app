@@ -2262,6 +2262,8 @@ export interface components {
          *     ici en amont pour un 422 lisible plutôt qu'une violation de contrainte brute.
          */
         MouvementPesticideCreate: {
+            /** Id */
+            id?: string | null;
             /**
              * Type
              * @enum {string}
@@ -4591,6 +4593,8 @@ export interface components {
          *     message d'erreur y est plus précis qu'un `ValueError` de validateur Pydantic.
          */
         VolCreate: {
+            /** Id */
+            id?: string | null;
             /**
              * Type
              * @enum {string}

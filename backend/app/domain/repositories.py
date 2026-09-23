@@ -645,6 +645,10 @@ class MouvementPesticideRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_by_id(self, mouvement_id: uuid.UUID) -> MouvementPesticide | None:
+        pass
+
+    @abstractmethod
     async def solde(
         self,
         site_id: uuid.UUID | None = None,

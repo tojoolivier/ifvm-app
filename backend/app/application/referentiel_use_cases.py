@@ -30,6 +30,7 @@ from app.domain.referentiel import (
     EquipeRequiseError,
     EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
+    IdentifiantDejaUtiliseError,
     LieuAerien,
     MembreEquipe,
     MouvementPesticide,
@@ -1621,7 +1622,29 @@ class CreateMouvementPesticide:
         unite: str,
         site_destination_id: uuid.UUID | None = None,
         date_mouvement: date | None = None,
+        id: uuid.UUID | None = None,
     ) -> MouvementPesticide:
+        # Création idempotente (#639) : `id` généré côté client pour la saisie
+        # hors-ligne — un envoi rejoué après une coupure ne doit pas doubler le
+        # mouvement (ce qui fausserait le solde). `date_mouvement` n'est comparée
+        # que si le client l'a envoyée : son défaut (« aujourd'hui ») diffère d'un
+        # jour à l'autre sans que le contenu saisi ait changé.
+        if id is not None:
+            existant = await self.repository.get_by_id(id)
+            if existant is not None:
+                identique = (
+                    existant.type == type
+                    and existant.pesticide_id == pesticide_id
+                    and existant.site_id == site_id
+                    and existant.site_destination_id == site_destination_id
+                    and existant.quantite == quantite
+                    and existant.unite == unite
+                    and (date_mouvement is None or existant.date_mouvement == date_mouvement)
+                )
+                if not identique:
+                    raise IdentifiantDejaUtiliseError(str(id))
+                return existant
+
         est_transfert = type == "transfert"
         if est_transfert and site_destination_id is None:
             raise SiteDestinationIncoherentError("site_destination_id est requis pour un transfert")
@@ -1640,6 +1663,7 @@ class CreateMouvementPesticide:
         maintenant = datetime.now(timezone.utc)
         return await self.repository.create(
             MouvementPesticide(
+                id=id or uuid.uuid4(),
                 type=type,
                 pesticide_id=pesticide_id,
                 site_id=site_id,
@@ -1735,7 +1759,31 @@ class CreateVol:
         lieu_depart: str | None = None,
         lieu_arrivee: str | None = None,
         observations: str | None = None,
+        id: uuid.UUID | None = None,
     ) -> Vol:
+        # Création idempotente (#639) : cf. `CreateMouvementPesticide`.
+        if id is not None:
+            existant = await self.repository.get_by_id(id)
+            if existant is not None:
+                identique = (
+                    existant.type == type
+                    and existant.equipe_id == equipe_id
+                    and existant.aeronef_id == aeronef_id
+                    and existant.date_vol == date_vol
+                    and existant.heure_debut == heure_debut
+                    and existant.heure_fin == heure_fin
+                    and existant.site_principal_id == site_principal_id
+                    and existant.stand_id == stand_id
+                    and existant.base_secondaire_id == base_secondaire_id
+                    and existant.motif == motif
+                    and existant.lieu_depart == lieu_depart
+                    and existant.lieu_arrivee == lieu_arrivee
+                    and existant.observations == observations
+                )
+                if not identique:
+                    raise IdentifiantDejaUtiliseError(str(id))
+                return existant
+
         equipe = await self.equipe_repository.get_by_id(equipe_id)
         if equipe is None:
             raise EquipeIntrouvableError(str(equipe_id))
@@ -1773,7 +1821,7 @@ class CreateVol:
         maintenant = datetime.now(timezone.utc)
         return await self.repository.create(
             Vol(
-                id=uuid.uuid4(),
+                id=id or uuid.uuid4(),
                 type=type,
                 equipe_id=equipe_id,
                 aeronef_id=aeronef_id,

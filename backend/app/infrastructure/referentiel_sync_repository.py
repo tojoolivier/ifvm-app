@@ -1059,6 +1059,13 @@ class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
         await self.session.refresh(model)
         return self._to_domain(model)
 
+    async def get_by_id(self, mouvement_id: uuid.UUID) -> MouvementPesticide | None:
+        result = await self.session.execute(
+            select(MouvementPesticideModel).where(MouvementPesticideModel.id == mouvement_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
     async def regenerer_consommation(
         self,
         traitement_id: uuid.UUID,

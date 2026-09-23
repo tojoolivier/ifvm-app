@@ -92,3 +92,12 @@ async def require_admin(current_user=Depends(get_current_user)):
             status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs"
         )
     return current_user
+
+
+async def require_chef_de_base_ou_admin(current_user=Depends(get_current_user)):
+    if current_user.role not in ("chef_de_base", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Réservé aux chefs de base et aux administrateurs",
+        )
+    return current_user

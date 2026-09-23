@@ -672,6 +672,14 @@ class VolLieuxConvoyageRequisError(Exception):
     pass
 
 
+class IdentifiantDejaUtiliseError(Exception):
+    """`id` client déjà utilisé par une ressource au contenu différent (#639) — un
+    rejeu identique est idempotent, un même `id` avec un autre contenu est un
+    conflit (409), jamais un écrasement silencieux."""
+
+    pass
+
+
 class VolIntrouvableError(Exception):
     """`vol_id` ne référence aucun vol (#610)."""
 

@@ -64,7 +64,7 @@ from app.application.referentiel_use_cases import (
     UpdateVol,
     UpdateZoneAntiAcridien,
 )
-from app.auth import get_current_user, require_admin
+from app.auth import get_current_user, require_admin, require_chef_de_base_ou_admin
 from app.database import get_db
 from app.domain.referentiel import (
     Aeronef,
@@ -87,6 +87,7 @@ from app.domain.referentiel import (
     EquipeNonAutoriseeError,
     EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
+    IdentifiantDejaUtiliseError,
     ImmatriculationAeronefDejaPriseError,
     MembreDejaDansEquipeError,
     NumeroSiteAerienneDejaPrisError,
@@ -1442,7 +1443,7 @@ async def update_pesticide(
 async def create_mouvement_pesticide(
     body: MouvementPesticideCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
+    _: Annotated[Utilisateur, Depends(require_chef_de_base_ou_admin)],
 ):
     use_case = CreateMouvementPesticide(
         MouvementPesticideRepositoryImpl(db),
@@ -1458,7 +1459,13 @@ async def create_mouvement_pesticide(
             unite=body.unite,
             site_destination_id=body.site_destination_id,
             date_mouvement=body.date_mouvement,
+            id=body.id,
         )
+    except IdentifiantDejaUtiliseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"l'identifiant {exc.args[0]} est déjà utilisé par un mouvement différent",
+        ) from exc
     except SiteDestinationIncoherentError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
@@ -1519,7 +1526,13 @@ async def create_vol(
             lieu_depart=body.lieu_depart,
             lieu_arrivee=body.lieu_arrivee,
             observations=body.observations,
+            id=body.id,
         )
+    except IdentifiantDejaUtiliseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"l'identifiant {exc.args[0]} est déjà utilisé par un vol différent",
+        ) from exc
     except EquipeIntrouvableError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"équipe introuvable : {exc.args[0]}"

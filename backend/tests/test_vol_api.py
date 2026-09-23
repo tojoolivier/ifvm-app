@@ -425,3 +425,38 @@ async def test_refuse_prospection_sur_vol_non_prospection_422(
         headers=admin_headers,
     )
     assert reponse.status_code == 422, reponse.text
+
+
+@pytest.mark.asyncio
+async def test_rejeu_vol_meme_id_meme_contenu_ne_cree_pas_de_doublon(
+    client: AsyncClient, admin_headers: dict, equipe_aerienne, aeronef_affecte: dict
+):
+    """Saisie hors-ligne (#639) : l'envoi rejoué renvoie le vol existant."""
+    payload = _payload(equipe_aerienne, aeronef_affecte, id=str(uuid.uuid4()))
+    premier = await client.post("/vols", json=payload, headers=admin_headers)
+    rejeu = await client.post("/vols", json=payload, headers=admin_headers)
+    assert premier.status_code == 201, premier.text
+    assert rejeu.status_code == 201, rejeu.text
+    assert rejeu.json()["id"] == premier.json()["id"] == payload["id"]
+
+    liste = await client.get(f"/vols?equipe_id={equipe_aerienne.id}", headers=admin_headers)
+    assert [v["id"] for v in liste.json()].count(payload["id"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_vol_meme_id_contenu_different_409(
+    client: AsyncClient, admin_headers: dict, equipe_aerienne, aeronef_affecte: dict
+):
+    identifiant = str(uuid.uuid4())
+    premier = await client.post(
+        "/vols",
+        json=_payload(equipe_aerienne, aeronef_affecte, id=identifiant),
+        headers=admin_headers,
+    )
+    assert premier.status_code == 201, premier.text
+    conflit = await client.post(
+        "/vols",
+        json=_payload(equipe_aerienne, aeronef_affecte, id=identifiant, motif="Autre motif"),
+        headers=admin_headers,
+    )
+    assert conflit.status_code == 409, conflit.text

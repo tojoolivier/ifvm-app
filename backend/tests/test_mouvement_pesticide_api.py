@@ -1,5 +1,9 @@
+import uuid
+
 import pytest
 from httpx import AsyncClient
+
+from app.auth import create_access_token
 
 
 @pytest.fixture
@@ -146,3 +150,63 @@ async def test_deux_unites_distinctes_sur_meme_site_restent_separees(
     )
     lignes = {ligne["unite"]: ligne["quantite"] for ligne in solde.json()}
     assert lignes == {"L": 100, "kg": 50}
+
+
+@pytest.mark.asyncio
+async def test_rejeu_meme_id_meme_contenu_ne_double_pas_le_mouvement(
+    client: AsyncClient, admin_headers: dict, payload_approvisionnement, base_aerienne
+):
+    """Saisie hors-ligne (#639) : l'envoi rejoué après une coupure renvoie la
+    ressource existante — un doublon fausserait le solde de stock."""
+    payload = payload_approvisionnement(id=str(uuid.uuid4()), quantite=100)
+    premier = await client.post("/mouvements-pesticide", json=payload, headers=admin_headers)
+    rejeu = await client.post("/mouvements-pesticide", json=payload, headers=admin_headers)
+    assert premier.status_code == 201, premier.text
+    assert rejeu.status_code == 201, rejeu.text
+    assert rejeu.json()["id"] == premier.json()["id"] == payload["id"]
+
+    solde = await client.get(
+        f"/stock-pesticide/solde?site_id={base_aerienne.id}", headers=admin_headers
+    )
+    assert solde.json()[0]["quantite"] == 100
+
+
+@pytest.mark.asyncio
+async def test_meme_id_contenu_different_409(
+    client: AsyncClient, admin_headers: dict, payload_approvisionnement
+):
+    identifiant = str(uuid.uuid4())
+    premier = await client.post(
+        "/mouvements-pesticide",
+        json=payload_approvisionnement(id=identifiant, quantite=100),
+        headers=admin_headers,
+    )
+    assert premier.status_code == 201, premier.text
+    conflit = await client.post(
+        "/mouvements-pesticide",
+        json=payload_approvisionnement(id=identifiant, quantite=250),
+        headers=admin_headers,
+    )
+    assert conflit.status_code == 409, conflit.text
+
+
+@pytest.mark.asyncio
+async def test_droits_de_saisie_chef_de_base_et_admin_seulement(
+    client: AsyncClient,
+    admin_headers: dict,
+    auth_headers: dict,
+    chef_de_base,
+    payload_approvisionnement,
+):
+    chef_headers = {"Authorization": f"Bearer {create_access_token(chef_de_base.id)}"}
+
+    refus = await client.post(
+        "/mouvements-pesticide", json=payload_approvisionnement(), headers=auth_headers
+    )
+    assert refus.status_code == 403, refus.text
+
+    for headers in (chef_headers, admin_headers):
+        reponse = await client.post(
+            "/mouvements-pesticide", json=payload_approvisionnement(), headers=headers
+        )
+        assert reponse.status_code == 201, reponse.text
