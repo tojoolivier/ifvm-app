@@ -9,10 +9,11 @@ from app.infrastructure.prospection_model import ProspectionModel, ProspectionPo
 
 
 @pytest.fixture
-def payload_traitement(chef_de_base, pilote, mecanicien, base_aerienne):
+def payload_traitement(chef_de_base, pilote, mecanicien, base_aerienne, equipe_aerienne_id):
     def _build(prospection_id, **overrides):
         payload = {
             "prospection_id": str(prospection_id),
+            "equipe_id": str(equipe_aerienne_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -98,6 +99,7 @@ async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation
     pilote,
     mecanicien,
     base_aerienne,
+    equipe_aerienne_id,
 ):
     """#stand-base-secondaire-date-installation : Stand/Base secondaire restent
     du texte libre, la date d'installation de chacun est facultative et
@@ -107,6 +109,7 @@ async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation
         "/traitements",
         json={
             "prospection_id": str(prospection_id),
+            "equipe_id": str(equipe_aerienne_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -1196,10 +1199,11 @@ async def test_list_traitements_filtres(
 
 
 @pytest.fixture
-def payload_traitement_terrestre(chef_equipe):
+def payload_traitement_terrestre(chef_equipe, equipe_terrestre_id):
     def _build(prospection_id, **overrides):
         payload = {
             "prospection_id": str(prospection_id),
+            "equipe_id": str(equipe_terrestre_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -2293,11 +2297,12 @@ async def test_modifier_fiche_terrestre_validee_rejetee_sur_tous_les_writes_403(
 # ==========================================
 
 
-def _payload_sync(fiche_id, prospection_id, base_updated_at, **overrides):
+def _payload_sync(fiche_id, prospection_id, base_updated_at, equipe_id, **overrides):
     payload = {
         "id": str(fiche_id),
         "base_updated_at": base_updated_at.isoformat(),
         "prospection_id": str(prospection_id),
+        "equipe_id": str(equipe_id),
         "date_traitement": "2026-08-11",
         "date_validation": "2026-08-10",
         "localite": "Betioky",
@@ -2355,7 +2360,7 @@ async def test_sync_push_aerien_reclasse_la_surface_quand_le_mode_change(
 
 @pytest.mark.asyncio
 async def test_sync_push_cree_fiche_inconnue_201(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
     fiche_id = uuid.uuid4()
@@ -2363,6 +2368,7 @@ async def test_sync_push_cree_fiche_inconnue_201(
         fiche_id,
         prospection_id,
         base_updated_at=datetime.utcnow(),
+        equipe_id=equipe_terrestre_id,
         terrestre={"chef_equipe_id": str(chef_equipe.id)},
     )
     resp = await client.post("/traitements/sync", json=payload, headers=auth_headers)
@@ -2374,7 +2380,7 @@ async def test_sync_push_cree_fiche_inconnue_201(
 
 @pytest.mark.asyncio
 async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflict(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """Critère d'acceptation : deux appareils créant la même fiche hors-ligne (même id)
     avec un contenu divergent -> la seconde synchronisation est rejetée (409), marquée
@@ -2389,6 +2395,7 @@ async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflic
             fiche_id,
             prospection_id,
             base_updated_at=t0,
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2402,6 +2409,7 @@ async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflic
             prospection_id,
             base_updated_at=t0 - timedelta(minutes=5),  # jamais lu la version serveur
             localite="Ampanihy",  # contenu divergent
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2418,7 +2426,7 @@ async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflic
 
 @pytest.mark.asyncio
 async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_par_conflict(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """Critère d'acceptation : une fiche serveur déjà `validee` rejette systématiquement
     toute divergence entrante, sans jamais passer par `conflict`."""
@@ -2432,6 +2440,7 @@ async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_pa
             fiche_id,
             prospection_id,
             base_updated_at=t0,
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2456,6 +2465,7 @@ async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_pa
             prospection_id,
             base_updated_at=t0,
             localite="Ampanihy",
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2471,7 +2481,7 @@ async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_pa
 
 @pytest.mark.asyncio
 async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """Critère d'acceptation : un renvoi réseau (même id, contenu identique) est traité
     `synced` sans conflit."""
@@ -2482,6 +2492,7 @@ async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
         fiche_id,
         prospection_id,
         base_updated_at=t0,
+        equipe_id=equipe_terrestre_id,
         terrestre={"chef_equipe_id": str(chef_equipe.id)},
     )
 
@@ -2499,7 +2510,7 @@ async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
 
 @pytest.mark.asyncio
 async def test_sync_renvoi_remplace_les_evaluations_risque_population(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """#evaluation-risque-population, mode Offline-First : une fiche créée hors
     ligne (premier sync) puis rouverte et modifiée (deuxième sync, même id) voit
@@ -2512,6 +2523,7 @@ async def test_sync_renvoi_remplace_les_evaluations_risque_population(
         fiche_id,
         prospection_id,
         base_updated_at=t0,
+        equipe_id=equipe_terrestre_id,
         terrestre={"chef_equipe_id": str(chef_equipe.id)},
         evaluations_risque_population=[
             {"habitat_proche": "Rizière", "distance_km": 1.0, "sensibilisation": False}
@@ -2615,3 +2627,49 @@ async def test_get_traitement_pdf_terrestre_valide_200(
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content.startswith(b"%PDF-")
+
+
+# ==========================================
+# #607 — équipe rattachée au traitement
+# ==========================================
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_aerien_refuse_equipe_terrestre(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    equipe_terrestre_id,
+):
+    """Décision actée #607 : la FK composite `(equipe_id, equipe_type) ->
+    equipe(id, type)` refuse un traitement aérien rattaché à une équipe
+    terrestre — l'erreur doit rester explicite (4xx), jamais une 500."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id, equipe_id=str(equipe_terrestre_id))
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert 400 <= resp.status_code < 500
+    assert resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_expose_equipe_id(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    equipe_terrestre_id,
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement_terrestre(prospection_id)
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["equipe_id"] == str(equipe_terrestre_id)
+
+    relu = await client.get(f"/traitements/{resp.json()['id']}", headers=auth_headers)
+    assert relu.status_code == 200
+    assert relu.json()["equipe_id"] == str(equipe_terrestre_id)

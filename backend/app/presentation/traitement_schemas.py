@@ -188,6 +188,11 @@ class EvaluationRisquePopulationCreate(BaseModel):
 
 class TraitementCreate(BaseModel):
     prospection_id: uuid.UUID
+    # Équipe qui a mené la fiche (#607) — nullable en base (rétro-compatibilité),
+    # exigée ici pour toute nouvelle fiche. Portée par la fiche de base, commune
+    # à Aérien et Terrestre : `type_traitement` détermine seul le type d'équipe
+    # attendu (validé côté serveur, cf. traitement_use_cases._valider_equipe).
+    equipe_id: uuid.UUID
     numero_fiche: str | None = Field(None, max_length=50)
     mode_traitement: ModeTraitement | None = None
     date_traitement: date
@@ -546,6 +551,7 @@ class TraitementRead(BaseModel):
     observations: str | None
     statut: StatutTraitement
     statut_sync: str
+    equipe_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

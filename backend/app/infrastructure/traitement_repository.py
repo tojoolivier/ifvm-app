@@ -239,6 +239,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             observations=traitement.observations,
             statut=traitement.statut,
             statut_sync=traitement.statut_sync,
+            equipe_id=traitement.equipe_id,
             created_at=traitement.created_at,
             updated_at=traitement.updated_at,
         )
@@ -901,6 +902,7 @@ class TraitementRepositoryImpl(TraitementRepository):
             observations=model.observations,
             statut=model.statut,
             statut_sync=model.statut_sync,
+            equipe_id=model.equipe_id,
             created_at=model.created_at,
             updated_at=model.updated_at,
             cible=Cible(

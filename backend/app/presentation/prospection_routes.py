@@ -31,6 +31,7 @@ from app.domain.referentiel import StationNotFoundError
 from app.infrastructure.audit_log_repository import AuditLogRepositoryImpl
 from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
+from app.infrastructure.referentiel_sync_repository import EquipeRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.prospection_pdf import build_prospection_html
 from app.presentation.prospection_schemas import (
@@ -60,6 +61,14 @@ async def list_prospections(
     campagne_id: uuid.UUID | None = Query(default=None),
     station_id: uuid.UUID | None = Query(default=None),
     prospecteur_id: uuid.UUID | None = Query(default=None),
+    equipe_id: uuid.UUID | None = Query(
+        default=None,
+        description=(
+            "Interventions menées par cette équipe, triées par date_prospection "
+            "décroissante (#607) — la position courante d'une équipe mobile "
+            "terrestre se déduit de la première ligne."
+        ),
+    ),
     disponible_pour_traitement: bool = Query(
         default=False,
         description=(
@@ -86,6 +95,7 @@ async def list_prospections(
         campagne_id=campagne_id,
         station_id=station_id,
         prospecteur_id=prospecteur_id,
+        equipe_id=equipe_id,
         disponible_pour_traitement=disponible_pour_traitement,
         a_revalider=a_revalider,
     )
@@ -98,12 +108,13 @@ async def create_prospection(
     current_user: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
-    use_case = CreateProspection(repository, AuditLogRepositoryImpl(db))
+    use_case = CreateProspection(repository, EquipeRepositoryImpl(db), AuditLogRepositoryImpl(db))
     try:
         prospection = await use_case.execute(
             type_prospection=body.type_prospection,
             campagne_id=body.campagne_id,
             prospecteur_id=current_user.id,
+            equipe_id=body.equipe_id,
             date_prospection=body.date_prospection,
             station_id=body.station_id,
             n_fiche=body.n_fiche,

@@ -6,11 +6,16 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_create_prospection_intensive(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -29,11 +34,16 @@ async def test_create_prospection_intensive(
 
 @pytest.mark.asyncio
 async def test_create_prospection_intensive_avec_sections(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -77,12 +87,17 @@ async def test_create_prospection_intensive_avec_sections(
 
 @pytest.mark.asyncio
 async def test_create_prospection_avec_nouveaux_champs(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Test de création avec les nouveaux champs (Références et Observations)"""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -149,7 +164,11 @@ async def test_create_prospection_avec_nouveaux_champs(
 
 @pytest.mark.asyncio
 async def test_create_prospection_population_extensive_imagos_larves(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """La fiche Extensive n'a pas d'écran Infestation séparé : type de cible, direction du
     déplacement, État/Comportement de l'essaim et surface contaminée vivent directement
@@ -159,6 +178,7 @@ async def test_create_prospection_population_extensive_imagos_larves(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -241,7 +261,11 @@ async def test_create_prospection_population_extensive_imagos_larves(
 
 @pytest.mark.asyncio
 async def test_create_prospection_population_densite_diffuse_facultative(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#densite-diffuse-obligatoire retiré (demande explicite du 2026-09-14) :
     une population sans densité diffuse ni groupée est acceptée — ce
@@ -253,6 +277,7 @@ async def test_create_prospection_population_densite_diffuse_facultative(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -274,13 +299,18 @@ async def test_create_prospection_population_densite_diffuse_facultative(
 
 @pytest.mark.asyncio
 async def test_create_prospection_population_densite_groupee_facultative(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#densite-groupee-obligatoire retiré : une population sans densité
     groupée (densite_diffuse seule renseignée) est acceptée."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -301,7 +331,7 @@ async def test_create_prospection_population_densite_groupee_facultative(
 
 @pytest.mark.asyncio
 async def test_create_prospection_extensive_mode_aerien(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_aerienne_id: uuid.UUID
 ):
     """Mode aérien : infos équipe/aéronef + opérations, numero et duree_minutes
     assignés côté serveur (jamais fait confiance au client — OperationAerienneCreate
@@ -310,6 +340,7 @@ async def test_create_prospection_extensive_mode_aerien(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_aerienne_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-26",
@@ -364,7 +395,7 @@ async def test_create_prospection_extensive_mode_aerien(
 
 @pytest.mark.asyncio
 async def test_create_prospection_extensive_aerienne_base_principale_et_secondaire(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_aerienne_id: uuid.UUID
 ):
     """Base principale : numéro, date d'installation et coordonnées GPS ;
     Base secondaire (texte libre) : sa propre date d'installation et ses
@@ -372,6 +403,7 @@ async def test_create_prospection_extensive_aerienne_base_principale_et_secondai
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_aerienne_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-26",
@@ -404,13 +436,14 @@ async def test_create_prospection_extensive_aerienne_base_principale_et_secondai
 
 @pytest.mark.asyncio
 async def test_create_prospection_extensive_aerienne_sans_base_secondaire_reste_non_renseignee(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_aerienne_id: uuid.UUID
 ):
     """Base secondaire facultative : une prospection aérienne sans base
     secondaire n'a rien à renseigner ici, sans effet sur la base principale."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_aerienne_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-26",
@@ -436,13 +469,14 @@ async def test_create_prospection_extensive_aerienne_sans_base_secondaire_reste_
 
 @pytest.mark.asyncio
 async def test_create_prospection_operation_motif_divers(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_aerienne_id: uuid.UUID
 ):
     """« Motif du divers » (#ux-aerien) : persisté seulement pour l'opération de
     type Divers, `None` pour les autres — jamais exigé ni inventé."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_aerienne_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-09-02",
@@ -475,13 +509,14 @@ async def test_create_prospection_operation_motif_divers(
 
 @pytest.mark.asyncio
 async def test_create_prospection_extensive_mode_terrestre_inchange(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_terrestre_id: uuid.UUID
 ):
     """Non-régression : une fiche extensive sans mode_extensif (terrestre implicite,
     comportement historique) ne réclame et n'active aucun champ aérien."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-26",
@@ -502,7 +537,7 @@ async def test_create_prospection_extensive_mode_terrestre_inchange(
 
 @pytest.mark.asyncio
 async def test_create_prospection_extensive_aerien_signatures(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_aerienne_id: uuid.UUID
 ):
     """Mode aérien : les 4 signatures sont persistées et relues telles quelles
     (aucun pesticide embarqué — une prospection est un vol de reconnaissance,
@@ -510,6 +545,7 @@ async def test_create_prospection_extensive_aerien_signatures(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_aerienne_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-26",
@@ -554,7 +590,11 @@ async def test_create_prospection_extensive_aerien_signatures(
 
 @pytest.mark.asyncio
 async def test_create_prospection_intensive_signature_visa_auto(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Écran Observations de l'Intensif (remplace le champ « Photo », jamais
     câblé) : auto-signature du prospecteur connecté. Réutilise
@@ -564,6 +604,7 @@ async def test_create_prospection_intensive_signature_visa_auto(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -591,7 +632,11 @@ async def test_create_prospection_intensive_signature_visa_auto(
 
 @pytest.mark.asyncio
 async def test_create_prospection_avec_avertissements(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#106 : la fiche « à vérifier » côté mobile transmet ses avertissements non
     bloquants (plausibilité horaire, écart historique) au backend, qui les
@@ -599,6 +644,7 @@ async def test_create_prospection_avec_avertissements(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -621,11 +667,16 @@ async def test_create_prospection_avec_avertissements(
 
 @pytest.mark.asyncio
 async def test_create_prospection_sans_avertissements_est_vide(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -639,7 +690,11 @@ async def test_create_prospection_sans_avertissements_est_vide(
 
 @pytest.mark.asyncio
 async def test_create_prospection_population_methode_phase(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Régression: methode/phase (population) et surface_infestee_pourcent (infestation)
     existent côté ORM/Pydantic mais avaient été oubliés dans le mapping du domaine
@@ -649,6 +704,7 @@ async def test_create_prospection_population_methode_phase(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -689,12 +745,17 @@ async def test_create_prospection_population_methode_phase(
 
 @pytest.mark.asyncio
 async def test_create_prospection_avec_infestation_complete(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Test de création avec une infestation complète (tous les champs)"""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -744,11 +805,12 @@ async def test_create_prospection_avec_infestation_complete(
 
 @pytest.mark.asyncio
 async def test_create_intensive_sans_station_id_echoue(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_terrestre_id: uuid.UUID
 ):
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-06-25",
@@ -760,11 +822,12 @@ async def test_create_intensive_sans_station_id_echoue(
 
 @pytest.mark.asyncio
 async def test_create_sans_campagne_id_echoue(
-    client: AsyncClient, auth_headers: dict, station_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, station_id: uuid.UUID, equipe_terrestre_id: uuid.UUID
 ):
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
@@ -776,11 +839,16 @@ async def test_create_sans_campagne_id_echoue(
 
 @pytest.mark.asyncio
 async def test_list_prospections_filtre_par_type(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -799,11 +867,16 @@ async def test_list_prospections_filtre_par_type(
 
 @pytest.mark.asyncio
 async def test_get_prospection_par_id(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -827,11 +900,16 @@ async def test_get_prospection_inexistante_retourne_404(client: AsyncClient, aut
 
 @pytest.mark.asyncio
 async def test_update_prospection_brouillon(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -853,13 +931,18 @@ async def test_update_prospection_brouillon(
 
 @pytest.mark.asyncio
 async def test_update_prospection_efface_avertissements_une_fois_corriges(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#106 : quand le prospecteur corrige la saisie et que plus aucun avertissement
     ne se déclenche, la fiche n'est plus « à vérifier » (liste vidée, pas conservée)."""
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -881,12 +964,17 @@ async def test_update_prospection_efface_avertissements_une_fois_corriges(
 
 @pytest.mark.asyncio
 async def test_update_prospection_avec_nouveaux_champs(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Test de mise à jour avec les nouveaux champs"""
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -932,12 +1020,14 @@ async def test_create_prospection_surface_infestee_superieure_rejetee(
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
     type_prospection: str,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """La surface infestée ne peut jamais dépasser la surface prospectée, quel que
     soit le type de fiche (#surface-infestee-superieure)."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": type_prospection,
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -954,11 +1044,16 @@ async def test_create_prospection_surface_infestee_superieure_rejetee(
 
 @pytest.mark.asyncio
 async def test_update_prospection_surface_infestee_superieure_rejetee(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1002,11 +1097,16 @@ async def test_create_prospection_deplacement_perchee_rejete(
 
 @pytest.mark.asyncio
 async def test_update_prospection_non_brouillon_interdit(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1028,11 +1128,16 @@ async def test_update_prospection_non_brouillon_interdit(
 
 @pytest.mark.asyncio
 async def test_delete_prospection_brouillon(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1052,11 +1157,16 @@ async def test_delete_prospection_brouillon(
 
 @pytest.mark.asyncio
 async def test_delete_prospection_non_brouillon_interdit(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     create_resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1074,11 +1184,16 @@ async def test_delete_prospection_non_brouillon_interdit(
 
 @pytest.mark.asyncio
 async def test_list_filtre_statut(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1100,12 +1215,17 @@ async def test_list_filtre_statut(
 
 @pytest.mark.asyncio
 async def test_create_prospection_avec_stades_larvaires_l6_l7(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Test de création avec les nouveaux stades L6 et L7 pour NSE"""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1151,13 +1271,18 @@ async def test_create_prospection_avec_stades_larvaires_l6_l7(
 
 @pytest.mark.asyncio
 async def test_create_prospection_avec_type_cible_dense_enum(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Densités de cible (0031 : 'essaim' a disparu de type_cible)."""
     for type_cible in ["vol_clair", "dense", "tres_dense"]:
         response = await client.post(
             "/prospections",
             json={
+                "equipe_id": str(equipe_terrestre_id),
                 "type_prospection": "extensive",
                 "campagne_id": str(campagne_id),
                 "station_id": str(station_id),
@@ -1183,13 +1308,18 @@ async def test_create_prospection_avec_type_cible_dense_enum(
 
 @pytest.mark.asyncio
 async def test_create_prospection_avec_type_larve_enum(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Test de création avec les différents types de larves"""
     for type_larve in ["tache_larvaire", "bande_larvaire"]:
         response = await client.post(
             "/prospections",
             json={
+                "equipe_id": str(equipe_terrestre_id),
                 "type_prospection": "extensive",
                 "campagne_id": str(campagne_id),
                 "station_id": str(station_id),
@@ -1212,12 +1342,17 @@ async def test_create_prospection_avec_type_larve_enum(
 
 @pytest.mark.asyncio
 async def test_create_prospection_extensive_avec_populations_agregees(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Fiche extensive : comptages agrégés par phénotype (B) et densités par stade (C)."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1284,12 +1419,17 @@ async def test_create_prospection_extensive_avec_populations_agregees(
 
 @pytest.mark.asyncio
 async def test_create_prospection_validation_avec_signalement_et_conclusion(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Fiche de validation : signalement affiché, conclusion binaire (pas de motif ni statut)."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1317,13 +1457,18 @@ async def test_create_prospection_validation_avec_signalement_et_conclusion(
 
 @pytest.mark.asyncio
 async def test_create_prospection_validation_numero_fiche_reprend_numero_message(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Le n° de fiche définitif d'un signalement est exactement le n° de message
     généré à la Référence — jamais un second numéro (#signalements-treatment-ready)."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1342,7 +1487,11 @@ async def test_create_prospection_validation_numero_fiche_reprend_numero_message
 
 @pytest.mark.asyncio
 async def test_create_prospection_validation_disponible_immediatement_pour_traitement(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Critère d'acceptation central (#signalements-treatment-ready) : une fiche de
     validation/signalement fraîchement créée apparaît tout de suite dans « Consulter
@@ -1352,6 +1501,7 @@ async def test_create_prospection_validation_disponible_immediatement_pour_trait
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1381,6 +1531,7 @@ async def test_traitement_depuis_prospection_validation_conserve_le_lien_et_la_m
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
     chef_equipe,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Test 7 (#signalements-treatment-ready) : une fois sélectionnée pour traitement,
     une fiche de validation/signalement se comporte exactement comme une fiche
@@ -1390,6 +1541,7 @@ async def test_traitement_depuis_prospection_validation_conserve_le_lien_et_la_m
     creation = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1406,6 +1558,7 @@ async def test_traitement_depuis_prospection_validation_conserve_le_lien_et_la_m
         "/traitements",
         json={
             "prospection_id": prospection_id,
+            "equipe_id": str(equipe_terrestre_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -1438,11 +1591,16 @@ async def test_traitement_depuis_prospection_validation_conserve_le_lien_et_la_m
 
 @pytest.mark.asyncio
 async def test_create_prospection_conclusion_invalide_echoue(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1458,11 +1616,12 @@ async def test_create_prospection_conclusion_invalide_echoue(
 
 @pytest.mark.asyncio
 async def test_create_intensive_station_inexistante_renvoie_409(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_terrestre_id: uuid.UUID
 ):
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(uuid.uuid4()),
@@ -1477,7 +1636,11 @@ async def test_create_intensive_station_inexistante_renvoie_409(
 
 @pytest.mark.asyncio
 async def test_create_intensive_autre_violation_ne_blame_pas_la_station(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#201 : n'importe quelle contrainte violée (ici deux populations LMC/imago, qui
     violent `uq_prospection_population`) remontait « station_id n'existe pas » alors que
@@ -1485,6 +1648,7 @@ async def test_create_intensive_autre_violation_ne_blame_pas_la_station(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1514,7 +1678,11 @@ async def test_create_intensive_autre_violation_ne_blame_pas_la_station(
 
 @pytest.mark.asyncio
 async def test_create_capture_stade_inconnu_refuse_avant_la_base(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#201 : le vocabulaire des stades est un invariant du domaine, pas seulement une
     contrainte de base. Un stade hors référentiel doit être refusé à la frontière, en
@@ -1522,6 +1690,7 @@ async def test_create_capture_stade_inconnu_refuse_avant_la_base(
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1547,13 +1716,18 @@ async def test_create_capture_stade_inconnu_refuse_avant_la_base(
 
 @pytest.mark.asyncio
 async def test_create_capture_sous_stade_a3_et_male_groupe_acceptes(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#201 : les stades réellement saisis sur le terrain (sous-stades A3 femelles et
     stade mâle groupé) doivent s'enregistrer."""
     response = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
             "station_id": str(station_id),
@@ -1582,3 +1756,118 @@ async def test_create_capture_sous_stade_a3_et_male_groupe_acceptes(
     )
     assert response.status_code == 201
     assert {c["stade"] for c in response.json()["captures"]} == {"A3-1/4", "A234"}
+
+
+# ==========================================
+# #607 — équipe rattachée à la prospection
+# ==========================================
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_intensive_refuse_equipe_aerienne(
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_aerienne_id: uuid.UUID,
+):
+    """Décision actée #607 : intensive/validation n'ont pas de mode aérien — la FK
+    composite `(equipe_id, equipe_type) -> equipe(id, type)` refuse une équipe
+    aérienne, mais l'erreur doit rester explicite (4xx), jamais une 500."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "equipe_id": str(equipe_aerienne_id),
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code < 500
+    assert 400 <= response.status_code < 500
+    assert response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_expose_equipe_id(
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
+):
+    response = await client.post(
+        "/prospections",
+        json={
+            "equipe_id": str(equipe_terrestre_id),
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["equipe_id"] == str(equipe_terrestre_id)
+
+    relue = await client.get(f"/prospections/{response.json()['id']}", headers=auth_headers)
+    assert relue.status_code == 200
+    assert relue.json()["equipe_id"] == str(equipe_terrestre_id)
+
+
+@pytest.mark.asyncio
+async def test_position_equipe_deductible_de_la_derniere_intervention(
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
+):
+    """Décision actée #607 : pas de table de position dédiée pour l'EMT — sa
+    position courante se déduit de sa dernière intervention rattachée.
+    `GET /prospections?equipe_id=...` trie par `date_prospection` décroissante
+    (ProspectionRepositoryImpl.list_by_filters) : la première ligne EST la
+    position déduite."""
+    ancienne = await client.post(
+        "/prospections",
+        json={
+            "equipe_id": str(equipe_terrestre_id),
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-05-01",
+            "latitude": -20.0,
+            "longitude": 45.0,
+        },
+        headers=auth_headers,
+    )
+    assert ancienne.status_code == 201, ancienne.text
+
+    recente = await client.post(
+        "/prospections",
+        json={
+            "equipe_id": str(equipe_terrestre_id),
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-08-15",
+            "latitude": -21.5,
+            "longitude": 46.5,
+        },
+        headers=auth_headers,
+    )
+    assert recente.status_code == 201, recente.text
+
+    resp = await client.get(
+        "/prospections",
+        params={"equipe_id": str(equipe_terrestre_id)},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    interventions = resp.json()
+    assert len(interventions) == 2
+    position_courante = interventions[0]
+    assert position_courante["id"] == recente.json()["id"]
+    assert position_courante["latitude"] == -21.5
+    assert position_courante["longitude"] == 46.5

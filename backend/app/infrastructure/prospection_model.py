@@ -6,8 +6,10 @@ from sqlalchemy import (
     TIMESTAMP,
     Boolean,
     CheckConstraint,
+    Computed,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     Numeric,
     String,
@@ -214,6 +216,33 @@ class ProspectionModel(Base):
     )
     signature_chef_base_image: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Équipe (#607, ADR-018)
+    # ==========================================
+    # Nullable en base (rétro-compatibilité avec les fiches déjà enregistrées),
+    # exigé côté ProspectionCreate pour toute nouvelle fiche. `equipe_type` est
+    # `GENERATED ALWAYS ... STORED` (même patron que `_equipe_type_genere` de
+    # referentiel_model.py) mais avec une expression propre à cette table plutôt
+    # qu'un type constant : une intensive/validation est toujours terrestre
+    # (« CHECK métier » du ticket #607, forcé ici plutôt que vérifié — aucun
+    # chemin d'écriture ne peut le contourner) ; une extensive suit
+    # `mode_extensif` (NULL ou 'terrestre' -> terrestre, 'aerien' -> aerien),
+    # l'axe orthogonal à `type_prospection` déjà en place. La FK composite vers
+    # `equipe(id, type)` échoue donc net si `equipe_id` désigne une équipe du
+    # mauvais type — refus explicite en base, pas seulement applicatif.
+    equipe_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    equipe_type: Mapped[str | None] = mapped_column(
+        Text(),
+        Computed(
+            "CASE WHEN equipe_id IS NULL THEN NULL "
+            "WHEN type_prospection IN ('intensive','validation') THEN 'terrestre' "
+            "WHEN mode_extensif = 'aerien' THEN 'aerien' "
+            "ELSE 'terrestre' END",
+            persisted=True,
+        ),
+        nullable=True,
+    )
+
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
     )
@@ -268,6 +297,13 @@ class ProspectionModel(Base):
             "mode_extensif IN ('terrestre','aerien')",
             name="ck_prospection_mode_extensif",
         ),
+        ForeignKeyConstraint(
+            ["equipe_id", "equipe_type"],
+            ["equipe.id", "equipe.type"],
+            name="fk_prospection_equipe_id",
+            ondelete="RESTRICT",
+        ),
+        sa.Index("ix_prospection_equipe_id", "equipe_id"),
         # #revalidation-prospection (migration 0062) — même paire d'index que
         # TraitementAerienModel.traitement_origine_id : un plain index pour les
         # jointures/recherches, et l'index unique partiel qui garantit la

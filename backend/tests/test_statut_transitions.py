@@ -25,13 +25,18 @@ def _headers(user: Utilisateur) -> dict:
 
 
 async def _creer_prospection(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_id: uuid.UUID,
 ) -> str:
     resp = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
+            "equipe_id": str(equipe_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
             "biotope": ["xerophyle"],
@@ -72,8 +77,11 @@ async def test_transition_brouillon_en_attente(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     code = await _changer_statut(client, pid, "en_attente", auth_headers)
     assert code == 200
 
@@ -88,9 +96,12 @@ async def test_transition_en_attente_verifiee(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     code = await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     assert code == 200
@@ -112,10 +123,13 @@ async def test_transition_verifiee_validee(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(client, pid, "validee", _headers(validateur))
@@ -137,10 +151,13 @@ async def test_transition_verifiee_rejetee(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(client, pid, "rejetee", _headers(validateur))
@@ -162,9 +179,12 @@ async def test_admin_peut_verifier(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     admin: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     code = await _changer_statut(client, pid, "verifiee", _headers(admin))
     assert code == 200
@@ -182,9 +202,12 @@ async def test_admin_peut_valider(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     admin: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(admin))
     code = await _changer_statut(client, pid, "validee", _headers(admin))
@@ -203,9 +226,15 @@ async def test_admin_peut_valider(
 
 @pytest.mark.asyncio
 async def test_transition_invalide_brouillon_validee(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     code = await _changer_statut(client, pid, "validee", auth_headers)
     assert code == 400
 
@@ -217,9 +246,12 @@ async def test_transition_invalide_en_attente_validee(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     validateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     code = await _changer_statut(client, pid, "validee", _headers(validateur))
     assert code == 400
@@ -237,8 +269,11 @@ async def test_prospecteur_ne_peut_pas_verifier(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     # Le même prospecteur tente de vérifier
     code = await _changer_statut(client, pid, "verifiee", auth_headers)
@@ -252,9 +287,12 @@ async def test_verificateur_ne_peut_pas_valider(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(client, pid, "validee", _headers(verificateur))
@@ -273,8 +311,11 @@ async def test_audit_log_cree_lors_transition(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
 
     resp = await client.get(f"/prospections/{pid}/audit-log", headers=auth_headers)
@@ -292,9 +333,12 @@ async def test_audit_log_plusieurs_transitions(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
 
@@ -310,6 +354,7 @@ async def test_rejet_conserve_le_motif_dans_le_log_audit(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
@@ -317,7 +362,9 @@ async def test_rejet_conserve_le_motif_dans_le_log_audit(
     transitait déjà jusqu'à l'API mais `ChangerStatut.execute()` l'ignorait :
     la fiche changeait bien de statut, le motif saisi disparaissait sans
     jamais être stocké — impossible de l'afficher ensuite (#toutes-les-donnees)."""
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     code = await _changer_statut(
@@ -343,8 +390,11 @@ async def test_ajouter_commentaire(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
 
     resp = await client.post(
         f"/prospections/{pid}/commentaire",
@@ -376,10 +426,13 @@ async def _valider_prospection(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ) -> str:
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     await _changer_statut(client, pid, "validee", _headers(validateur))
@@ -393,6 +446,7 @@ async def test_disponible_pour_traitement_exclut_une_fiche_deja_traitee(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
     chef_equipe: Utilisateur,
@@ -402,15 +456,16 @@ async def test_disponible_pour_traitement_exclut_une_fiche_deja_traitee(
     transformée (par n'importe quel utilisateur) doit en disparaître — sans
     être supprimée (elle garde son historique, cf. GET /prospections/{id})."""
     pid_disponible = await _valider_prospection(
-        client, auth_headers, campagne_id, station_id, verificateur, validateur
+        client, auth_headers, campagne_id, station_id, equipe_terrestre_id, verificateur, validateur
     )
     pid_deja_traitee = await _valider_prospection(
-        client, auth_headers, campagne_id, station_id, verificateur, validateur
+        client, auth_headers, campagne_id, station_id, equipe_terrestre_id, verificateur, validateur
     )
     creation = await client.post(
         "/traitements",
         json={
             "prospection_id": pid_deja_traitee,
+            "equipe_id": str(equipe_terrestre_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",

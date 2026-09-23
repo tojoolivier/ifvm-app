@@ -5,8 +5,10 @@ from sqlalchemy import (
     TIMESTAMP,
     Boolean,
     CheckConstraint,
+    Computed,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
@@ -71,6 +73,25 @@ class TraitementModel(Base):
     observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
     statut: Mapped[str] = mapped_column(String(30), nullable=False, default="brouillon")
     statut_sync: Mapped[str] = mapped_column(String(30), nullable=False, default="local")
+    # Équipe (#607, ADR-018) : nullable en base, exigée côté TraitementCreate pour
+    # toute nouvelle fiche. Portée par la fiche de base (pas aerien/terrestre) :
+    # `type_traitement` détermine déjà le type d'équipe sans ambiguïté (contrairement
+    # à la prospection, où l'axe aérien est orthogonal à `type_prospection` via
+    # `mode_extensif`) — `equipe_type` est donc `GENERATED ALWAYS ... STORED` à partir
+    # de `type_traitement` seul, même patron que `_equipe_type_genere` de
+    # referentiel_model.py mais avec un mapping AERIEN/TERRESTRE -> aerien/terrestre
+    # au lieu d'une constante.
+    equipe_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    equipe_type: Mapped[str | None] = mapped_column(
+        Text(),
+        Computed(
+            "CASE WHEN equipe_id IS NULL THEN NULL "
+            "WHEN type_traitement = 'AERIEN' THEN 'aerien' "
+            "ELSE 'terrestre' END",
+            persisted=True,
+        ),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
     )
@@ -113,6 +134,13 @@ class TraitementModel(Base):
         # Nom de contrainte conservé pour continuité malgré l'inversion du sens : elle
         # porte toujours sur la relation date_traitement/date_validation.
         CheckConstraint("date_traitement >= date_validation", name="ck_traitement_date_validation"),
+        ForeignKeyConstraint(
+            ["equipe_id", "equipe_type"],
+            ["equipe.id", "equipe.type"],
+            name="fk_traitement_equipe_id",
+            ondelete="RESTRICT",
+        ),
+        Index("ix_traitement_equipe_id", "equipe_id"),
     )
 
 

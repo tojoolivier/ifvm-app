@@ -12,7 +12,30 @@ from app.domain.prospection import (
     StadeInconnuError,
     valider_surfaces_prospection,
 )
-from app.domain.repositories import AuditLogRepository, ProspectionRepository
+from app.domain.repositories import AuditLogRepository, EquipeRepository, ProspectionRepository
+
+
+def _type_equipe_attendu(type_prospection: str, mode_extensif: str | None) -> str:
+    """Type d'équipe imposé par la fiche (#607) — même règle que le CASE de
+    `ProspectionModel.equipe_type` (colonne générée), dupliquée ici pour échouer
+    explicitement (ValueError -> 422) avant l'écriture plutôt que de laisser
+    remonter une violation de FK composite anonyme."""
+    if type_prospection in ("intensive", "validation"):
+        return "terrestre"
+    return "aerien" if mode_extensif == "aerien" else "terrestre"
+
+
+async def _valider_equipe(
+    equipe_repository: EquipeRepository, equipe_id: uuid.UUID, type_attendu: str
+) -> None:
+    equipe = await equipe_repository.get_by_id(equipe_id)
+    if equipe is None:
+        raise ValueError(f"equipe_id {equipe_id} ne référence aucune équipe du référentiel")
+    if equipe.type != type_attendu:
+        raise ValueError(
+            f"equipe_id {equipe_id} référence une équipe '{equipe.type}', "
+            f"attendu '{type_attendu}' pour cette fiche"
+        )
 
 
 async def _verifier_stades(
@@ -43,9 +66,11 @@ class CreateProspection:
     def __init__(
         self,
         repository: ProspectionRepository,
+        equipe_repository: EquipeRepository,
         audit_repo: AuditLogRepository | None = None,
     ):
         self.repository = repository
+        self.equipe_repository = equipe_repository
         # Optionnel, rétrocompatible : seule la route l'a toujours fourni en
         # pratique. `None` reste accepté pour ne pas casser un appelant qui ne
         # se soucierait pas des notifications (ex. import de masse).
@@ -56,6 +81,7 @@ class CreateProspection:
         type_prospection: str,
         campagne_id: uuid.UUID,
         prospecteur_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         date_prospection: date,
         station_id: uuid.UUID | None = None,
         n_fiche: str | None = None,
@@ -149,6 +175,12 @@ class CreateProspection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
 
+        await _valider_equipe(
+            self.equipe_repository,
+            equipe_id,
+            _type_equipe_attendu(type_prospection, mode_extensif),
+        )
+
         await _verifier_stades(self.repository, captures)
         valider_surfaces_prospection(surface_prospectee, surface_infestee)
 
@@ -210,6 +242,7 @@ class CreateProspection:
             statut=statut,
             validated_at=validated_at,
             revalide_de_id=revalide_de_id,
+            equipe_id=equipe_id,
             created_at=now,
             updated_at=now,
             populations=populations or [],
@@ -324,6 +357,7 @@ class ListProspections:
         campagne_id: uuid.UUID | None = None,
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
+        equipe_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
     ) -> list[Prospection]:
@@ -333,6 +367,7 @@ class ListProspections:
             campagne_id=campagne_id,
             station_id=station_id,
             prospecteur_id=prospecteur_id,
+            equipe_id=equipe_id,
             disponible_pour_traitement=disponible_pour_traitement,
             a_revalider=a_revalider,
         )

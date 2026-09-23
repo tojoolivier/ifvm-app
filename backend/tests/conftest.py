@@ -404,6 +404,19 @@ async def equipe_terrestre(db_session: AsyncSession, chef_equipe: Utilisateur):
 
 
 @pytest_asyncio.fixture
+async def equipe_terrestre_id(equipe_terrestre) -> uuid.UUID:
+    """#607 : payload le plus courant (`prospection`/`traitement` terrestre ne
+    veulent qu'un id, pas l'objet équipe complet) — même patron que `station_id`."""
+    return equipe_terrestre.id
+
+
+@pytest_asyncio.fixture
+async def equipe_aerienne_id(equipe_aerienne) -> uuid.UUID:
+    """#607, pendant aérien de `equipe_terrestre_id`."""
+    return equipe_aerienne.id
+
+
+@pytest_asyncio.fixture
 async def campagne_id(db_session: AsyncSession, utilisateur: Utilisateur) -> uuid.UUID:
     from datetime import date
 

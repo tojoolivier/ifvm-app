@@ -44,9 +44,12 @@ async def test_prospecteur_voit_la_verification_de_sa_fiche(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
 
@@ -66,10 +69,13 @@ async def test_prospecteur_ne_voit_pas_les_fiches_dun_autre(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
     autre_prospecteur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
 
@@ -85,10 +91,13 @@ async def test_rejet_expose_le_motif_dans_la_notification(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     await _changer_statut(
@@ -107,9 +116,12 @@ async def test_admin_voit_toutes_les_fiches_et_la_creation(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     admin: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
 
     resp = await client.get("/prospections/notifications", headers=_headers(admin))
     assert resp.status_code == 200
@@ -125,9 +137,12 @@ async def test_marquer_vues_fait_retomber_le_compteur_a_zero(
     auth_headers: dict,
     campagne_id: uuid.UUID,
     station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
     verificateur: Utilisateur,
 ):
-    pid = await _creer_prospection(client, auth_headers, campagne_id, station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, station_id, equipe_id=equipe_terrestre_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
 

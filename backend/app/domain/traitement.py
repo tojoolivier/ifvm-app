@@ -641,6 +641,10 @@ class Traitement:
     observations: str | None = None
     statut: str = "brouillon"
     statut_sync: str = "local"
+    # Équipe qui a mené la fiche (#607, ADR-018) — nullable (fiches déjà
+    # enregistrées avant ce chantier), exigée côté TraitementCreate pour
+    # toute nouvelle fiche (cf. _valider_equipe dans traitement_use_cases.py).
+    equipe_id: uuid.UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 

@@ -237,6 +237,10 @@ class Prospection:
     # traitement) — mirroir de Traitement.traitement_origine_id, cf. migration
     # 0062. `None` : fiche "normale", jamais une revalidation.
     revalide_de_id: uuid.UUID | None = None
+    # Équipe qui a mené la fiche (#607, ADR-018) — nullable (fiches déjà
+    # enregistrées avant ce chantier), exigée côté ProspectionCreate pour
+    # toute nouvelle fiche (cf. CreateProspection._valider_equipe).
+    equipe_id: uuid.UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 

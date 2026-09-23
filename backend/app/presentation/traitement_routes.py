@@ -49,7 +49,10 @@ from app.domain.traitement import (
 )
 from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
-from app.infrastructure.referentiel_sync_repository import SiteAerienneRepositoryImpl
+from app.infrastructure.referentiel_sync_repository import (
+    EquipeRepositoryImpl,
+    SiteAerienneRepositoryImpl,
+)
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
@@ -95,6 +98,7 @@ async def list_traitements(
 def _champs_communs(body: TraitementCreate) -> dict[str, Any]:
     return dict(
         prospection_id=body.prospection_id,
+        equipe_id=body.equipe_id,
         numero_fiche=body.numero_fiche,
         mode_traitement=body.mode_traitement,
         date_traitement=body.date_traitement,
@@ -153,6 +157,7 @@ async def create_traitement(
     prospection_repository = ProspectionRepositoryImpl(db)
     utilisateur_repository = UtilisateurRepositoryImpl(db)
     site_aerienne_repository = SiteAerienneRepositoryImpl(db)
+    equipe_repository = EquipeRepositoryImpl(db)
     try:
         if body.aerien is not None:
             use_case = CreateTraitementAerien(
@@ -160,6 +165,7 @@ async def create_traitement(
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
                 site_aerienne_repository=site_aerienne_repository,
+                equipe_repository=equipe_repository,
             )
             return await use_case.execute(
                 **_champs_communs(body),
@@ -185,6 +191,7 @@ async def create_traitement(
             traitement_repository=repository,
             prospection_repository=prospection_repository,
             utilisateur_repository=utilisateur_repository,
+            equipe_repository=equipe_repository,
         )
         return await use_case_terrestre.execute(
             **_champs_communs(body),
@@ -242,6 +249,7 @@ async def sync_traitement(
     prospection_repository = ProspectionRepositoryImpl(db)
     utilisateur_repository = UtilisateurRepositoryImpl(db)
     site_aerienne_repository = SiteAerienneRepositoryImpl(db)
+    equipe_repository = EquipeRepositoryImpl(db)
     try:
         if body.aerien is not None:
             use_case = SyncPushTraitementAerien(
@@ -249,6 +257,7 @@ async def sync_traitement(
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
                 site_aerienne_repository=site_aerienne_repository,
+                equipe_repository=equipe_repository,
             )
             traitement, cree = await use_case.execute(
                 traitement_id=body.id,
@@ -277,6 +286,7 @@ async def sync_traitement(
                 traitement_repository=repository,
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
+                equipe_repository=equipe_repository,
             )
             traitement, cree = await use_case_terrestre.execute(
                 traitement_id=body.id,

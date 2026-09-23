@@ -2735,6 +2735,11 @@ export interface components {
              * Format: uuid
              */
             campagne_id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
             /** Station Id */
             station_id?: string | null;
             /** N Fiche */
@@ -2991,6 +2996,8 @@ export interface components {
             validated_at?: string | null;
             /** Revalide De Id */
             revalide_de_id?: string | null;
+            /** Equipe Id */
+            equipe_id?: string | null;
             /** Prospecteur Nom */
             prospecteur_nom?: string | null;
             /** Verified By Nom */
@@ -3807,6 +3814,11 @@ export interface components {
              * Format: uuid
              */
             prospection_id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
             /** Numero Fiche */
             numero_fiche?: string | null;
             mode_traitement?: components["schemas"]["ModeTraitement"] | null;
@@ -4029,6 +4041,8 @@ export interface components {
             statut: components["schemas"]["StatutTraitement"];
             /** Statut Sync */
             statut_sync: string;
+            /** Equipe Id */
+            equipe_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4069,6 +4083,11 @@ export interface components {
              * Format: uuid
              */
             prospection_id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
             /** Numero Fiche */
             numero_fiche?: string | null;
             mode_traitement?: components["schemas"]["ModeTraitement"] | null;
@@ -6648,6 +6667,8 @@ export interface operations {
                 campagne_id?: string | null;
                 station_id?: string | null;
                 prospecteur_id?: string | null;
+                /** @description Interventions menées par cette équipe, triées par date_prospection décroissante (#607) — la position courante d'une équipe mobile terrestre se déduit de la première ligne. */
+                equipe_id?: string | null;
                 /** @description N'inclut que les fiches sans traitement associé, ni périmées (#revalidation-prospection : extensive/validation validées depuis plus de 5 jours sans traitement) — « Fiches de traitement → Consulter une fiche validée » (mobile), combiné à statut=validee. */
                 disponible_pour_traitement?: boolean;
                 /** @description N'inclut que les fiches périmées (#revalidation-prospection) — exactement celles qu'exclut disponible_pour_traitement pour cette raison, sans traitement associé et pas déjà revalidées. */

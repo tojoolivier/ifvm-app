@@ -4,6 +4,7 @@ from typing import Any
 
 from app.domain.prospection import Prospection
 from app.domain.repositories import (
+    EquipeRepository,
     ProspectionRepository,
     SiteAerienneRepository,
     TraitementRepository,
@@ -73,6 +74,25 @@ def _valider_dates(date_traitement: date, date_validation: date) -> None:
         raise ValueError("date_traitement doit être postérieure ou égale à date_validation")
 
 
+async def _valider_equipe(
+    equipe_repository: EquipeRepository, equipe_id: uuid.UUID, type_attendu: str
+) -> None:
+    """Partagée entre les quatre use cases de création/sync (#607) — même
+    principe que `_valider_site_principal` : échouer explicitement (ValueError
+    -> 422) avant l'écriture plutôt que de laisser remonter une violation de FK
+    composite anonyme. `type_attendu` ne dépend que de `type_traitement`, sans
+    ambiguïté (contrairement à la prospection, cf. `equipe_type` généré de
+    `TraitementModel`)."""
+    equipe = await equipe_repository.get_by_id(equipe_id)
+    if equipe is None:
+        raise ValueError(f"equipe_id {equipe_id} ne référence aucune équipe du référentiel")
+    if equipe.type != type_attendu:
+        raise ValueError(
+            f"equipe_id {equipe_id} référence une équipe '{equipe.type}', "
+            f"attendu '{type_attendu}' pour cette fiche"
+        )
+
+
 async def _valider_site_principal(
     site_aerienne_repository: SiteAerienneRepository, site_principal_id: uuid.UUID
 ) -> None:
@@ -104,6 +124,7 @@ def _construire_traitement_base(
     base_numero: str,
     traitement_id: uuid.UUID | None = None,
     type_traitement: str,
+    equipe_id: uuid.UUID,
     mode_traitement: str | None,
     date_traitement: date,
     date_validation: date,
@@ -150,6 +171,7 @@ def _construire_traitement_base(
         prospection_id=prospection.id,
         numero_fiche=base_numero,
         type_traitement=type_traitement,
+        equipe_id=equipe_id,
         mode_traitement=mode_traitement,
         date_traitement=date_traitement,
         date_validation=date_validation,
@@ -207,11 +229,13 @@ class CreateTraitementAerien:
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
         site_aerienne_repository: SiteAerienneRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
         self.site_aerienne_repository = site_aerienne_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -224,6 +248,7 @@ class CreateTraitementAerien:
         chef_de_base_id: uuid.UUID,
         base_principale: str,
         site_principal_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         immatricule_aeronef: str,
         consultant_international: str | None = None,
         stand: str | None = None,
@@ -315,6 +340,7 @@ class CreateTraitementAerien:
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
         await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
+        await _valider_equipe(self.equipe_repository, equipe_id, "aerien")
 
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
@@ -324,6 +350,7 @@ class CreateTraitementAerien:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="AERIEN",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,
@@ -408,10 +435,12 @@ class CreateTraitementTerrestre:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -424,6 +453,7 @@ class CreateTraitementTerrestre:
         vitesse_vent_ms: float,
         temperature_c: float,
         chef_equipe_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         direction_vent: str | None = None,
         agent_encadreur: str | None = None,
         consultant_international: str | None = None,
@@ -518,6 +548,8 @@ class CreateTraitementTerrestre:
                 "avec le rôle 'chef_equipe'"
             )
 
+        await _valider_equipe(self.equipe_repository, equipe_id, "terrestre")
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Terrestre"
         )
@@ -526,6 +558,7 @@ class CreateTraitementTerrestre:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="TERRESTRE",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,
@@ -1109,11 +1142,13 @@ class SyncPushTraitementAerien:
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
         site_aerienne_repository: SiteAerienneRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
         self.site_aerienne_repository = site_aerienne_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -1128,6 +1163,7 @@ class SyncPushTraitementAerien:
         chef_de_base_id: uuid.UUID,
         base_principale: str,
         site_principal_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         immatricule_aeronef: str,
         consultant_international: str | None = None,
         stand: str | None = None,
@@ -1226,6 +1262,7 @@ class SyncPushTraitementAerien:
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
         await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
+        await _valider_equipe(self.equipe_repository, equipe_id, "aerien")
 
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
@@ -1236,6 +1273,7 @@ class SyncPushTraitementAerien:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="AERIEN",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,
@@ -1351,10 +1389,12 @@ class SyncPushTraitementTerrestre:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -1369,6 +1409,7 @@ class SyncPushTraitementTerrestre:
         vitesse_vent_ms: float,
         temperature_c: float,
         chef_equipe_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         direction_vent: str | None = None,
         agent_encadreur: str | None = None,
         consultant_international: str | None = None,
@@ -1469,6 +1510,8 @@ class SyncPushTraitementTerrestre:
                 "avec le rôle 'chef_equipe'"
             )
 
+        await _valider_equipe(self.equipe_repository, equipe_id, "terrestre")
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Terrestre"
         )
@@ -1478,6 +1521,7 @@ class SyncPushTraitementTerrestre:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="TERRESTRE",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,

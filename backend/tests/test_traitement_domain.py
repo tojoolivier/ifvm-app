@@ -446,9 +446,29 @@ class FakeSiteAerienneRepo:
         return self.site
 
 
+class _FakeEquipe:
+    def __init__(self, type_equipe: str):
+        self.type = type_equipe
+
+
+class FakeEquipeRepo:
+    """#607 : renvoie une équipe du type demandé par le test pour n'importe quel
+    id — `_valider_equipe` ne compare que `equipe.type`, jamais l'identité."""
+
+    def __init__(self, type_equipe: str | None = "aerien"):
+        self.type_equipe = type_equipe
+
+    async def get_by_id(self, equipe_id):
+        if self.type_equipe is None:
+            return None
+        return _FakeEquipe(self.type_equipe)
+
+
 _CHEF = UtilisateurRef(id=uuid.uuid4(), prenom="Hery", role="chef_de_base")
 _SITE_PRINCIPAL_ID = uuid.uuid4()
 _SITE_PRINCIPAL = object()  # get_by_id ne renvoie jamais None => site trouvé
+_EQUIPE_AERIENNE_ID = uuid.uuid4()
+_EQUIPE_TERRESTRE_ID = uuid.uuid4()
 
 
 def _use_case(
@@ -456,6 +476,7 @@ def _use_case(
     chef: UtilisateurRef | None = None,
     conflits: int = 0,
     site_principal: object | None = _SITE_PRINCIPAL,
+    type_equipe: str | None = "aerien",
 ) -> tuple[CreateTraitementAerien, FakeTraitementRepo]:
     repo = FakeTraitementRepo(conflits=conflits)
     return (
@@ -464,6 +485,7 @@ def _use_case(
             prospection_repository=FakeProspectionRepo(prospection),
             utilisateur_repository=FakeUtilisateurRepo(chef),
             site_aerienne_repository=FakeSiteAerienneRepo(site_principal),
+            equipe_repository=FakeEquipeRepo(type_equipe),
         ),
         repo,
     )
@@ -480,6 +502,7 @@ def _args(**overrides):
         chef_de_base_id=_CHEF.id,
         base_principale="Base Betioky",
         site_principal_id=_SITE_PRINCIPAL_ID,
+        equipe_id=_EQUIPE_AERIENNE_ID,
         immatricule_aeronef="5R-XYZ",
     )
     args.update(overrides)
@@ -1237,6 +1260,7 @@ def _use_case_terrestre(
     conflits: int = 0,
     traitements_par_id: dict | None = None,
     origines_deja_utilisees: set | None = None,
+    type_equipe: str | None = "terrestre",
 ) -> tuple[CreateTraitementTerrestre, FakeTraitementRepo]:
     repo = FakeTraitementRepo(
         conflits=conflits,
@@ -1248,6 +1272,7 @@ def _use_case_terrestre(
             traitement_repository=repo,
             prospection_repository=FakeProspectionRepo(prospection),
             utilisateur_repository=FakeUtilisateurRepo(chef),
+            equipe_repository=FakeEquipeRepo(type_equipe),
         ),
         repo,
     )
@@ -1264,6 +1289,7 @@ def _args_terrestre(**overrides):
         vitesse_vent_ms=1.5,
         temperature_c=24.0,
         chef_equipe_id=_CHEF_EQUIPE.id,
+        equipe_id=_EQUIPE_TERRESTRE_ID,
     )
     args.update(overrides)
     return args
@@ -2284,6 +2310,7 @@ def _sync_terrestre_args(fiche_id, base_updated_at, **overrides):
         vitesse_vent_ms=1.5,
         temperature_c=24.0,
         chef_equipe_id=_CHEF_EQUIPE.id,
+        equipe_id=_EQUIPE_TERRESTRE_ID,
         surface_atomiseur_ha=10.0,
         surface_restante_abandonnee=False,
         numero_fiche="Hery-Terrestre-2026-08-11",
@@ -2301,6 +2328,7 @@ def _sync_use_case(existant: Traitement | None = None):
                 _prospection(id=_PROSPECTION_ID_SYNC, surface_infestee=100.0)
             ),
             utilisateur_repository=FakeUtilisateurRepo(_CHEF_EQUIPE),
+            equipe_repository=FakeEquipeRepo("terrestre"),
         ),
         repo,
     )

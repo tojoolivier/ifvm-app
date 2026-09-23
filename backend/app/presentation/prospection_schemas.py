@@ -448,6 +448,11 @@ class OperationAerienneRead(BaseModel):
 class ProspectionCreate(BaseModel):
     type_prospection: TypeProspection
     campagne_id: uuid.UUID
+    # Équipe qui a mené la fiche (#607) — nullable en base (rétro-compatibilité),
+    # exigée ici pour toute nouvelle fiche. Une intensive/validation ne peut être
+    # rattachée qu'à une équipe terrestre (validée côté serveur, cf.
+    # CreateProspection._valider_equipe) ; une extensive suit `mode_extensif`.
+    equipe_id: uuid.UUID
     station_id: uuid.UUID | None = None
     n_fiche: str | None = None
     n_message: str | None = None
@@ -737,6 +742,7 @@ class ProspectionRead(BaseModel):
     # #revalidation-prospection : auto-référence vers la fiche périmée que
     # celle-ci revalide, `None` pour une fiche "normale" (cf. migration 0062).
     revalide_de_id: uuid.UUID | None = None
+    equipe_id: uuid.UUID | None = None
     # Champs dérivés (jointure `utilisateur`, jamais stockés) — évite à chaque
     # client de résoudre lui-même id -> nom pour l'affichage.
     prospecteur_nom: str | None = None
