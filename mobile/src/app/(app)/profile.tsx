@@ -17,6 +17,7 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
 import { OtaSection } from '@/components/ota-section';
 import { buildNatif, formatVersionBuild, versionApp } from '@/lib/ota';
+import { useThemeStore } from '@/lib/theme-store';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_BG = '#E8F5E9';
@@ -41,9 +42,10 @@ export default function ProfileScreen() {
   const setDebugEnabled = useDebugStore((s) => s.setEnabled);
   const fontScaleLevel = useFontScaleStore((s) => s.level);
   const setFontScaleLevel = useFontScaleStore((s) => s.setLevel);
+  const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
 
   const [locationEnabled, setLocationEnabled] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const { run: runImage, isRunning: isLoading } = useAsyncAction();
   const { run: runSync, isRunning: isSyncing } = useAsyncAction();
@@ -490,8 +492,10 @@ export default function ProfileScreen() {
             <PreferenceItem
               icon="🌙"
               label="Mode sombre"
-              value={darkMode}
-              onToggle={setDarkMode}
+              value={themeMode === 'dark'}
+              onToggle={async (value) => {
+                await setThemeMode(value ? 'dark' : 'light');
+              }}
             />
             <PreferenceChoice
               icon="🔤"
