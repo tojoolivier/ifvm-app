@@ -62,12 +62,23 @@ const FILL_BG = '#fdf6e3';
  * numérotation serveur pour l'extensif. #sigle-utilisateur-numero-fiche : le
  * sigle de l'utilisateur connecté s'insère entre la date et le suffixe final
  * quand il est renseigné — jamais une chaîne vide (pas de tiret orphelin).
+ *
+ * #numero-fiche-extensive-terr-aer : `suffixeMode` ajoute « -TERR »/« -AER »
+ * en toute fin, pour une fiche de prospection Extensive (jamais une
+ * vérification de signalement — cf. appelant) — distingue les deux modes
+ * d'un seul coup d'œil sur le numéro, sans ouvrir la fiche.
  */
-function generateNumeroMessage(draftId: string, dateProspection: string, sigle?: string | null): string {
+function generateNumeroMessage(
+  draftId: string,
+  dateProspection: string,
+  sigle?: string | null,
+  suffixeMode?: 'TERR' | 'AER' | null
+): string {
   const datePart = dateProspection.replace(/-/g, '');
   const idPart = draftId.replace(/-/g, '').slice(0, 4).toUpperCase();
   const sigleParts = sigle ? `${sigle}-` : '';
-  return `${datePart}-${sigleParts}${idPart}`;
+  const suffixe = suffixeMode ? `-${suffixeMode}` : '';
+  return `${datePart}-${sigleParts}${idPart}${suffixe}`;
 }
 
 // ==========================================
@@ -226,6 +237,10 @@ export default function ExtensiveReferenceScreen() {
   // que si le mode a été explicitement choisi sur extensive-mode-chooser.tsx — le
   // reste de cet écran (et de la fiche) reste identique dans tous les autres cas.
   const isAerien = draft?.mode_extensif === 'aerien';
+  // #numero-fiche-extensive-terr-aer : jamais pour une vérification de
+  // signalement (`isValidation`) — seulement la prospection Extensive
+  // elle-même, comme demandé.
+  const suffixeNumeroMode: 'TERR' | 'AER' | null = isValidation ? null : isAerien ? 'AER' : 'TERR';
   // #revalidation-verrouillage-localisation : une fiche née de « Prospections
   // à revalider » (`demarrerRevalidation`) documente la MÊME localisation que
   // la fiche périmée qu'elle revalide — revérifier une situation ne veut pas
@@ -272,7 +287,8 @@ export default function ExtensiveReferenceScreen() {
   const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
   const [surfaceInfestee, setSurfaceInfestee] = useState(draft?.surface_infestee != null ? String(draft.surface_infestee) : '');
   const [nMessage, setNMessage] = useState(
-    draft?.n_message ?? (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection, user?.sigle) : '')
+    draft?.n_message ??
+      (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection, user?.sigle, suffixeNumeroMode) : '')
   );
   // Horodatage technique (ISO) de l'heure d'observation — même mécanisme que
   // observations.tsx côté Intensif (`getCurrentPosition().timestamp`, colonne
@@ -453,7 +469,15 @@ export default function ExtensiveReferenceScreen() {
       setSelectedTypeStation(parseSelectionMultiple(draft.type_station));
       setSurfaceStation(draft.surface_station != null ? String(draft.surface_station) : '');
       setSurfaceInfestee(draft.surface_infestee != null ? String(draft.surface_infestee) : '');
-      setNMessage(draft.n_message ?? generateNumeroMessage(draft.id, draft.date_prospection, user?.sigle));
+      setNMessage(
+        draft.n_message ??
+          generateNumeroMessage(
+            draft.id,
+            draft.date_prospection,
+            user?.sigle,
+            draft.type_prospection === 'validation' ? null : draft.mode_extensif === 'aerien' ? 'AER' : 'TERR'
+          )
+      );
       if (draft.heure_observation_at) setHeureObservationAt(draft.heure_observation_at);
       // Mode aérien uniquement — sans effet sur une fiche terrestre (colonnes NULL).
       setSociete(draft.societe ?? '');
