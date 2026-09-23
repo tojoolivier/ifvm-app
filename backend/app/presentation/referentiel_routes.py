@@ -64,7 +64,7 @@ from app.application.referentiel_use_cases import (
     UpdateVol,
     UpdateZoneAntiAcridien,
 )
-from app.auth import get_current_user
+from app.auth import get_current_user, require_admin
 from app.database import get_db
 from app.domain.referentiel import (
     Aeronef,
@@ -1072,12 +1072,8 @@ async def cloturer_affectation_aeronef(
 async def create_aeronef(
     body: AeronefCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    acteur: Annotated[Utilisateur, Depends(get_current_user)],
+    _: Annotated[Utilisateur, Depends(require_admin)],
 ):
-    if acteur.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs"
-        )
     try:
         return await CreateAeronef(AeronefRepositoryImpl(db)).execute(
             immatriculation=body.immatriculation,
@@ -1121,13 +1117,9 @@ async def update_aeronef(
     aeronef_id: uuid.UUID,
     body: AeronefUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    acteur: Annotated[Utilisateur, Depends(get_current_user)],
+    _: Annotated[Utilisateur, Depends(require_admin)],
 ):
     # Le parc d'hélicoptères est une donnée d'administration : réservé aux admins.
-    if acteur.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs"
-        )
     use_case = UpdateAeronef(AeronefRepositoryImpl(db))
     try:
         return await use_case.execute(

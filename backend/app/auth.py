@@ -84,3 +84,11 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur introuvable"
         )
     return user
+
+
+async def require_admin(current_user=Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs"
+        )
+    return current_user
