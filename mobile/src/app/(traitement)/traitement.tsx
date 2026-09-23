@@ -280,6 +280,12 @@ export default function TraitementScreen() {
             pesticideUnite: store.terrestre.pesticideUnite,
             pesticideRecuL: store.terrestre.pesticideRecuL,
             stockInitialL: store.terrestre.stockInitialL,
+            // #recap-terrestre-moyens-produits-vides : mêmes valeurs que celles déjà
+            // affichées en direct sur cet écran (TerrestreForm) — jusqu'ici jamais
+            // renvoyées à `updateTraitementTerrestre`, donc jamais retrouvées par le
+            // récapitulatif.
+            totalPesticideL: totalPesticideTerrestre,
+            pesticideStockRestantL: pesticideStockRestantTerrestre,
             taux_mortalite_pourcent: store.terrestre.taux_mortalite_pourcent,
             evaluation_efficacite_heures_apres: store.terrestre.evaluation_efficacite_heures_apres,
             methode_evaluation_efficacite: store.terrestre.methode_evaluation_efficacite,

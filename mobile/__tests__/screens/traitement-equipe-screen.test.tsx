@@ -350,6 +350,13 @@ describe('TraitementScreen (Équipe, Terrestre) — persistance des produits uti
         expect.objectContaining({ produit_id: 'prod-1' })
       )
     );
+    // #recap-terrestre-moyens-produits-vides : ces deux valeurs, déjà affichées en
+    // direct sur cet écran, doivent désormais être transmises à la sauvegarde —
+    // sans quoi le récapitulatif les retrouve toujours vides.
+    expect(traitementRepository.updateTraitementTerrestre).toHaveBeenCalledWith(
+      'trait-1',
+      expect.objectContaining({ totalPesticideL: 5, pesticideStockRestantL: null })
+    );
     const ordrePurge = jest.mocked(traitementRepository.deleteAllProduitsForTraitementTerrestre).mock
       .invocationCallOrder[0];
     const ordreAjout = jest.mocked(traitementRepository.addProduitUtilise).mock.invocationCallOrder[0];

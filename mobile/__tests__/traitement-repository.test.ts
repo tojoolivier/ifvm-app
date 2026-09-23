@@ -240,6 +240,29 @@ describe('updateTraitementTerrestre', () => {
       expect.arrayContaining([TERRESTRE_INPUT.chefEquipeId, '08:00', '10:00'])
     );
   });
+
+  // #recap-terrestre-moyens-produits-vides : ces deux valeurs, calculées en
+  // direct sur l'écran « Équipe » (computeTotalPesticideTerrestre/
+  // computePesticideStockRestant), n'étaient jusqu'ici jamais transmises à
+  // cette fonction — le récapitulatif les retrouvait donc toujours vides.
+  it('persists totalPesticideL and pesticideStockRestantL (#recap-terrestre-moyens-produits-vides)', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({ ...STORED_TRAITEMENT_ROW, type_traitement: 'TERRESTRE' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([]);
+
+    await updateTraitementTerrestre(TERRESTRE_INPUT.id, {
+      chefEquipeId: TERRESTRE_INPUT.chefEquipeId,
+      totalPesticideL: 12,
+      pesticideStockRestantL: 8,
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('total_pesticide_l = ?'),
+      expect.arrayContaining([12, 8])
+    );
+  });
 });
 
 describe('updateTraitementMoyens', () => {

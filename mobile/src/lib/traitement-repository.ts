@@ -773,6 +773,13 @@ export interface TerrestreUpdateInput {
   taux_mortalite_pourcent?: number | null;
   evaluation_efficacite_heures_apres?: number | null;
   methode_evaluation_efficacite?: string | null;
+  // #recap-terrestre-moyens-produits-vides : calculés en direct sur l'écran
+  // « Équipe » (computeTotalPesticideTerrestre/computePesticideStockRestant,
+  // traitement-validation.ts) mais jamais persistés jusqu'ici — le récapitulatif,
+  // qui relit ces colonnes depuis la base plutôt que de recalculer, les trouvait
+  // donc toujours vides malgré une saisie complète.
+  totalPesticideL?: number | null;
+  pesticideStockRestantL?: number | null;
 }
 
 export async function updateTraitementTerrestre(
@@ -803,6 +810,8 @@ export async function updateTraitementTerrestre(
       pesticide_unite = ?,
       pesticide_recu_l = ?,
       stock_initial_l = ?,
+      total_pesticide_l = ?,
+      pesticide_stock_restant_l = ?,
       taux_mortalite_pourcent = ?,
       evaluation_efficacite_heures_apres = ?,
       methode_evaluation_efficacite = ?
@@ -828,6 +837,8 @@ export async function updateTraitementTerrestre(
       input.pesticideUnite ?? 'L',
       input.pesticideRecuL ?? null,
       input.stockInitialL ?? null,
+      input.totalPesticideL ?? null,
+      input.pesticideStockRestantL ?? null,
       input.taux_mortalite_pourcent ?? null,
       input.evaluation_efficacite_heures_apres ?? null,
       input.methode_evaluation_efficacite ?? null,

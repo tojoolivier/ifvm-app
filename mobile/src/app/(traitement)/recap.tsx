@@ -23,6 +23,8 @@ import {
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
+  computeTotalPesticideTerrestre,
+  computePesticideStockRestant,
 } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
 import { Toast, useTraitementToast } from '@/components/traitement/Toast';
@@ -253,6 +255,12 @@ export default function RecapScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const signaler = useErrorStore((s) => s.signaler);
   const logError = useErrorLogStore((s) => s.addEntry);
+  // #recap-terrestre-moyens-produits-vides : surface cumulée de la fiche
+  // D'ORIGINE (reprise de traitement), nécessaire à `computeSurfaceCumulee`
+  // ci-dessous — même lecture que traitement.tsx (`origineCumuleeHa`). Une
+  // fiche reprenable est forcément déjà `validee` et synchronisée (cf.
+  // listReprenableTraitements), donc cette valeur est toujours disponible.
+  const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
 
   useEffect(() => {
     if (!draft) return;
@@ -327,6 +335,37 @@ export default function RecapScreen() {
     chargerRecap();
   }, [chargerRecap]);
 
+  useEffect(() => {
+    const origineId = draft?.terrestre?.traitement_origine_id;
+    let cancelled = false;
+    if (draft?.terrestre?.reprise_traitement && origineId) {
+      void getTraitement(origineId)
+        .then((origine) => {
+          if (!cancelled) setOrigineCumuleeHa(origine?.terrestre?.surface_cumulee_ha ?? null);
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            logError({
+              message: toFriendlyError(error).message,
+              stack: error instanceof Error ? error.stack ?? null : null,
+              screen: 'recap',
+              context: { traitementId, source: 'getTraitement:origine' },
+            });
+          }
+        });
+    } else {
+      // Défère hors du tick synchrone de l'effet (react-hooks/set-state-in-effect),
+      // même choix que traitement.tsx.
+      void Promise.resolve().then(() => {
+        if (!cancelled) setOrigineCumuleeHa(null);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft?.terrestre?.reprise_traitement, draft?.terrestre?.traitement_origine_id]);
+
   if (!draft) {
     return (
       <SafeAreaView style={styles.container}>
@@ -377,11 +416,23 @@ export default function RecapScreen() {
           consultant_international: draft.terrestre?.consultant_international,
         }).map((r) => ({ ...r, signe: estSigne(r.role as SignatureRole) }));
 
+  // #recap-terrestre-moyens-produits-vides : `surface_traitee_ha`/`surface_cumulee_ha`/
+  // `surface_restante_ha` ne sont écrites en base qu'après synchronisation (dérivées
+  // côté serveur, cf. listReprenableTraitements) — tant que la fiche est encore locale,
+  // ces colonnes restent NULL. On recalcule alors la même estimation que l'écran
+  // « Équipe » (déjà montrée à l'agent pendant la saisie), plutôt que d'afficher
+  // « non renseigné » alors que tout a été rempli. La valeur serveur, une fois
+  // synchronisée, reprend le dessus (elle seule tient compte de tout ce que le
+  // serveur sait par ailleurs).
   const surfaceTraitee = draft.terrestre ? computeSurfaceTraitee(draft.terrestre) : 0;
   const surfaceCumulee = draft.terrestre
-    ? computeSurfaceCumulee(surfaceTraitee, draft.terrestre.reprise_traitement, draft.terrestre.surface_cumulee_ha)
+    ? computeSurfaceCumulee(surfaceTraitee, draft.terrestre.reprise_traitement, origineCumuleeHa)
     : 0;
   const surfaceRestante = draft.terrestre ? computeSurfaceRestante(draft.cible?.surface_infestee_ha, surfaceCumulee) : 0;
+  const totalPesticideTerrestre = draft.terrestre ? computeTotalPesticideTerrestre(draft.terrestre.produits) : 0;
+  const pesticideStockRestantTerrestre = draft.terrestre
+    ? computePesticideStockRestant(draft.terrestre.pesticide_recu_l, totalPesticideTerrestre, draft.terrestre.stock_initial_l)
+    : null;
 
   const errors = aggregateRecapErrors({
     typeTraitement: draft.type_traitement,
@@ -625,10 +676,10 @@ export default function RecapScreen() {
               {draft.mode_traitement === 'BARRIERE' ? (
                 <RecapLigne label="Surface protégée (ha)" value={display(draft.terrestre.surface_protegee_ha)} />
               ) : (
-                <RecapLigne label="Surface traitée (ha)" value={display(draft.terrestre.surface_traitee_ha)} />
+                <RecapLigne label="Surface traitée (ha)" value={display(draft.terrestre.surface_traitee_ha ?? surfaceTraitee)} />
               )}
-              <RecapLigne label="Surface cumulée (ha)" value={display(draft.terrestre.surface_cumulee_ha)} />
-              <RecapLigne label="Surface restante (ha)" value={display(draft.terrestre.surface_restante_ha)} />
+              <RecapLigne label="Surface cumulée (ha)" value={display(draft.terrestre.surface_cumulee_ha ?? surfaceCumulee)} />
+              <RecapLigne label="Surface restante (ha)" value={display(draft.terrestre.surface_restante_ha ?? surfaceRestante)} />
               {draft.terrestre.surface_restante_abandonnee && (
                 <RecapLigne label="Motif d'abandon" value={draft.terrestre.motif_surface_restante_abandonnee} />
               )}
@@ -645,7 +696,7 @@ export default function RecapScreen() {
               )}
               <RecapLigne
                 label={`Total pesticide (${draft.terrestre.pesticide_unite ?? 'L'})`}
-                value={display(draft.terrestre.total_pesticide_l)}
+                value={display(draft.terrestre.total_pesticide_l ?? totalPesticideTerrestre)}
               />
               <RecapLigne
                 label={`Stock initial (${draft.terrestre.pesticide_unite ?? 'L'})`}
@@ -657,10 +708,12 @@ export default function RecapScreen() {
               />
               <RecapLigne
                 label={`Stock Final (${draft.terrestre.pesticide_unite ?? 'L'})`}
-                value={display(draft.terrestre.pesticide_stock_restant_l)}
+                value={display(draft.terrestre.pesticide_stock_restant_l ?? pesticideStockRestantTerrestre)}
               />
-              <RecapLigne label="Essence (l)" value={display(draft.terrestre.essence_litres)} />
-              <RecapLigne label="Nombre de piles" value={display(draft.terrestre.nb_piles)} />
+              {/* #recap-terrestre-moyens-produits-vides : « Essence (l) »/« Nombre de
+                  piles » ici faisaient doublon avec la carte « Moyens & protection »
+                  ci-dessous (moyens_essence_litres/moyens_piles_nb), seule saisie
+                  réellement branchée sur un écran — retirées plutôt que dupliquées. */}
             </Card>
           </>
         )}
