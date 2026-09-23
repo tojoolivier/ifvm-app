@@ -378,10 +378,11 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
   });
 
   /**
-   * « Motif du divers » (#ux-aerien) : n'apparaît que pour Divers, disparaît pour
-   * Prospection, et se sauvegarde uniquement quand le type final est Divers.
+   * « Convoyage » et « Divers » retirés définitivement de la saisie
+   * (#operations-heures-vol, puis #type-operation-prospection-seule) : pour la
+   * prospection, le seul type d'opération proposé est « Prospection ».
    */
-  it("« Motif du divers » n'apparaît que pour le type Divers, et se sauvegarde avec l'opération", async () => {
+  it('ne propose plus que « Prospection » comme type d’opération', async () => {
     useProspectionWizardStore.setState({
       draft: {
         id: 'draft-123',
@@ -397,16 +398,15 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     await render(<ExtensiveReferenceScreen />);
     await screen.findByText('Informations sur les heures de vol');
 
-    // « Convoyage » retiré définitivement de la saisie (#operations-heures-vol),
-    // et Température/Vent ne sont plus proposés — seules les heures restent.
+    // « Convoyage »/« Divers » retirés définitivement de la saisie, et
+    // Température/Vent ne sont plus proposés — seules les heures restent.
     expect(screen.queryByText('Convoyage')).toBeNull();
+    expect(screen.queryByText('Divers')).toBeNull();
+    expect(screen.queryByText('Motif du divers')).toBeNull();
     expect(screen.queryByText('Température (°C)')).toBeNull();
     expect(screen.queryByText('Vent (m/s)')).toBeNull();
     expect(screen.getByText('Heure début opération')).toBeVisible();
     expect(screen.getByText('Heure fin opération')).toBeVisible();
-
-    // Aucun type choisi au départ : pas de champ Motif.
-    expect(screen.queryByText('Motif du divers')).toBeNull();
 
     fireEvent.press(screen.getByText('Prospection'));
     await waitFor(() =>
@@ -415,31 +415,21 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
       )
     );
     expect(screen.queryByText('Motif du divers')).toBeNull();
-
-    fireEvent.press(screen.getByText('Divers'));
-    expect(await screen.findByText('Motif du divers')).toBeVisible();
-
-    fireEvent.changeText(screen.getByPlaceholderText('Ex. Rinçage, maintenance, vérification…'), 'Rinçage');
-    expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
-
-    // Bascule vers Prospection : le champ disparaît (mais la saisie n'est pas perdue
-    // localement — cf. commentaire de `OperationDraft.motifDivers`). « Convoyage »
-    // n'est plus une option proposée (#operations-heures-vol), on retombe donc sur
-    // l'autre type non-Divers déjà disponible.
-    fireEvent.press(screen.getByText('Prospection'));
-    await waitFor(() => expect(screen.queryByText('Motif du divers')).toBeNull());
-
-    // Retour sur Divers : le motif précédemment saisi est bien retrouvé.
-    fireEvent.press(screen.getByText('Divers'));
-    expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
   });
 
-  /** `saveOperationsAeriennes` n'envoie `motif_divers` que si le type final est Divers. */
-  it('sauvegarde le motif du divers avec une opération déjà existante rebasculée sur Divers', async () => {
+  /**
+   * Continuité d'affichage (même principe que « Convoyage », déjà retiré du
+   * picker mais toujours affiché pour une opération existante) : une fiche
+   * déjà enregistrée en Divers avant #type-operation-prospection-seule
+   * continue d'afficher son motif, et le réenregistre tel quel — le picker
+   * n'offre plus Divers, donc aucun chip n'apparaît sélectionné, mais rien
+   * n'est perdu tant que l'agent ne rebascule pas manuellement sur Prospection.
+   */
+  it('affiche encore le motif d’une opération déjà enregistrée en Divers, et le réenregistre à l’identique', async () => {
     jest.mocked(prospectionRepository.listOperationsAeriennes).mockResolvedValue([
       {
-        type_operation: 'prospection',
-        motif_divers: null,
+        type_operation: 'divers',
+        motif_divers: 'Rinçage',
         debut_heure: '08:00',
         debut_temperature_c: null,
         debut_vent_ms: null,
@@ -466,10 +456,9 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     await waitFor(() => expect(prospectionRepository.listOperationsAeriennes).toHaveBeenCalledWith('draft-123'));
     await screen.findByText('08:00');
 
-    fireEvent.press(screen.getByText('Divers'));
+    expect(screen.queryByText('Divers')).toBeNull();
     expect(await screen.findByText('Motif du divers')).toBeVisible();
-    fireEvent.changeText(screen.getByPlaceholderText('Ex. Rinçage, maintenance, vérification…'), 'Rinçage');
-    expect(await screen.findByDisplayValue('Rinçage')).toBeVisible();
+    expect(screen.getByDisplayValue('Rinçage')).toBeVisible();
 
     // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
     // testé ici — hors sujet de ce test (motif du divers).

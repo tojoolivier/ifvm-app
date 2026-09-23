@@ -896,11 +896,14 @@ export default function ExtensiveReferenceScreen() {
 
                       <Text style={[styles.label, styles.operationSubLabel]}>Type d&apos;opération</Text>
                       <View style={styles.chipsRow}>
-                        {/* « Convoyage » retiré définitivement de la saisie (#operations-heures-vol) —
-                         * conservé dans `TYPE_OPERATION_OPTIONS`/`TypeOperationAerienne` pour que les
-                         * opérations déjà enregistrées avec ce type continuent de s'afficher correctement
-                         * (récap, `typeOperationLabel`). Filtrage au seul point de rendu du picker. */}
-                        {TYPE_OPERATION_OPTIONS.filter((option) => option.value !== 'convoyage').map((option) => {
+                        {/* « Convoyage » et « Divers » retirés définitivement de la saisie
+                         * (#operations-heures-vol, puis #type-operation-prospection-seule) — pour la
+                         * prospection, le seul type d'opération est « Prospection ». Les deux valeurs
+                         * restent dans `TYPE_OPERATION_OPTIONS`/`TypeOperationAerienne` pour que les
+                         * opérations déjà enregistrées avec l'un de ces types continuent de s'afficher
+                         * correctement (récap, `typeOperationLabel`). Filtrage au seul point de rendu
+                         * du picker. */}
+                        {TYPE_OPERATION_OPTIONS.filter((option) => option.value === 'prospection').map((option) => {
                           const active = option.value === op.typeOperation;
                           return (
                             <TouchableOpacity
