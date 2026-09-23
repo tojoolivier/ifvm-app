@@ -309,6 +309,13 @@ class VolCreate(BaseModel):
         return self
 
 
+class VolUpdate(BaseModel):
+    """Rattachement différé d'un traitement aérien (#610) — seul champ mutable
+    après création d'un vol."""
+
+    traitement_id: uuid.UUID
+
+
 class VolRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -318,6 +325,7 @@ class VolRead(BaseModel):
     site_principal_id: uuid.UUID | None
     stand_id: uuid.UUID | None
     base_secondaire_id: uuid.UUID | None
+    traitement_id: uuid.UUID | None
     date_vol: date
     heure_debut: time
     heure_fin: time

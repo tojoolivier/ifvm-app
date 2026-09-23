@@ -243,6 +243,18 @@ class ProspectionModel(Base):
         nullable=True,
     )
 
+    # ==========================================
+    # NOUVEAUX CHAMPS - Vol (migration 0095, #610)
+    # ==========================================
+    # Vol de prospection ayant produit cette fiche (1:N, porté ici plutôt que
+    # par `vol` : une seule sortie aérienne balaie typiquement plusieurs zones
+    # et produit plusieurs fiches). Nullable — rattachement facultatif. La
+    # cohérence « le vol référencé est bien de type `prospection` » est
+    # inter-tables, hors CHECK SQL — validée côté application.
+    vol_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("vol.id", ondelete="RESTRICT"), nullable=True
+    )
+
     populations: Mapped[list["ProspectionPopulationModel"]] = relationship(
         back_populates="prospection", cascade="all, delete-orphan"
     )
@@ -304,6 +316,7 @@ class ProspectionModel(Base):
             ondelete="RESTRICT",
         ),
         sa.Index("ix_prospection_equipe_id", "equipe_id"),
+        sa.Index("ix_prospection_vol_id", "vol_id"),
         # #revalidation-prospection (migration 0062) — même paire d'index que
         # TraitementAerienModel.traitement_origine_id : un plain index pour les
         # jointures/recherches, et l'index unique partiel qui garantit la

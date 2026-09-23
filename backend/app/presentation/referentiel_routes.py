@@ -61,6 +61,7 @@ from app.application.referentiel_use_cases import (
     UpdatePosteAcridien,
     UpdateSiteAerienne,
     UpdateStation,
+    UpdateVol,
     UpdateZoneAntiAcridien,
 )
 from app.auth import get_current_user
@@ -103,11 +104,14 @@ from app.domain.referentiel import (
     SiteHorsBaseError,
     SiteNonPrincipalError,
     StadeInconnuError,
+    TraitementAerienIntrouvableError,
     TypeLieuAerienInvalideError,
     UtilisateurMembreIntrouvableError,
+    VolIntrouvableError,
     VolLieuxConvoyageRequisError,
     VolMotifRequisError,
     VolSiteObligatoireError,
+    VolTypeNonApplicationError,
     ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
 )
@@ -132,6 +136,7 @@ from app.infrastructure.referentiel_sync_repository import (
     UtilisateurEquipeRepositoryImpl,
     VolRepositoryImpl,
 )
+from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
@@ -177,6 +182,7 @@ from app.presentation.referentiel_schemas import (
     StationFixeUpdate,
     VolCreate,
     VolRead,
+    VolUpdate,
     ZoneAntiAcridienCreate,
     ZoneAntiAcridienRead,
     ZoneAntiAcridienUpdate,
@@ -1561,6 +1567,33 @@ async def create_vol(
     except SiteAerienneIntrouvableError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"site introuvable : {exc.args[0]}"
+        ) from exc
+
+
+@router.patch("/vols/{vol_id}", response_model=VolRead)
+async def update_vol(
+    vol_id: uuid.UUID,
+    body: VolUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateVol(VolRepositoryImpl(db), TraitementRepositoryImpl(db))
+    try:
+        return await use_case.execute(vol_id=vol_id, traitement_id=body.traitement_id)
+    except VolIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"vol introuvable : {exc.args[0]}"
+        ) from exc
+    except VolTypeNonApplicationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"le vol {exc.args[0]} n'est pas de type application, "
+            "il ne peut pas porter de traitement",
+        ) from exc
+    except TraitementAerienIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"traitement aérien introuvable : {exc.args[0]}",
         ) from exc
 
 

@@ -65,6 +65,7 @@ class ProspectionRepository(ABC):
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
         equipe_id: uuid.UUID | None = None,
+        vol_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
     ) -> list[Prospection]:
@@ -676,11 +677,16 @@ class MouvementPesticideRepository(ABC):
 
 
 class VolRepository(ABC):
-    """Lignes d'activité aérienne (#608). Aucune méthode de suppression ni de mise à
-    jour dans ce ticket : hors scope, le vol saisi n'est pas corrigé après coup."""
+    """Lignes d'activité aérienne (#608). Aucune méthode de suppression dans ce
+    ticket : hors scope, le vol saisi n'est pas corrigé après coup — seul le
+    rattachement différé d'un traitement (#610, `update`) y échappe."""
 
     @abstractmethod
     async def create(self, vol: Vol) -> Vol:
+        pass
+
+    @abstractmethod
+    async def update(self, vol: Vol) -> Vol:
         pass
 
     @abstractmethod

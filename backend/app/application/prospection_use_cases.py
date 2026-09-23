@@ -12,7 +12,12 @@ from app.domain.prospection import (
     StadeInconnuError,
     valider_surfaces_prospection,
 )
-from app.domain.repositories import AuditLogRepository, EquipeRepository, ProspectionRepository
+from app.domain.repositories import (
+    AuditLogRepository,
+    EquipeRepository,
+    ProspectionRepository,
+    VolRepository,
+)
 
 
 def _type_equipe_attendu(type_prospection: str, mode_extensif: str | None) -> str:
@@ -36,6 +41,16 @@ async def _valider_equipe(
             f"equipe_id {equipe_id} référence une équipe '{equipe.type}', "
             f"attendu '{type_attendu}' pour cette fiche"
         )
+
+
+async def _valider_vol(vol_repository: VolRepository, vol_id: uuid.UUID) -> None:
+    """`vol_id` doit référencer un vol de type `prospection` (#610) — cohérence de
+    type inter-tables, hors CHECK SQL, même patron que `_valider_equipe`."""
+    vol = await vol_repository.get_by_id(vol_id)
+    if vol is None:
+        raise ValueError(f"vol_id {vol_id} ne référence aucun vol")
+    if vol.type != "prospection":
+        raise ValueError(f"vol_id {vol_id} référence un vol '{vol.type}', attendu 'prospection'")
 
 
 async def _verifier_stades(
@@ -68,6 +83,7 @@ class CreateProspection:
         repository: ProspectionRepository,
         equipe_repository: EquipeRepository,
         audit_repo: AuditLogRepository | None = None,
+        vol_repository: VolRepository | None = None,
     ):
         self.repository = repository
         self.equipe_repository = equipe_repository
@@ -75,6 +91,11 @@ class CreateProspection:
         # pratique. `None` reste accepté pour ne pas casser un appelant qui ne
         # se soucierait pas des notifications (ex. import de masse).
         self.audit_repo = audit_repo
+        # Optionnel, rétrocompatible (#610) : `None` accepté pour ne pas casser
+        # un appelant qui ne rattache jamais de vol — `vol_id` reste alors
+        # simplement non vérifiable côté application (la FK protège quand même
+        # en base contre une valeur inexistante).
+        self.vol_repository = vol_repository
 
     async def execute(
         self,
@@ -171,6 +192,7 @@ class CreateProspection:
         # prospection.py) — jamais décidé côté serveur, toujours transmis
         # explicitement par le client.
         revalide_de_id: uuid.UUID | None = None,
+        vol_id: uuid.UUID | None = None,
     ) -> Prospection:
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
@@ -180,6 +202,8 @@ class CreateProspection:
             equipe_id,
             _type_equipe_attendu(type_prospection, mode_extensif),
         )
+        if vol_id is not None and self.vol_repository is not None:
+            await _valider_vol(self.vol_repository, vol_id)
 
         await _verifier_stades(self.repository, captures)
         valider_surfaces_prospection(surface_prospectee, surface_infestee)
@@ -243,6 +267,7 @@ class CreateProspection:
             validated_at=validated_at,
             revalide_de_id=revalide_de_id,
             equipe_id=equipe_id,
+            vol_id=vol_id,
             created_at=now,
             updated_at=now,
             populations=populations or [],
@@ -358,6 +383,7 @@ class ListProspections:
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
         equipe_id: uuid.UUID | None = None,
+        vol_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
     ) -> list[Prospection]:
@@ -368,6 +394,7 @@ class ListProspections:
             station_id=station_id,
             prospecteur_id=prospecteur_id,
             equipe_id=equipe_id,
+            vol_id=vol_id,
             disponible_pour_traitement=disponible_pour_traitement,
             a_revalider=a_revalider,
         )
@@ -398,8 +425,11 @@ class GenererProspectionPdf:
 
 
 class UpdateProspection:
-    def __init__(self, repository: ProspectionRepository):
+    def __init__(
+        self, repository: ProspectionRepository, vol_repository: VolRepository | None = None
+    ):
         self.repository = repository
+        self.vol_repository = vol_repository
 
     async def execute(
         self,
@@ -484,6 +514,7 @@ class UpdateProspection:
         signature_chef_base_nom: str | None = None,
         signature_chef_base_horodatage: datetime | None = None,
         signature_chef_base_image: str | None = None,
+        vol_id: uuid.UUID | None = None,
     ) -> Prospection | None:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
@@ -491,6 +522,9 @@ class UpdateProspection:
 
         if prospection.statut != "brouillon":
             raise PermissionError("Seules les fiches en brouillon peuvent être modifiées")
+
+        if vol_id is not None and self.vol_repository is not None:
+            await _valider_vol(self.vol_repository, vol_id)
 
         if station_id is not None:
             prospection.station_id = station_id
@@ -534,6 +568,8 @@ class UpdateProspection:
             prospection.observations = observations
         if statut is not None:
             prospection.statut = statut
+        if vol_id is not None:
+            prospection.vol_id = vol_id
 
         # ==========================================
         # Mise à jour des nouveaux champs - Références (A)

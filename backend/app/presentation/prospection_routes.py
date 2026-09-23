@@ -31,7 +31,7 @@ from app.domain.referentiel import StationNotFoundError
 from app.infrastructure.audit_log_repository import AuditLogRepositoryImpl
 from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
-from app.infrastructure.referentiel_sync_repository import EquipeRepositoryImpl
+from app.infrastructure.referentiel_sync_repository import EquipeRepositoryImpl, VolRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.prospection_pdf import build_prospection_html
 from app.presentation.prospection_schemas import (
@@ -69,6 +69,13 @@ async def list_prospections(
             "terrestre se déduit de la première ligne."
         ),
     ),
+    vol_id: uuid.UUID | None = Query(
+        default=None,
+        description=(
+            "Fiches rattachées à ce vol de prospection (#610) — permet de relire, "
+            "depuis un vol, les prospections qu'il a produites."
+        ),
+    ),
     disponible_pour_traitement: bool = Query(
         default=False,
         description=(
@@ -96,6 +103,7 @@ async def list_prospections(
         station_id=station_id,
         prospecteur_id=prospecteur_id,
         equipe_id=equipe_id,
+        vol_id=vol_id,
         disponible_pour_traitement=disponible_pour_traitement,
         a_revalider=a_revalider,
     )
@@ -108,7 +116,12 @@ async def create_prospection(
     current_user: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
-    use_case = CreateProspection(repository, EquipeRepositoryImpl(db), AuditLogRepositoryImpl(db))
+    use_case = CreateProspection(
+        repository,
+        EquipeRepositoryImpl(db),
+        AuditLogRepositoryImpl(db),
+        VolRepositoryImpl(db),
+    )
     try:
         prospection = await use_case.execute(
             type_prospection=body.type_prospection,
@@ -202,6 +215,7 @@ async def create_prospection(
             signature_chef_base_horodatage=body.signature_chef_base_horodatage,
             signature_chef_base_image=body.signature_chef_base_image,
             revalide_de_id=body.revalide_de_id,
+            vol_id=body.vol_id,
         )
 
         # 👇 AJOUTE CETTE VÉRIFICATION POUR ÉVITER L'ERREUR 500
@@ -307,7 +321,7 @@ async def update_prospection(
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
-    use_case = UpdateProspection(repository)
+    use_case = UpdateProspection(repository, VolRepositoryImpl(db))
     try:
         prospection = await use_case.execute(
             prospection_id=prospection_id,
@@ -358,6 +372,7 @@ async def update_prospection(
             signalement_description=body.signalement_description,
             conclusion_validation=body.conclusion_validation,
             avertissements=body.avertissements,
+            vol_id=body.vol_id,
         )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))

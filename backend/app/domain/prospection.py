@@ -241,6 +241,10 @@ class Prospection:
     # enregistrées avant ce chantier), exigée côté ProspectionCreate pour
     # toute nouvelle fiche (cf. CreateProspection._valider_equipe).
     equipe_id: uuid.UUID | None = None
+    # Vol de prospection ayant produit cette fiche (#610) — nullable, 1:N porté
+    # ici (une sortie aérienne produit typiquement plusieurs fiches). Cf.
+    # ProspectionModel.vol_id.
+    vol_id: uuid.UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 

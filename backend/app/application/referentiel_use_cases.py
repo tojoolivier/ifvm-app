@@ -53,13 +53,16 @@ from app.domain.referentiel import (
     SoldePesticide,
     StadeInconnuError,
     StationFixe,
+    TraitementAerienIntrouvableError,
     TypeLieuAerienInvalideError,
     UtilisateurEquipe,
     UtilisateurMembreIntrouvableError,
     Vol,
+    VolIntrouvableError,
     VolLieuxConvoyageRequisError,
     VolMotifRequisError,
     VolSiteObligatoireError,
+    VolTypeNonApplicationError,
     ZoneAntiAcridien,
     ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
@@ -79,6 +82,7 @@ from app.domain.repositories import (
     SiteAeriennePositionRepository,
     SiteAerienneRepository,
     StationFixeRepository,
+    TraitementRepository,
     UtilisateurEquipeRepository,
     VolRepository,
     ZoneAntiAcridienRepository,
@@ -1787,6 +1791,37 @@ class CreateVol:
                 updated_at=maintenant,
             )
         )
+
+
+class UpdateVol:
+    """Rattachement différé d'un traitement aérien à un vol d'application (#610) —
+    seule mise à jour permise sur un vol, cf. docstring de `VolRepository`.
+
+    `traitement_id` référence `traitement.id` (le CRT), pas directement
+    `traitement_aerien.traitement_id` bien qu'ils partagent la même valeur (relation
+    1:1) : c'est `TraitementRepository`, déjà utilisé côté traitement, qui permet de
+    vérifier à la fois l'existence de la fiche et qu'elle est bien aérienne
+    (`traitement.aerien is not None`), sans dupliquer un accès direct à
+    `traitement_aerien`."""
+
+    def __init__(self, repository: VolRepository, traitement_repository: TraitementRepository):
+        self.repository = repository
+        self.traitement_repository = traitement_repository
+
+    async def execute(self, vol_id: uuid.UUID, traitement_id: uuid.UUID) -> Vol:
+        vol = await self.repository.get_by_id(vol_id)
+        if vol is None:
+            raise VolIntrouvableError(str(vol_id))
+        if vol.type != "application":
+            raise VolTypeNonApplicationError(str(vol_id))
+
+        traitement = await self.traitement_repository.get_by_id(traitement_id)
+        if traitement is None or traitement.aerien is None:
+            raise TraitementAerienIntrouvableError(str(traitement_id))
+
+        vol.traitement_id = traitement_id
+        vol.updated_at = datetime.now(timezone.utc)
+        return await self.repository.update(vol)
 
 
 class GetVol:

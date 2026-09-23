@@ -7,9 +7,15 @@ et `application` (§6) ; `convoyage` exige un motif et des lieux (§5.3/§5.5) ;
 exige un motif ; `prospection` ne porte aucune obligation dure.
 """
 
+import uuid
+from datetime import date
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.infrastructure.prospection_model import ProspectionModel
 
 AERONEF = {"immatriculation": "5R-VOL", "societe": "Madagascar Helicopter", "volume_cuve_l": 800}
 DATE_VOL = "2026-06-10"
@@ -62,6 +68,57 @@ async def stand_autre_base(client: AsyncClient, admin_headers: dict, autre_base_
     reponse = await client.post("/sites-aeriens", json=body, headers=admin_headers)
     assert reponse.status_code == 201, reponse.text
     return reponse.json()
+
+
+@pytest_asyncio.fixture
+async def traitement_aerien_id(
+    client: AsyncClient,
+    admin_headers: dict,
+    db_session: AsyncSession,
+    campagne_id: uuid.UUID,
+    admin,
+    chef_de_base,
+    pilote,
+    mecanicien,
+    base_aerienne,
+    equipe_aerienne_id: uuid.UUID,
+) -> uuid.UUID:
+    """Fiche `traitement` de type AERIEN, pour les tests de rattachement
+    `vol.traitement_id` (#610) — une prospection minimale suffit comme origine,
+    son propre contenu n'est pas ce qui est testé ici."""
+    prospection = ProspectionModel(
+        id=uuid.uuid4(),
+        type_prospection="extensive",
+        campagne_id=campagne_id,
+        prospecteur_id=admin.id,
+        date_prospection=date(2026, 6, 1),
+        statut="brouillon",
+        statut_sync="local",
+    )
+    db_session.add(prospection)
+    await db_session.commit()
+
+    reponse = await client.post(
+        "/traitements",
+        json={
+            "prospection_id": str(prospection.id),
+            "equipe_id": str(equipe_aerienne_id),
+            "date_traitement": "2026-06-05",
+            "date_validation": "2026-06-04",
+            "localite": "Ihosy",
+            "aerien": {
+                "pilote": f"{pilote.prenom} {pilote.nom}",
+                "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
+                "chef_de_base_id": str(chef_de_base.id),
+                "base_principale": "Base Ihosy",
+                "site_principal_id": str(base_aerienne.id),
+                "immatricule_aeronef": "5R-ABC",
+            },
+        },
+        headers=admin_headers,
+    )
+    assert reponse.status_code == 201, reponse.text
+    return uuid.UUID(reponse.json()["id"])
 
 
 def _payload(equipe, aeronef: dict, **overrides) -> dict:
@@ -233,3 +290,138 @@ async def test_lire_un_vol_puis_le_lister(
     liste = await client.get(f"/vols?equipe_id={equipe_aerienne.id}", headers=admin_headers)
     assert liste.status_code == 200
     assert vol_id in [v["id"] for v in liste.json()]
+
+
+@pytest.mark.asyncio
+async def test_rattacher_traitement_a_vol_application(
+    client: AsyncClient,
+    admin_headers: dict,
+    equipe_aerienne,
+    aeronef_affecte: dict,
+    base_aerienne,
+    stand: dict,
+    traitement_aerien_id: uuid.UUID,
+):
+    """Le rattachement est toujours différé (#610) : le vol est créé sans
+    `traitement_id` (`VolCreate` ne porte pas ce champ), puis rattaché via une
+    mise à jour — jamais à la création."""
+    creation = await client.post(
+        "/vols",
+        json=_payload(
+            equipe_aerienne,
+            aeronef_affecte,
+            type="application",
+            motif=None,
+            site_principal_id=str(base_aerienne.id),
+            stand_id=stand["id"],
+        ),
+        headers=admin_headers,
+    )
+    assert creation.status_code == 201, creation.text
+    vol_id = creation.json()["id"]
+    assert creation.json()["traitement_id"] is None
+
+    rattachement = await client.patch(
+        f"/vols/{vol_id}",
+        json={"traitement_id": str(traitement_aerien_id)},
+        headers=admin_headers,
+    )
+    assert rattachement.status_code == 200, rattachement.text
+    assert rattachement.json()["traitement_id"] == str(traitement_aerien_id)
+
+    relu = await client.get(f"/vols/{vol_id}", headers=admin_headers)
+    assert relu.json()["traitement_id"] == str(traitement_aerien_id)
+
+
+@pytest.mark.asyncio
+async def test_refuse_rattacher_traitement_a_vol_d_un_autre_type_422(
+    client: AsyncClient,
+    admin_headers: dict,
+    equipe_aerienne,
+    aeronef_affecte: dict,
+    traitement_aerien_id: uuid.UUID,
+):
+    creation = await client.post(
+        "/vols",
+        json=_payload(equipe_aerienne, aeronef_affecte, type="divers", motif="Repositionnement"),
+        headers=admin_headers,
+    )
+    assert creation.status_code == 201, creation.text
+    vol_id = creation.json()["id"]
+
+    rattachement = await client.patch(
+        f"/vols/{vol_id}",
+        json={"traitement_id": str(traitement_aerien_id)},
+        headers=admin_headers,
+    )
+    assert rattachement.status_code == 422, rattachement.text
+
+
+@pytest.mark.asyncio
+async def test_rattacher_deux_prospections_a_un_meme_vol(
+    client: AsyncClient,
+    admin_headers: dict,
+    equipe_aerienne,
+    aeronef_affecte: dict,
+    campagne_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
+):
+    creation = await client.post(
+        "/vols",
+        json=_payload(equipe_aerienne, aeronef_affecte, type="prospection", motif=None),
+        headers=admin_headers,
+    )
+    assert creation.status_code == 201, creation.text
+    vol_id = creation.json()["id"]
+
+    ids = []
+    for _ in range(2):
+        reponse = await client.post(
+            "/prospections",
+            json={
+                "equipe_id": str(equipe_terrestre_id),
+                "type_prospection": "extensive",
+                "campagne_id": str(campagne_id),
+                "date_prospection": "2026-06-10",
+                "vol_id": vol_id,
+            },
+            headers=admin_headers,
+        )
+        assert reponse.status_code == 201, reponse.text
+        assert reponse.json()["vol_id"] == vol_id
+        ids.append(reponse.json()["id"])
+
+    liste = await client.get(f"/prospections?vol_id={vol_id}", headers=admin_headers)
+    assert liste.status_code == 200
+    assert {p["id"] for p in liste.json()} == set(ids)
+
+
+@pytest.mark.asyncio
+async def test_refuse_prospection_sur_vol_non_prospection_422(
+    client: AsyncClient,
+    admin_headers: dict,
+    equipe_aerienne,
+    aeronef_affecte: dict,
+    campagne_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
+):
+    creation = await client.post(
+        "/vols",
+        json=_payload(equipe_aerienne, aeronef_affecte, type="divers", motif="Repositionnement"),
+        headers=admin_headers,
+    )
+    assert creation.status_code == 201, creation.text
+    vol_id = creation.json()["id"]
+
+    reponse = await client.post(
+        "/prospections",
+        json={
+            "equipe_id": str(equipe_terrestre_id),
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "date_prospection": "2026-06-10",
+            "vol_id": vol_id,
+        },
+        headers=admin_headers,
+    )
+    assert reponse.status_code == 422, reponse.text

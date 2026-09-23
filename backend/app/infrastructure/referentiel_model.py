@@ -611,6 +611,16 @@ class VolModel(Base):
     base_secondaire_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
     )
+    # Traitement aérien réalisé par ce vol (migration 0095, #610) : 0..1,
+    # nullable et jamais renseigné à la création — le compte-rendu de
+    # traitement est souvent rédigé après les vols, parfois sur un autre
+    # appareil (ADR-014, question 9). Rattaché plus tard via une mise à jour.
+    # `ondelete=RESTRICT`, même politique que les autres FK de `vol`.
+    traitement_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("traitement_aerien.traitement_id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     date_vol: Mapped[date] = mapped_column(Date(), nullable=False)
     heure_debut: Mapped[time] = mapped_column(Time(), nullable=False)
     heure_fin: Mapped[time] = mapped_column(Time(), nullable=False)
@@ -646,12 +656,17 @@ class VolModel(Base):
             name="ck_vol_lieux_convoyage",
         ),
         CheckConstraint("heure_fin > heure_debut", name="ck_vol_heures_coherentes"),
+        CheckConstraint(
+            "traitement_id IS NULL OR type = 'application'",
+            name="ck_vol_traitement_type",
+        ),
         Index("ix_vol_equipe_id", "equipe_id"),
         Index("ix_vol_aeronef_id", "aeronef_id"),
         Index("ix_vol_site_principal_id", "site_principal_id"),
         Index("ix_vol_stand_id", "stand_id"),
         Index("ix_vol_base_secondaire_id", "base_secondaire_id"),
         Index("ix_vol_date_vol", "date_vol"),
+        Index("ix_vol_traitement_id", "traitement_id"),
     )
 
 

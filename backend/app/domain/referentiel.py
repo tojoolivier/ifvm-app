@@ -672,6 +672,27 @@ class VolLieuxConvoyageRequisError(Exception):
     pass
 
 
+class VolIntrouvableError(Exception):
+    """`vol_id` ne référence aucun vol (#610)."""
+
+    pass
+
+
+class VolTypeNonApplicationError(Exception):
+    """Seul un vol de type `application` peut porter un traitement aérien
+    (§Décisions actées, `ck_vol_traitement_type`, #610)."""
+
+    pass
+
+
+class TraitementAerienIntrouvableError(Exception):
+    """`traitement_id` ne référence aucun traitement aérien — soit la fiche
+    `traitement` n'existe pas, soit elle existe mais n'est pas de type
+    `AERIEN` (#610). La cohérence de type est inter-tables, hors CHECK SQL."""
+
+    pass
+
+
 @dataclass
 class Vol:
     """Ligne d'activité aérienne : un type, une équipe, un aéronef, une date, et ses
@@ -693,6 +714,9 @@ class Vol:
     site_principal_id: uuid.UUID | None = None
     stand_id: uuid.UUID | None = None
     base_secondaire_id: uuid.UUID | None = None
+    # Traitement aérien réalisé par ce vol (#610) — 0..1, jamais renseigné à la
+    # création, rattaché plus tard via UpdateVol. Cf. VolModel.traitement_id.
+    traitement_id: uuid.UUID | None = None
     date_vol: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
     heure_debut: time = field(default_factory=lambda: time(0, 0))
     heure_fin: time = field(default_factory=lambda: time(0, 0))

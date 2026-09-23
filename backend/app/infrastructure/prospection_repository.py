@@ -132,6 +132,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
         equipe_id: uuid.UUID | None = None,
+        vol_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
     ) -> list[Prospection]:
@@ -158,6 +159,8 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             stmt = stmt.where(ProspectionModel.prospecteur_id == prospecteur_id)
         if equipe_id is not None:
             stmt = stmt.where(ProspectionModel.equipe_id == equipe_id)
+        if vol_id is not None:
+            stmt = stmt.where(ProspectionModel.vol_id == vol_id)
         if disponible_pour_traitement:
             # « Fiches de traitement → Consulter une fiche validée » (#fiches-
             # validees-multi-utilisateurs) : une fiche déjà transformée en
@@ -269,6 +272,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             validated_at=prospection.validated_at,
             revalide_de_id=prospection.revalide_de_id,
             equipe_id=prospection.equipe_id,
+            vol_id=prospection.vol_id,
             created_at=prospection.created_at,
             updated_at=prospection.updated_at,
             # ==========================================
@@ -463,6 +467,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
         model.verified_at = prospection.verified_at
         model.validated_by = prospection.validated_by
         model.validated_at = prospection.validated_at
+        model.vol_id = prospection.vol_id
 
         # ==========================================
         # NOUVEAUX CHAMPS - Références (A)
@@ -762,6 +767,7 @@ class ProspectionRepositoryImpl(ProspectionRepository):
             validated_at=model.validated_at,
             revalide_de_id=model.revalide_de_id,
             equipe_id=model.equipe_id,
+            vol_id=model.vol_id,
             created_at=model.created_at,
             updated_at=model.updated_at,
             # ==========================================

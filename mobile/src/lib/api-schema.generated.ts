@@ -747,7 +747,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Vol */
+        patch: operations["update_vol_vols__vol_id__patch"];
         trace?: never;
     };
     "/referentiel/pull": {
@@ -2943,6 +2944,8 @@ export interface components {
             surface_infestee_pourcent?: number | null;
             /** Revalide De Id */
             revalide_de_id?: string | null;
+            /** Vol Id */
+            vol_id?: string | null;
         };
         /** ProspectionRead */
         ProspectionRead: {
@@ -3035,6 +3038,8 @@ export interface components {
             revalide_de_id?: string | null;
             /** Equipe Id */
             equipe_id?: string | null;
+            /** Vol Id */
+            vol_id?: string | null;
             /** Prospecteur Nom */
             prospecteur_nom?: string | null;
             /** Verified By Nom */
@@ -3284,6 +3289,8 @@ export interface components {
             signature_chef_base_horodatage?: string | null;
             /** Signature Chef Base Image */
             signature_chef_base_image?: string | null;
+            /** Vol Id */
+            vol_id?: string | null;
         };
         /** ReferentielPullResponse */
         ReferentielPullResponse: {
@@ -4654,6 +4661,8 @@ export interface components {
             stand_id: string | null;
             /** Base Secondaire Id */
             base_secondaire_id: string | null;
+            /** Traitement Id */
+            traitement_id: string | null;
             /**
              * Date Vol
              * Format: date
@@ -4692,6 +4701,18 @@ export interface components {
              * @description Dérivée de heure_debut/heure_fin à la lecture, jamais stockée (#608).
              */
             readonly duree_minutes: number;
+        };
+        /**
+         * VolUpdate
+         * @description Rattachement différé d'un traitement aérien (#610) — seul champ mutable
+         *     après création d'un vol.
+         */
+        VolUpdate: {
+            /**
+             * Traitement Id
+             * Format: uuid
+             */
+            traitement_id: string;
         };
         /** ZoneAntiAcridienCreate */
         ZoneAntiAcridienCreate: {
@@ -6863,6 +6884,41 @@ export interface operations {
             };
         };
     };
+    update_vol_vols__vol_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pull_referentiel_referentiel_pull_get: {
         parameters: {
             query?: {
@@ -6912,6 +6968,8 @@ export interface operations {
                 prospecteur_id?: string | null;
                 /** @description Interventions menées par cette équipe, triées par date_prospection décroissante (#607) — la position courante d'une équipe mobile terrestre se déduit de la première ligne. */
                 equipe_id?: string | null;
+                /** @description Fiches rattachées à ce vol de prospection (#610) — permet de relire, depuis un vol, les prospections qu'il a produites. */
+                vol_id?: string | null;
                 /** @description N'inclut que les fiches sans traitement associé, ni périmées (#revalidation-prospection : extensive/validation validées depuis plus de 5 jours sans traitement) — « Fiches de traitement → Consulter une fiche validée » (mobile), combiné à statut=validee. */
                 disponible_pour_traitement?: boolean;
                 /** @description N'inclut que les fiches périmées (#revalidation-prospection) — exactement celles qu'exclut disponible_pour_traitement pour cette raison, sans traitement associé et pas déjà revalidées. */

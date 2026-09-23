@@ -1153,6 +1153,7 @@ def _vol_to_domain(model: VolModel) -> Vol:
         site_principal_id=model.site_principal_id,
         stand_id=model.stand_id,
         base_secondaire_id=model.base_secondaire_id,
+        traitement_id=model.traitement_id,
         date_vol=model.date_vol,
         heure_debut=model.heure_debut,
         heure_fin=model.heure_fin,
@@ -1177,6 +1178,7 @@ def _vol_to_model(vol: Vol) -> VolModel:
         site_principal_id=vol.site_principal_id,
         stand_id=vol.stand_id,
         base_secondaire_id=vol.base_secondaire_id,
+        traitement_id=vol.traitement_id,
         date_vol=vol.date_vol,
         heure_debut=vol.heure_debut,
         heure_fin=vol.heure_fin,
@@ -1196,6 +1198,17 @@ class VolRepositoryImpl(VolRepository):
     async def create(self, vol: Vol) -> Vol:
         model = _vol_to_model(vol)
         self.session.add(model)
+        await self.session.commit()
+        await self.session.refresh(model)
+        return _vol_to_domain(model)
+
+    async def update(self, vol: Vol) -> Vol:
+        """Rattachement différé d'un traitement (#610) — seul champ mutable
+        après création, cf. docstring de `VolRepository`."""
+        result = await self.session.execute(select(VolModel).where(VolModel.id == vol.id))
+        model = result.scalar_one()
+        model.traitement_id = vol.traitement_id
+        model.updated_at = vol.updated_at
         await self.session.commit()
         await self.session.refresh(model)
         return _vol_to_domain(model)
