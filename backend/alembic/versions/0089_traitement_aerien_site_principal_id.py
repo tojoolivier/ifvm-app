@@ -35,8 +35,8 @@ opération, une règle dure inexprimable sur du texte libre seul.
    réelles. `stand`, `base_secondaire` et leurs dates d'installation restent
    inchangées (bascule vers l'entité `vol` traitée par un autre ticket du lot).
 
-Revision ID: 0087
-Revises: 0086
+Revision ID: 0089
+Revises: 0088
 Create Date: 2026-09-22
 """
 
@@ -49,8 +49,8 @@ from alembic import context, op
 
 _log = logging.getLogger("alembic.runtime.migration")
 
-revision = "0087"
-down_revision = "0086"
+revision = "0089"
+down_revision = "0088"
 branch_labels = None
 depends_on = None
 
@@ -121,7 +121,7 @@ def _journaliser_non_rapproches() -> None:
             f"{numero_fiche} ({base_principale})" for numero_fiche, base_principale in lignes
         )
         _log.warning(
-            "Migration 0087 : %d fiche(s) traitement aérien non rapprochées à un "
+            "Migration 0089 : %d fiche(s) traitement aérien non rapprochées à un "
             "site_aerienne (base_principale sans correspondance numero/localite "
             "univoque), site_principal_id laissé à NULL : %s",
             len(lignes),

@@ -1,7 +1,7 @@
 """prospection/traitement : rattachement à l'équipe qui les a menés
 
 Ticket #607 (parent #592, bloqué par #602/#604 -> equipe(id, type) unifiée,
-migration 0084). Aujourd'hui, aucune prospection ni aucun traitement n'est
+migration 0086). Aujourd'hui, aucune prospection ni aucun traitement n'est
 rattaché à une équipe : impossible de retracer les déplacements d'une équipe
 mobile terrestre (EMT) à partir de ses interventions, ni d'attribuer une fiche
 à l'équipe qui l'a menée.
@@ -33,8 +33,8 @@ l'exigent pour toute nouvelle fiche (validation applicative, hors périmètre SQ
 Pas de backfill des fiches existantes (décision actée, hors scope #607) : elles
 gardent `equipe_id IS NULL`.
 
-Revision ID: 0089
-Revises: 0088
+Revision ID: 0091
+Revises: 0090
 Create Date: 2026-09-23
 """
 
@@ -42,8 +42,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0089"
-down_revision = "0088"
+revision = "0091"
+down_revision = "0090"
 branch_labels = None
 depends_on = None
 

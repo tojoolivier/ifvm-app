@@ -36,7 +36,7 @@ position précédente — l'historique des implantations était perdu.
 
 3. **Historisation** : `site_aerienne_position(id, site_id, latitude, longitude,
    altitude, date_debut, date_fin NULL, created_at)`, une ligne par période
-   d'implantation — même patron que `equipe_aeronef` (migration 0085) pour
+   d'implantation — même patron que `equipe_aeronef` (migration 0087) pour
    l'affectation d'aéronef. Les coordonnées existantes (`site_aerienne.longitude`/
    `latitude` non NULL) sont reprises comme position initiale ouverte
    (`date_fin NULL`, `date_debut = site_aerienne.created_at`) ; un site sans
@@ -47,8 +47,8 @@ position précédente — l'historique des implantations était perdu.
    partiel `uq_site_aerienne_position_ouverte_par_site` (comme les deux index
    équivalents de `equipe_aeronef`), validation complète côté application.
 
-Revision ID: 0086
-Revises: 0085
+Revision ID: 0088
+Revises: 0087
 Create Date: 2026-09-22
 """
 
@@ -57,8 +57,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from alembic import context, op
 
-revision = "0086"
-down_revision = "0085"
+revision = "0088"
+down_revision = "0087"
 branch_labels = None
 depends_on = None
 
@@ -110,7 +110,7 @@ def _refuser_stands_orphelins(conn) -> None:
     )
     if lignes:
         raise RuntimeError(
-            f"Migration 0086 : {len(lignes)} stand(s) de remplissage sans équipe "
+            f"Migration 0088 : {len(lignes)} stand(s) de remplissage sans équipe "
             f"({', '.join(lignes)}) — aucun parent_site_id déductible. Rattachez-les "
             "d'abord à une équipe (PUT /stands-remplissage/{id} sur la révision "
             "précédente, ou UPDATE stand_remplissage en base), puis relancez cette "
@@ -133,7 +133,7 @@ def _refuser_collisions_numero(conn) -> None:
     )
     if lignes:
         raise RuntimeError(
-            f"Migration 0086 : {len(lignes)} numero(s) en collision entre "
+            f"Migration 0088 : {len(lignes)} numero(s) en collision entre "
             f"stand_remplissage et site_aerienne ({', '.join(lignes)}) — numero est "
             "UNIQUE sur la table fusionnée. Renommez l'un des deux (stand ou base) "
             "avant de relancer cette migration."
@@ -163,7 +163,7 @@ def _refuser_stands_sans_base_principale(conn) -> None:
     )
     if lignes:
         raise RuntimeError(
-            f"Migration 0086 : {len(lignes)} stand(s) de remplissage rattachés à une "
+            f"Migration 0088 : {len(lignes)} stand(s) de remplissage rattachés à une "
             f"équipe sans base principale ({', '.join(lignes)}) — aucun parent_site_id "
             "déductible. Créez d'abord la base principale de cette équipe, puis "
             "relancez cette migration."
@@ -205,7 +205,7 @@ def _creer_table_position() -> None:
         ),
     )
     # Garde-fou partiel — même patron que `uq_equipe_aeronef_ouverte_par_equipe`
-    # (migration 0085) : deux positions *ouvertes* pour le même site sont toujours un
+    # (migration 0087) : deux positions *ouvertes* pour le même site sont toujours un
     # chevauchement, quel que soit le reste de l'historique. Validation complète
     # (bornes non chevauchantes) côté application.
     op.create_index(
@@ -221,7 +221,7 @@ def _creer_table_position() -> None:
 def _reprendre_positions() -> None:
     """Les coordonnées existantes deviennent la position initiale, ouverte. `date_debut`
     est une approximation assumée (même raisonnement que `date_debut` sur les
-    affectations d'aéronef reprises, migration 0085) : `site_aerienne.created_at` est la
+    affectations d'aéronef reprises, migration 0087) : `site_aerienne.created_at` est la
     seule borne inférieure que la base connaisse."""
     op.execute(
         """

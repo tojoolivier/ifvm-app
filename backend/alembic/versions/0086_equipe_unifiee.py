@@ -49,8 +49,8 @@ reste UNIQUE (une équipe = une base principale), `poste_acridien.equipe_terrest
 `utilisateur.chef_de_base_id` / `chef_equipe_id` ne sont pas touchés : redondance
 assumée avec `equipe_membre(fonction='chef')`, dette explicite (ADR-018 §2).
 
-Revision ID: 0082
-Revises: 0081
+Revision ID: 0086
+Revises: 0085
 Create Date: 2026-09-22
 """
 
@@ -62,8 +62,8 @@ from alembic import op
 
 _log = logging.getLogger("alembic.runtime.migration")
 
-revision = "0084"
-down_revision = "0083"
+revision = "0086"
+down_revision = "0085"
 branch_labels = None
 depends_on = None
 
@@ -347,7 +347,7 @@ def _journaliser_fonctions_absorbees() -> None:
     )
     for nom_complet, fonction, equipe_nom in lignes:
         _log.warning(
-            "Migration 0082 : « %s » est déjà membre de l'équipe « %s » ; sa fonction "
+            "Migration 0086 : « %s » est déjà membre de l'équipe « %s » ; sa fonction "
             "« %s » n'est pas reprise (une personne = une fonction par équipe).",
             nom_complet,
             equipe_nom,
@@ -402,5 +402,5 @@ def downgrade() -> None:
     arrière est la restauration d'un `pg_dump` antérieur.
     """
     raise NotImplementedError(
-        "Migration 0082 non réversible : restaurer un pg_dump antérieur (cf. docstring)."
+        "Migration 0086 non réversible : restaurer un pg_dump antérieur (cf. docstring)."
     )

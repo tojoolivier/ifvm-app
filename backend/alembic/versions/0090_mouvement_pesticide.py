@@ -29,8 +29,8 @@ quantite, unite, date_mouvement, created_at)` :
   mouvement compensatoire, pas par une modification de l'historique — pas de route
   PUT/DELETE côté API.
 
-Revision ID: 0088
-Revises: 0087
+Revision ID: 0090
+Revises: 0089
 Create Date: 2026-09-22
 """
 
@@ -39,8 +39,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from alembic import op
 
-revision = "0088"
-down_revision = "0087"
+revision = "0090"
+down_revision = "0089"
 branch_labels = None
 depends_on = None
 
