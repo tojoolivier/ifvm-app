@@ -217,6 +217,85 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     expect(screen.queryByText('Surface traitée (ha)')).toBeNull();
   });
 
+  /**
+   * #recap-terrestre-moyens-produits-vides : `surface_traitee_ha`/`surface_cumulee_ha`/
+   * `surface_restante_ha`/`total_pesticide_l`/`pesticide_stock_restant_l` ne sont écrites
+   * en base qu'à la synchronisation (dérivées côté serveur) — tant que la fiche est
+   * encore locale, elles valaient toutes NULL et le récap affichait « non renseigné »
+   * malgré une saisie complète. Il doit désormais retomber sur la même estimation que
+   * l'écran « Équipe » (déjà montrée à l'agent pendant la saisie).
+   */
+  it('affiche l’estimation locale de Surface traitée/cumulée/restante et Total pesticide/Stock Final quand la fiche n’est pas encore synchronisée', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_TERRESTRE,
+      terrestre: {
+        ...DRAFT_TERRESTRE.terrestre,
+        surface_traitee_ha: null,
+        surface_cumulee_ha: null,
+        surface_restante_ha: null,
+        total_pesticide_l: null,
+        pesticide_stock_restant_l: null,
+        stock_initial_l: null,
+        produits: [
+          { id: 'prod-1', traitement_terrestre_id: 'trait-1', numero: 1, produit_id: 'p1', quantite_l: 7, nom_commercial: 'Fyfanon' },
+        ],
+      },
+    });
+
+    await render(<RecapScreen />);
+
+    // Surface traitée (ha) ET Surface cumulée (ha) : atomiseur (10) + disque (5),
+    // pas de reprise — deux lignes affichent la même valeur.
+    expect((await screen.findAllByText('15')).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('30')).toBeVisible(); // Surface restante (ha) : 45 − 15
+    expect(screen.getByText('7')).toBeVisible(); // Total pesticide (l) : somme des produits
+    expect(screen.getByText('13')).toBeVisible(); // Stock Final (l) : 0 + 20 (reçu) − 7 (consommé)
+  });
+
+  /**
+   * #recap-terrestre-moyens-produits-vides : dans une reprise, la surface cumulée
+   * doit additionner celle de la fiche D'ORIGINE — jamais son propre champ
+   * `surface_cumulee_ha`, qui reste toujours NULL avant sa propre synchronisation.
+   */
+  it("dans une reprise, la surface cumulée additionne celle de la fiche D'ORIGINE (pas son propre champ)", async () => {
+    jest.mocked(traitementRepository.getTraitement).mockImplementation((id: string) =>
+      id === 'trait-origine'
+        ? Promise.resolve({ terrestre: { surface_cumulee_ha: 20 } } as any)
+        : Promise.resolve({
+            ...DRAFT_TERRESTRE,
+            terrestre: {
+              ...DRAFT_TERRESTRE.terrestre,
+              reprise_traitement: true,
+              traitement_origine_id: 'trait-origine',
+              surface_atomiseur_ha: 10,
+              surface_disque_rotatif_ha: 0,
+              surface_traitee_ha: null,
+              surface_cumulee_ha: null,
+              surface_restante_ha: null,
+            },
+          })
+    );
+
+    await render(<RecapScreen />);
+
+    expect(await screen.findByText('30')).toBeVisible(); // Surface cumulée : 10 (fiche) + 20 (origine)
+    expect(screen.getByText('15')).toBeVisible(); // Surface restante : 45 − 30
+  });
+
+  /**
+   * #recap-terrestre-moyens-produits-vides : « Essence (l) »/« Nombre de piles »
+   * faisaient doublon dans « Moyens & produits (Terrestre) » avec la carte
+   * « Moyens & protection », seule saisie réellement branchée sur un écran.
+   */
+  it("n'affiche plus « Essence (l) » en double dans « Moyens & produits (Terrestre) »", async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('Fyfanon');
+    expect(screen.queryByText('Essence (l)')).toBeNull();
+    expect(screen.getByText('Essence (litres)')).toBeVisible();
+    expect(screen.getAllByText('Nombre de piles')).toHaveLength(1);
+  });
+
   it('affiche la carte Localisation (région/district/commune, coordonnées GPS, altitude)', async () => {
     await render(<RecapScreen />);
 
