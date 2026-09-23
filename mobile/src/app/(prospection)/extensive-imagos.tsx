@@ -650,7 +650,7 @@ const handleContinue = () => {
             )}
 
             <View style={styles.typeSection}>
-              <Text style={styles.sectionLabel}>📊 Comportement de l&apos;essaim</Text>
+              <Text style={styles.sectionLabel}>📊 Comportement</Text>
               <Text style={styles.commonHint}>Déterminé automatiquement par l&apos;État</Text>
               <View style={styles.typeRow}>
                 {(['vol', 'pose'] as const).map((value) => {

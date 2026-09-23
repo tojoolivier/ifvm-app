@@ -89,7 +89,7 @@ function buildImagoRows(row: PopulationRow | null): DetailRow[] {
     },
     { label: 'État', value: row?.etat === 'repos' ? 'Repos' : row?.etat === 'deplacement' ? 'Déplacement' : '—' },
     {
-      label: 'Comportement de l’essaim',
+      label: 'Comportement',
       value: row?.essaim_en_vol ? 'En vol' : row?.essaim_pose ? 'Posé' : '—',
     },
     { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} ind./ha` : '—' },
