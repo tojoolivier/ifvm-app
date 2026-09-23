@@ -441,14 +441,16 @@ describe('ExtensiveRecapScreen — mode aérien : opérations + signatures', () 
     expect(screen.getByText('04:45')).toBeVisible();
 
     // Non-régression (#operations-heures-vol) : « Convoyage » n'est plus proposé à la
-    // saisie, mais une opération déjà enregistrée avec ce type — et ses températures/
-    // vents — continue de s'afficher normalement dans le récap.
+    // saisie, mais une opération déjà enregistrée avec ce type continue de s'afficher
+    // normalement dans le récap.
     expect(screen.getByText('Convoyage')).toBeVisible();
     expect(screen.getByText('Prospection')).toBeVisible();
-    expect(screen.getByText('24 °C')).toBeVisible();
-    expect(screen.getByText('3.2 m/s')).toBeVisible();
-    expect(screen.getByText('26 °C')).toBeVisible();
-    expect(screen.getByText('4.1 m/s')).toBeVisible();
+    // Température/Vent (début et fin) retirés du récap (#recap-operations-sans-meteo) :
+    // saisis sur Opérations, mais plus jamais réaffichés ici.
+    expect(screen.queryByText('Début — Température')).toBeNull();
+    expect(screen.queryByText('Début — Vent')).toBeNull();
+    expect(screen.queryByText('Fin — Température')).toBeNull();
+    expect(screen.queryByText('Fin — Vent')).toBeNull();
 
     // Signatures — VISA n'apparaît plus (donnée historique préservée en base,
     // jamais réaffichée) ; Rakoto V. n'était que sa valeur. Pilote n'est plus une
