@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, ScrollView, View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,8 +28,8 @@ import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
 import { ProduitSelectField } from '@/components/traitement/ProduitSelectField';
 import { TimeField } from '@/components/traitement/TimeField';
-import { formStyles as styles } from '@/components/traitement/TraitementFormStyles';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { useFormStyles } from '@/components/traitement/TraitementFormStyles';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -137,6 +137,9 @@ export default function RotationsScreen() {
     });
   };
   const { run, isRunning: isSaving } = useAsyncAction();
+  const typeSizes = useTraitementTypeSizes();
+  const formStyles = useFormStyles();
+  const chrome = useMemo(() => createChromeStyles(typeSizes), [typeSizes]);
   const signalerChargementBase = useSignalerChargement('rotations');
   const signalerChargement = (error: unknown, source: string) =>
     signalerChargementBase(error, { traitementId, source });
@@ -301,11 +304,11 @@ export default function RotationsScreen() {
         <ProgressBar currentIndex={3} segments={PROGRESS_SEGMENTS_AERIEN} />
         <Text style={chrome.title}>Pesticides & rotations</Text>
 
-        <Text style={styles.label}>Approvisionnement (l)</Text>
+        <Text style={formStyles.label}>Approvisionnement (l)</Text>
         <TextInput
           testID="pesticide-recu-input"
           editable={!readOnly}
-          style={styles.input}
+          style={formStyles.input}
           placeholder="0"
           keyboardType="decimal-pad"
           value={getAerienDraft('pesticideRecuL') ?? formatDecimalDisplay(store.aerien.pesticideRecuL)}
@@ -323,39 +326,39 @@ export default function RotationsScreen() {
           const unite = rotation.unite ?? 'L';
 
           return (
-            <Card key={rotation.localId} style={styles.rotationCard}>
-              <View style={styles.rotationHeader}>
-                <Text style={styles.rotationTitle}>Rotation {index + 1}</Text>
+            <Card key={rotation.localId} style={formStyles.rotationCard}>
+              <View style={formStyles.rotationHeader}>
+                <Text style={formStyles.rotationTitle}>Rotation {index + 1}</Text>
                 {store.aerien.rotations.length > 1 && !readOnly && (
                   <TouchableOpacity onPress={() => store.removeRotation(rotation.localId)}>
-                    <Text style={styles.removeButton}>×</Text>
+                    <Text style={formStyles.removeButton}>×</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               <Card variant="derivee">
-                <Text style={styles.label}>N° cuve</Text>
+                <Text style={formStyles.label}>N° cuve</Text>
                 {/* Format aligné sur le serveur (str(numero), migration 0047) : pas de
                     préfixe "C" — sinon l'aperçu ici divergerait de ce qu'affichent le
                     web admin et toute relecture de la fiche synchronisée. testID plutôt
                     qu'un texte unique : "1" collide avec d'autres valeurs affichées
                     (ex. Nb rotations) dès qu'il n'y a qu'une rotation. */}
-                <Text testID={`rotation-numero-cuve-${index}`} style={styles.derivedValue}>
+                <Text testID={`rotation-numero-cuve-${index}`} style={formStyles.derivedValue}>
                   {String(index + 1)}
                 </Text>
               </Card>
 
-              <Text style={styles.label}>Unité *</Text>
-              <View style={styles.chipRow}>
+              <Text style={formStyles.label}>Unité *</Text>
+              <View style={formStyles.chipRow}>
                 <Chip label="Litres (L)" selected={unite === 'L'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'L' })} />
                 <Chip label="Kilos (kg)" selected={unite === 'kg'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'kg' })} />
               </View>
 
-              <Text style={styles.label}>{`Pesticides consommés (${unite === 'kg' ? 'kg' : 'l'}) *`}</Text>
+              <Text style={formStyles.label}>{`Pesticides consommés (${unite === 'kg' ? 'kg' : 'l'}) *`}</Text>
               <TextInput
                 testID={`rotation-quantite-input-${index}`}
                 editable={!readOnly}
-                style={styles.input}
+                style={formStyles.input}
                 placeholder="0"
                 keyboardType="decimal-pad"
                 value={getRotationDraft(rotation.localId, 'quantite') ?? formatDecimalDisplay(rotation.quantite)}
@@ -363,11 +366,11 @@ export default function RotationsScreen() {
                 onBlur={() => clearRotationDraft(rotation.localId, 'quantite')}
               />
 
-              <Text style={styles.label}>Surface traitée (ha) *</Text>
+              <Text style={formStyles.label}>Surface traitée (ha) *</Text>
               <TextInput
                 testID={`rotation-surface-ha-input-${index}`}
                 editable={!readOnly}
-                style={styles.input}
+                style={formStyles.input}
                 placeholder="0"
                 keyboardType="decimal-pad"
                 value={getRotationDraft(rotation.localId, 'surface_ha') ?? formatDecimalDisplay(rotation.surface_ha)}
@@ -375,7 +378,7 @@ export default function RotationsScreen() {
                 onBlur={() => clearRotationDraft(rotation.localId, 'surface_ha')}
               />
 
-              <Text style={styles.label}>Produit / matières actives *</Text>
+              <Text style={formStyles.label}>Produit / matières actives *</Text>
               <ProduitSelectField
                 pesticides={pesticides}
                 selectedId={rotation.produit_id}
@@ -388,21 +391,21 @@ export default function RotationsScreen() {
                 }
               />
               <Card variant="derivee">
-                <Text style={styles.label}>Nom commercial</Text>
-                <Text style={styles.derivedValue}>{rotation.nom_commercial || '—'}</Text>
+                <Text style={formStyles.label}>Nom commercial</Text>
+                <Text style={formStyles.derivedValue}>{rotation.nom_commercial || '—'}</Text>
               </Card>
 
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Heure début *</Text>
+              <View style={formStyles.row}>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Heure début *</Text>
                   <TimeField
                     editable={!readOnly}
                     value={rotation.heure_debut ?? null}
                     onChange={(v) => store.updateRotation(rotation.localId, { heure_debut: v })}
                   />
                 </View>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Heure fin *</Text>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Heure fin *</Text>
                   <TimeField
                     editable={!readOnly}
                     value={rotation.heure_fin ?? null}
@@ -411,17 +414,17 @@ export default function RotationsScreen() {
                 </View>
               </View>
 
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Ouverture vanne *</Text>
+              <View style={formStyles.row}>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Ouverture vanne *</Text>
                   <TimeField
                     editable={!readOnly}
                     value={rotation.heure_ouverture_vanne ?? null}
                     onChange={(v) => store.updateRotation(rotation.localId, { heure_ouverture_vanne: v })}
                   />
                 </View>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Fermeture vanne *</Text>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Fermeture vanne *</Text>
                   <TimeField
                     editable={!readOnly}
                     value={rotation.heure_fermeture_vanne ?? null}
@@ -430,12 +433,12 @@ export default function RotationsScreen() {
                 </View>
               </View>
 
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Température début (°C) *</Text>
+              <View style={formStyles.row}>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Température début (°C) *</Text>
                   <TextInput
                     editable={!readOnly}
-                    style={styles.input}
+                    style={formStyles.input}
                     placeholder="0"
                     keyboardType="decimal-pad"
                     value={getRotationDraft(rotation.localId, 'temperature_debut_c') ?? formatDecimalDisplay(rotation.temperature_debut_c)}
@@ -443,11 +446,11 @@ export default function RotationsScreen() {
                     onBlur={() => clearRotationDraft(rotation.localId, 'temperature_debut_c')}
                   />
                 </View>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Température fin (°C) *</Text>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Température fin (°C) *</Text>
                   <TextInput
                     editable={!readOnly}
-                    style={styles.input}
+                    style={formStyles.input}
                     placeholder="0"
                     keyboardType="decimal-pad"
                     value={getRotationDraft(rotation.localId, 'temperature_fin_c') ?? formatDecimalDisplay(rotation.temperature_fin_c)}
@@ -457,13 +460,13 @@ export default function RotationsScreen() {
                 </View>
               </View>
 
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Vitesse du vent début (m/s) *</Text>
+              <View style={formStyles.row}>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Vitesse du vent début (m/s) *</Text>
                   <TextInput
                     testID={`rotation-vent-debut-input-${index}`}
                     editable={!readOnly}
-                    style={styles.input}
+                    style={formStyles.input}
                     placeholder="0"
                     keyboardType="decimal-pad"
                     value={getRotationDraft(rotation.localId, 'vent_debut_ms') ?? formatDecimalDisplay(rotation.vent_debut_ms)}
@@ -471,12 +474,12 @@ export default function RotationsScreen() {
                     onBlur={() => clearRotationDraft(rotation.localId, 'vent_debut_ms')}
                   />
                 </View>
-                <View style={styles.flex1}>
-                  <Text style={styles.label}>Vitesse du vent fin (m/s) *</Text>
+                <View style={formStyles.flex1}>
+                  <Text style={formStyles.label}>Vitesse du vent fin (m/s) *</Text>
                   <TextInput
                     testID={`rotation-vent-fin-input-${index}`}
                     editable={!readOnly}
-                    style={styles.input}
+                    style={formStyles.input}
                     placeholder="0"
                     keyboardType="decimal-pad"
                     value={getRotationDraft(rotation.localId, 'vent_fin_ms') ?? formatDecimalDisplay(rotation.vent_fin_ms)}
@@ -487,22 +490,22 @@ export default function RotationsScreen() {
               </View>
 
               {/* Durées calculées, jamais saisies (critère d'acceptation). */}
-              <View style={styles.row}>
+              <View style={formStyles.row}>
                 <Card variant="derivee" style={chrome.dureeCard}>
-                  <Text style={styles.label}>Durée application</Text>
-                  <Text style={styles.derivedValue}>
+                  <Text style={formStyles.label}>Durée application</Text>
+                  <Text style={formStyles.derivedValue}>
                     {durees.applicationMinutes != null ? formatDureeRotation(durees.applicationMinutes) : '—'}
                   </Text>
                 </Card>
                 <Card variant="derivee" style={chrome.dureeCard}>
-                  <Text style={styles.label}>Durée totale</Text>
-                  <Text style={styles.derivedValue}>
+                  <Text style={formStyles.label}>Durée totale</Text>
+                  <Text style={formStyles.derivedValue}>
                     {durees.totaleMinutes != null ? formatDureeRotation(durees.totaleMinutes) : '—'}
                   </Text>
                 </Card>
                 <Card variant="derivee" style={chrome.dureeCard}>
-                  <Text style={styles.label}>Mise en place</Text>
-                  <Text style={styles.derivedValue}>
+                  <Text style={formStyles.label}>Mise en place</Text>
+                  <Text style={formStyles.derivedValue}>
                     {durees.miseEnPlaceMinutes != null ? formatDureeRotation(durees.miseEnPlaceMinutes) : '—'}
                   </Text>
                 </Card>
@@ -512,45 +515,45 @@ export default function RotationsScreen() {
         })}
 
         {!readOnly && (
-          <TouchableOpacity style={styles.addButton} onPress={() => store.addRotation({})}>
-            <Text style={styles.addButtonText}>+ Ajouter une rotation</Text>
+          <TouchableOpacity style={formStyles.addButton} onPress={() => store.addRotation({})}>
+            <Text style={formStyles.addButtonText}>+ Ajouter une rotation</Text>
           </TouchableOpacity>
         )}
 
         <Card variant="derivee">
-          <Text style={styles.label}>Nb rotations</Text>
-          <Text style={styles.derivedValue}>{nbRotations}</Text>
+          <Text style={formStyles.label}>Nb rotations</Text>
+          <Text style={formStyles.derivedValue}>{nbRotations}</Text>
         </Card>
         <Card variant="derivee">
-          <Text style={styles.label}>Total pesticide (l)</Text>
-          <Text style={styles.derivedValue}>{totauxPesticide.l}</Text>
+          <Text style={formStyles.label}>Total pesticide (l)</Text>
+          <Text style={formStyles.derivedValue}>{totauxPesticide.l}</Text>
         </Card>
         <Card variant="derivee">
-          <Text style={styles.label}>Total pesticide (kg)</Text>
-          <Text style={styles.derivedValue}>{totauxPesticide.kg}</Text>
+          <Text style={formStyles.label}>Total pesticide (kg)</Text>
+          <Text style={formStyles.derivedValue}>{totauxPesticide.kg}</Text>
         </Card>
         <Card variant="derivee">
-          <Text style={styles.label}>Surface traitée (ha)</Text>
-          <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
+          <Text style={formStyles.label}>Surface traitée (ha)</Text>
+          <Text style={formStyles.derivedValue}>{surfaceTraitee}</Text>
         </Card>
         {store.aerien.repriseTraitement && (
           <Card variant="derivee">
-            <Text style={styles.label}>Surface cumulée (ha)</Text>
-            <Text style={styles.derivedValue}>{surfaceCumulee}</Text>
+            <Text style={formStyles.label}>Surface cumulée (ha)</Text>
+            <Text style={formStyles.derivedValue}>{surfaceCumulee}</Text>
           </Card>
         )}
         <Card variant="derivee">
-          <Text style={styles.label}>Surface restante (ha)</Text>
-          <Text style={styles.derivedValue}>{surfaceRestante}</Text>
+          <Text style={formStyles.label}>Surface restante (ha)</Text>
+          <Text style={formStyles.derivedValue}>{surfaceRestante}</Text>
         </Card>
         {pesticideStockRestant != null && (
           <Card variant="derivee">
-            <Text style={styles.label}>Reste en stock (l)</Text>
-            <Text style={styles.derivedValue}>{pesticideStockRestant}</Text>
+            <Text style={formStyles.label}>Reste en stock (l)</Text>
+            <Text style={formStyles.derivedValue}>{pesticideStockRestant}</Text>
           </Card>
         )}
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={formStyles.error}>{error}</Text>}
 
         {!readOnly && (
           <TouchableOpacity style={chrome.continueButton} onPress={handleContinuer} disabled={isSaving}>
@@ -563,22 +566,24 @@ export default function RotationsScreen() {
   );
 }
 
-const chrome = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  keyboardAvoidingView: { flex: 1 },
-  content: { padding: 16, gap: 10 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  dureeCard: { flex: 1 },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createChromeStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    keyboardAvoidingView: { flex: 1 },
+    content: { padding: 16, gap: 10 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    dureeCard: { flex: 1 },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

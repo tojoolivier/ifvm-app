@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { traitementColors, traitementFonts, traitementTypeSizes } from './tokens';
+import { traitementColors, traitementFonts, useTraitementTypeSizes } from './tokens';
 
 const TOAST_DURATION_MS = 1900;
 
@@ -22,6 +22,8 @@ interface ToastProps {
 }
 
 export function Toast({ message }: ToastProps) {
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   if (!message) return null;
   return (
     <View style={styles.toast} pointerEvents="none">
@@ -30,21 +32,23 @@ export function Toast({ message }: ToastProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  toast: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  text: {
-    fontFamily: traitementFonts.uiSemiBold,
-    fontSize: traitementTypeSizes.corps,
-    color: '#fff',
-    textAlign: 'center',
-  },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    toast: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      bottom: 24,
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+    },
+    text: {
+      fontFamily: traitementFonts.uiSemiBold,
+      fontSize: typeSizes.corps,
+      color: '#fff',
+      textAlign: 'center',
+    },
+  });
+}

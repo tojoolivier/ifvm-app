@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   Dimensions,
   ScrollView,
@@ -10,6 +10,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { FICHES_GREEN, FICHES_GREEN_DARK, FICHES_GREEN_LIGHT } from './tokens';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const { width: SCREEN_WIDTH_DEFAULT } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH_DEFAULT < 380;
@@ -42,6 +44,9 @@ export function SearchAndFilterBar<T extends string>({
   const scrollViewRef = useRef<ScrollView>(null);
   const { width: windowWidth } = useWindowDimensions();
   const showIcons = windowWidth >= 400;
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   return (
     <>
@@ -106,76 +111,89 @@ export function SearchAndFilterBar<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: isSmallScreen ? 40 : 44,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: isSmallScreen ? 14 : 15,
-    color: '#111827',
-    paddingVertical: 8,
-  },
-  clearButton: {
-    padding: 4,
-  },
-  clearIcon: {
-    fontSize: 16,
-    color: '#9CA3AF',
-  },
-  filtersWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  filtersContainer: {
-    paddingVertical: 8,
-  },
-  filtersContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: isSmallScreen ? 12 : 14,
-    paddingVertical: isSmallScreen ? 5 : 6,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  filterChipActive: {
-    backgroundColor: FICHES_GREEN_LIGHT,
-    borderColor: FICHES_GREEN,
-  },
-  filterChipDisabled: {
-    opacity: 0.5,
-  },
-  filterChipText: {
-    fontSize: isSmallScreen ? 12 : 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  filterChipTextActive: {
-    color: FICHES_GREEN_DARK,
-    fontWeight: '600',
-  },
-  filterChipTextDisabled: {
-    color: '#9CA3AF',
-  },
-});
+const BASE_TYPE_SIZES = {
+  searchIcon: 16,
+  searchInput: isSmallScreen ? 14 : 15,
+  clearIcon: 16,
+  filterChipText: isSmallScreen ? 12 : 13,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: '#FFFFFF',
+      borderBottomWidth: 1,
+      borderBottomColor: '#E5E7EB',
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F3F4F6',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      height: isSmallScreen ? 40 : 44,
+    },
+    searchIcon: {
+      fontSize: typeSizes.searchIcon,
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: typeSizes.searchInput,
+      color: '#111827',
+      paddingVertical: 8,
+    },
+    clearButton: {
+      padding: 4,
+    },
+    clearIcon: {
+      fontSize: typeSizes.clearIcon,
+      color: '#9CA3AF',
+    },
+    filtersWrapper: {
+      backgroundColor: '#FFFFFF',
+      borderBottomWidth: 1,
+      borderBottomColor: '#E5E7EB',
+    },
+    filtersContainer: {
+      paddingVertical: 8,
+    },
+    filtersContent: {
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    filterChip: {
+      paddingHorizontal: isSmallScreen ? 12 : 14,
+      paddingVertical: isSmallScreen ? 5 : 6,
+      borderRadius: 20,
+      backgroundColor: '#F3F4F6',
+      borderWidth: 1,
+      borderColor: '#D1D5DB',
+    },
+    filterChipActive: {
+      backgroundColor: FICHES_GREEN_LIGHT,
+      borderColor: FICHES_GREEN,
+    },
+    filterChipDisabled: {
+      opacity: 0.5,
+    },
+    filterChipText: {
+      fontSize: typeSizes.filterChipText,
+      color: '#6B7280',
+      fontWeight: '500',
+    },
+    filterChipTextActive: {
+      color: FICHES_GREEN_DARK,
+      fontWeight: '600',
+    },
+    filterChipTextDisabled: {
+      color: '#9CA3AF',
+    },
+  });
+}

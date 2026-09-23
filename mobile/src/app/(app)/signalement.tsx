@@ -14,7 +14,7 @@
  *   n'apparaissait qu'en mode débogage, donc après l'avoir activé *avant* le
  *   bug.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -29,6 +29,8 @@ import { useRouter } from 'expo-router';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { envoyerSignalement, LONGUEUR_MAX_COMMENTAIRE } from '@/lib/signalement';
 import { depsSignalement } from '@/lib/signalement-natif';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 /**
  * Jetons de `DESIGN.md`. Ne pas recopier les hex ad hoc des écrans antérieurs.
@@ -68,6 +70,9 @@ const CE_QUI_PART = [
 
 export default function SignalementScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const [commentaire, setCommentaire] = useState('');
   const { run, isRunning } = useAsyncAction();
 
@@ -170,65 +175,80 @@ export default function SignalementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: JETONS.background },
-  header: { backgroundColor: JETONS.primary, paddingHorizontal: 16, paddingBottom: 14 },
-  headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: { color: JETONS.surface, fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -2 },
-  headerTitle: { color: JETONS.surface, fontSize: 19, fontWeight: '800', marginLeft: 12 },
-  container: { flex: 1 },
-  content: { padding: 16, paddingBottom: 40 },
-  intro: { fontSize: 13, color: JETONS.foregroundSecondary, lineHeight: 19, marginBottom: 12 },
-  champ: {
-    backgroundColor: JETONS.surface,
-    borderWidth: 1,
-    borderColor: JETONS.borderField,
-    borderRadius: 10,
-    padding: 12,
-    minHeight: 110,
-    fontSize: 13,
-    color: JETONS.foreground,
-  },
-  carte: {
-    backgroundColor: JETONS.aideBg,
-    borderWidth: 1,
-    borderColor: JETONS.aideBordure,
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 16,
-  },
-  carteTitre: { fontSize: 13, fontWeight: '700', color: JETONS.aideTexte, marginBottom: 6 },
-  carteLigne: { fontSize: 12, color: JETONS.aideTexte, lineHeight: 18 },
-  carteNote: { fontSize: 12, color: JETONS.aideTexte, marginTop: 8, fontWeight: '700' },
-  boutonPrincipal: {
-    backgroundColor: JETONS.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  boutonPrincipalTexte: { color: JETONS.surface, fontSize: 14, fontWeight: '700' },
-  boutonSecondaire: {
-    backgroundColor: JETONS.surface,
-    borderWidth: 1,
-    borderColor: JETONS.border,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  boutonSecondaireTexte: { color: JETONS.primary, fontSize: 14, fontWeight: '700' },
-  boutonDesactive: { opacity: 0.6 },
-  aide: { fontSize: 12, color: JETONS.foregroundTertiary, marginTop: 14, lineHeight: 18 },
-});
+const BASE_TYPE_SIZES = {
+  backIcon: 22,
+  headerTitle: 19,
+  intro: 13,
+  champ: 13,
+  carteTitre: 13,
+  carteLigne: 12,
+  carteNote: 12,
+  boutonPrincipalTexte: 14,
+  boutonSecondaireTexte: 14,
+  aide: 12,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: JETONS.background },
+    header: { backgroundColor: JETONS.primary, paddingHorizontal: 16, paddingBottom: 14 },
+    headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
+    backBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: '#FFFFFF22',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backIcon: { color: JETONS.surface, fontSize: typeSizes.backIcon, fontWeight: '300', lineHeight: 26, marginTop: -2 },
+    headerTitle: { color: JETONS.surface, fontSize: typeSizes.headerTitle, fontWeight: '800', marginLeft: 12 },
+    container: { flex: 1 },
+    content: { padding: 16, paddingBottom: 40 },
+    intro: { fontSize: typeSizes.intro, color: JETONS.foregroundSecondary, lineHeight: 19, marginBottom: 12 },
+    champ: {
+      backgroundColor: JETONS.surface,
+      borderWidth: 1,
+      borderColor: JETONS.borderField,
+      borderRadius: 10,
+      padding: 12,
+      minHeight: 110,
+      fontSize: typeSizes.champ,
+      color: JETONS.foreground,
+    },
+    carte: {
+      backgroundColor: JETONS.aideBg,
+      borderWidth: 1,
+      borderColor: JETONS.aideBordure,
+      borderRadius: 10,
+      padding: 12,
+      marginTop: 16,
+    },
+    carteTitre: { fontSize: typeSizes.carteTitre, fontWeight: '700', color: JETONS.aideTexte, marginBottom: 6 },
+    carteLigne: { fontSize: typeSizes.carteLigne, color: JETONS.aideTexte, lineHeight: 18 },
+    carteNote: { fontSize: typeSizes.carteNote, color: JETONS.aideTexte, marginTop: 8, fontWeight: '700' },
+    boutonPrincipal: {
+      backgroundColor: JETONS.primary,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 20,
+    },
+    boutonPrincipalTexte: { color: JETONS.surface, fontSize: typeSizes.boutonPrincipalTexte, fontWeight: '700' },
+    boutonSecondaire: {
+      backgroundColor: JETONS.surface,
+      borderWidth: 1,
+      borderColor: JETONS.border,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    boutonSecondaireTexte: { color: JETONS.primary, fontSize: typeSizes.boutonSecondaireTexte, fontWeight: '700' },
+    boutonDesactive: { opacity: 0.6 },
+    aide: { fontSize: typeSizes.aide, color: JETONS.foregroundTertiary, marginTop: 14, lineHeight: 18 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172).

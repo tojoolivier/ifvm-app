@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,6 +11,8 @@ import { estLeJournalCasse } from '@/lib/logger';
 import { viderJournal } from '@/lib/journal-db';
 import { runTask } from '@/lib/run-task';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const IFVM_GREEN_DARK = '#163F16';
 
@@ -23,6 +25,9 @@ function statusColor(entry: RequestLogEntry): string {
 function LogRow({ entry }: { entry: RequestLogEntry }) {
   const [expanded, setExpanded] = useState(false);
   const time = new Date(entry.startedAt).toLocaleTimeString('fr-FR');
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   return (
     <TouchableOpacity style={styles.row} onPress={() => setExpanded((e) => !e)} activeOpacity={0.7}>
@@ -58,6 +63,9 @@ function LogRow({ entry }: { entry: RequestLogEntry }) {
 function ErrorRow({ entry }: { entry: ErrorLogEntry }) {
   const [expanded, setExpanded] = useState(false);
   const time = new Date(entry.occurredAt).toLocaleTimeString('fr-FR');
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   return (
     <TouchableOpacity style={styles.row} onPress={() => setExpanded((e) => !e)} activeOpacity={0.7}>
@@ -96,6 +104,9 @@ function ErrorRow({ entry }: { entry: ErrorLogEntry }) {
 
 export default function DebugLogsScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const entries = useRequestLogStore((s) => s.entries);
   const clear = useRequestLogStore((s) => s.clear);
   const errorEntries = useErrorLogStore((s) => s.entries);
@@ -206,72 +217,92 @@ export default function DebugLogsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
-  headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: { color: '#FFFFFF', fontSize: 22, fontWeight: '300', lineHeight: 26, marginTop: -2 },
-  headerTextContainer: { flex: 1, marginLeft: 12 },
-  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  headerSub: { color: '#FFFFFFAA', fontSize: 12, marginTop: 1 },
-  clearBtn: { paddingHorizontal: 10, paddingVertical: 6 },
-  clearBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-  container: { flex: 1 },
-  contentContainer: { padding: 16, paddingBottom: 40 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
-  notice: {
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FCD34D',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  noticeText: { fontSize: 12, color: '#78350F' },
-  // Jetons `danger-bg` / `danger-border` / `danger-text` de DESIGN.md. Le reste
-  // du fichier porte des hex ad hoc antérieurs ; ne pas les recopier.
-  alerte: {
-    backgroundColor: '#fbe9e5',
-    borderWidth: 1,
-    borderColor: '#f0c4b9',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  alerteText: { fontSize: 12, color: '#a5341c' },
-  row: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  method: { fontSize: 12, fontWeight: '700', color: '#111827', width: 44 },
-  url: { flex: 1, fontSize: 12, color: '#374151' },
-  rowMeta: { marginTop: 4, marginLeft: 16 },
-  metaText: { fontSize: 11, color: '#9CA3AF' },
-  detail: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  detailError: { fontSize: 12, color: '#DC2626', marginBottom: 4 },
-  detailLabel: { fontSize: 11, fontWeight: '700', color: '#6B7280', marginTop: 4 },
-  detailBody: { fontSize: 11, color: '#111827', fontFamily: 'monospace' },
-  emptyContainer: { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
-});
+const BASE_TYPE_SIZES = {
+  backIcon: 22,
+  headerTitle: 18,
+  headerSub: 12,
+  clearBtnText: 13,
+  sectionTitle: 11,
+  noticeText: 12,
+  alerteText: 12,
+  method: 12,
+  url: 12,
+  metaText: 11,
+  detailError: 12,
+  detailLabel: 11,
+  detailBody: 11,
+  emptyIcon: 40,
+  emptyTitle: 16,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: '#F3F4F6' },
+    header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
+    headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
+    backBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: '#FFFFFF22',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backIcon: { color: '#FFFFFF', fontSize: typeSizes.backIcon, fontWeight: '300', lineHeight: 26, marginTop: -2 },
+    headerTextContainer: { flex: 1, marginLeft: 12 },
+    headerTitle: { color: '#FFFFFF', fontSize: typeSizes.headerTitle, fontWeight: '700' },
+    headerSub: { color: '#FFFFFFAA', fontSize: typeSizes.headerSub, marginTop: 1 },
+    clearBtn: { paddingHorizontal: 10, paddingVertical: 6 },
+    clearBtnText: { color: '#FFFFFF', fontSize: typeSizes.clearBtnText, fontWeight: '600' },
+    container: { flex: 1 },
+    contentContainer: { padding: 16, paddingBottom: 40 },
+    sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
+    notice: {
+      backgroundColor: '#FEF3C7',
+      borderWidth: 1,
+      borderColor: '#FCD34D',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+    },
+    noticeText: { fontSize: typeSizes.noticeText, color: '#78350F' },
+    // Jetons `danger-bg` / `danger-border` / `danger-text` de DESIGN.md. Le reste
+    // du fichier porte des hex ad hoc antérieurs ; ne pas les recopier.
+    alerte: {
+      backgroundColor: '#fbe9e5',
+      borderWidth: 1,
+      borderColor: '#f0c4b9',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+    },
+    alerteText: { fontSize: typeSizes.alerteText, color: '#a5341c' },
+    row: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    statusDot: { width: 8, height: 8, borderRadius: 4 },
+    method: { fontSize: typeSizes.method, fontWeight: '700', color: '#111827', width: 44 },
+    url: { flex: 1, fontSize: typeSizes.url, color: '#374151' },
+    rowMeta: { marginTop: 4, marginLeft: 16 },
+    metaText: { fontSize: typeSizes.metaText, color: '#9CA3AF' },
+    detail: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
+    detailError: { fontSize: typeSizes.detailError, color: '#DC2626', marginBottom: 4 },
+    detailLabel: { fontSize: typeSizes.detailLabel, fontWeight: '700', color: '#6B7280', marginTop: 4 },
+    detailBody: { fontSize: typeSizes.detailBody, color: '#111827', fontFamily: 'monospace' },
+    emptyContainer: { alignItems: 'center', paddingVertical: 60 },
+    emptyIcon: { fontSize: typeSizes.emptyIcon, marginBottom: 8 },
+    emptyTitle: { fontSize: typeSizes.emptyTitle, fontWeight: '600', color: '#111827' },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

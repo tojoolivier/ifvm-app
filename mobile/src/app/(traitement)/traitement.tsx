@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,7 +26,7 @@ import {
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { AerienForm } from '@/components/traitement/AerienForm';
 import { TerrestreForm } from '@/components/traitement/TerrestreForm';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
@@ -50,6 +50,8 @@ export default function TraitementScreen() {
   const [produits, setProduits] = useState<ProduitDraft[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { run, isRunning: isSaving } = useAsyncAction();
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const signalerChargementBase = useSignalerChargement('traitement');
   const signalerChargement = (error: unknown, source: string) =>
     signalerChargementBase(error, { traitementId, source });
@@ -367,21 +369,23 @@ export default function TraitementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  keyboardAvoidingView: { flex: 1 },
-  content: { padding: 16, gap: 10 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    keyboardAvoidingView: { flex: 1 },
+    content: { padding: 16, gap: 10 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

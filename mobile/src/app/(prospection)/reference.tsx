@@ -21,6 +21,8 @@ import { ReferenceFormValues } from '@/lib/prospection-reference-schema';
 import { validateGpsPosition } from '@/lib/prospection-validation';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { useErrorLogStore } from '@/lib/error-log-store';
 import { toFriendlyError } from '@/lib/friendly-error';
 import { logger } from '@/lib/logger';
@@ -100,6 +102,10 @@ function SelecteurReferentiel<T extends OptionReferentiel>({
 }) {
   const [ouvert, setOuvert] = useState(false);
   const [recherche, setRecherche] = useState('');
+
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const filtres = useMemo(() => {
     const q = recherche.trim().toLowerCase();
@@ -193,6 +199,10 @@ export default function ReferenceScreen() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGpsLoading, setIsGpsLoading] = useState(true);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   // Retour visuel continu sur la qualité du fix : la précision n'empêche jamais
   // d'enregistrer, c'est donc ici — sous les yeux de l'agent pendant qu'il saisit —
@@ -955,7 +965,45 @@ export default function ReferenceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  gpsLoadingText: 12,
+  gpsTitle: 12,
+  accuracyText: 9.5,
+  gpsPrecisionAvertissement: 10.5,
+  gpsFieldLabel: 8.5,
+  gpsFieldValue: 12.5,
+  gpsAdminText: 10.5,
+  refLabel: 9,
+  toggleSegment: 9.5,
+  autoValueText: 15,
+  manualInput: 15,
+  gpsBadgeText: 9,
+  selectTriggerText: 15,
+  selectChevron: 13,
+  selectVide: 12.5,
+  selectLigneTexte: 14,
+  selectLien: 13,
+  chip: 12,
+  metaLabel: 9,
+  metaValue: 13,
+  sectionLabel: 11,
+  surfaceLabel: 9.5,
+  surfaceInput: 18,
+  biotopeChipText: 13,
+  hintText: 10.5,
+  errorText: 11,
+  infoText: 11,
+  continueButtonText: 15,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
@@ -967,22 +1015,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
   progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
   progressActive: { backgroundColor: GREEN },
   scroll: { flex: 1 },
   gpsCard: { backgroundColor: GREEN, borderRadius: 13, padding: 14, marginBottom: 12 },
   gpsLoadingContainer: { paddingVertical: 8 },
-  gpsLoadingText: { color: '#ffffffcc', fontSize: 12, textAlign: 'center' },
+  gpsLoadingText: { color: '#ffffffcc', fontSize: typeSizes.gpsLoadingText, textAlign: 'center' },
   gpsHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 9,
   },
-  gpsTitle: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  gpsTitle: { color: '#fff', fontWeight: '700', fontSize: typeSizes.gpsTitle },
   accuracyBadge: {
     backgroundColor: '#ffffff2e',
     borderRadius: 20,
@@ -993,18 +1041,18 @@ const styles = StyleSheet.create({
   accuracyBadgeMoyenne: { backgroundColor: '#f59e0b' },
   /** Rouge : « position peu fiable » — signal fort, mais jamais bloquant. */
   accuracyBadgeInsuffisante: { backgroundColor: '#dc2626' },
-  accuracyText: { color: '#fff', fontSize: 9.5, fontWeight: '600' },
+  accuracyText: { color: '#fff', fontSize: typeSizes.accuracyText, fontWeight: '600' },
   gpsPrecisionAvertissement: {
     color: '#fff',
-    fontSize: 10.5,
+    fontSize: typeSizes.gpsPrecisionAvertissement,
     lineHeight: 14,
     marginBottom: 9,
   },
   gpsFieldsRow: { flexDirection: 'row', gap: 8, marginBottom: 9 },
   gpsField: { flex: 1, backgroundColor: '#ffffff1f', borderRadius: 8, padding: 7 },
-  gpsFieldLabel: { color: '#ffffffbf', fontSize: 8.5, textTransform: 'uppercase' },
-  gpsFieldValue: { color: '#fff', fontWeight: '600', fontSize: 12.5 },
-  gpsAdminText: { color: '#ffffffd9', fontSize: 10.5 },
+  gpsFieldLabel: { color: '#ffffffbf', fontSize: typeSizes.gpsFieldLabel, textTransform: 'uppercase' },
+  gpsFieldValue: { color: '#fff', fontWeight: '600', fontSize: typeSizes.gpsFieldValue },
+  gpsAdminText: { color: '#ffffffd9', fontSize: typeSizes.gpsAdminText },
   refCard: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -1020,7 +1068,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   refLabel: {
-    fontSize: 9,
+    fontSize: typeSizes.refLabel,
     fontWeight: '700',
     color: INACTIVE_TEXT,
     textTransform: 'uppercase',
@@ -1028,7 +1076,7 @@ const styles = StyleSheet.create({
   },
   toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 8, padding: 2, gap: 2 },
   toggleSegment: {
-    fontSize: 9.5,
+    fontSize: typeSizes.toggleSegment,
     fontWeight: '700',
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -1038,9 +1086,9 @@ const styles = StyleSheet.create({
   },
   toggleSegmentActive: { backgroundColor: GREEN, color: '#fff' },
   autoValueRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  autoValueText: { fontSize: 15, fontWeight: '700', color: TEXT },
+  autoValueText: { fontSize: typeSizes.autoValueText, fontWeight: '700', color: TEXT },
   manualInput: {
-    fontSize: 15,
+    fontSize: typeSizes.manualInput,
     fontWeight: '700',
     color: TEXT,
     backgroundColor: INACTIVE_BG,
@@ -1049,12 +1097,12 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   gpsBadge: { backgroundColor: GPS_BADGE_BG, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
-  gpsBadgeText: { fontSize: 9, fontWeight: '600', color: GREEN },
+  gpsBadgeText: { fontSize: typeSizes.gpsBadgeText, fontWeight: '600', color: GREEN },
   selectTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   selectTriggerDisabled: { opacity: 0.55 },
-  selectTriggerText: { flex: 1, fontSize: 15, fontWeight: '700', color: TEXT },
+  selectTriggerText: { flex: 1, fontSize: typeSizes.selectTriggerText, fontWeight: '700', color: TEXT },
   selectTriggerPlaceholder: { color: INACTIVE_TEXT, fontWeight: '600' },
-  selectChevron: { fontSize: 13, color: TEXT_SECONDARY, marginLeft: 8 },
+  selectChevron: { fontSize: typeSizes.selectChevron, color: TEXT_SECONDARY, marginLeft: 8 },
   selectVoile: { flex: 1, backgroundColor: 'rgba(22,32,26,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   selectCarte: {
     width: '100%',
@@ -1068,13 +1116,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   selectListe: { flexGrow: 0 },
-  selectVide: { fontSize: 12.5, color: TEXT_SECONDARY, padding: 12 },
+  selectVide: { fontSize: typeSizes.selectVide, color: TEXT_SECONDARY, padding: 12 },
   selectLigne: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
-  selectLigneTexte: { fontSize: 14, fontWeight: '600', color: TEXT },
-  selectLien: { color: TEXT_SECONDARY, fontSize: 13, fontWeight: '700', textAlign: 'center', paddingVertical: 8 },
+  selectLigneTexte: { fontSize: typeSizes.selectLigneTexte, fontWeight: '600', color: TEXT },
+  selectLien: { color: TEXT_SECONDARY, fontSize: typeSizes.selectLien, fontWeight: '700', textAlign: 'center', paddingVertical: 8 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
-    fontSize: 12,
+    fontSize: typeSizes.chip,
     fontWeight: '600',
     color: TEXT_SECONDARY,
     backgroundColor: INACTIVE_BG,
@@ -1093,10 +1141,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 9,
   },
-  metaLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
-  metaValue: { fontSize: 13, fontWeight: '600', color: TEXT },
+  metaLabel: { fontSize: typeSizes.metaLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+  metaValue: { fontSize: typeSizes.metaValue, fontWeight: '600', color: TEXT },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: typeSizes.sectionLabel,
     fontWeight: '700',
     color: TEXT_SECONDARY,
     textTransform: 'uppercase',
@@ -1118,8 +1166,8 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 24,
   },
-  surfaceLabel: { fontSize: 9.5, color: '#9a9484', marginBottom: 2 },
-  surfaceInput: { fontSize: 18, fontWeight: '700', color: TEXT, padding: 0 },
+  surfaceLabel: { fontSize: typeSizes.surfaceLabel, color: '#9a9484', marginBottom: 2 },
+  surfaceInput: { fontSize: typeSizes.surfaceInput, fontWeight: '700', color: TEXT, padding: 0 },
   biotopeContainer: { marginTop: 4, marginBottom: 12 },
   biotopeOptions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   biotopeChip: {
@@ -1135,17 +1183,17 @@ const styles = StyleSheet.create({
     borderColor: GREEN,
   },
   biotopeChipText: {
-    fontSize: 13,
+    fontSize: typeSizes.biotopeChipText,
     fontWeight: '600',
     color: TEXT_SECONDARY,
   },
   biotopeChipTextActive: {
     color: '#fff',
   },
-  hintText: { fontSize: 10.5, color: '#9a9484', paddingHorizontal: 2 },
-  errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
+  hintText: { fontSize: typeSizes.hintText, color: '#9a9484', paddingHorizontal: 2 },
+  errorText: { color: '#c0412b', fontSize: typeSizes.errorText, marginBottom: 4 },
   infoText: {
-    fontSize: 11,
+    fontSize: typeSizes.infoText,
     color: '#6f6a59',
     marginBottom: 8,
     fontStyle: 'italic',
@@ -1167,8 +1215,9 @@ const styles = StyleSheet.create({
   continueButtonDisabled: {
     opacity: 0.6,
   },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

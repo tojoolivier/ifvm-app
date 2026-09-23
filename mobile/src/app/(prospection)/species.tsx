@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useProspectionCaptureStore } from '@/lib/prospection-capture-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -36,6 +38,9 @@ export default function SpeciesScreen() {
   );
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('species');
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   // Reconstruit le store si l'app a été relancée directement sur cet écran
   // (même garde-fou que les autres écrans du parcours).
@@ -174,39 +179,56 @@ export default function SpeciesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  hint: 12,
+  cardTitle: 14,
+  toggleText: 12.5,
+  stepsHintIcon: 18,
+  stepsHintText: 11.5,
+  continueButtonText: 15,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 14 },
   progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
   progressActive: { backgroundColor: GREEN },
   content: { flex: 1, paddingHorizontal: 16 },
-  hint: { fontSize: 12, lineHeight: 17, color: TEXT_SECONDARY, marginBottom: 14 },
+  hint: { fontSize: typeSizes.hint, lineHeight: 17, color: TEXT_SECONDARY, marginBottom: 14 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 13, padding: 14, marginBottom: 12 },
   cardActive: { borderWidth: 2, borderColor: GREEN },
   // Nom scientifique en italique réel (fontStyle, pas des caractères Unicode) —
   // convention de nomenclature (Locusta migratoria capito / Nomadacris
   // septemfasciata), uniquement décoratif : n'affecte ni la valeur enregistrée
   // (`prospection.especes`, cf. prospection-especes.ts) ni aucune autre règle.
-  cardTitle: { fontSize: 14, fontWeight: '700', fontStyle: 'italic', color: TEXT },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', fontStyle: 'italic', color: TEXT },
   toggleRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   toggle: { flex: 1, borderRadius: 9, padding: 11, alignItems: 'center', backgroundColor: INACTIVE_BG },
   toggleActive: { backgroundColor: GREEN },
-  toggleText: { fontWeight: '700', fontSize: 12.5, color: INACTIVE_TEXT },
+  toggleText: { fontWeight: '700', fontSize: typeSizes.toggleText, color: INACTIVE_TEXT },
   toggleTextActive: { color: '#fff' },
   stepsHint: { marginTop: 4, backgroundColor: '#eaf2ec', borderRadius: 11, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepsHintIcon: { fontSize: 18 },
-  stepsHintText: { flex: 1, fontSize: 11.5, lineHeight: 16, color: GREEN },
+  stepsHintIcon: { fontSize: typeSizes.stepsHintIcon },
+  stepsHintText: { flex: 1, fontSize: typeSizes.stepsHintText, lineHeight: 16, color: GREEN },
   stepsHintStrong: { fontWeight: '700' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

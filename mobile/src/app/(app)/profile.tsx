@@ -2,13 +2,16 @@ import { View, TouchableOpacity, ScrollView, StyleSheet, Image, Switch, SafeArea
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { storage } from '@/lib/storage';
 import { apiClient } from '@/lib/api-client';
 import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 import { useDebugStore } from '@/lib/debug-store';
+import { useFontScaleStore } from '@/lib/font-scale-store';
+import { FONT_SCALE_LEVELS, FontScaleLevel, scaleTypeSizes } from '@/lib/typography';
+import { useFontScale } from '@/hooks/use-font-scale';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
@@ -28,11 +31,16 @@ const PROFILE_IMAGE_KEY = 'profile_image';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const token = useAuthStore((s) => s.token);
   const debugEnabled = useDebugStore((s) => s.enabled);
   const setDebugEnabled = useDebugStore((s) => s.setEnabled);
+  const fontScaleLevel = useFontScaleStore((s) => s.level);
+  const setFontScaleLevel = useFontScaleStore((s) => s.setLevel);
 
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -485,6 +493,14 @@ export default function ProfileScreen() {
               value={darkMode}
               onToggle={setDarkMode}
             />
+            <PreferenceChoice
+              icon="🔤"
+              label="Taille de police"
+              value={fontScaleLevel}
+              onChange={(level) => {
+                if (user) void setFontScaleLevel(user.id, level);
+              }}
+            />
           </View>
         </View>
 
@@ -691,6 +707,9 @@ export default function ProfileScreen() {
 // ============================================
 
 function InfoItem({ label, value }: { label: string; value: string }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <View style={styles.infoItem}>
       <ThemedText style={styles.infoLabel}>{label}</ThemedText>
@@ -707,6 +726,9 @@ function PreferenceItem({ icon, label, hint, value, onToggle }: {
   value: boolean;
   onToggle: (val: boolean) => void;
 }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <View style={styles.preferenceItem}>
       <View style={styles.preferenceLeft}>
@@ -727,431 +749,530 @@ function PreferenceItem({ icon, label, hint, value, onToggle }: {
   );
 }
 
+/**
+ * Pendant de `PreferenceItem` pour un réglage à 3 valeurs plutôt que
+ * booléen (#taille-police-par-utilisateur) — même en-tête icône/libellé,
+ * un rang de chips à la place du `Switch`.
+ */
+function PreferenceChoice({ icon, label, value, onChange }: {
+  icon: string;
+  label: string;
+  value: FontScaleLevel;
+  onChange: (level: FontScaleLevel) => void;
+}) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  return (
+    <View style={[styles.preferenceItem, styles.preferenceChoiceItem]}>
+      <View style={styles.preferenceLeft}>
+        <ThemedText style={styles.preferenceIcon}>{icon}</ThemedText>
+        <ThemedText style={styles.preferenceLabel}>{label}</ThemedText>
+      </View>
+      <View style={styles.fontScaleChips}>
+        {FONT_SCALE_LEVELS.map((option) => {
+          const active = option.value === value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              onPress={() => onChange(option.value)}
+              style={[styles.fontScaleChip, active && styles.fontScaleChipActive]}
+              activeOpacity={0.8}
+            >
+              <ThemedText style={[styles.fontScaleChipText, active && styles.fontScaleChipTextActive]}>
+                {option.label}
+              </ThemedText>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 // ============================================
 // STYLES
 // ============================================
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: IFVM_BG_LIGHT,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: IFVM_BG_LIGHT,
-  },
-  contentContainer: {
-    paddingBottom: 40,
-  },
-  header: {
-    backgroundColor: HEADER_BG,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  safeArea: {
-    backgroundColor: HEADER_BG,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '300',
-    lineHeight: 26,
-    marginTop: -2,
-  },
-  logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    padding: 6,
-    marginLeft: 10,
-  },
-  headerTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  headerSub: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    marginTop: 1,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  avatarTouchable: {
-    position: 'relative',
-  },
-  avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    position: 'relative',
-  },
-  avatarImage: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-  },
-  avatarText: {
-    fontSize: 44,
-    fontWeight: '700',
-  },
-  cameraIconContainer: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: IFVM_GREEN,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-    zIndex: 10,
-  },
-  cameraIcon: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 60,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1A237E',
-    marginTop: 12,
-  },
-  userRole: {
-    fontSize: 14,
-    color: '#757575',
-    marginTop: 2,
-  },
-  changePhotoButton: {
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: IFVM_GREEN_BG,
-  },
-  changePhotoText: {
-    fontSize: 12,
-    color: IFVM_GREEN,
-    fontWeight: '500',
-  },
-  infoSection: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A237E',
-    marginBottom: 10,
-  },
-  infoCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  infoLabel: {
-    fontSize: 13,
-    color: '#757575',
-  },
-  infoValue: {
-    fontSize: 13,
-    color: '#1A237E',
-    fontWeight: '500',
-  },
-  securityButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: CARD_BG,
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  securityButtonLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  securityIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  securityText: {
-    fontSize: 14,
-    color: '#1A237E',
-    fontWeight: '500',
-  },
-  securityArrow: {
-    fontSize: 18,
-    color: '#9E9E9E',
-  },
-  preferencesSection: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  preferencesCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 14,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  preferenceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  preferenceLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    // Sans borne, un libellé sur deux lignes pousse le Switch hors de l'écran.
-    flex: 1,
-    paddingRight: 12,
-  },
-  preferenceIcon: {
-    fontSize: 18,
-  },
-  preferenceTextes: {
-    flex: 1,
-  },
-  preferenceLabel: {
-    fontSize: 14,
-    color: '#1A237E',
-    fontWeight: '500',
-  },
-  // Jeton `foreground-tertiary` de DESIGN.md ; le reste de ce fichier porte des
-  // hex ad hoc antérieurs, ne pas les recopier.
-  preferenceHint: {
-    fontSize: 12,
-    color: '#6f6a59',
-    marginTop: 2,
-  },
-  versionContainer: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  versionText: {
-    fontSize: 12,
-    color: '#BDBDBD',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: CARD_BG,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#FCE4EC',
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  logoutIcon: {
-    fontSize: 20,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: IFVM_RED,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingTop: 20,
-  },
-  footerText: {
-    fontSize: 11,
-    color: '#BDBDBD',
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A237E',
-  },
-  modalClose: {
-    fontSize: 24,
-    color: '#757575',
-    padding: 4,
-  },
-  modalBody: {
-    padding: 20,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1A237E',
-    marginBottom: 6,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    fontSize: 14,
-    color: '#1A237E',
-  },
-  passwordInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  eyeButton: {
-    padding: 12,
-  },
-  eyeIcon: {
-    fontSize: 20,
-  },
-  inputHint: {
-    fontSize: 11,
-    color: '#9E9E9E',
-    marginTop: 4,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 8,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  modalButtonCancelText: {
-    color: '#757575',
-    fontWeight: '600',
-  },
-  modalButtonConfirm: {
-    backgroundColor: IFVM_GREEN,
-  },
-  modalButtonConfirmText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-});
+const BASE_TYPE_SIZES = {
+  backIcon: 22,
+  headerTitle: 18,
+  headerSub: 12,
+  avatarText: 44,
+  cameraIcon: 16,
+  userName: 22,
+  userRole: 14,
+  changePhotoText: 12,
+  sectionTitle: 16,
+  infoLabel: 13,
+  infoValue: 13,
+  securityIcon: 20,
+  securityText: 14,
+  securityArrow: 18,
+  preferenceIcon: 18,
+  preferenceLabel: 14,
+  preferenceHint: 12,
+  fontScaleChipText: 12,
+  versionText: 12,
+  logoutIcon: 20,
+  logoutText: 16,
+  footerText: 11,
+  modalTitle: 18,
+  modalClose: 24,
+  inputLabel: 14,
+  input: 14,
+  eyeIcon: 20,
+  inputHint: 11,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: IFVM_BG_LIGHT,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: IFVM_BG_LIGHT,
+    },
+    contentContainer: {
+      paddingBottom: 40,
+    },
+    header: {
+      backgroundColor: HEADER_BG,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    safeArea: {
+      backgroundColor: HEADER_BG,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: 8,
+    },
+    backBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: '#FFFFFF22',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backIcon: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.backIcon,
+      fontWeight: '300',
+      lineHeight: 26,
+      marginTop: -2,
+    },
+    logo: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      padding: 6,
+      marginLeft: 10,
+    },
+    headerTextContainer: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.headerTitle,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
+    headerSub: {
+      color: 'rgba(255,255,255,0.8)',
+      fontSize: typeSizes.headerSub,
+      marginTop: 1,
+    },
+    avatarSection: {
+      alignItems: 'center',
+      paddingTop: 20,
+      paddingBottom: 16,
+    },
+    avatarTouchable: {
+      position: 'relative',
+    },
+    avatarContainer: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 4,
+      borderColor: '#FFFFFF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 6,
+      position: 'relative',
+    },
+    avatarImage: {
+      width: 112,
+      height: 112,
+      borderRadius: 56,
+    },
+    avatarText: {
+      fontSize: typeSizes.avatarText,
+      fontWeight: '700',
+    },
+    cameraIconContainer: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: IFVM_GREEN,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+      zIndex: 10,
+    },
+    cameraIcon: {
+      fontSize: typeSizes.cameraIcon,
+      color: '#FFFFFF',
+    },
+    loadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: 60,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    userName: {
+      fontSize: typeSizes.userName,
+      fontWeight: '700',
+      color: '#1A237E',
+      marginTop: 12,
+    },
+    userRole: {
+      fontSize: typeSizes.userRole,
+      color: '#757575',
+      marginTop: 2,
+    },
+    changePhotoButton: {
+      marginTop: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: IFVM_GREEN_BG,
+    },
+    changePhotoText: {
+      fontSize: typeSizes.changePhotoText,
+      color: IFVM_GREEN,
+      fontWeight: '500',
+    },
+    infoSection: {
+      paddingHorizontal: 16,
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: typeSizes.sectionTitle,
+      fontWeight: '600',
+      color: '#1A237E',
+      marginBottom: 10,
+    },
+    infoCard: {
+      backgroundColor: CARD_BG,
+      borderRadius: 14,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    infoItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F0F0F0',
+    },
+    infoLabel: {
+      fontSize: typeSizes.infoLabel,
+      color: '#757575',
+    },
+    infoValue: {
+      fontSize: typeSizes.infoValue,
+      color: '#1A237E',
+      fontWeight: '500',
+    },
+    securityButton: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: CARD_BG,
+      borderRadius: 14,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    securityButtonLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    securityIcon: {
+      fontSize: typeSizes.securityIcon,
+      marginRight: 12,
+    },
+    securityText: {
+      fontSize: typeSizes.securityText,
+      color: '#1A237E',
+      fontWeight: '500',
+    },
+    securityArrow: {
+      fontSize: typeSizes.securityArrow,
+      color: '#9E9E9E',
+    },
+    preferencesSection: {
+      paddingHorizontal: 16,
+      marginBottom: 16,
+    },
+    preferencesCard: {
+      backgroundColor: CARD_BG,
+      borderRadius: 14,
+      padding: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    preferenceItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F0F0F0',
+    },
+    preferenceLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      // Sans borne, un libellé sur deux lignes pousse le Switch hors de l'écran.
+      flex: 1,
+      paddingRight: 12,
+    },
+    preferenceIcon: {
+      fontSize: typeSizes.preferenceIcon,
+    },
+    preferenceTextes: {
+      flex: 1,
+    },
+    preferenceLabel: {
+      fontSize: typeSizes.preferenceLabel,
+      color: '#1A237E',
+      fontWeight: '500',
+    },
+    // Jeton `foreground-tertiary` de DESIGN.md ; le reste de ce fichier porte des
+    // hex ad hoc antérieurs, ne pas les recopier.
+    preferenceHint: {
+      fontSize: typeSizes.preferenceHint,
+      color: '#6f6a59',
+      marginTop: 2,
+    },
+    preferenceChoiceItem: {
+      flexWrap: 'wrap',
+      rowGap: 8,
+    },
+    fontScaleChips: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    fontScaleChip: {
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 20,
+      backgroundColor: '#F0F2F5',
+    },
+    fontScaleChipActive: {
+      backgroundColor: IFVM_GREEN,
+    },
+    fontScaleChipText: {
+      fontSize: typeSizes.fontScaleChipText,
+      fontWeight: '600',
+      color: '#6f6a59',
+    },
+    fontScaleChipTextActive: {
+      color: '#FFFFFF',
+    },
+    versionContainer: {
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    versionText: {
+      fontSize: typeSizes.versionText,
+      color: '#BDBDBD',
+    },
+    logoutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: CARD_BG,
+      marginHorizontal: 16,
+      marginTop: 16,
+      paddingVertical: 16,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: '#FCE4EC',
+      gap: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    logoutIcon: {
+      fontSize: typeSizes.logoutIcon,
+    },
+    logoutText: {
+      fontSize: typeSizes.logoutText,
+      fontWeight: '600',
+      color: IFVM_RED,
+    },
+    footer: {
+      alignItems: 'center',
+      paddingTop: 20,
+    },
+    footerText: {
+      fontSize: typeSizes.footerText,
+      color: '#BDBDBD',
+    },
+    // Modal styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContainer: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 20,
+      width: '90%',
+      maxWidth: 400,
+      maxHeight: '80%',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F0F0F0',
+    },
+    modalTitle: {
+      fontSize: typeSizes.modalTitle,
+      fontWeight: '700',
+      color: '#1A237E',
+    },
+    modalClose: {
+      fontSize: typeSizes.modalClose,
+      color: '#757575',
+      padding: 4,
+    },
+    modalBody: {
+      padding: 20,
+    },
+    inputContainer: {
+      marginBottom: 16,
+    },
+    inputLabel: {
+      fontSize: typeSizes.inputLabel,
+      fontWeight: '500',
+      color: '#1A237E',
+      marginBottom: 6,
+    },
+    input: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      fontSize: typeSizes.input,
+      color: '#1A237E',
+    },
+    passwordInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F5F5F5',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+    },
+    eyeButton: {
+      padding: 12,
+    },
+    eyeIcon: {
+      fontSize: typeSizes.eyeIcon,
+    },
+    inputHint: {
+      fontSize: typeSizes.inputHint,
+      color: '#9E9E9E',
+      marginTop: 4,
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginTop: 8,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    modalButtonCancel: {
+      backgroundColor: '#F5F5F5',
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+    },
+    modalButtonCancelText: {
+      color: '#757575',
+      fontWeight: '600',
+    },
+    modalButtonConfirm: {
+      backgroundColor: IFVM_GREEN,
+    },
+    modalButtonConfirmText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

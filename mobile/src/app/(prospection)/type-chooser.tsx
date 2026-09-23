@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,6 +6,8 @@ import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const GREEN = '#235a36';
 const BG = '#faf7ef';
@@ -18,6 +21,9 @@ export default function TypeChooserScreen() {
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const { run, isRunning: isCreating } = useAsyncAction();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const chooseIntensive = () =>
     run(
@@ -105,21 +111,36 @@ export default function TypeChooserScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  cardTitle: 15,
+  cardTitleIntensive: 15,
+  cardSubtitle: 11.5,
+  cardSubtitleIntensive: 11.5,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   content: { paddingHorizontal: 16 },
   card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: '#fff', borderWidth: 1.5, borderColor: BORDER },
   cardIntensive: { backgroundColor: GREEN, borderWidth: 0 },
   cardDashed: { borderStyle: 'dashed', borderColor: '#bdb6a2' },
-  cardTitle: { fontSize: 15, fontWeight: '800', color: TEXT },
-  cardTitleIntensive: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  cardSubtitle: { fontSize: 11.5, lineHeight: 16, color: TEXT_SECONDARY, marginTop: 4 },
-  cardSubtitleIntensive: { fontSize: 11.5, lineHeight: 16, color: '#ffffffd9', marginTop: 4 },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '800', color: TEXT },
+  cardTitleIntensive: { fontSize: typeSizes.cardTitleIntensive, fontWeight: '800', color: '#fff' },
+  cardSubtitle: { fontSize: typeSizes.cardSubtitle, lineHeight: 16, color: TEXT_SECONDARY, marginTop: 4 },
+  cardSubtitleIntensive: { fontSize: typeSizes.cardSubtitleIntensive, lineHeight: 16, color: '#ffffffd9', marginTop: 4 },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

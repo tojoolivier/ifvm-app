@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement } from '@/lib/traitement-repository';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN } from '@/components/traitement/ProgressBar';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 
 /**
@@ -23,6 +23,8 @@ export default function SurfaceTraiteeScreen() {
   const [surfaceTraiteeHa, setSurfaceTraiteeHa] = useState<number | null>(null);
   const [estProtegee, setEstProtegee] = useState(false);
   const signalerChargement = useSignalerChargement('surface-traitee');
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   useEffect(() => {
     if (!traitementId) return;
@@ -61,33 +63,35 @@ export default function SurfaceTraiteeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  content: { padding: 16, gap: 12 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  label: {
-    fontFamily: traitementFonts.uiSemiBold,
-    fontSize: traitementTypeSizes.corps + 1,
-    color: traitementColors.texteLabel,
-    textAlign: 'center',
-  },
-  derivedValue: {
-    fontFamily: traitementFonts.monoBold,
-    fontSize: traitementTypeSizes.valeurDerivee,
-    color: traitementColors.vertPrincipal,
-    textAlign: 'center',
-  },
-  deriveeCentree: { alignItems: 'center' },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    content: { padding: 16, gap: 12 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    label: {
+      fontFamily: traitementFonts.uiSemiBold,
+      fontSize: typeSizes.corps + 1,
+      color: traitementColors.texteLabel,
+      textAlign: 'center',
+    },
+    derivedValue: {
+      fontFamily: traitementFonts.monoBold,
+      fontSize: typeSizes.valeurDerivee,
+      color: traitementColors.vertPrincipal,
+      textAlign: 'center',
+    },
+    deriveeCentree: { alignItems: 'center' },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,7 +12,9 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+// Import intermodule : cet écran vit sous (prospection) mais affiche une liste
+// avec le style visuel du module traitement (cf. hand-off #taille-police-par-utilisateur).
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
@@ -64,6 +66,8 @@ export default function RevalidationListeScreen() {
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
   const [horsLigne, setHorsLigne] = useState(false);
   const { run, isRunning: isSelectionEnCours } = useAsyncAction();
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const charger = useCallback(() => {
     if (!token) return;
@@ -183,54 +187,56 @@ export default function RevalidationListeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
-  title: {
-    fontFamily: traitementFonts.uiExtraBold,
-    fontSize: traitementTypeSizes.titreEcran,
-    color: traitementColors.texteTitre,
-  },
-  sousTitre: {
-    fontFamily: traitementFonts.ui,
-    fontSize: traitementTypeSizes.label,
-    color: traitementColors.texteSecondaire,
-  },
-  bandeauHorsLigne: {
-    fontFamily: traitementFonts.ui,
-    fontSize: traitementTypeSizes.label,
-    color: traitementColors.avertissementTexte,
-    backgroundColor: traitementColors.avertissementFond,
-    borderWidth: 1,
-    borderColor: traitementColors.avertissementBordure,
-    borderRadius: traitementRadii.carte,
-    padding: 10,
-  },
-  list: { flex: 1 },
-  emptyText: { fontFamily: traitementFonts.ui, color: traitementColors.texteLabel, textAlign: 'center', marginTop: 20 },
-  row: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.carte,
-    padding: 10,
-    marginBottom: 8,
-    gap: 2,
-  },
-  rowTitle: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
-  rowRetard: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.danger },
-  backLink: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: traitementColors.dashedBordure,
-    borderRadius: traitementRadii.chip,
-    padding: 10,
-    alignItems: 'center',
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  backLinkText: { fontFamily: traitementFonts.uiMedium, color: traitementColors.texteSecondaire },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
+    title: {
+      fontFamily: traitementFonts.uiExtraBold,
+      fontSize: typeSizes.titreEcran,
+      color: traitementColors.texteTitre,
+    },
+    sousTitre: {
+      fontFamily: traitementFonts.ui,
+      fontSize: typeSizes.label,
+      color: traitementColors.texteSecondaire,
+    },
+    bandeauHorsLigne: {
+      fontFamily: traitementFonts.ui,
+      fontSize: typeSizes.label,
+      color: traitementColors.avertissementTexte,
+      backgroundColor: traitementColors.avertissementFond,
+      borderWidth: 1,
+      borderColor: traitementColors.avertissementBordure,
+      borderRadius: traitementRadii.carte,
+      padding: 10,
+    },
+    list: { flex: 1 },
+    emptyText: { fontFamily: traitementFonts.ui, color: traitementColors.texteLabel, textAlign: 'center', marginTop: 20 },
+    row: {
+      backgroundColor: '#fff',
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.carte,
+      padding: 10,
+      marginBottom: 8,
+      gap: 2,
+    },
+    rowTitle: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
+    rowSubtitle: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.texteSecondaire },
+    rowRetard: { fontFamily: traitementFonts.uiMedium, fontSize: typeSizes.label, color: traitementColors.danger },
+    backLink: {
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: traitementColors.dashedBordure,
+      borderRadius: traitementRadii.chip,
+      padding: 10,
+      alignItems: 'center',
+      minHeight: 44,
+      justifyContent: 'center',
+    },
+    backLinkText: { fontFamily: traitementFonts.uiMedium, color: traitementColors.texteSecondaire },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

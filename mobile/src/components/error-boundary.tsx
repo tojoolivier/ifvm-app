@@ -1,7 +1,9 @@
-import { Component, ReactNode } from 'react';
+import { Component, ReactNode, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, type ErrorBoundaryProps } from 'expo-router';
 import { logger } from '@/lib/logger';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { BACKGROUND, FOREGROUND, FOREGROUND_TERTIARY, PRIMARY } from './erreurs/tokens';
 
 /**
@@ -11,6 +13,10 @@ import { BACKGROUND, FOREGROUND, FOREGROUND_TERTIARY, PRIMARY } from './erreurs/
  * à un agent en brousse, et le support la retrouve dans le journal.
  */
 function EcranDeRepli({ onSortie }: { onSortie?: () => void }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+
   return (
     <View style={styles.root} accessibilityRole="alert">
       <Text style={styles.title}>Cet écran n’a pas pu s’afficher</Text>
@@ -106,10 +112,28 @@ function journaliserLeCrash(error: unknown, zone: string, componentStack?: strin
   });
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: BACKGROUND },
-  title: { fontSize: 16, fontWeight: '800', color: FOREGROUND, marginBottom: 6, textAlign: 'center' },
-  subtitle: { fontSize: 13, color: FOREGROUND_TERTIARY, marginBottom: 18, textAlign: 'center', lineHeight: 19 },
-  button: { backgroundColor: PRIMARY, borderRadius: 13, paddingHorizontal: 20, paddingVertical: 12 },
-  buttonText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-});
+const BASE_TYPE_SIZES = {
+  title: 16,
+  subtitle: 13,
+  buttonText: 14,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    root: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: BACKGROUND },
+    title: { fontSize: typeSizes.title, fontWeight: '800', color: FOREGROUND, marginBottom: 6, textAlign: 'center' },
+    subtitle: {
+      fontSize: typeSizes.subtitle,
+      color: FOREGROUND_TERTIARY,
+      marginBottom: 18,
+      textAlign: 'center',
+      lineHeight: 19,
+    },
+    button: { backgroundColor: PRIMARY, borderRadius: 13, paddingHorizontal: 20, paddingVertical: 12 },
+    buttonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.buttonText },
+  });
+}

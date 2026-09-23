@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { useAuthStore } from '@/lib/auth-store';
 import { useErrorStore } from '@/lib/error-store';
 import { AuthError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -31,6 +33,9 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const login = useAuthStore((s) => s.login);
   const signaler = useErrorStore((s) => s.signaler);
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -178,181 +183,199 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    justifyContent: 'center',
-  },
-  headerSection: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: IFVM_GREEN,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: IFVM_GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  title: {
-    fontSize: isSmallScreen ? 22 : 24,
-    fontWeight: '700',
-    color: '#111827',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: isSmallScreen ? 12 : 13,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 4,
-    maxWidth: 300,
-  },
-  formContainer: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  input: {
-    width: '100%',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    fontSize: 15,
-    color: '#111827',
-  },
-  inputFilled: {
-    borderColor: IFVM_GREEN,
-    backgroundColor: IFVM_GREEN_LIGHT,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#111827',
-    backgroundColor: 'transparent',
-  },
-  eyeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  eyeButtonText: {
-    fontSize: 20,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 20,
-  },
-  forgotPasswordText: {
-    fontSize: 13,
-    color: IFVM_GREEN,
-    fontWeight: '500',
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#DC2626',
-  },
-  loginButton: {
-    width: '100%',
-    paddingVertical: 14,
-    backgroundColor: IFVM_GREEN,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: IFVM_GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  footer: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  footerVersion: {
-    fontSize: 11,
-    color: '#D1D5DB',
-    marginTop: 4,
-  },
-});
+const BASE_TYPE_SIZES = {
+  logoText: 32,
+  title: isSmallScreen ? 22 : 24,
+  subtitle: isSmallScreen ? 12 : 13,
+  inputLabel: 13,
+  input: 15,
+  passwordInput: 15,
+  eyeButton: 20,
+  forgotPassword: 13,
+  errorIcon: 16,
+  errorText: 13,
+  loginButton: 16,
+  footerText: 12,
+  footerVersion: 11,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: '#FFFFFF',
+    },
+    container: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingVertical: 20,
+      justifyContent: 'center',
+    },
+    headerSection: {
+      alignItems: 'center',
+      marginBottom: 40,
+    },
+    logoContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 20,
+      backgroundColor: IFVM_GREEN,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+      shadowColor: IFVM_GREEN,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    logoText: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.logoText,
+      fontWeight: '700',
+      letterSpacing: 1,
+    },
+    title: {
+      fontSize: typeSizes.title,
+      fontWeight: '700',
+      color: '#111827',
+      letterSpacing: 0.5,
+    },
+    subtitle: {
+      fontSize: typeSizes.subtitle,
+      color: '#6B7280',
+      textAlign: 'center',
+      marginTop: 4,
+      maxWidth: 300,
+    },
+    formContainer: {
+      width: '100%',
+      maxWidth: 400,
+      alignSelf: 'center',
+    },
+    inputGroup: {
+      marginBottom: 16,
+    },
+    inputLabel: {
+      fontSize: typeSizes.inputLabel,
+      fontWeight: '600',
+      color: '#374151',
+      marginBottom: 6,
+    },
+    input: {
+      width: '100%',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: '#F9FAFB',
+      borderWidth: 1,
+      borderColor: '#D1D5DB',
+      borderRadius: 10,
+      fontSize: typeSizes.input,
+      color: '#111827',
+    },
+    inputFilled: {
+      borderColor: IFVM_GREEN,
+      backgroundColor: IFVM_GREEN_LIGHT,
+    },
+    passwordContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F9FAFB',
+      borderWidth: 1,
+      borderColor: '#D1D5DB',
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    passwordInput: {
+      flex: 1,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: typeSizes.passwordInput,
+      color: '#111827',
+      backgroundColor: 'transparent',
+    },
+    eyeButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    eyeButtonText: {
+      fontSize: typeSizes.eyeButton,
+    },
+    forgotPassword: {
+      alignSelf: 'flex-end',
+      marginBottom: 20,
+    },
+    forgotPasswordText: {
+      fontSize: typeSizes.forgotPassword,
+      color: IFVM_GREEN,
+      fontWeight: '500',
+    },
+    errorContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#FEF2F2',
+      borderWidth: 1,
+      borderColor: '#FCA5A5',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+    },
+    errorIcon: {
+      fontSize: typeSizes.errorIcon,
+      marginRight: 8,
+    },
+    errorText: {
+      flex: 1,
+      fontSize: typeSizes.errorText,
+      color: '#DC2626',
+    },
+    loginButton: {
+      width: '100%',
+      paddingVertical: 14,
+      backgroundColor: IFVM_GREEN,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: IFVM_GREEN,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    loginButtonDisabled: {
+      opacity: 0.6,
+    },
+    loadingContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    loginButtonText: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.loginButton,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+    },
+    footer: {
+      marginTop: 24,
+      alignItems: 'center',
+    },
+    footerText: {
+      fontSize: typeSizes.footerText,
+      color: '#9CA3AF',
+    },
+    footerVersion: {
+      fontSize: typeSizes.footerVersion,
+      color: '#D1D5DB',
+      marginTop: 4,
+    },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

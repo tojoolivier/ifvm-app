@@ -33,6 +33,8 @@ import {
 } from '@/components/fiches/tokens';
 import { statutFicheAffiche } from '@/lib/prospection-statut';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 type FilterKey = 'TOUS' | 'PROSPECTION' | 'CRT' | 'METEO';
 
@@ -94,6 +96,9 @@ interface FicheRow {
 
 export default function FichesScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
@@ -415,87 +420,99 @@ export default function FichesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: FICHES_BG,
-  },
-  header: {
-    backgroundColor: FICHES_GREEN_DARK,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '300',
-    lineHeight: 26,
-    marginTop: -2,
-  },
-  headerTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  headerSub: {
-    color: '#FFFFFFAA',
-    fontSize: 12,
-    marginTop: 1,
-  },
-  headerRight: {
-    width: 32,
-  },
-  resultCountContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#F9FAFB',
-  },
-  resultCount: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  emptySub: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-});
+const BASE_TYPE_SIZES = {
+  backIcon: 22,
+  headerTitle: 18,
+  headerSub: 12,
+  resultCount: 13,
+  emptyIcon: 48,
+  emptyTitle: 18,
+  emptySub: 14,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: FICHES_BG,
+    },
+    header: {
+      backgroundColor: FICHES_GREEN_DARK,
+      paddingHorizontal: 16,
+      paddingBottom: 14,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: 8,
+    },
+    backBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: '#FFFFFF22',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backIcon: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.backIcon,
+      fontWeight: '300',
+      lineHeight: 26,
+      marginTop: -2,
+    },
+    headerTextContainer: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.headerTitle,
+      fontWeight: '700',
+    },
+    headerSub: {
+      color: '#FFFFFFAA',
+      fontSize: typeSizes.headerSub,
+      marginTop: 1,
+    },
+    headerRight: {
+      width: 32,
+    },
+    resultCountContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: '#F9FAFB',
+    },
+    resultCount: {
+      fontSize: typeSizes.resultCount,
+      color: '#6B7280',
+      fontWeight: '500',
+    },
+    listContent: {
+      padding: 16,
+      paddingBottom: 100,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: 60,
+    },
+    emptyIcon: {
+      fontSize: typeSizes.emptyIcon,
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      fontSize: typeSizes.emptyTitle,
+      fontWeight: '600',
+      color: '#111827',
+      marginBottom: 8,
+    },
+    emptySub: {
+      fontSize: typeSizes.emptySub,
+      color: '#6B7280',
+      textAlign: 'center',
+    },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

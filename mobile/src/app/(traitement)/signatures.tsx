@@ -10,7 +10,7 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { Card } from '@/components/traitement/Card';
 import { SignaturePad } from '@/components/traitement/SignaturePad';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 
 const ROLE_LABELS: Record<SignatureRole, string> = {
   PILOTE: 'Pilote',
@@ -51,6 +51,8 @@ export default function SignaturesScreen() {
   const [editingRoles, setEditingRoles] = useState<Set<SignatureRole>>(new Set());
   const [resetTicks, setResetTicks] = useState<Record<string, number>>({});
   const [pendingPaths, setPendingPaths] = useState<Record<string, string>>({});
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const nomPersonne = (utilisateurs: UtilisateurEquipe[], id: string | null | undefined): string | null => {
     if (!id) return null;
@@ -250,42 +252,44 @@ export default function SignaturesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  content: { padding: 16, gap: 10 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  row: { gap: 6 },
-  roleLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  value: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire },
-  stamp: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.label, color: traitementColors.texteNote },
-  signButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.chip,
-  },
-  signButtonDisabled: { backgroundColor: traitementColors.infoFond },
-  signButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps },
-  modifyButton: {
-    minHeight: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
-  },
-  modifyButtonText: { fontFamily: traitementFonts.uiBold, color: traitementColors.texteTitre, fontSize: traitementTypeSizes.corps },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    content: { padding: 16, gap: 10 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    row: { gap: 6 },
+    roleLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
+    value: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteSecondaire },
+    stamp: { fontFamily: traitementFonts.mono, fontSize: typeSizes.label, color: traitementColors.texteNote },
+    signButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.chip,
+    },
+    signButtonDisabled: { backgroundColor: traitementColors.infoFond },
+    signButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps },
+    modifyButton: {
+      minHeight: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.chip,
+    },
+    modifyButtonText: { fontFamily: traitementFonts.uiBold, color: traitementColors.texteTitre, fontSize: typeSizes.corps },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

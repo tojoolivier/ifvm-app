@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { FOREGROUND_TERTIARY } from './tokens';
 
 /**
@@ -16,6 +19,9 @@ export function LienVersLeJournal({ autres }: { autres: number }) {
   // Le journal vit sous `(app)` : hors session, le lien se ferait renvoyer par
   // le garde d'authentification.
   const estAuthentifie = useAuthStore((s) => s.isAuthenticated);
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   if (autres <= 0 || !estAuthentifie) return null;
 
@@ -32,6 +38,16 @@ export function LienVersLeJournal({ autres }: { autres: number }) {
   );
 }
 
-const styles = StyleSheet.create({
-  lien: { color: FOREGROUND_TERTIARY, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
-});
+const BASE_TYPE_SIZES = {
+  lien: 12,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    lien: { color: FOREGROUND_TERTIARY, fontSize: typeSizes.lien, fontWeight: '700', textDecorationLine: 'underline' },
+  });
+}

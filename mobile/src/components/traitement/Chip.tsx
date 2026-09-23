@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from './tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from './tokens';
 
 interface ChipProps {
   label: string;
@@ -10,6 +11,8 @@ interface ChipProps {
 
 /** Chip de sélection (rôles, produits, zones, familles...) — cible tactile ≥44px. */
 export function Chip({ label, selected, onPress, disabled }: ChipProps) {
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -23,27 +26,29 @@ export function Chip({ label, selected, onPress, disabled }: ChipProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  chip: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: traitementRadii.chip,
-    backgroundColor: traitementColors.chipInactive,
-  },
-  chipSelected: {
-    backgroundColor: traitementColors.vertPrincipal,
-  },
-  chipDisabled: {
-    opacity: 0.5,
-  },
-  label: {
-    fontFamily: traitementFonts.uiMedium,
-    fontSize: traitementTypeSizes.corps,
-    color: traitementColors.texteSecondaire,
-  },
-  labelSelected: {
-    color: '#fff',
-  },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    chip: {
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: traitementRadii.chip,
+      backgroundColor: traitementColors.chipInactive,
+    },
+    chipSelected: {
+      backgroundColor: traitementColors.vertPrincipal,
+    },
+    chipDisabled: {
+      opacity: 0.5,
+    },
+    label: {
+      fontFamily: traitementFonts.uiMedium,
+      fontSize: typeSizes.corps,
+      color: traitementColors.texteSecondaire,
+    },
+    labelSelected: {
+      color: '#fff',
+    },
+  });
+}
