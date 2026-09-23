@@ -21,6 +21,8 @@ import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -93,6 +95,9 @@ function traitementVersActivite(fiche: DraftTraitementRow): ActiviteItem {
 export default function DashboardScreen() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const [prospections, setProspections] = useState<DraftProspection[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
@@ -430,6 +435,9 @@ export default function DashboardScreen() {
 
 function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
   const max = Math.max(1, ...data.map((d) => d.count));
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   return (
     <View style={styles.weekChart}>
@@ -457,314 +465,341 @@ function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
 // STYLES
 // ============================================
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: IFVM_BG_LIGHT,
-  },
-  scrollView: {
-    flex: 1,
-    backgroundColor: IFVM_BG_LIGHT,
-  },
-  safeArea: {
-    backgroundColor: HEADER_BG,
-  },
-  header: {
-    backgroundColor: HEADER_BG,
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  networkStatus: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  gearIcon: {
-    fontSize: 18,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  logo: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    padding: 6,
-  },
-  headerTextContainer: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  headerGreeting: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
-  },
-  headerName: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  headerRole: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    marginTop: 1,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
-  },
-  badgeAvailable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  badgeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: IFVM_GREEN_LIGHT,
-    marginRight: 6,
-  },
-  badgeAvailableText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  scrollContentTablet: {
-    paddingHorizontal: 32,
-    paddingVertical: 24,
-  },
-  chartCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: TEXT_DARK,
-    marginBottom: 16,
-  },
-  weekChart: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  weekChartColumn: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  weekChartBar: {
-    width: 20,
-    borderRadius: 6,
-    marginBottom: 8,
-  },
-  weekChartLabel: {
-    fontSize: 12,
-    color: TEXT_SECONDARY,
-  },
-  weekChartLabelToday: {
-    color: IFVM_GREEN,
-    fontWeight: '700',
-  },
-  syncBanner: {
-    backgroundColor: IFVM_ORANGE_BG,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: IFVM_ORANGE + '40',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  syncBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  syncBannerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: IFVM_ORANGE + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  syncBannerIconText: {
-    fontSize: 20,
-  },
-  syncBannerText: {
-    flex: 1,
-  },
-  syncBannerTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: IFVM_ORANGE,
-  },
-  syncBannerSub: {
-    fontSize: 11,
-    color: TEXT_SECONDARY,
-    marginTop: 1,
-  },
-  syncBannerButton: {
-    backgroundColor: IFVM_GREEN,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  syncBannerButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    color: TEXT_SECONDARY,
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 12,
-    letterSpacing: 0.5,
-  },
-  viewAll: {
-    color: IFVM_GREEN,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  recentSection: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  ficheCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-  },
-  ficheCardLast: {
-    borderBottomWidth: 0,
-  },
-  ficheTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: TEXT_BLACK,
-  },
-  ficheSub: {
-    fontSize: 12,
-    color: TEXT_SECONDARY,
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  quickAccessSection: {
-    marginBottom: 16,
-  },
-  quickAccessGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  quickTile: {
-    width: '48%',
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    paddingVertical: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  quickTilePrimary: {
-    backgroundColor: IFVM_ORANGE,
-  },
-  quickTileDisabled: {
-    opacity: 0.55,
-  },
-  quickTileIcon: {
-    fontSize: 26,
-    marginBottom: 8,
-  },
-  quickTileText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TEXT_DARK,
-    textAlign: 'center',
-  },
-  quickTileTextPrimary: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  quickTileSoon: {
-    fontSize: 10,
-    color: TEXT_SECONDARY,
-    marginTop: 4,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  footerText: {
-    color: '#BDBDBD',
-    fontSize: 12,
-  },
-});
+const BASE_TYPE_SIZES = {
+  networkStatus: 12,
+  gearIcon: 18,
+  headerGreeting: 13,
+  headerName: 20,
+  headerRole: 12,
+  badgeAvailableText: 12,
+  chartTitle: 16,
+  weekChartLabel: 12,
+  syncBannerIconText: 20,
+  syncBannerTitle: 14,
+  syncBannerSub: 11,
+  syncBannerButtonText: 12,
+  sectionTitle: 12,
+  viewAll: 13,
+  ficheTitle: 15,
+  ficheSub: 12,
+  statusBadgeText: 10,
+  quickTileIcon: 26,
+  quickTileText: 13,
+  quickTileTextPrimary: 13,
+  quickTileSoon: 10,
+  footerText: 12,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: IFVM_BG_LIGHT,
+    },
+    scrollView: {
+      flex: 1,
+      backgroundColor: IFVM_BG_LIGHT,
+    },
+    safeArea: {
+      backgroundColor: HEADER_BG,
+    },
+    header: {
+      backgroundColor: HEADER_BG,
+      paddingHorizontal: 16,
+      paddingBottom: 20,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    headerTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: 8,
+    },
+    networkStatus: {
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: typeSizes.networkStatus,
+      fontWeight: '600',
+    },
+    gearIcon: {
+      fontSize: typeSizes.gearIcon,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 12,
+    },
+    logo: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      padding: 6,
+    },
+    headerTextContainer: {
+      flex: 1,
+      marginLeft: 10,
+    },
+    headerGreeting: {
+      color: 'rgba(255,255,255,0.8)',
+      fontSize: typeSizes.headerGreeting,
+    },
+    headerName: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.headerName,
+      fontWeight: '700',
+    },
+    headerRole: {
+      color: 'rgba(255,255,255,0.75)',
+      fontSize: typeSizes.headerRole,
+      marginTop: 1,
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 14,
+    },
+    badgeAvailable: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 14,
+    },
+    badgeDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: IFVM_GREEN_LIGHT,
+      marginRight: 6,
+    },
+    badgeAvailableText: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.badgeAvailableText,
+      fontWeight: '600',
+    },
+    scrollContent: {
+      padding: 16,
+      paddingBottom: 100,
+    },
+    scrollContentTablet: {
+      paddingHorizontal: 32,
+      paddingVertical: 24,
+    },
+    chartCard: {
+      backgroundColor: CARD_BG,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    chartTitle: {
+      fontSize: typeSizes.chartTitle,
+      fontWeight: '700',
+      color: TEXT_DARK,
+      marginBottom: 16,
+    },
+    weekChart: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+    },
+    weekChartColumn: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    weekChartBar: {
+      width: 20,
+      borderRadius: 6,
+      marginBottom: 8,
+    },
+    weekChartLabel: {
+      fontSize: typeSizes.weekChartLabel,
+      color: TEXT_SECONDARY,
+    },
+    weekChartLabelToday: {
+      color: IFVM_GREEN,
+      fontWeight: '700',
+    },
+    syncBanner: {
+      backgroundColor: IFVM_ORANGE_BG,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: IFVM_ORANGE + '40',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    syncBannerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    syncBannerIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: IFVM_ORANGE + '20',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    syncBannerIconText: {
+      fontSize: typeSizes.syncBannerIconText,
+    },
+    syncBannerText: {
+      flex: 1,
+    },
+    syncBannerTitle: {
+      fontSize: typeSizes.syncBannerTitle,
+      fontWeight: '600',
+      color: IFVM_ORANGE,
+    },
+    syncBannerSub: {
+      fontSize: typeSizes.syncBannerSub,
+      color: TEXT_SECONDARY,
+      marginTop: 1,
+    },
+    syncBannerButton: {
+      backgroundColor: IFVM_GREEN,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 10,
+    },
+    syncBannerButtonText: {
+      color: '#FFFFFF',
+      fontSize: typeSizes.syncBannerButtonText,
+      fontWeight: '600',
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      color: TEXT_SECONDARY,
+      fontSize: typeSizes.sectionTitle,
+      fontWeight: '700',
+      marginBottom: 12,
+      letterSpacing: 0.5,
+    },
+    viewAll: {
+      color: IFVM_GREEN,
+      fontSize: typeSizes.viewAll,
+      fontWeight: '600',
+    },
+    recentSection: {
+      backgroundColor: CARD_BG,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    ficheCard: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F5F5F5',
+    },
+    ficheCardLast: {
+      borderBottomWidth: 0,
+    },
+    ficheTitle: {
+      fontSize: typeSizes.ficheTitle,
+      fontWeight: '700',
+      color: TEXT_BLACK,
+    },
+    ficheSub: {
+      fontSize: typeSizes.ficheSub,
+      color: TEXT_SECONDARY,
+      marginTop: 2,
+    },
+    statusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+    },
+    statusBadgeText: {
+      fontSize: typeSizes.statusBadgeText,
+      fontWeight: '700',
+    },
+    quickAccessSection: {
+      marginBottom: 16,
+    },
+    quickAccessGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    quickTile: {
+      width: '48%',
+      backgroundColor: CARD_BG,
+      borderRadius: 16,
+      paddingVertical: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    quickTilePrimary: {
+      backgroundColor: IFVM_ORANGE,
+    },
+    quickTileDisabled: {
+      opacity: 0.55,
+    },
+    quickTileIcon: {
+      fontSize: typeSizes.quickTileIcon,
+      marginBottom: 8,
+    },
+    quickTileText: {
+      fontSize: typeSizes.quickTileText,
+      fontWeight: '600',
+      color: TEXT_DARK,
+      textAlign: 'center',
+    },
+    quickTileTextPrimary: {
+      fontSize: typeSizes.quickTileTextPrimary,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      textAlign: 'center',
+    },
+    quickTileSoon: {
+      fontSize: typeSizes.quickTileSoon,
+      color: TEXT_SECONDARY,
+      marginTop: 4,
+    },
+    footer: {
+      alignItems: 'center',
+      paddingVertical: 20,
+    },
+    footerText: {
+      color: '#BDBDBD',
+      fontSize: typeSizes.footerText,
+    },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

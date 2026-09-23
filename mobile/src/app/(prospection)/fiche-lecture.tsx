@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,8 @@ import { buildFicheLecture, FicheLectureViewModel, isFicheValidee } from '@/lib/
 import { telechargerEtPartagerPdf } from '@/lib/pdf-partage';
 import { depsPdfPartage } from '@/lib/pdf-partage-natif';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
@@ -27,6 +29,9 @@ export default function FicheLectureScreen() {
   const [prospection, setProspection] = useState<ProspectionRead | null>(null);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
   const { run, isRunning: isExporting } = useAsyncAction();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const charger = useCallback(() => {
     if (!id || !token) return;
@@ -145,6 +150,9 @@ export default function FicheLectureScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -153,29 +161,48 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  backLink: 13,
+  headerTitle: 18,
+  badgeText: 12,
+  cardLabel: 12,
+  especeTitle: 13,
+  rowLabel: 14,
+  rowValue: 15,
+  summaryText: 13,
+  errorText: 13,
+  btnExportText: 15,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F3F4F6' },
   header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
-  backLink: { color: '#FFFFFFCC', fontSize: 13, marginBottom: 6 },
-  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  backLink: { color: '#FFFFFFCC', fontSize: typeSizes.backLink, marginBottom: 6 },
+  headerTitle: { color: '#FFFFFF', fontSize: typeSizes.headerTitle, fontWeight: '700' },
   badge: { backgroundColor: '#DCFCE7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 6 },
-  badgeText: { color: '#15803d', fontSize: 12, fontWeight: '700' },
+  badgeText: { color: '#15803d', fontSize: typeSizes.badgeText, fontWeight: '700' },
   content: { flex: 1 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12 },
-  cardLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' },
+  cardLabel: { fontSize: typeSizes.cardLabel, fontWeight: '700', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' },
   especeBlock: { marginBottom: 10 },
-  especeTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  especeTitle: { fontSize: typeSizes.especeTitle, fontWeight: '700', color: '#111827', marginBottom: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   // #lisibilite-terrain : libellés/valeurs agrandis (densité incluse) pour rester
   // lisibles sur le terrain par tous les prospecteurs.
-  rowLabel: { color: '#4B5563', fontSize: 14, fontWeight: '600' },
-  rowValue: { color: '#111827', fontSize: 15, fontWeight: '700' },
-  summaryText: { color: '#111827', fontSize: 13, lineHeight: 19 },
-  errorText: { color: '#dc2626', fontSize: 13, marginBottom: 8, textAlign: 'center' },
+  rowLabel: { color: '#4B5563', fontSize: typeSizes.rowLabel, fontWeight: '600' },
+  rowValue: { color: '#111827', fontSize: typeSizes.rowValue, fontWeight: '700' },
+  summaryText: { color: '#111827', fontSize: typeSizes.summaryText, lineHeight: 19 },
+  errorText: { color: '#dc2626', fontSize: typeSizes.errorText, marginBottom: 8, textAlign: 'center' },
   btnExport: { backgroundColor: IFVM_GREEN, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   btnDisabled: { opacity: 0.6 },
-  btnExportText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  btnExportText: { color: '#FFFFFF', fontSize: typeSizes.btnExportText, fontWeight: '600' },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

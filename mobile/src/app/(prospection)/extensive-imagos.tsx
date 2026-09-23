@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { Espece, accouplementOptionsFor } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
@@ -43,6 +45,10 @@ export default function ExtensiveImagosScreen() {
   
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-imagos');
+
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   // #nombre-de-capture-fiable — modèle Intensive (captures.tsx, écran d'attente tant
   // que le brouillon/vocabulaire n'est pas prêt) : tant que la lecture de la ligne déjà
@@ -650,7 +656,7 @@ const handleContinue = () => {
             )}
 
             <View style={styles.typeSection}>
-              <Text style={styles.sectionLabel}>📊 Comportement de l&apos;essaim</Text>
+              <Text style={styles.sectionLabel}>📊 Comportement</Text>
               <Text style={styles.commonHint}>Déterminé automatiquement par l&apos;État</Text>
               <View style={styles.typeRow}>
                 {(['vol', 'pose'] as const).map((value) => {
@@ -796,70 +802,113 @@ const handleContinue = () => {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  speciesButtonText: 13,
+  sectionLabel: 9.5,
+  sectionCount: 13,
+  errorText: 11,
+  totalCaptureInput: 18,
+  totalCaptureInfo: 12,
+  phaseLabel: 13,
+  phaseStaticCount: 13,
+  totalLabel: 12,
+  totalValue: 13,
+  counterButtonText: 17,
+  counterValue: 17,
+  sexeText: 13,
+  sexeHint: 10,
+  stadeLabel: 13,
+  miniButtonText: 14,
+  summaryText: 12,
+  label: 11,
+  inputMono: 18,
+  speciesHint: 9,
+  typeButtonText: 13,
+  commonHint: 9,
+  chipText: 12,
+  summaryTitle: 12,
+  summaryLabel: 13,
+  summaryValue: 13,
+  ruleText: 11,
+  warningText: 13,
+  warningDetail: 12,
+  warningHint: 11,
+  successText: 13,
+  successDetail: 12,
+  continueButtonText: 15,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
   progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
   progressActive: { backgroundColor: GREEN },
   speciesRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
   speciesButton: { flex: 1, textAlign: 'center', borderRadius: 10, paddingVertical: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   speciesButtonActive: { backgroundColor: GREEN, borderWidth: 0 },
-  speciesButtonText: { fontSize: 13, fontWeight: '800', color: TEXT_SECONDARY },
+  speciesButtonText: { fontSize: typeSizes.speciesButtonText, fontWeight: '800', color: TEXT_SECONDARY },
   speciesButtonTextActive: { color: '#fff' },
   scroll: { flex: 1 },
   
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, marginTop: 4 },
-  sectionLabel: { fontSize: 9.5, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7, marginTop: 4 },
-  sectionCount: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7, marginTop: 4 },
+  sectionCount: { fontSize: typeSizes.sectionCount, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   errorCount: { color: '#d32f2f' },
-  errorText: { fontSize: 11, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
+  errorText: { fontSize: typeSizes.errorText, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
   requiredSectionLabel: { color: '#d32f2f' },
   
   totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
-  totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: typeSizes.totalCaptureInput, fontWeight: '700', color: TEXT },
+  totalCaptureInfo: { marginTop: 6, fontSize: typeSizes.totalCaptureInfo, color: TEXT_SECONDARY, textAlign: 'center' },
   
   phaseSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   phaseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 13 },
   phaseRowActive: { borderWidth: 2, borderColor: GREEN, paddingVertical: 6, paddingLeft: 13 },
-  phaseLabel: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  phaseLabel: { fontSize: typeSizes.phaseLabel, fontWeight: '600', color: TEXT_SECONDARY },
   phaseLabelActive: { fontWeight: '700', color: TEXT },
-  phaseStaticCount: { fontSize: 13, fontWeight: '600', color: TEXT, fontFamily: 'monospace' },
+  phaseStaticCount: { fontSize: typeSizes.phaseStaticCount, fontWeight: '600', color: TEXT, fontFamily: 'monospace' },
   totalRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: BORDER },
-  totalLabel: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY, marginRight: 8 },
-  totalValue: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
+  totalLabel: { fontSize: typeSizes.totalLabel, fontWeight: '600', color: TEXT_SECONDARY, marginRight: 8 },
+  totalValue: { fontSize: typeSizes.totalValue, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   counterRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   counterButton: { width: 32, height: 32, borderRadius: 9, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   counterButtonAdd: { backgroundColor: GREEN },
   counterButtonDisabled: { opacity: 0.4 },
-  counterButtonText: { fontSize: 17, fontWeight: '700', color: TEXT_SECONDARY },
+  counterButtonText: { fontSize: typeSizes.counterButtonText, fontWeight: '700', color: TEXT_SECONDARY },
   counterButtonAddText: { color: '#fff' },
-  counterValue: { fontSize: 17, fontWeight: '700', color: TEXT, minWidth: 16, textAlign: 'center', fontFamily: 'monospace' },
+  counterValue: { fontSize: typeSizes.counterValue, fontWeight: '700', color: TEXT, minWidth: 16, textAlign: 'center', fontFamily: 'monospace' },
   
   stadesSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 4, marginBottom: 11, marginTop: 4 },
   sexeToggle: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
   sexeToggleActive: { backgroundColor: '#fff' },
-  sexeText: { fontWeight: '700', fontSize: 13, color: '#9a9484' },
+  sexeText: { fontWeight: '700', fontSize: typeSizes.sexeText, color: '#9a9484' },
   sexeTextActive: { color: TEXT },
-  sexeHint: { fontSize: 10, color: '#9a9484', marginBottom: 9 },
+  sexeHint: { fontSize: typeSizes.sexeHint, color: '#9a9484', marginBottom: 9 },
   stadesGrid: { gap: 6 },
   stadeCounterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
-  stadeLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
+  stadeLabel: { fontSize: typeSizes.stadeLabel, fontWeight: '500', color: TEXT },
   counterButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   miniButton: { width: 28, height: 28, borderRadius: 6, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   miniButtonAdd: { backgroundColor: GREEN },
   miniButtonDisabled: { opacity: 0.4 },
-  miniButtonText: { fontSize: 14, fontWeight: '700', color: TEXT_SECONDARY },
+  miniButtonText: { fontSize: typeSizes.miniButtonText, fontWeight: '700', color: TEXT_SECONDARY },
   miniButtonAddText: { color: '#fff' },
   stadesSummary: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER },
-  summaryText: { fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  summaryText: { fontSize: typeSizes.summaryText, color: TEXT_SECONDARY, textAlign: 'center' },
   
   densitySection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   row: { flexDirection: 'row', gap: 8, marginBottom: 0 },
@@ -867,48 +916,49 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
   // #lisibilite-terrain : libellé agrandi et assombri (au lieu de 9px gris clair,
   // difficile à lire en plein soleil) — même niveau de lisibilité que sectionLabel.
-  label: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY },
-  inputMono: { fontSize: 18, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
-  speciesHint: { fontSize: 9, color: '#9a9484', marginTop: 4, textAlign: 'center', fontStyle: 'italic' },
+  label: { fontSize: typeSizes.label, fontWeight: '700', color: TEXT_SECONDARY },
+  inputMono: { fontSize: typeSizes.inputMono, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  speciesHint: { fontSize: typeSizes.speciesHint, color: '#9a9484', marginTop: 4, textAlign: 'center', fontStyle: 'italic' },
   
   typeSection: { marginTop: 4, marginBottom: 8 },
   typeRow: { flexDirection: 'row', gap: 8 },
   typeButton: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: INACTIVE_BG, alignItems: 'center' },
   typeButtonActive: { backgroundColor: GREEN },
-  typeButtonText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  typeButtonText: { fontSize: typeSizes.typeButtonText, fontWeight: '600', color: TEXT_SECONDARY },
   typeButtonTextActive: { color: '#fff' },
-  commonHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
+  commonHint: { fontSize: typeSizes.commonHint, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
 
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: INACTIVE_BG },
   chipActive: { backgroundColor: GREEN },
-  chipText: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY },
+  chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: TEXT_SECONDARY },
   chipTextActive: { fontWeight: '700', color: '#fff' },
   
   summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
-  summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
+  summaryTitle: { fontSize: typeSizes.summaryTitle, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
   summaryDivider: { height: 1, backgroundColor: '#f0eee8', marginVertical: 4 },
-  summaryLabel: { fontSize: 13, color: TEXT_SECONDARY },
-  summaryValue: { fontSize: 13, fontWeight: '700', color: TEXT },
+  summaryLabel: { fontSize: typeSizes.summaryLabel, color: TEXT_SECONDARY },
+  summaryValue: { fontSize: typeSizes.summaryValue, fontWeight: '700', color: TEXT },
   summaryValueValid: { color: GREEN },
   summaryValueInvalid: { color: '#dc2626' },
   ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
-  ruleText: { fontSize: 11, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
+  ruleText: { fontSize: typeSizes.ruleText, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
   
   warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
-  warningText: { color: '#dc2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
-  warningDetail: { color: '#dc2626', fontSize: 12, textAlign: 'center', marginTop: 5, lineHeight: 18 },
-  warningHint: { color: '#dc2626', fontSize: 11, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
+  warningText: { color: '#dc2626', fontWeight: '700', fontSize: typeSizes.warningText, textAlign: 'center' },
+  warningDetail: { color: '#dc2626', fontSize: typeSizes.warningDetail, textAlign: 'center', marginTop: 5, lineHeight: 18 },
+  warningHint: { color: '#dc2626', fontSize: typeSizes.warningHint, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
   successContainer: { backgroundColor: '#dcfce7', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#86efac' },
-  successText: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center' },
-  successDetail: { color: '#15803d', fontSize: 12, textAlign: 'center', marginTop: 3, lineHeight: 18 },
+  successText: { color: '#15803d', fontWeight: '700', fontSize: typeSizes.successText, textAlign: 'center' },
+  successDetail: { color: '#15803d', fontSize: typeSizes.successDetail, textAlign: 'center', marginTop: 3, lineHeight: 18 },
   
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

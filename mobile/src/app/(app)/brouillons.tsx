@@ -12,6 +12,8 @@ import { runTask } from '@/lib/run-task';
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 import { FICHES_BG, FICHES_GREEN_DARK, FICHES_TEXT_SECONDARY, PROSPECTION_SUBTYPE_BADGE_CONFIG, STATUT_BADGE_CONFIG } from '@/components/fiches/tokens';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 /**
  * #dossier-brouillons : « dossier » dédié aux fiches de prospection encore en
@@ -42,6 +44,9 @@ function stationLabel(item: { station_nom?: string | null; station_libre?: strin
 
 export default function BrouillonsScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const [drafts, setDrafts] = useState<DraftProspection[]>([]);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
@@ -152,25 +157,34 @@ export default function BrouillonsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: FICHES_BG },
-  header: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 },
-  back: { fontSize: 22, fontWeight: '700', color: FICHES_TEXT_SECONDARY },
-  title: { fontSize: 17, fontWeight: '700', color: FICHES_GREEN_DARK },
-  subtitle: { fontSize: 12, color: FICHES_TEXT_SECONDARY, paddingHorizontal: 16, paddingBottom: 12 },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16 },
-  deleteAction: {
-    backgroundColor: '#DC2626',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 96,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  deleteActionText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-});
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 17,
+  subtitle: 12,
+  deleteActionText: 13,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: FICHES_BG },
+    header: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 },
+    back: { fontSize: typeSizes.back, fontWeight: '700', color: FICHES_TEXT_SECONDARY },
+    title: { fontSize: typeSizes.title, fontWeight: '700', color: FICHES_GREEN_DARK },
+    subtitle: { fontSize: typeSizes.subtitle, color: FICHES_TEXT_SECONDARY, paddingHorizontal: 16, paddingBottom: 12 },
+    scroll: { flex: 1 },
+    scrollContent: { padding: 16 },
+    deleteAction: {
+      backgroundColor: '#DC2626',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: 96,
+      borderRadius: 12,
+      marginBottom: 10,
+    },
+    deleteActionText: { color: '#fff', fontWeight: '700', fontSize: typeSizes.deleteActionText },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

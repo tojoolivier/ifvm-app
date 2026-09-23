@@ -1,10 +1,12 @@
-import { Dispatch, SetStateAction, useCallback, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { listLieuxAeriens, LieuAerien } from '@/lib/referentiel-db';
 import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 interface LieuAerienFieldProps {
   label: string;
@@ -56,6 +58,9 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
   const { run: runEquipes, isRunning: isChargementEquipes } = useAsyncAction();
   const { run: runGps, isRunning: isGpsLoading } = useAsyncAction();
   const { run: runCreation, isRunning: isCreating } = useAsyncAction();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const charger = useCallback(
     () =>
@@ -250,33 +255,63 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
   );
 }
 
-const styles = StyleSheet.create({
-  group: { marginBottom: 10 },
-  label: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
-  box: { backgroundColor: FILL_BG, borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9 },
-  boxFocused: { borderColor: GREEN, borderWidth: 1.5 },
-  input: { fontSize: 13, fontWeight: '600', color: TEXT, padding: 0 },
-  actionsRow: { flexDirection: 'row', gap: 14, marginTop: 6 },
-  actionLink: { fontSize: 11.5, fontWeight: '700', color: GREEN },
-  panel: { marginTop: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 9, padding: 9, gap: 7 },
-  vide: { fontSize: 12, color: TEXT_SECONDARY, fontStyle: 'italic' },
-  option: { borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8, backgroundColor: FILL_BG },
-  optionText: { fontSize: 12.5, fontWeight: '600', color: TEXT },
-  optionType: { fontSize: 10.5, fontWeight: '500', color: TEXT_SECONDARY },
-  creationInput: { fontSize: 13, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
-  typeRow: { flexDirection: 'row', gap: 6 },
-  equipeLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
-  equipeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  typeChip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
-  typeChipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
-  typeChipText: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY },
-  typeChipTextSelectionne: { color: GREEN },
-  gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  gpsRowText: { fontSize: 11, color: TEXT_SECONDARY },
-  gpsValue: { fontSize: 12, fontWeight: '700', color: TEXT },
-  creationActionsRow: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end', alignItems: 'center' },
-  annulerText: { fontSize: 12.5, fontWeight: '600', color: TEXT_SECONDARY },
-  creerButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 14 },
-  creerButtonDisabled: { opacity: 0.6 },
-  creerButtonText: { fontSize: 12.5, fontWeight: '700', color: '#fff' },
-});
+const BASE_TYPE_SIZES = {
+  label: 9,
+  input: 13,
+  actionLink: 11.5,
+  vide: 12,
+  optionText: 12.5,
+  optionType: 10.5,
+  creationInput: 13,
+  equipeLabel: 9,
+  typeChipText: 11.5,
+  gpsRowText: 11,
+  gpsValue: 12,
+  annulerText: 12.5,
+  creerButtonText: 12.5,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    group: { marginBottom: 10 },
+    label: { fontSize: typeSizes.label, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
+    box: { backgroundColor: FILL_BG, borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9 },
+    boxFocused: { borderColor: GREEN, borderWidth: 1.5 },
+    input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, padding: 0 },
+    actionsRow: { flexDirection: 'row', gap: 14, marginTop: 6 },
+    actionLink: { fontSize: typeSizes.actionLink, fontWeight: '700', color: GREEN },
+    panel: { marginTop: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 9, padding: 9, gap: 7 },
+    vide: { fontSize: typeSizes.vide, color: TEXT_SECONDARY, fontStyle: 'italic' },
+    option: { borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8, backgroundColor: FILL_BG },
+    optionText: { fontSize: typeSizes.optionText, fontWeight: '600', color: TEXT },
+    optionType: { fontSize: typeSizes.optionType, fontWeight: '500', color: TEXT_SECONDARY },
+    creationInput: {
+      fontSize: typeSizes.creationInput,
+      fontWeight: '600',
+      color: TEXT,
+      borderWidth: 1,
+      borderColor: BORDER,
+      borderRadius: 8,
+      padding: 8,
+    },
+    typeRow: { flexDirection: 'row', gap: 6 },
+    equipeLabel: { fontSize: typeSizes.equipeLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+    equipeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    typeChip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
+    typeChipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
+    typeChipText: { fontSize: typeSizes.typeChipText, fontWeight: '600', color: TEXT_SECONDARY },
+    typeChipTextSelectionne: { color: GREEN },
+    gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    gpsRowText: { fontSize: typeSizes.gpsRowText, color: TEXT_SECONDARY },
+    gpsValue: { fontSize: typeSizes.gpsValue, fontWeight: '700', color: TEXT },
+    creationActionsRow: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end', alignItems: 'center' },
+    annulerText: { fontSize: typeSizes.annulerText, fontWeight: '600', color: TEXT_SECONDARY },
+    creerButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 14 },
+    creerButtonDisabled: { opacity: 0.6 },
+    creerButtonText: { fontSize: typeSizes.creerButtonText, fontWeight: '700', color: '#fff' },
+  });
+}

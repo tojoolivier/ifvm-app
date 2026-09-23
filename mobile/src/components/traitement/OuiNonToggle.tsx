@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { traitementColors, traitementFonts, traitementTypeSizes } from './tokens';
+import { traitementColors, traitementFonts, useTraitementTypeSizes } from './tokens';
 
 interface ToggleOption {
   label: string;
@@ -21,6 +22,8 @@ interface OuiNonToggleProps {
  * → aucune des deux sélectionnée) — reste entièrement du côté de l'appelant.
  */
 export function OuiNonToggle({ options, disabled }: OuiNonToggleProps) {
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <View style={styles.container}>
       {options.map((option, index) => (
@@ -44,29 +47,31 @@ export function OuiNonToggle({ options, disabled }: OuiNonToggleProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    minHeight: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: traitementColors.chipInactive,
-  },
-  segment: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // `overflow: hidden` sur le conteneur suffit à découper les coins visibles
-  // en pilule unique — pas besoin de rayon par segment.
-  segmentLeft: {},
-  segmentRight: {},
-  segmentSelected: { backgroundColor: traitementColors.vertPrincipal },
-  segmentDisabled: { opacity: 0.5 },
-  label: {
-    fontFamily: traitementFonts.uiSemiBold,
-    fontSize: traitementTypeSizes.corps + 2,
-    color: traitementColors.texteSecondaire,
-  },
-  labelSelected: { color: '#fff' },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      minHeight: 48,
+      borderRadius: 24,
+      overflow: 'hidden',
+      backgroundColor: traitementColors.chipInactive,
+    },
+    segment: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    // `overflow: hidden` sur le conteneur suffit à découper les coins visibles
+    // en pilule unique — pas besoin de rayon par segment.
+    segmentLeft: {},
+    segmentRight: {},
+    segmentSelected: { backgroundColor: traitementColors.vertPrincipal },
+    segmentDisabled: { opacity: 0.5 },
+    label: {
+      fontFamily: traitementFonts.uiSemiBold,
+      fontSize: typeSizes.corps + 2,
+      color: traitementColors.texteSecondaire,
+    },
+    labelSelected: { color: '#fff' },
+  });
+}

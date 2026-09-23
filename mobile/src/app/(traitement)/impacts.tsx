@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,7 +12,7 @@ import { generateId } from '@/lib/id';
 import { Chip } from '@/components/traitement/Chip';
 import { OuiNonToggle } from '@/components/traitement/OuiNonToggle';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 
 const AXES_RISQUE: { key: 'ressources_eau' | 'sol' | 'faune_non_cible' | 'abeilles'; label: string }[] = [
   { key: 'ressources_eau', label: "Ressources en eau" },
@@ -31,6 +31,8 @@ export default function ImpactsScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('impacts');
   const typeTraitement = store.typeTraitement;
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   useEffect(() => {
     if (!traitementId) return;
@@ -362,59 +364,61 @@ export default function ImpactsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  keyboardAvoidingView: { flex: 1 },
-  content: { padding: 16, gap: 10 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
-  // visibles sur les fiches de traitement.
-  label: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  axeRow: { gap: 4 },
-  axeLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  input: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
-    paddingHorizontal: 10,
-    fontFamily: traitementFonts.ui,
-    fontSize: traitementTypeSizes.corps,
-    color: traitementColors.texteTitre,
-    backgroundColor: '#fff',
-  },
-  textarea: { minHeight: 88, textAlignVertical: 'top', paddingTop: 10 },
-  error: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.label, color: traitementColors.erreurTexte },
-  continueButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-  evaluationCard: {
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
-    padding: 10,
-    gap: 6,
-    backgroundColor: '#fff',
-  },
-  evaluationTitle: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  addEvaluationButton: {
-    minHeight: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.chip,
-  },
-  addEvaluationButtonText: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.vertPrincipal, fontSize: traitementTypeSizes.corps },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    keyboardAvoidingView: { flex: 1 },
+    content: { padding: 16, gap: 10 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    // Semi-gras (au lieu de uiMedium) : demande explicite, titres de champ plus
+    // visibles sur les fiches de traitement.
+    label: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.label, color: traitementColors.texteLabel },
+    axeRow: { gap: 4 },
+    axeLabel: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    input: {
+      minHeight: 44,
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.chip,
+      paddingHorizontal: 10,
+      fontFamily: traitementFonts.ui,
+      fontSize: typeSizes.corps,
+      color: traitementColors.texteTitre,
+      backgroundColor: '#fff',
+    },
+    textarea: { minHeight: 88, textAlignVertical: 'top', paddingTop: 10 },
+    error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },
+    continueButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    continueButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+    evaluationCard: {
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.chip,
+      padding: 10,
+      gap: 6,
+      backgroundColor: '#fff',
+    },
+    evaluationTitle: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
+    addEvaluationButton: {
+      minHeight: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.chip,
+    },
+    addEvaluationButtonText: { fontFamily: traitementFonts.uiSemiBold, color: traitementColors.vertPrincipal, fontSize: typeSizes.corps },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { toFriendlyError } from '@/lib/friendly-error';
 import { useErrorAction } from '@/hooks/use-error-action';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import {
   AMBER_BORDER,
   BACKGROUND,
@@ -39,6 +42,9 @@ export function EtatVide({ erreur, titreVide, sousTitreVide, onReessayer }: Prop
   const action = useErrorAction(
     affichable === null ? null : { action: affichable.action, retry: onReessayer }
   );
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   if (!affichable) {
     return (
@@ -66,11 +72,23 @@ export function EtatVide({ erreur, titreVide, sousTitreVide, onReessayer }: Prop
   );
 }
 
-const styles = StyleSheet.create({
-  zone: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, paddingHorizontal: 20, gap: 8 },
-  zoneErreur: { backgroundColor: BACKGROUND, borderWidth: 1, borderColor: AMBER_BORDER, borderRadius: 14, margin: 12 },
-  titre: { fontSize: 13, fontWeight: '700', color: FOREGROUND, textAlign: 'center', lineHeight: 19 },
-  sousTitre: { fontSize: 12, fontWeight: '500', color: FOREGROUND_TERTIARY, textAlign: 'center' },
-  bouton: { backgroundColor: PRIMARY, borderRadius: 13, paddingHorizontal: 20, paddingVertical: 11, marginTop: 4 },
-  boutonText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-});
+const BASE_TYPE_SIZES = {
+  titre: 13,
+  sousTitre: 12,
+  boutonText: 13,
+};
+
+function computeTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+  return StyleSheet.create({
+    zone: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, paddingHorizontal: 20, gap: 8 },
+    zoneErreur: { backgroundColor: BACKGROUND, borderWidth: 1, borderColor: AMBER_BORDER, borderRadius: 14, margin: 12 },
+    titre: { fontSize: typeSizes.titre, fontWeight: '700', color: FOREGROUND, textAlign: 'center', lineHeight: 19 },
+    sousTitre: { fontSize: typeSizes.sousTitre, fontWeight: '500', color: FOREGROUND_TERTIARY, textAlign: 'center' },
+    bouton: { backgroundColor: PRIMARY, borderRadius: 13, paddingHorizontal: 20, paddingVertical: 11, marginTop: 4 },
+    boutonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.boutonText },
+  });
+}

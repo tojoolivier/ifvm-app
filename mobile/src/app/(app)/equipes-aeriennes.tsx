@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -8,6 +8,8 @@ import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
 import { peutCreerLieuAerien } from '@/lib/equipe-aerienne-access';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const log = logger.child({ module: 'referentiels-aeriens' });
 
@@ -60,6 +62,9 @@ interface Stand {
  */
 export default function ReferentielsAeriensScreen() {
   const router = useRouter();
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.user?.role);
   const utilisateurId = useAuthStore((s) => s.user?.id);
@@ -255,6 +260,9 @@ function SectionEquipes({
   token: string;
   onCreated: (equipe: Equipe) => void;
 }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const [creation, setCreation] = useState(false);
   const [nom, setNom] = useState('');
   const [chefDeBaseId, setChefDeBaseId] = useState<string | null>(null);
@@ -508,6 +516,9 @@ function SectionBasePrincipale({
   token: string;
   onCreated: (base: Base) => void;
 }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const [creation, setCreation] = useState(false);
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
@@ -652,6 +663,9 @@ function SectionBaseSecondaire({
   token: string;
   onCreated: (base: Base) => void;
 }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const [creation, setCreation] = useState(false);
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
@@ -789,6 +803,9 @@ function SectionStand({
   token: string;
   onCreated: (stand: Stand) => void;
 }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const [creation, setCreation] = useState(false);
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
@@ -886,52 +903,74 @@ function SectionStand({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-  safe: { flex: 1 },
-  headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  chargerLinkText: { fontSize: 14, fontWeight: '700', color: GREEN },
-  content: { paddingHorizontal: 16, paddingBottom: 24, gap: 14 },
-  avertissement: {
-    backgroundColor: '#fdf1e3',
-    borderWidth: 1,
-    borderColor: '#e8c99a',
-    borderRadius: 10,
-    padding: 11,
-    gap: 6,
-  },
-  avertissementTexte: { fontSize: 12, color: '#7a5a26', lineHeight: 16 },
-  avertissementLien: { fontSize: 12.5, fontWeight: '700', color: GREEN },
-  section: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 13, gap: 8 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY, letterSpacing: 0.5 },
-  vide: { fontSize: 12.5, color: TEXT_SECONDARY, fontStyle: 'italic' },
-  item: { borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8, backgroundColor: BG, gap: 2 },
-  itemText: { fontSize: 13, fontWeight: '700', color: TEXT },
-  itemSubtext: { fontSize: 11.5, color: TEXT_SECONDARY },
-  nouveauLink: { paddingVertical: 8, alignItems: 'center' },
-  nouveauLinkText: { fontSize: 13, fontWeight: '700', color: GREEN },
-  formulaire: { gap: 8, marginTop: 4 },
-  input: { fontSize: 13, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
-  sousLabel: { fontSize: 9, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
-  chipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  membreRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  membreInput: { flex: 1 },
-  chip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
-  chipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
-  chipText: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY },
-  chipTextSelectionne: { color: GREEN },
-  gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  gpsRowText: { fontSize: 11.5, color: TEXT_SECONDARY },
-  gpsValue: { fontSize: 12, fontWeight: '700', color: TEXT },
-  actionsRow: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end', alignItems: 'center' },
-  annulerText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
-  creerButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
-  creerButtonDisabled: { opacity: 0.6 },
-  creerButtonText: { fontSize: 13, fontWeight: '700', color: '#fff' },
-});
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  chargerLinkText: 14,
+  avertissementTexte: 12,
+  avertissementLien: 12.5,
+  sectionTitle: 11,
+  vide: 12.5,
+  itemText: 13,
+  itemSubtext: 11.5,
+  nouveauLinkText: 13,
+  input: 13,
+  sousLabel: 9,
+  chipText: 12,
+  gpsRowText: 11.5,
+  gpsValue: 12,
+  annulerText: 13,
+  creerButtonText: 13,
+};
+
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: BG },
+    safe: { flex: 1 },
+    headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+    title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+    centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    chargerLinkText: { fontSize: typeSizes.chargerLinkText, fontWeight: '700', color: GREEN },
+    content: { paddingHorizontal: 16, paddingBottom: 24, gap: 14 },
+    avertissement: {
+      backgroundColor: '#fdf1e3',
+      borderWidth: 1,
+      borderColor: '#e8c99a',
+      borderRadius: 10,
+      padding: 11,
+      gap: 6,
+    },
+    avertissementTexte: { fontSize: typeSizes.avertissementTexte, color: '#7a5a26', lineHeight: 16 },
+    avertissementLien: { fontSize: typeSizes.avertissementLien, fontWeight: '700', color: GREEN },
+    section: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 13, gap: 8 },
+    sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '700', color: TEXT_SECONDARY, letterSpacing: 0.5 },
+    vide: { fontSize: typeSizes.vide, color: TEXT_SECONDARY, fontStyle: 'italic' },
+    item: { borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8, backgroundColor: BG, gap: 2 },
+    itemText: { fontSize: typeSizes.itemText, fontWeight: '700', color: TEXT },
+    itemSubtext: { fontSize: typeSizes.itemSubtext, color: TEXT_SECONDARY },
+    nouveauLink: { paddingVertical: 8, alignItems: 'center' },
+    nouveauLinkText: { fontSize: typeSizes.nouveauLinkText, fontWeight: '700', color: GREEN },
+    formulaire: { gap: 8, marginTop: 4 },
+    input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
+    sousLabel: { fontSize: typeSizes.sousLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+    chipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+    membreRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    membreInput: { flex: 1 },
+    chip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
+    chipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
+    chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: TEXT_SECONDARY },
+    chipTextSelectionne: { color: GREEN },
+    gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    gpsRowText: { fontSize: typeSizes.gpsRowText, color: TEXT_SECONDARY },
+    gpsValue: { fontSize: typeSizes.gpsValue, fontWeight: '700', color: TEXT },
+    actionsRow: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end', alignItems: 'center' },
+    annulerText: { fontSize: typeSizes.annulerText, fontWeight: '600', color: TEXT_SECONDARY },
+    creerButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
+    creerButtonDisabled: { opacity: 0.6 },
+    creerButtonText: { fontSize: typeSizes.creerButtonText, fontWeight: '700', color: '#fff' },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

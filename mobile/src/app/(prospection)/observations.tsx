@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from '@tanstack/react-form';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lecture';
 import { ENNEMIS_OPTIONS, parseEnnemis, serializeEnnemis } from '@/lib/prospection-observations';
 import { ObservationsFormValues } from '@/lib/prospection-observations-schema';
@@ -41,6 +43,9 @@ export default function ObservationsScreen() {
   const setDraft = useProspectionWizardStore((s) => s.setDraft);
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('observations');
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const initialEnnemis = parseEnnemis(draft?.ennemis_naturels ?? null);
   const [showAutre, setShowAutre] = useState(initialEnnemis.autre !== '');
   const scrollRef = useRef<ScrollView>(null);
@@ -449,43 +454,65 @@ export default function ObservationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  cardTitle: 12.5,
+  autoLabel: 10,
+  autoValue: 16,
+  chipText: 11.5,
+  textInput: 12,
+  fieldLabel: 10,
+  errorText: 11,
+  continueButtonText: 15,
+  signatureStamp: 10,
+  signButtonText: 12,
+  modifyButtonText: 12,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   scroll: { flex: 1 },
   card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14, marginBottom: 11 },
   cardError: { borderColor: '#c0412b', borderWidth: 1.5 },
-  cardTitle: { fontSize: 12.5, fontWeight: '700', color: TEXT, marginBottom: 11 },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', color: TEXT, marginBottom: 11 },
   autoCard: { backgroundColor: AUTO_BG, borderRadius: 12, padding: 14, marginBottom: 11 },
-  autoLabel: { fontSize: 10, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
-  autoValue: { fontSize: 16, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
+  autoLabel: { fontSize: typeSizes.autoLabel, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
+  autoValue: { fontSize: typeSizes.autoValue, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   chip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: INACTIVE_BG },
   chipFlex: { flex: 1, alignItems: 'center' },
   chipActive: { backgroundColor: '#235a36' },
-  chipText: { fontSize: 11.5, fontWeight: '600', color: TEXT_SECONDARY },
+  chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: TEXT_SECONDARY },
   chipTextActive: { fontWeight: '700', color: '#fff' },
-  textInput: { backgroundColor: '#f6f3e9', borderRadius: 7, padding: 8, fontSize: 12, fontWeight: '500', color: TEXT, marginTop: 4 },
+  textInput: { backgroundColor: '#f6f3e9', borderRadius: 7, padding: 8, fontSize: typeSizes.textInput, fontWeight: '500', color: TEXT, marginTop: 4 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, borderRadius: 7, backgroundColor: '#f6f3e9', paddingHorizontal: 8, paddingVertical: 8, marginTop: 4 },
   textArea: { minHeight: 70, textAlignVertical: 'top' },
   fieldGroup: { marginBottom: 8 },
-  fieldLabel: { fontSize: 10, fontWeight: '600', color: TEXT_SECONDARY, marginBottom: 4 },
-  errorText: { color: '#c0412b', fontSize: 11, marginBottom: 4 },
+  fieldLabel: { fontSize: typeSizes.fieldLabel, fontWeight: '600', color: TEXT_SECONDARY, marginBottom: 4 },
+  errorText: { color: '#c0412b', fontSize: typeSizes.errorText, marginBottom: 4 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: ORANGE, borderRadius: 13, padding: 15, alignItems: 'center' },
-  continueButtonText: { color: TEXT, fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: TEXT, fontWeight: '800', fontSize: typeSizes.continueButtonText },
   // ===== Signature =====
-  signatureStamp: { fontSize: 10, color: TEXT_SECONDARY, fontFamily: 'monospace', marginTop: 6 },
+  signatureStamp: { fontSize: typeSizes.signatureStamp, color: TEXT_SECONDARY, fontFamily: 'monospace', marginTop: 6 },
   signButton: { backgroundColor: GREEN, borderRadius: 9, paddingVertical: 9, alignItems: 'center', marginTop: 8 },
   signButtonDisabled: { backgroundColor: '#9a9484' },
-  signButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  signButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.signButtonText },
   modifyButton: { borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingVertical: 9, alignItems: 'center', marginTop: 8 },
-  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: 12 },
+  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: typeSizes.modifyButtonText },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,7 +28,7 @@ import {
 } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
 import { Toast, useTraitementToast } from '@/components/traitement/Toast';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from '@/components/traitement/tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useErrorStore } from '@/lib/error-store';
 import { useErrorLogStore } from '@/lib/error-log-store';
@@ -230,6 +230,8 @@ function displayZonesExposees(raw: string | null | undefined): string {
 /** Une ligne « libellé : valeur » des cartes Équipe/Traitement — « — » si absent,
  * jamais une ligne masquée (un champ facultatif vide reste visible, cf. #equipe-slide-aerien). */
 function RecapLigne({ label, value }: { label: string; value: string | null | undefined }) {
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <View style={styles.recapLigne}>
       <Text style={styles.recapLabel}>{label}</Text>
@@ -261,6 +263,8 @@ export default function RecapScreen() {
   // fiche reprenable est forcément déjà `validee` et synchronisée (cf.
   // listReprenableTraitements), donc cette valeur est toujours disponible.
   const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   useEffect(() => {
     if (!draft) return;
@@ -837,55 +841,57 @@ export default function RecapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: traitementColors.fondApp },
-  content: { padding: 16, gap: 10 },
-  title: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.titreEcran, color: traitementColors.texteTitre },
-  header: { backgroundColor: traitementColors.vertPrincipal, borderColor: traitementColors.vertPrincipal, gap: 4 },
-  numeroFiche: { fontFamily: traitementFonts.monoBold, fontSize: traitementTypeSizes.valeurDerivee, color: '#fff' },
-  headerLine: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.corps, color: '#fff' },
-  controlLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dotOk: { color: traitementColors.vertPrincipal, fontFamily: traitementFonts.uiBold },
-  dotWarn: { color: traitementColors.attente, fontFamily: traitementFonts.uiBold },
-  controlLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre, flex: 1 },
-  controlDetail: { fontFamily: traitementFonts.mono, fontSize: traitementTypeSizes.label, color: traitementColors.texteSecondaire },
-  sectionTitle: { fontFamily: traitementFonts.uiExtraBold, fontSize: traitementTypeSizes.corps + 1, color: traitementColors.texteTitre, marginBottom: 4 },
-  // Sous-titre à l'intérieur d'une Card qui regroupe plusieurs sous-sections
-  // de l'écran source (ex. "Moyens & protection" = Humains + Matériels + Kit
-  // de protection sur moyens.tsx) — plus discret que `sectionTitle` (titre de
-  // la Card elle-même), avec un espace au-dessus pour marquer la coupure.
-  subsectionTitle: {
-    fontFamily: traitementFonts.uiSemiBold,
-    fontSize: traitementTypeSizes.label,
-    color: traitementColors.texteLabel,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  recapLigne: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
-  recapLabel: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteSecondaire, flex: 1 },
-  recapValue: { fontFamily: traitementFonts.uiSemiBold, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre, textAlign: 'right' },
-  label: { fontFamily: traitementFonts.uiMedium, fontSize: traitementTypeSizes.label, color: traitementColors.texteLabel },
-  sousTitre: {
-    fontFamily: traitementFonts.uiSemiBold,
-    fontSize: traitementTypeSizes.label,
-    color: traitementColors.texteTitre,
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  note: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteNote },
-  saveButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: traitementColors.vertPrincipal,
-    borderRadius: traitementRadii.boutonPrincipal,
-    marginTop: 8,
-  },
-  saveButtonWarn: { backgroundColor: traitementColors.attente },
-  saveButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: traitementTypeSizes.corps + 1 },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: traitementColors.fondApp },
+    content: { padding: 16, gap: 10 },
+    title: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.titreEcran, color: traitementColors.texteTitre },
+    header: { backgroundColor: traitementColors.vertPrincipal, borderColor: traitementColors.vertPrincipal, gap: 4 },
+    numeroFiche: { fontFamily: traitementFonts.monoBold, fontSize: typeSizes.valeurDerivee, color: '#fff' },
+    headerLine: { fontFamily: traitementFonts.uiMedium, fontSize: typeSizes.corps, color: '#fff' },
+    controlLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    dotOk: { color: traitementColors.vertPrincipal, fontFamily: traitementFonts.uiBold },
+    dotWarn: { color: traitementColors.attente, fontFamily: traitementFonts.uiBold },
+    controlLabel: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteTitre, flex: 1 },
+    controlDetail: { fontFamily: traitementFonts.mono, fontSize: typeSizes.label, color: traitementColors.texteSecondaire },
+    sectionTitle: { fontFamily: traitementFonts.uiExtraBold, fontSize: typeSizes.corps + 1, color: traitementColors.texteTitre, marginBottom: 4 },
+    // Sous-titre à l'intérieur d'une Card qui regroupe plusieurs sous-sections
+    // de l'écran source (ex. "Moyens & protection" = Humains + Matériels + Kit
+    // de protection sur moyens.tsx) — plus discret que `sectionTitle` (titre de
+    // la Card elle-même), avec un espace au-dessus pour marquer la coupure.
+    subsectionTitle: {
+      fontFamily: traitementFonts.uiSemiBold,
+      fontSize: typeSizes.label,
+      color: traitementColors.texteLabel,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      marginTop: 6,
+      marginBottom: 2,
+    },
+    recapLigne: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
+    recapLabel: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteSecondaire, flex: 1 },
+    recapValue: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.corps, color: traitementColors.texteTitre, textAlign: 'right' },
+    label: { fontFamily: traitementFonts.uiMedium, fontSize: typeSizes.label, color: traitementColors.texteLabel },
+    sousTitre: {
+      fontFamily: traitementFonts.uiSemiBold,
+      fontSize: typeSizes.label,
+      color: traitementColors.texteTitre,
+      marginTop: 6,
+      marginBottom: 2,
+    },
+    note: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteNote },
+    saveButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: traitementColors.vertPrincipal,
+      borderRadius: traitementRadii.boutonPrincipal,
+      marginTop: 8,
+    },
+    saveButtonWarn: { backgroundColor: traitementColors.attente },
+    saveButtonText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 1 },
+  });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`

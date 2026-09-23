@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
+import { useFontScaleStore } from '@/lib/font-scale-store';
 import { getDb } from '@/lib/prospection-db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import { useFichesAutoSync } from '@/hooks/use-fiches-auto-sync';
@@ -48,7 +49,16 @@ export default function RootLayout() {
   useAuthGuard();
   const isInitialized = useAuthStore((s) => s.isInitialized);
   const token = useAuthStore((s) => s.token);
-  
+  const userId = useAuthStore((s) => s.user?.id);
+
+  // #taille-police-par-utilisateur : la clé de stockage dépend de l'utilisateur
+  // connu (`font-scale-store.ts`), donc amorcé ici plutôt que dans
+  // `demarrerApp` (qui tourne avant que l'auth ne soit résolue) — recalculé si
+  // un autre agent se connecte sur ce même appareil.
+  useEffect(() => {
+    if (userId) void useFontScaleStore.getState().init(userId);
+  }, [userId]);
+
   // Hook de synchronisation automatique du référentiel
   useReferentielAutoSync(token);
 

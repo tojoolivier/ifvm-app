@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, Platform, Modal } from 'react-native';
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
-import { traitementColors, traitementFonts, traitementRadii, traitementTypeSizes } from './tokens';
+import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from './tokens';
 
 interface DateFieldProps {
   /** Date au format ISO "AAAA-MM-JJ", ou null si non renseignée. */
@@ -38,6 +38,8 @@ function formatDateFr(iso: string): string {
 /** Champ de saisie de date avec sélecteur calendrier natif (iOS inline / Android dialog). */
 export function DateField({ value, onChange, editable = true, placeholder = 'JJ/MM/AAAA', minimumDate, maximumDate }: DateFieldProps) {
   const [show, setShow] = useState(false);
+  const typeSizes = useTraitementTypeSizes();
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   const onValueChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
     setShow(false);
@@ -88,28 +90,30 @@ export function DateField({ value, onChange, editable = true, placeholder = 'JJ/
   );
 }
 
-const styles = StyleSheet.create({
-  input: {
-    minHeight: 44,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: traitementColors.bordure,
-    borderRadius: traitementRadii.chip,
-    paddingHorizontal: 10,
-    backgroundColor: '#fff',
-  },
-  value: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteTitre },
-  placeholder: { fontFamily: traitementFonts.ui, fontSize: traitementTypeSizes.corps, color: traitementColors.texteLabel },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarCard: {
-    backgroundColor: '#fff',
-    borderRadius: traitementRadii.chip,
-    padding: 8,
-    overflow: 'hidden',
-  },
-});
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+  return StyleSheet.create({
+    input: {
+      minHeight: 44,
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: traitementColors.bordure,
+      borderRadius: traitementRadii.chip,
+      paddingHorizontal: 10,
+      backgroundColor: '#fff',
+    },
+    value: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
+    placeholder: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteLabel },
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    calendarCard: {
+      backgroundColor: '#fff',
+      borderRadius: traitementRadii.chip,
+      padding: 8,
+      overflow: 'hidden',
+    },
+  });
+}

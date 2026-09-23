@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 import { Espece, stadesLarvairesFor } from '@/lib/prospection-especes-stades';
 import { getProspectionPopulation, saveProspectionPopulation } from '@/lib/prospection-repository';
 import {
@@ -37,6 +39,10 @@ export default function ExtensiveLarvesScreen() {
   
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('extensive-larves');
+
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
 
   // #nombre-de-capture-fiable — modèle Intensive (captures.tsx, écran d'attente tant
   // que le brouillon/vocabulaire n'est pas prêt) : tant que la lecture de la ligne déjà
@@ -519,55 +525,95 @@ export default function ExtensiveLarvesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  back: 22,
+  title: 15,
+  speciesButtonText: 13,
+  sectionLabel: 9.5,
+  errorText: 11,
+  totalCaptureInput: 18,
+  totalCaptureInfo: 12,
+  phaseLabel: 13,
+  totalLabel: 12,
+  totalValue: 13,
+  counterButtonText: 17,
+  counterValue: 17,
+  stadeLabel: 13,
+  miniButtonText: 14,
+  label: 11,
+  inputMono: 18,
+  speciesHint: 9,
+  toggleLabel: 13,
+  toggleText: 13,
+  inputLabel: 13,
+  inputField: 15,
+  deplacementText: 13,
+  summaryTitle: 12,
+  summaryLabel: 13,
+  summaryValue: 13,
+  ruleText: 11,
+  warningText: 13,
+  warningDetail: 12,
+  warningHint: 11,
+  successText: 13,
+  successDetail: 12,
+  continueButtonText: 15,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: 22, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: 15, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
   progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
   progressActive: { backgroundColor: GREEN },
   speciesRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
   speciesButton: { flex: 1, textAlign: 'center', borderRadius: 10, paddingVertical: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   speciesButtonActive: { backgroundColor: GREEN, borderWidth: 0 },
-  speciesButtonText: { fontSize: 13, fontWeight: '800', color: TEXT_SECONDARY },
+  speciesButtonText: { fontSize: typeSizes.speciesButtonText, fontWeight: '800', color: TEXT_SECONDARY },
   speciesButtonTextActive: { color: '#fff' },
   scroll: { flex: 1 },
   
-  sectionLabel: { fontSize: 9.5, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7, marginTop: 4 },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7, marginTop: 4 },
   errorCount: { color: '#d32f2f' },
-  errorText: { fontSize: 11, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
+  errorText: { fontSize: typeSizes.errorText, color: '#d32f2f', marginTop: 4, marginBottom: 4 },
   
   totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, fontWeight: '700', color: TEXT },
-  totalCaptureInfo: { marginTop: 6, fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center' },
+  totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: typeSizes.totalCaptureInput, fontWeight: '700', color: TEXT },
+  totalCaptureInfo: { marginTop: 6, fontSize: typeSizes.totalCaptureInfo, color: TEXT_SECONDARY, textAlign: 'center' },
   
   phaseSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   phaseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 13 },
-  phaseLabel: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  phaseLabel: { fontSize: typeSizes.phaseLabel, fontWeight: '600', color: TEXT_SECONDARY },
   totalRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: BORDER },
-  totalLabel: { fontSize: 12, fontWeight: '600', color: TEXT_SECONDARY, marginRight: 8 },
-  totalValue: { fontSize: 13, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
+  totalLabel: { fontSize: typeSizes.totalLabel, fontWeight: '600', color: TEXT_SECONDARY, marginRight: 8 },
+  totalValue: { fontSize: typeSizes.totalValue, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   counterRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   counterButton: { width: 32, height: 32, borderRadius: 9, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   counterButtonAdd: { backgroundColor: GREEN },
   counterButtonDisabled: { opacity: 0.4 },
-  counterButtonText: { fontSize: 17, fontWeight: '700', color: TEXT_SECONDARY },
+  counterButtonText: { fontSize: typeSizes.counterButtonText, fontWeight: '700', color: TEXT_SECONDARY },
   counterButtonAddText: { color: '#fff' },
-  counterValue: { fontSize: 17, fontWeight: '700', color: TEXT, minWidth: 16, textAlign: 'center', fontFamily: 'monospace' },
+  counterValue: { fontSize: typeSizes.counterValue, fontWeight: '700', color: TEXT, minWidth: 16, textAlign: 'center', fontFamily: 'monospace' },
   
   stadesSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   stadesGrid: { gap: 6 },
   stadeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
-  stadeLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
+  stadeLabel: { fontSize: typeSizes.stadeLabel, fontWeight: '500', color: TEXT },
   counterButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   miniButton: { width: 28, height: 28, borderRadius: 6, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
   miniButtonAdd: { backgroundColor: GREEN },
   miniButtonDisabled: { opacity: 0.4 },
-  miniButtonText: { fontSize: 14, fontWeight: '700', color: TEXT_SECONDARY },
+  miniButtonText: { fontSize: typeSizes.miniButtonText, fontWeight: '700', color: TEXT_SECONDARY },
   miniButtonAddText: { color: '#fff' },
   
   // ✨ STYLES AJOUTÉS POUR LA SECTION DENSITÉS
@@ -577,49 +623,50 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#f6f3e9', borderRadius: 9, padding: 8 },
   // #lisibilite-terrain : libellé agrandi et assombri (au lieu de 9px gris clair,
   // difficile à lire en plein soleil) — même niveau de lisibilité que sectionLabel.
-  label: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY },
-  inputMono: { fontSize: 18, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
-  speciesHint: { fontSize: 9, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
+  label: { fontSize: typeSizes.label, fontWeight: '700', color: TEXT_SECONDARY },
+  inputMono: { fontSize: typeSizes.inputMono, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  speciesHint: { fontSize: typeSizes.speciesHint, color: '#9a9484', marginBottom: 6, textAlign: 'center', fontStyle: 'italic' },
   
   observationsSection: { marginTop: 4, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
-  toggleLabel: { fontSize: 13, fontWeight: '500', color: TEXT },
+  toggleLabel: { fontSize: typeSizes.toggleLabel, fontWeight: '500', color: TEXT },
   toggleButton: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: INACTIVE_BG },
   toggleButtonActive: { backgroundColor: GREEN },
-  toggleText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  toggleText: { fontSize: typeSizes.toggleText, fontWeight: '600', color: TEXT_SECONDARY },
   toggleTextActive: { color: '#fff' },
   inputRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
-  inputLabel: { fontSize: 13, fontWeight: '500', color: TEXT, marginBottom: 4 },
-  inputField: { backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 15, fontWeight: '700', color: TEXT },
+  inputLabel: { fontSize: typeSizes.inputLabel, fontWeight: '500', color: TEXT, marginBottom: 4 },
+  inputField: { backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: typeSizes.inputField, fontWeight: '700', color: TEXT },
   deplacementRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   deplacementButton: { flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: INACTIVE_BG, alignItems: 'center' },
   deplacementButtonActive: { backgroundColor: GREEN },
-  deplacementText: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY },
+  deplacementText: { fontSize: typeSizes.deplacementText, fontWeight: '600', color: TEXT_SECONDARY },
   deplacementTextActive: { color: '#fff' },
   
   summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 8, borderWidth: 1, borderColor: BORDER },
-  summaryTitle: { fontSize: 12, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
+  summaryTitle: { fontSize: typeSizes.summaryTitle, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
   summaryDivider: { height: 1, backgroundColor: '#f0eee8', marginVertical: 4 },
-  summaryLabel: { fontSize: 13, color: TEXT_SECONDARY },
-  summaryValue: { fontSize: 13, fontWeight: '700', color: TEXT },
+  summaryLabel: { fontSize: typeSizes.summaryLabel, color: TEXT_SECONDARY },
+  summaryValue: { fontSize: typeSizes.summaryValue, fontWeight: '700', color: TEXT },
   summaryValueValid: { color: GREEN },
   summaryValueInvalid: { color: '#dc2626' },
   ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
-  ruleText: { fontSize: 11, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
+  ruleText: { fontSize: typeSizes.ruleText, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
   
   warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
-  warningText: { color: '#dc2626', fontWeight: '700', fontSize: 13, textAlign: 'center' },
-  warningDetail: { color: '#dc2626', fontSize: 12, textAlign: 'center', marginTop: 5, lineHeight: 18 },
-  warningHint: { color: '#dc2626', fontSize: 11, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
+  warningText: { color: '#dc2626', fontWeight: '700', fontSize: typeSizes.warningText, textAlign: 'center' },
+  warningDetail: { color: '#dc2626', fontSize: typeSizes.warningDetail, textAlign: 'center', marginTop: 5, lineHeight: 18 },
+  warningHint: { color: '#dc2626', fontSize: typeSizes.warningHint, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
   successContainer: { backgroundColor: '#dcfce7', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#86efac' },
-  successText: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center' },
-  successDetail: { color: '#15803d', fontSize: 12, textAlign: 'center', marginTop: 3, lineHeight: 18 },
+  successText: { color: '#15803d', fontWeight: '700', fontSize: typeSizes.successText, textAlign: 'center' },
+  successDetail: { color: '#15803d', fontSize: typeSizes.successDetail, textAlign: 'center', marginTop: 3, lineHeight: 18 },
   
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },
-  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
 });
+}
 
 export { RouteErrorBoundary as ErrorBoundary } from '@/components/error-boundary';

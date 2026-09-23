@@ -25,6 +25,8 @@ import { DEGATS_OPTIONS, formatHeureLocale } from '@/lib/prospection-fiche-lectu
 import { formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useFontScale } from '@/hooks/use-font-scale';
+import { scaleTypeSizes } from '@/lib/typography';
 
 const GREEN = '#235a36';
 const RED = '#c0412b';
@@ -89,7 +91,7 @@ function buildImagoRows(row: PopulationRow | null): DetailRow[] {
     },
     { label: 'État', value: row?.etat === 'repos' ? 'Repos' : row?.etat === 'deplacement' ? 'Déplacement' : '—' },
     {
-      label: 'Comportement de l’essaim',
+      label: 'Comportement',
       value: row?.essaim_en_vol ? 'En vol' : row?.essaim_pose ? 'Posé' : '—',
     },
     { label: 'Densité diffuse', value: row?.densite_diffuse != null ? `${row.densite_diffuse} ind./ha` : '—' },
@@ -239,6 +241,9 @@ function buildSignaturesRows(draft: DraftProspection): DetailRow[] {
 }
 
 function DetailRows({ rows }: { rows: DetailRow[] }) {
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   return (
     <>
       {rows.map((row) => (
@@ -261,6 +266,9 @@ export default function ExtensiveRecapScreen() {
   const [populations, setPopulations] = useState<PopulationRow[]>([]);
   const [operationsAeriennes, setOperationsAeriennes] = useState<OperationAerienneRow[]>([]);
   const signalerChargement = useSignalerChargement('extensive-recap');
+  const { scale } = useFontScale();
+  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
+  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   // Terrestre implicite (NULL) — même garde que sur les autres écrans du mode aérien.
   const isAerien = draft?.mode_extensif === 'aerien';
 
@@ -673,49 +681,76 @@ export default function ExtensiveRecapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const BASE_TYPE_SIZES = {
+  backWhite: 20,
+  titleWhite: 14,
+  subtitleWhite: 10.5,
+  checkBadgeText: 11,
+  checkLabel: 12.5,
+  detailSubtitle: 10,
+  detailLine: 12,
+  detailRowLabel: 13,
+  detailRowValue: 13.5,
+  offlineText: 11,
+  saveButtonText: 15,
+  quoteText: 11.5,
+  figureLabel: 9,
+  figureValue: 17,
+  summaryText: 11.5,
+  conclusionLabel: 11,
+  infirmeeButtonText: 13,
+  confirmeeButtonText: 13,
+} as const;
+
+function createTypeSizes(scale: number) {
+  return scaleTypeSizes(BASE_TYPE_SIZES, scale);
+}
+
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerGreen: { backgroundColor: GREEN, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16 },
   headerRowGreen: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  backWhite: { fontSize: 20, fontWeight: '700', color: '#fff' },
-  titleWhite: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  subtitleWhite: { fontSize: 10.5, fontWeight: '500', color: '#ffffffcc', marginTop: 2 },
+  backWhite: { fontSize: typeSizes.backWhite, fontWeight: '700', color: '#fff' },
+  titleWhite: { fontSize: typeSizes.titleWhite, fontWeight: '700', color: '#fff' },
+  subtitleWhite: { fontSize: typeSizes.subtitleWhite, fontWeight: '500', color: '#ffffffcc', marginTop: 2 },
   scroll: { flex: 1 },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11 },
   checkBadge: { width: 24, height: 24, borderRadius: 7, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
-  checkBadgeText: { color: '#fff', fontWeight: '800', fontSize: 11 },
-  checkLabel: { fontSize: 12.5, fontWeight: '600', color: '#2a2a22' },
+  checkBadgeText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.checkBadgeText },
+  checkLabel: { fontSize: typeSizes.checkLabel, fontWeight: '600', color: '#2a2a22' },
   detailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginTop: -2 },
-  detailSubtitle: { fontSize: 10, fontWeight: '700', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  detailLine: { fontSize: 12, color: '#5c5848', lineHeight: 17 },
+  detailSubtitle: { fontSize: typeSizes.detailSubtitle, fontWeight: '700', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+  detailLine: { fontSize: typeSizes.detailLine, color: '#5c5848', lineHeight: 17 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
   // #lisibilite-terrain : libellés/valeurs agrandis (au lieu de 11.5px) pour rester
   // lisibles sur le terrain, y compris pour la densité.
-  detailRowLabel: { fontSize: 13, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
-  detailRowValue: { fontSize: 13.5, color: TEXT, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
+  detailRowLabel: { fontSize: typeSizes.detailRowLabel, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
+  detailRowValue: { fontSize: typeSizes.detailRowValue, color: TEXT, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
   offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
-  offlineText: { fontSize: 11, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
+  offlineText: { fontSize: typeSizes.offlineText, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
   footer: { padding: 16 },
   saveButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
-  saveButtonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  saveButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.saveButtonText },
   quoteBanner: { backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 10, padding: 11, marginBottom: 12 },
-  quoteText: { fontSize: 11.5, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
+  quoteText: { fontSize: typeSizes.quoteText, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
   row: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   flex1: { flex: 1 },
   figureCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9 },
-  figureLabel: { fontSize: 9, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase' },
-  figureValue: { fontSize: 17, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
+  figureLabel: { fontSize: typeSizes.figureLabel, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase' },
+  figureValue: { fontSize: typeSizes.figureValue, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
   summaryCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 14 },
-  summaryText: { fontSize: 11.5, lineHeight: 16, color: '#5c5848', fontWeight: '500' },
-  conclusionLabel: { fontSize: 11, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 9 },
+  summaryText: { fontSize: typeSizes.summaryText, lineHeight: 16, color: '#5c5848', fontWeight: '500' },
+  conclusionLabel: { fontSize: typeSizes.conclusionLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 9 },
   footerRow: { padding: 16, paddingTop: 10, flexDirection: 'row', gap: 9 },
   infirmeeButton: { flex: 1, backgroundColor: '#fff', borderWidth: 1.5, borderColor: RED, borderRadius: 13, padding: 14, alignItems: 'center' },
-  infirmeeButtonText: { color: RED, fontWeight: '800', fontSize: 13 },
+  infirmeeButtonText: { color: RED, fontWeight: '800', fontSize: typeSizes.infirmeeButtonText },
   confirmeeButton: { flex: 1, backgroundColor: GREEN, borderRadius: 13, padding: 14, alignItems: 'center' },
-  confirmeeButtonText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  confirmeeButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.confirmeeButtonText },
 });
+}
 
 /**
  * Frontière de rendu de cette route — ADR-012 décision 5 (#172). `expo-router`
