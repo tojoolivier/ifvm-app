@@ -1131,29 +1131,36 @@ def _vol_to_domain(model: VolModel) -> Vol:
     )
 
 
+def _vol_to_model(vol: Vol) -> VolModel:
+    """Mapping inverse de `_vol_to_domain` — les deux se lisent champ à champ l'un en
+    face de l'autre plutôt que de relister les 14 champs une troisième fois dans
+    `VolRepositoryImpl.create`."""
+    return VolModel(
+        id=vol.id,
+        type=vol.type,
+        equipe_id=vol.equipe_id,
+        aeronef_id=vol.aeronef_id,
+        site_principal_id=vol.site_principal_id,
+        stand_id=vol.stand_id,
+        base_secondaire_id=vol.base_secondaire_id,
+        date_vol=vol.date_vol,
+        heure_debut=vol.heure_debut,
+        heure_fin=vol.heure_fin,
+        motif=vol.motif,
+        lieu_depart=vol.lieu_depart,
+        lieu_arrivee=vol.lieu_arrivee,
+        observations=vol.observations,
+        created_at=vol.created_at,
+        updated_at=vol.updated_at,
+    )
+
+
 class VolRepositoryImpl(VolRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def create(self, vol: Vol) -> Vol:
-        model = VolModel(
-            id=vol.id,
-            type=vol.type,
-            equipe_id=vol.equipe_id,
-            aeronef_id=vol.aeronef_id,
-            site_principal_id=vol.site_principal_id,
-            stand_id=vol.stand_id,
-            base_secondaire_id=vol.base_secondaire_id,
-            date_vol=vol.date_vol,
-            heure_debut=vol.heure_debut,
-            heure_fin=vol.heure_fin,
-            motif=vol.motif,
-            lieu_depart=vol.lieu_depart,
-            lieu_arrivee=vol.lieu_arrivee,
-            observations=vol.observations,
-            created_at=vol.created_at,
-            updated_at=vol.updated_at,
-        )
+        model = _vol_to_model(vol)
         self.session.add(model)
         await self.session.commit()
         await self.session.refresh(model)

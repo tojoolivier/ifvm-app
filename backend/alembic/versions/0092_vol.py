@@ -18,7 +18,9 @@ lieu_depart, lieu_arrivee, observations, created_at, updated_at)` :
   questions métier restantes n°1), volontairement absent.
 - `equipe_id` NOT NULL, FK composite type-sûre `(equipe_id, equipe_type) ->
   equipe(id, type)`, `equipe_type` en `GENERATED ALWAYS ... STORED` toujours
-  `'aerien'` (même patron que `equipe_aeronef`, migration 0087) — c'est la seule
+  `'aerien'` — constante littérale (`equipe_id` est NOT NULL sur `vol`, pas de
+  branche NULL à couvrir, à la différence du `CASE WHEN ... IS NULL` réutilisé sur
+  les FK nullables comme `equipe_aeronef`, migration 0087) — c'est la seule
   façon de tracer l'équipe sur un convoyage ou un vol divers, qui n'ont ni
   traitement ni prospection.
 - `aeronef_id` NOT NULL, FK simple vers `aeronef` — la cohérence « affecté à
@@ -67,8 +69,8 @@ def upgrade() -> None:
         sa.Column(
             "equipe_type",
             sa.Text(),
-            sa.Computed("CASE WHEN equipe_id IS NULL THEN NULL ELSE 'aerien' END", persisted=True),
-            nullable=True,
+            sa.Computed("'aerien'", persisted=True),
+            nullable=False,
         ),
         sa.Column("aeronef_id", UUID(as_uuid=True), nullable=False),
         sa.Column("site_principal_id", UUID(as_uuid=True), nullable=True),

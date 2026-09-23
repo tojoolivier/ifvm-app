@@ -569,9 +569,10 @@ class VolModel(Base):
     Réintroduite après la suppression de l'ancienne `vol` (migration 0080, ADR-017) —
     ce n'est pas le même objet, cf. docstring du domaine `Vol`.
 
-    `equipe_type` est en `GENERATED ALWAYS ... STORED`, même patron que
-    `EquipeAeronefModel` (migration 0087) : `equipe_id` sur un vol ne vise jamais
-    qu'une équipe aérienne.
+    `equipe_type` est en `GENERATED ALWAYS ... STORED` et vaut toujours `'aerien'` —
+    constante littérale plutôt que le `CASE WHEN equipe_id IS NULL ...` réutilisé sur
+    les FK nullables (`SiteAerienneModel`) : `equipe_id` est NOT NULL sur `vol`, la
+    branche NULL de ce CASE serait morte.
 
     Les trois FK vers `site_aerienne` (`site_principal_id`, `stand_id`,
     `base_secondaire_id`) sont indépendantes : un vol peut désigner le même site pour
@@ -586,8 +587,8 @@ class VolModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     type: Mapped[str] = mapped_column(Text(), nullable=False)
     equipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    equipe_type: Mapped[str | None] = mapped_column(
-        Text(), _equipe_type_genere("equipe_id", "aerien"), nullable=True
+    equipe_type: Mapped[str] = mapped_column(
+        Text(), Computed("'aerien'", persisted=True), nullable=False
     )
     aeronef_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("aeronef.id", ondelete="RESTRICT"), nullable=False

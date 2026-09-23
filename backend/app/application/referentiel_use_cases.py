@@ -1681,6 +1681,18 @@ async def _valider_rattachement_site(
         raise SiteHorsBaseError(str(site_id))
 
 
+async def _valider_rattachements_site(
+    site_repository: SiteAerienneRepository,
+    site_principal_id: uuid.UUID | None,
+    *sites_secondaires: uuid.UUID | None,
+) -> None:
+    """`stand_id` et `base_secondaire_id` voyagent toujours ensemble avec
+    `site_principal_id` (les trois FK d'un même vol) : un seul point d'appel pour
+    les deux, plutôt que répéter `_valider_rattachement_site` par rôle de site."""
+    for site_id in sites_secondaires:
+        await _valider_rattachement_site(site_repository, site_principal_id, site_id)
+
+
 class CreateVol:
     """Enregistre une ligne d'activité aérienne (ADR-018, #608).
 
@@ -1740,9 +1752,8 @@ class CreateVol:
             and await self.site_repository.get_by_id(site_principal_id) is None
         ):
             raise SiteAerienneIntrouvableError(str(site_principal_id))
-        await _valider_rattachement_site(self.site_repository, site_principal_id, stand_id)
-        await _valider_rattachement_site(
-            self.site_repository, site_principal_id, base_secondaire_id
+        await _valider_rattachements_site(
+            self.site_repository, site_principal_id, stand_id, base_secondaire_id
         )
 
         affectations = await self.equipe_aeronef_repository.list_chevauchements(
