@@ -1,3 +1,10 @@
+jest.mock('@/hooks/use-font-scale', () => ({
+  useFontScale: () => ({
+    level: 'normale',
+    scale: 1,
+  }),
+}));
+
 import { traitementColors } from '@/components/traitement/tokens';
 
 type Hex = `#${string}`;
