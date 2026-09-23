@@ -721,6 +721,72 @@ class CampagneSyncRead(BaseModel):
     updated_at: datetime
 
 
+class SiteAerienneSyncRead(BaseModel):
+    """Site aérien pour le pull mobile (#638), avec sa position active aplatie.
+
+    `latitude`/`longitude`/`date_debut_position` valent `None` pour un site sans
+    implantation en cours (jamais installé, ou démonté) : le mobile doit distinguer
+    « pas de position » de « position à (0, 0) »."""
+
+    id: uuid.UUID
+    parent_site_id: uuid.UUID | None
+    equipe_id: uuid.UUID | None
+    numero: str
+    localite: str
+    actif: bool
+    latitude: float | None = None
+    longitude: float | None = None
+    altitude: float | None = None
+    date_debut_position: date | None = None
+    updated_at: datetime
+
+
+class EquipeSyncRead(BaseModel):
+    """Équipe pour le pull mobile (#638). Les membres et affectations d'appareil ont
+    leurs propres collections (`equipe_membres`, `equipe_aeronefs`) : elles évoluent
+    à des moments différents et se pullent avec leur propre curseur."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+    type: Literal["terrestre", "aerien"]
+    actif: bool
+    updated_at: datetime
+
+
+class EquipeMembreSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    equipe_id: uuid.UUID
+    user_id: uuid.UUID
+    fonction: str
+    nom: str | None = None
+    prenom: str | None = None
+    created_at: datetime
+
+
+class AeronefSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    immatriculation: str
+    societe: str
+    volume_cuve_l: float
+    actif: bool
+    updated_at: datetime
+
+
+class EquipeAeronefSyncRead(BaseModel):
+    """Affectation d'un appareil à une équipe (#638). `date_fin: null` = en cours ;
+    une clôture remonte comme une ligne mise à jour, jamais comme une absence."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    date_debut: date
+    date_fin: date | None = None
+    updated_at: datetime
+
+
 T = TypeVar("T")
 
 
@@ -738,4 +804,11 @@ class ReferentielPullResponse(BaseModel):
     cultures: EntityPull[CultureSyncRead]
     codes_stades: EntityPull[CodeStadeSyncRead]
     campagnes: EntityPull[CampagneSyncRead]
-    lieux_aeriens: EntityPull[LieuAerienSyncRead]
+    # DÉPRÉCIÉ (#638) : remplacé par `sites_aeriens` (+ position active), `equipes`
+    # et `aeronefs`. Conservé tant que le mobile publié le lit ; à retirer avec #641.
+    lieux_aeriens: EntityPull[LieuAerienSyncRead] = Field(deprecated=True)
+    sites_aeriens: EntityPull[SiteAerienneSyncRead]
+    equipes: EntityPull[EquipeSyncRead]
+    equipe_membres: EntityPull[EquipeMembreSyncRead]
+    aeronefs: EntityPull[AeronefSyncRead]
+    equipe_aeronefs: EntityPull[EquipeAeronefSyncRead]

@@ -373,7 +373,21 @@ class SiteAerienneRepositoryImpl(SiteAerienneRepository):
         if since is not None:
             stmt = stmt.where(SiteAerienneModel.updated_at > since)
         result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+        sites = [self._to_domain(m) for m in result.scalars().all()]
+        if sites:
+            # Une requête pour toutes les positions actives : pas de N+1 sur le pull.
+            actives = await self.session.execute(
+                select(SiteAeriennePositionModel).where(
+                    SiteAeriennePositionModel.site_id.in_([s.id for s in sites]),
+                    SiteAeriennePositionModel.date_fin.is_(None),
+                )
+            )
+            par_site = {p.site_id: p for p in actives.scalars().all()}
+            for site in sites:
+                position = par_site.get(site.id)
+                if position is not None:
+                    site.position_active = _position_to_domain(position)
+        return sites
 
     async def list_all(self, actif: bool | None = True) -> list[SiteAerienne]:
         stmt = select(SiteAerienneModel).order_by(SiteAerienneModel.numero)
@@ -443,21 +457,33 @@ class SiteAerienneRepositoryImpl(SiteAerienneRepository):
         return self._to_domain(model)
 
 
+def _position_to_domain(model: SiteAeriennePositionModel) -> SiteAeriennePosition:
+    return SiteAeriennePosition(
+        id=model.id,
+        site_id=model.site_id,
+        latitude=float(model.latitude),
+        longitude=float(model.longitude),
+        altitude=float(model.altitude) if model.altitude is not None else None,
+        date_debut=model.date_debut,
+        date_fin=model.date_fin,
+        created_at=model.created_at,
+    )
+
+
 class SiteAeriennePositionRepositoryImpl(SiteAeriennePositionRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
     def _to_domain(self, model: SiteAeriennePositionModel) -> SiteAeriennePosition:
-        return SiteAeriennePosition(
-            id=model.id,
-            site_id=model.site_id,
-            latitude=float(model.latitude),
-            longitude=float(model.longitude),
-            altitude=float(model.altitude) if model.altitude is not None else None,
-            date_debut=model.date_debut,
-            date_fin=model.date_fin,
-            created_at=model.created_at,
-        )
+        return _position_to_domain(model)
+
+    async def _toucher_site(self, site_id: uuid.UUID) -> None:
+        """Le pull embarque la position active dans le site : sans rehausse de
+        `site.updated_at`, une implantation ou un démontage ne serait jamais repris
+        par un mobile déjà synchronisé (#638). Committé avec la position."""
+        site = await self.session.get(SiteAerienneModel, site_id)
+        if site is not None:
+            site.updated_at = datetime.now(timezone.utc)
 
     async def list_par_site(self, site_id: uuid.UUID) -> list[SiteAeriennePosition]:
         stmt = (
@@ -489,6 +515,7 @@ class SiteAeriennePositionRepositoryImpl(SiteAeriennePositionRepository):
             created_at=position.created_at,
         )
         self.session.add(model)
+        await self._toucher_site(position.site_id)
         try:
             await self.session.commit()
         except IntegrityError as exc:
@@ -515,6 +542,7 @@ class SiteAeriennePositionRepositoryImpl(SiteAeriennePositionRepository):
         if model is None or model.date_fin is not None:
             raise PositionActiveIntrouvableError(str(position.site_id))
         model.date_fin = position.date_fin
+        await self._toucher_site(position.site_id)
         await self.session.commit()
         await self.session.refresh(model)
         return self._to_domain(model)
@@ -528,6 +556,24 @@ class EquipeRepositoryImpl(EquipeRepository):
         selectinload(EquipeModel.membres).joinedload(EquipeMembreModel.utilisateur),
         selectinload(EquipeModel.affectations_aeronef).joinedload(EquipeAeronefModel.aeronef),
     )
+
+    async def list_since(self, since: datetime | None) -> list[Equipe]:
+        stmt = select(EquipeModel).options(*self._CHARGEMENT).order_by(EquipeModel.nom)
+        if since is not None:
+            stmt = stmt.where(EquipeModel.updated_at > since)
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().unique().all()]
+
+    async def list_membres_since(self, since: datetime | None) -> list[MembreEquipe]:
+        stmt = (
+            select(EquipeMembreModel)
+            .options(joinedload(EquipeMembreModel.utilisateur))
+            .order_by(EquipeMembreModel.created_at)
+        )
+        if since is not None:
+            stmt = stmt.where(EquipeMembreModel.created_at > since)
+        result = await self.session.execute(stmt)
+        return [_membre_to_domain(m) for m in result.scalars().unique().all()]
 
     def _to_domain(self, model: EquipeModel) -> Equipe:
         # `aeronef_id` / `aeronef` ne sont plus des colonnes (#603) : ils projettent
@@ -687,12 +733,24 @@ def _affectation_to_domain(model: EquipeAeronefModel) -> AffectationAeronef:
         date_fin=model.date_fin,
         aeronef=_aeronef_to_domain(model.aeronef) if model.aeronef is not None else None,
         created_at=model.created_at,
+        updated_at=model.updated_at,
     )
 
 
 class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def list_since(self, since: datetime | None) -> list[AffectationAeronef]:
+        stmt = (
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .order_by(EquipeAeronefModel.date_debut)
+        )
+        if since is not None:
+            stmt = stmt.where(EquipeAeronefModel.updated_at > since)
+        result = await self.session.execute(stmt)
+        return [_affectation_to_domain(m) for m in result.scalars().all()]
 
     async def list_par_equipe(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
         result = await self.session.execute(
@@ -762,6 +820,7 @@ class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
             date_debut=affectation.date_debut,
             date_fin=affectation.date_fin,
             created_at=affectation.created_at,
+            updated_at=affectation.updated_at,
         )
         self.session.add(model)
         try:
@@ -781,6 +840,8 @@ class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
         # Seule `date_fin` bouge : rouvrir une période close ou déplacer son début
         # réécrirait l'histoire, ce que cette table existe précisément pour empêcher.
         model.date_fin = affectation.date_fin
+        # Sans rehausse, le pull incrémental sauterait la clôture (#638).
+        model.updated_at = datetime.now(timezone.utc)
         try:
             await self.session.commit()
         except IntegrityError as exc:
@@ -866,6 +927,13 @@ def _aeronef_to_domain(model: AeronefModel) -> Aeronef:
 class AeronefRepositoryImpl(AeronefRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def list_since(self, since: datetime | None) -> list[Aeronef]:
+        stmt = select(AeronefModel).order_by(AeronefModel.immatriculation)
+        if since is not None:
+            stmt = stmt.where(AeronefModel.updated_at > since)
+        result = await self.session.execute(stmt)
+        return [_aeronef_to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[Aeronef]:
         stmt = select(AeronefModel).order_by(AeronefModel.immatriculation)

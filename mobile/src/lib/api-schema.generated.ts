@@ -1191,6 +1191,27 @@ export interface components {
              */
             updated_at: string;
         };
+        /** AeronefSyncRead */
+        AeronefSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Immatriculation */
+            immatriculation: string;
+            /** Societe */
+            societe: string;
+            /** Volume Cuve L */
+            volume_cuve_l: number;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /**
          * AeronefUpdate
          * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
@@ -1729,6 +1750,16 @@ export interface components {
          * @enum {string}
          */
         EmpoisonnementType: "AGENT" | "POPULATION";
+        /** EntityPull[AeronefSyncRead] */
+        EntityPull_AeronefSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["AeronefSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /** EntityPull[CampagneSyncRead] */
         EntityPull_CampagneSyncRead_: {
             /** Upserts */
@@ -1753,6 +1784,36 @@ export interface components {
         EntityPull_CultureSyncRead_: {
             /** Upserts */
             upserts: components["schemas"]["CultureSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        /** EntityPull[EquipeAeronefSyncRead] */
+        EntityPull_EquipeAeronefSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["EquipeAeronefSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        /** EntityPull[EquipeMembreSyncRead] */
+        EntityPull_EquipeMembreSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["EquipeMembreSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        /** EntityPull[EquipeSyncRead] */
+        EntityPull_EquipeSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["EquipeSyncRead"][];
             /**
              * Server Time
              * Format: date-time
@@ -1789,6 +1850,16 @@ export interface components {
              */
             server_time: string;
         };
+        /** EntityPull[SiteAerienneSyncRead] */
+        EntityPull_SiteAerienneSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["SiteAerienneSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /** EntityPull[StationFixeSyncRead] */
         EntityPull_StationFixeSyncRead_: {
             /** Upserts */
@@ -1819,6 +1890,40 @@ export interface components {
              */
             server_time: string;
         };
+        /**
+         * EquipeAeronefSyncRead
+         * @description Affectation d'un appareil à une équipe (#638). `date_fin: null` = en cours ;
+         *     une clôture remonte comme une ligne mise à jour, jamais comme une absence.
+         */
+        EquipeAeronefSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Debut
+             * Format: date
+             */
+            date_debut: string;
+            /** Date Fin */
+            date_fin?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** EquipeCreate */
         EquipeCreate: {
             /** Nom */
@@ -1833,6 +1938,30 @@ export interface components {
             aeronef_id?: string | null;
             /** Membres */
             membres?: components["schemas"]["MembreEquipeCreate"][];
+        };
+        /** EquipeMembreSyncRead */
+        EquipeMembreSyncRead: {
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Fonction */
+            fonction: string;
+            /** Nom */
+            nom?: string | null;
+            /** Prenom */
+            prenom?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** EquipeRead */
         EquipeRead: {
@@ -1860,6 +1989,33 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * EquipeSyncRead
+         * @description Équipe pour le pull mobile (#638). Les membres et affectations d'appareil ont
+         *     leurs propres collections (`equipe_membres`, `equipe_aeronefs`) : elles évoluent
+         *     à des moments différents et se pullent avec leur propre curseur.
+         */
+        EquipeSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "terrestre" | "aerien";
+            /** Actif */
+            actif: boolean;
             /**
              * Updated At
              * Format: date-time
@@ -3304,7 +3460,13 @@ export interface components {
             cultures: components["schemas"]["EntityPull_CultureSyncRead_"];
             codes_stades: components["schemas"]["EntityPull_CodeStadeSyncRead_"];
             campagnes: components["schemas"]["EntityPull_CampagneSyncRead_"];
+            /** @deprecated */
             lieux_aeriens: components["schemas"]["EntityPull_LieuAerienSyncRead_"];
+            sites_aeriens: components["schemas"]["EntityPull_SiteAerienneSyncRead_"];
+            equipes: components["schemas"]["EntityPull_EquipeSyncRead_"];
+            equipe_membres: components["schemas"]["EntityPull_EquipeMembreSyncRead_"];
+            aeronefs: components["schemas"]["EntityPull_AeronefSyncRead_"];
+            equipe_aeronefs: components["schemas"]["EntityPull_EquipeAeronefSyncRead_"];
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -3526,6 +3688,44 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SiteAerienneSyncRead
+         * @description Site aérien pour le pull mobile (#638), avec sa position active aplatie.
+         *
+         *     `latitude`/`longitude`/`date_debut_position` valent `None` pour un site sans
+         *     implantation en cours (jamais installé, ou démonté) : le mobile doit distinguer
+         *     « pas de position » de « position à (0, 0) ».
+         */
+        SiteAerienneSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Site Id */
+            parent_site_id: string | null;
+            /** Equipe Id */
+            equipe_id: string | null;
+            /** Numero */
+            numero: string;
+            /** Localite */
+            localite: string;
+            /** Actif */
+            actif: boolean;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Date Debut Position */
+            date_debut_position?: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -6935,6 +7135,11 @@ export interface operations {
                 since_codes_stades?: string | null;
                 since_campagnes?: string | null;
                 since_lieux_aeriens?: string | null;
+                since_sites_aeriens?: string | null;
+                since_equipes?: string | null;
+                since_equipe_membres?: string | null;
+                since_aeronefs?: string | null;
+                since_equipe_aeronefs?: string | null;
             };
             header?: never;
             path?: never;

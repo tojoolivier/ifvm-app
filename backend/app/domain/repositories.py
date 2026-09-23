@@ -502,6 +502,11 @@ class AeronefRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
 
     @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[Aeronef]:
+        """Pull mobile : inactifs inclus, une désactivation doit remonter (#638)."""
+        pass
+
+    @abstractmethod
     async def list_all(self, actif: bool | None = True) -> list[Aeronef]:
         pass
 
@@ -526,6 +531,11 @@ class EquipeAeronefRepository(ABC):
 
     Aucune méthode de suppression : retirer un appareil, c'est borner l'affectation
     (`date_fin`), pas effacer la ligne — tout l'intérêt de la table est l'historique."""
+
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[AffectationAeronef]:
+        """Pull mobile (#638) : affectations créées ou clôturées depuis `since`."""
+        pass
 
     @abstractmethod
     async def list_par_equipe(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
@@ -563,6 +573,17 @@ class EquipeAeronefRepository(ABC):
 class EquipeRepository(ABC):
     """Référentiel unique des équipes (ADR-018). Aucune méthode de suppression : la
     sortie du référentiel est `actif=false`."""
+
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[Equipe]:
+        """Pull mobile (#638) : inactives incluses, avec leurs membres."""
+        pass
+
+    @abstractmethod
+    async def list_membres_since(self, since: datetime | None) -> list[MembreEquipe]:
+        """Pull mobile (#638) : membres ajoutés depuis `since` (une ligne de membre
+        est immuable — jamais mise à jour, donc `created_at` suffit comme curseur)."""
+        pass
 
     @abstractmethod
     async def list_all(

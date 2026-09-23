@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 
 from sqlalchemy import (
     TIMESTAMP,
@@ -300,6 +300,11 @@ class EquipeAeronefModel(Base):
     date_debut: Mapped[date] = mapped_column(Date(), nullable=False)
     date_fin: Mapped[date | None] = mapped_column(Date(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    # Curseur du pull incrémental (#638) : clôturer une affectation ne change que
+    # `date_fin`, il faut donc un horodatage rehaussé à chaque écriture.
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     equipe: Mapped["EquipeModel"] = relationship(
         back_populates="affectations_aeronef",

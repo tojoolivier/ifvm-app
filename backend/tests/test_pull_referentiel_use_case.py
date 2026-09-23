@@ -18,6 +18,9 @@ class InstantRepository:
     async def list_since(self, *args):
         return []
 
+    async def list_membres_since(self, *args):
+        return []
+
 
 @pytest.mark.asyncio
 async def test_server_time_is_captured_before_issuing_any_query():
@@ -33,6 +36,10 @@ async def test_server_time_is_captured_before_issuing_any_query():
         code_stade_repository=InstantRepository(),
         campagne_repository=InstantRepository(),
         lieu_aerien_repository=InstantRepository(),
+        site_aerien_repository=InstantRepository(),
+        equipe_unifiee_repository=InstantRepository(),
+        aeronef_repository=InstantRepository(),
+        affectation_aeronef_repository=InstantRepository(),
     )
     result = await use_case.execute(cursors=ReferentielSinceCursors())
 

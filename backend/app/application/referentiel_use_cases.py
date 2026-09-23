@@ -1524,6 +1524,11 @@ class ReferentielSinceCursors:
     codes_stades: datetime | None = None
     campagnes: datetime | None = None
     lieux_aeriens: datetime | None = None
+    sites_aeriens: datetime | None = None
+    equipes: datetime | None = None
+    equipe_membres: datetime | None = None
+    aeronefs: datetime | None = None
+    equipe_aeronefs: datetime | None = None
 
 
 @dataclass
@@ -1537,6 +1542,11 @@ class ReferentielPullResult:
     codes_stades: list[CodeStade]
     campagnes: list[Campagne]
     lieux_aeriens: list[LieuAerien]
+    sites_aeriens: list[SiteAerienne]
+    equipes: list[Equipe]
+    equipe_membres: list[MembreEquipe]
+    aeronefs: list[Aeronef]
+    equipe_aeronefs: list[AffectationAeronef]
     server_time: datetime
 
 
@@ -1552,6 +1562,10 @@ class PullReferentiel:
         code_stade_repository: CodeStadeRepository,
         campagne_repository: CampagneRepository,
         lieu_aerien_repository: LieuAerienRepository,
+        site_aerien_repository: SiteAerienneRepository,
+        equipe_unifiee_repository: EquipeRepository,
+        aeronef_repository: AeronefRepository,
+        affectation_aeronef_repository: EquipeAeronefRepository,
     ):
         self.zone_repository = zone_repository
         self.poste_repository = poste_repository
@@ -1562,6 +1576,10 @@ class PullReferentiel:
         self.code_stade_repository = code_stade_repository
         self.campagne_repository = campagne_repository
         self.lieu_aerien_repository = lieu_aerien_repository
+        self.site_aerien_repository = site_aerien_repository
+        self.equipe_unifiee_repository = equipe_unifiee_repository
+        self.aeronef_repository = aeronef_repository
+        self.affectation_aeronef_repository = affectation_aeronef_repository
 
     async def execute(self, cursors: ReferentielSinceCursors) -> ReferentielPullResult:
         # Capturé avant les requêtes : une entité modifiée pendant leur exécution doit
@@ -1581,6 +1599,15 @@ class PullReferentiel:
             codes_stades=await self.code_stade_repository.list_since(cursors.codes_stades),
             campagnes=await self.campagne_repository.list_since(cursors.campagnes),
             lieux_aeriens=await self.lieu_aerien_repository.list_since(cursors.lieux_aeriens),
+            sites_aeriens=await self.site_aerien_repository.list_since(cursors.sites_aeriens),
+            equipes=await self.equipe_unifiee_repository.list_since(cursors.equipes),
+            equipe_membres=await self.equipe_unifiee_repository.list_membres_since(
+                cursors.equipe_membres
+            ),
+            aeronefs=await self.aeronef_repository.list_since(cursors.aeronefs),
+            equipe_aeronefs=await self.affectation_aeronef_repository.list_since(
+                cursors.equipe_aeronefs
+            ),
             server_time=server_time,
         )
 

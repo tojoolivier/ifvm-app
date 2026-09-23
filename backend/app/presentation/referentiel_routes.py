@@ -176,6 +176,7 @@ from app.presentation.referentiel_schemas import (
     SiteAeriennePositionInstaller,
     SiteAeriennePositionRead,
     SiteAerienneRead,
+    SiteAerienneSyncRead,
     SiteAerienneUpdate,
     SoldePesticideRead,
     StationFixeCreate,
@@ -1623,6 +1624,23 @@ async def list_vols(
     return await ListVols(VolRepositoryImpl(db)).execute(equipe_id=equipe_id)
 
 
+def _site_sync_read(site) -> SiteAerienneSyncRead:
+    p = site.position_active
+    return SiteAerienneSyncRead(
+        id=site.id,
+        parent_site_id=site.parent_site_id,
+        equipe_id=site.equipe_id,
+        numero=site.numero,
+        localite=site.localite,
+        actif=site.actif,
+        latitude=p.latitude if p else None,
+        longitude=p.longitude if p else None,
+        altitude=p.altitude if p else None,
+        date_debut_position=p.date_debut if p else None,
+        updated_at=site.updated_at,
+    )
+
+
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)
 async def pull_referentiel(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -1636,6 +1654,11 @@ async def pull_referentiel(
     since_codes_stades: datetime | None = Query(default=None),
     since_campagnes: datetime | None = Query(default=None),
     since_lieux_aeriens: datetime | None = Query(default=None),
+    since_sites_aeriens: datetime | None = Query(default=None),
+    since_equipes: datetime | None = Query(default=None),
+    since_equipe_membres: datetime | None = Query(default=None),
+    since_aeronefs: datetime | None = Query(default=None),
+    since_equipe_aeronefs: datetime | None = Query(default=None),
 ):
     use_case = PullReferentiel(
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
@@ -1647,6 +1670,10 @@ async def pull_referentiel(
         code_stade_repository=CodeStadeRepositoryImpl(db),
         campagne_repository=CampagneRepositoryImpl(db),
         lieu_aerien_repository=LieuAerienRepositoryImpl(db),
+        site_aerien_repository=SiteAerienneRepositoryImpl(db),
+        equipe_unifiee_repository=EquipeRepositoryImpl(db),
+        aeronef_repository=AeronefRepositoryImpl(db),
+        affectation_aeronef_repository=EquipeAeronefRepositoryImpl(db),
     )
     cursors = ReferentielSinceCursors(
         zones_anti_acridiennes=since_zones_anti_acridiennes,
@@ -1658,6 +1685,11 @@ async def pull_referentiel(
         codes_stades=since_codes_stades,
         campagnes=since_campagnes,
         lieux_aeriens=since_lieux_aeriens,
+        sites_aeriens=since_sites_aeriens,
+        equipes=since_equipes,
+        equipe_membres=since_equipe_membres,
+        aeronefs=since_aeronefs,
+        equipe_aeronefs=since_equipe_aeronefs,
     )
     result = await use_case.execute(cursors=cursors)
 
@@ -1677,4 +1709,12 @@ async def pull_referentiel(
         codes_stades=EntityPull(upserts=result.codes_stades, server_time=result.server_time),
         campagnes=EntityPull(upserts=result.campagnes, server_time=result.server_time),
         lieux_aeriens=EntityPull(upserts=result.lieux_aeriens, server_time=result.server_time),
+        sites_aeriens=EntityPull(
+            upserts=[_site_sync_read(s) for s in result.sites_aeriens],
+            server_time=result.server_time,
+        ),
+        equipes=EntityPull(upserts=result.equipes, server_time=result.server_time),
+        equipe_membres=EntityPull(upserts=result.equipe_membres, server_time=result.server_time),
+        aeronefs=EntityPull(upserts=result.aeronefs, server_time=result.server_time),
+        equipe_aeronefs=EntityPull(upserts=result.equipe_aeronefs, server_time=result.server_time),
     )
