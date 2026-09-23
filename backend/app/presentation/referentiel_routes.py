@@ -9,11 +9,13 @@ from app.application.referentiel_use_cases import (
     AffecterAeronef,
     AjouterMembreEquipe,
     CloturerAffectationAeronef,
+    ConsulterSoldePesticide,
     CreateAeronef,
     CreateCodeStade,
     CreateCulture,
     CreateEquipe,
     CreateLieuAerien,
+    CreateMouvementPesticide,
     CreatePesticide,
     CreatePosteAcridien,
     CreateSiteAerienne,
@@ -84,6 +86,7 @@ from app.domain.referentiel import (
     MembreDejaDansEquipeError,
     NumeroSiteAerienneDejaPrisError,
     PeriodeAffectationInvalideError,
+    PesticideIntrouvableError,
     PositionActiveIntrouvableError,
     PositionDejaActiveError,
     PosteAcridienAvecStationsActivesError,
@@ -92,6 +95,8 @@ from app.domain.referentiel import (
     SiteAerienneEquipeInvalideError,
     SiteAerienneIntrouvableError,
     SiteAerienneParentInvalideError,
+    SiteDestinationIncoherentError,
+    SiteNonPrincipalError,
     StadeInconnuError,
     TypeLieuAerienInvalideError,
     UtilisateurMembreIntrouvableError,
@@ -112,6 +117,7 @@ from app.infrastructure.referentiel_sync_repository import (
     EquipeAeronefRepositoryImpl,
     EquipeRepositoryImpl,
     LieuAerienRepositoryImpl,
+    MouvementPesticideRepositoryImpl,
     PesticideRepositoryImpl,
     SiteAeriennePositionRepositoryImpl,
     SiteAerienneRepositoryImpl,
@@ -142,6 +148,8 @@ from app.presentation.referentiel_schemas import (
     LieuAerienUpdate,
     MembreEquipeCreate,
     MembreEquipeRead,
+    MouvementPesticideCreate,
+    MouvementPesticideRead,
     PesticideCreate,
     PesticideRead,
     PesticideUpdate,
@@ -154,6 +162,7 @@ from app.presentation.referentiel_schemas import (
     SiteAeriennePositionRead,
     SiteAerienneRead,
     SiteAerienneUpdate,
+    SoldePesticideRead,
     StationFixeCreate,
     StationFixeRead,
     StationFixeUpdate,
@@ -1418,6 +1427,59 @@ async def update_pesticide(
     if pesticide is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pesticide non trouvé")
     return pesticide
+
+
+@router.post("/mouvements-pesticide", response_model=MouvementPesticideRead, status_code=201)
+async def create_mouvement_pesticide(
+    body: MouvementPesticideCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateMouvementPesticide(
+        MouvementPesticideRepositoryImpl(db),
+        SiteAerienneRepositoryImpl(db),
+        PesticideRepositoryImpl(db),
+    )
+    try:
+        return await use_case.execute(
+            type=body.type,
+            pesticide_id=body.pesticide_id,
+            site_id=body.site_id,
+            quantite=body.quantite,
+            unite=body.unite,
+            site_destination_id=body.site_destination_id,
+            date_mouvement=body.date_mouvement,
+        )
+    except SiteDestinationIncoherentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except SiteNonPrincipalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"le stock de pesticides est rattaché au site aérien principal : "
+            f"{exc.args[0]} n'en est pas un",
+        ) from exc
+    except SiteAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"site introuvable : {exc.args[0]}"
+        ) from exc
+    except PesticideIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"pesticide_id introuvable : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/stock-pesticide/solde", response_model=list[SoldePesticideRead])
+async def get_solde_pesticide(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    site_id: uuid.UUID | None = Query(default=None),
+    pesticide_id: uuid.UUID | None = Query(default=None),
+):
+    use_case = ConsulterSoldePesticide(MouvementPesticideRepositoryImpl(db))
+    return await use_case.execute(site_id=site_id, pesticide_id=pesticide_id)
 
 
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)

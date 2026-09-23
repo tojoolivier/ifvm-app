@@ -508,6 +508,60 @@ class PesticideModel(Base):
     )
 
 
+class MouvementPesticideModel(Base):
+    """Mouvement de stock de pesticide au niveau d'un site aérien principal (#606).
+
+    Pas de colonne « stock actuel » dénormalisée : le solde par (site, pesticide,
+    unité) se calcule par agrégation de ces mouvements (source de vérité unique,
+    décision actée). `site_id`/`site_destination_id` référencent `site_aerienne`
+    sans distinguer principal/secondaire en base (même table depuis la migration
+    0086, #604) — le garde-fou « stock rattaché au principal » est validé côté
+    application (`SiteNonPrincipalError`), pas exprimable en CHECK SQL sans
+    jointure.
+    """
+
+    __tablename__ = "mouvement_pesticide"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    type: Mapped[str] = mapped_column(Text(), nullable=False)
+    pesticide_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("pesticide.id", ondelete="RESTRICT"), nullable=False
+    )
+    site_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=False
+    )
+    # Renseigné si et seulement si `type = 'transfert'`
+    # (ck_mouvement_pesticide_destination_coherente).
+    site_destination_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
+    quantite: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    # Même vocabulaire que `traitement_rotation.unite` (ck_traitement_rotation_unite) —
+    # une quantité en L ne s'additionne jamais à une quantité en kg.
+    unite: Mapped[str] = mapped_column(String(2), nullable=False)
+    date_mouvement: Mapped[date] = mapped_column(Date(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('approvisionnement', 'transfert', 'consommation')",
+            name="ck_mouvement_pesticide_type",
+        ),
+        CheckConstraint(
+            "unite IN ('L', 'kg')",
+            name="ck_mouvement_pesticide_unite",
+        ),
+        CheckConstraint(
+            "(type = 'transfert' AND site_destination_id IS NOT NULL) OR "
+            "(type != 'transfert' AND site_destination_id IS NULL)",
+            name="ck_mouvement_pesticide_destination_coherente",
+        ),
+        Index("ix_mouvement_pesticide_site_id", "site_id"),
+        Index("ix_mouvement_pesticide_site_destination_id", "site_destination_id"),
+        Index("ix_mouvement_pesticide_pesticide_id", "pesticide_id"),
+    )
+
+
 class CultureModel(Base):
     __tablename__ = "culture"
 

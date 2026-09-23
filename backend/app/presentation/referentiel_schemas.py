@@ -225,6 +225,49 @@ class PesticideSyncRead(BaseModel):
     updated_at: datetime
 
 
+class MouvementPesticideCreate(BaseModel):
+    """`site_destination_id` requis si et seulement si `type == 'transfert'` — même
+    règle que le CHECK `ck_mouvement_pesticide_destination_coherente` (#606), vérifiée
+    ici en amont pour un 422 lisible plutôt qu'une violation de contrainte brute."""
+
+    type: Literal["approvisionnement", "transfert", "consommation"]
+    pesticide_id: uuid.UUID
+    site_id: uuid.UUID
+    site_destination_id: uuid.UUID | None = None
+    quantite: float = Field(gt=0)
+    unite: Literal["L", "kg"]
+    date_mouvement: date | None = None
+
+    @model_validator(mode="after")
+    def _valider_destination_coherente(self) -> "MouvementPesticideCreate":
+        est_transfert = self.type == "transfert"
+        if est_transfert and self.site_destination_id is None:
+            raise ValueError("site_destination_id est requis pour un transfert")
+        if not est_transfert and self.site_destination_id is not None:
+            raise ValueError("site_destination_id ne doit être renseigné que pour un transfert")
+        return self
+
+
+class MouvementPesticideRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    type: str
+    pesticide_id: uuid.UUID
+    site_id: uuid.UUID
+    site_destination_id: uuid.UUID | None
+    quantite: float
+    unite: str
+    date_mouvement: date
+    created_at: datetime
+
+
+class SoldePesticideRead(BaseModel):
+    site_id: uuid.UUID
+    pesticide_id: uuid.UUID
+    unite: str
+    quantite: float
+
+
 class CultureRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

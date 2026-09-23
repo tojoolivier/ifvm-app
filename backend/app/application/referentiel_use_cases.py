@@ -29,8 +29,10 @@ from app.domain.referentiel import (
     GrilleDejaOccupeeError,
     LieuAerien,
     MembreEquipe,
+    MouvementPesticide,
     PeriodeAffectationInvalideError,
     Pesticide,
+    PesticideIntrouvableError,
     PositionActiveIntrouvableError,
     PositionDejaActiveError,
     PosteAcridien,
@@ -42,6 +44,9 @@ from app.domain.referentiel import (
     SiteAerienneIntrouvableError,
     SiteAerienneParentInvalideError,
     SiteAeriennePosition,
+    SiteDestinationIncoherentError,
+    SiteNonPrincipalError,
+    SoldePesticide,
     StadeInconnuError,
     StationFixe,
     TypeLieuAerienInvalideError,
@@ -60,6 +65,7 @@ from app.domain.repositories import (
     EquipeAeronefRepository,
     EquipeRepository,
     LieuAerienRepository,
+    MouvementPesticideRepository,
     PesticideRepository,
     PosteAcridienRepository,
     SiteAeriennePositionRepository,
@@ -1563,3 +1569,86 @@ class PullReferentiel:
             lieux_aeriens=await self.lieu_aerien_repository.list_since(cursors.lieux_aeriens),
             server_time=server_time,
         )
+
+
+async def _exiger_site_principal(
+    repository: SiteAerienneRepository, site_id: uuid.UUID
+) -> SiteAerienne:
+    """Le stock de pesticides est rattaché au site aérien principal (AC #606) : un
+    mouvement visant un site secondaire/stand (`parent_site_id` non nul) est refusé."""
+    site = await repository.get_by_id(site_id)
+    if site is None:
+        raise SiteAerienneIntrouvableError(str(site_id))
+    if site.parent_site_id is not None:
+        raise SiteNonPrincipalError(str(site_id))
+    return site
+
+
+class CreateMouvementPesticide:
+    """Enregistre un approvisionnement, un transfert ou une consommation de
+    pesticide — le solde s'en déduit par agrégation (`ConsulterSoldePesticide`),
+    jamais stocké (#606)."""
+
+    def __init__(
+        self,
+        repository: MouvementPesticideRepository,
+        site_repository: SiteAerienneRepository,
+        pesticide_repository: PesticideRepository,
+    ):
+        self.repository = repository
+        self.site_repository = site_repository
+        self.pesticide_repository = pesticide_repository
+
+    async def execute(
+        self,
+        type: str,
+        pesticide_id: uuid.UUID,
+        site_id: uuid.UUID,
+        quantite: float,
+        unite: str,
+        site_destination_id: uuid.UUID | None = None,
+        date_mouvement: date | None = None,
+    ) -> MouvementPesticide:
+        est_transfert = type == "transfert"
+        if est_transfert and site_destination_id is None:
+            raise SiteDestinationIncoherentError("site_destination_id est requis pour un transfert")
+        if not est_transfert and site_destination_id is not None:
+            raise SiteDestinationIncoherentError(
+                "site_destination_id ne doit être renseigné que pour un transfert"
+            )
+
+        await _exiger_site_principal(self.site_repository, site_id)
+        if est_transfert:
+            await _exiger_site_principal(self.site_repository, site_destination_id)
+
+        if await self.pesticide_repository.get_by_id(pesticide_id) is None:
+            raise PesticideIntrouvableError(str(pesticide_id))
+
+        maintenant = datetime.now(timezone.utc)
+        return await self.repository.create(
+            MouvementPesticide(
+                type=type,
+                pesticide_id=pesticide_id,
+                site_id=site_id,
+                site_destination_id=site_destination_id,
+                quantite=quantite,
+                unite=unite,
+                date_mouvement=date_mouvement or maintenant.date(),
+                created_at=maintenant,
+            )
+        )
+
+
+class ConsulterSoldePesticide:
+    """Solde par (site, pesticide, unité), calculé à la volée à partir des
+    mouvements — pas de colonne dénormalisée (décision actée, #606)."""
+
+    def __init__(self, repository: MouvementPesticideRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+    ) -> list[SoldePesticide]:
+        return await self.repository.solde(site_id=site_id, pesticide_id=pesticide_id)

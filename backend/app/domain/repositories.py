@@ -14,10 +14,12 @@ from app.domain.referentiel import (
     Equipe,
     LieuAerien,
     MembreEquipe,
+    MouvementPesticide,
     Pesticide,
     PosteAcridien,
     SiteAerienne,
     SiteAeriennePosition,
+    SoldePesticide,
     StationFixe,
     UtilisateurEquipe,
     ZoneAntiAcridien,
@@ -630,4 +632,24 @@ class CodeStadeRepository(ABC):
         espece: str | None,
     ) -> uuid.UUID | None:
         """Identifiant de la place occupant déjà cette grille, `None` si elle est libre."""
+        pass
+
+
+class MouvementPesticideRepository(ABC):
+    """Aucune mise à jour ni suppression : un mouvement, une fois enregistré, est
+    définitif (#606) — corriger une saisie passe par un mouvement compensatoire,
+    pas par une modification de l'historique."""
+
+    @abstractmethod
+    async def create(self, mouvement: MouvementPesticide) -> MouvementPesticide:
+        pass
+
+    @abstractmethod
+    async def solde(
+        self,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+    ) -> list[SoldePesticide]:
+        """Solde agrégé par (site, pesticide, unité), calculé à la volée — pas de
+        colonne dénormalisée (décision actée, #606)."""
         pass

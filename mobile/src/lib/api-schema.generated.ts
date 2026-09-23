@@ -681,6 +681,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mouvements-pesticide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Mouvement Pesticide */
+        post: operations["create_mouvement_pesticide_mouvements_pesticide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock-pesticide/solde": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Solde Pesticide */
+        get: operations["get_solde_pesticide_stock_pesticide_solde_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/referentiel/pull": {
         parameters: {
             query?: never;
@@ -2186,6 +2220,76 @@ export interface components {
          */
         ModeTraitement: "TOTAL" | "BARRIERE" | "IRREGULIER";
         /**
+         * MouvementPesticideCreate
+         * @description `site_destination_id` requis si et seulement si `type == 'transfert'` — même
+         *     règle que le CHECK `ck_mouvement_pesticide_destination_coherente` (#606), vérifiée
+         *     ici en amont pour un 422 lisible plutôt qu'une violation de contrainte brute.
+         */
+        MouvementPesticideCreate: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "approvisionnement" | "transfert" | "consommation";
+            /**
+             * Pesticide Id
+             * Format: uuid
+             */
+            pesticide_id: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Site Destination Id */
+            site_destination_id?: string | null;
+            /** Quantite */
+            quantite: number;
+            /**
+             * Unite
+             * @enum {string}
+             */
+            unite: "L" | "kg";
+            /** Date Mouvement */
+            date_mouvement?: string | null;
+        };
+        /** MouvementPesticideRead */
+        MouvementPesticideRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Type */
+            type: string;
+            /**
+             * Pesticide Id
+             * Format: uuid
+             */
+            pesticide_id: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Site Destination Id */
+            site_destination_id: string | null;
+            /** Quantite */
+            quantite: number;
+            /** Unite */
+            unite: string;
+            /**
+             * Date Mouvement
+             * Format: date
+             */
+            date_mouvement: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
          * NiveauPopulation
          * @description Accouplement/Ponte — réduit à 3 niveaux communs LMC/NSE (migration 0059,
          *     remplace les 5/4 niveaux d'origine issus du PDF papier).
@@ -3390,6 +3494,23 @@ export interface components {
             equipe_id?: string | null;
             /** Actif */
             actif?: boolean | null;
+        };
+        /** SoldePesticideRead */
+        SoldePesticideRead: {
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /**
+             * Pesticide Id
+             * Format: uuid
+             */
+            pesticide_id: string;
+            /** Unite */
+            unite: string;
+            /** Quantite */
+            quantite: number;
         };
         /**
          * StadeDominant
@@ -6402,6 +6523,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PesticideRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_mouvement_pesticide_mouvements_pesticide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MouvementPesticideCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MouvementPesticideRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_solde_pesticide_stock_pesticide_solde_get: {
+        parameters: {
+            query?: {
+                site_id?: string | null;
+                pesticide_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoldePesticideRead"][];
                 };
             };
             /** @description Validation Error */

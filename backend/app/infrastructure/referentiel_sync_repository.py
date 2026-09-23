@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -22,6 +22,7 @@ from app.domain.referentiel import (
     LieuAerien,
     MembreDejaDansEquipeError,
     MembreEquipe,
+    MouvementPesticide,
     NumeroSiteAerienneDejaPrisError,
     PeriodeAffectationInvalideError,
     Pesticide,
@@ -30,6 +31,7 @@ from app.domain.referentiel import (
     SiteAerienne,
     SiteAerienneEquipeInvalideError,
     SiteAeriennePosition,
+    SoldePesticide,
     UtilisateurEquipe,
 )
 from app.domain.repositories import (
@@ -39,6 +41,7 @@ from app.domain.repositories import (
     EquipeAeronefRepository,
     EquipeRepository,
     LieuAerienRepository,
+    MouvementPesticideRepository,
     PesticideRepository,
     SiteAeriennePositionRepository,
     SiteAerienneRepository,
@@ -52,6 +55,7 @@ from app.infrastructure.referentiel_model import (
     EquipeMembreModel,
     EquipeModel,
     LieuAerienModel,
+    MouvementPesticideModel,
     PesticideModel,
     SiteAerienneModel,
     SiteAeriennePositionModel,
@@ -1014,3 +1018,90 @@ class CodeStadeRepositoryImpl(CodeStadeRepository):
             actif=model.actif,
             updated_at=model.updated_at,
         )
+
+
+class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: MouvementPesticideModel) -> MouvementPesticide:
+        return MouvementPesticide(
+            id=model.id,
+            type=model.type,
+            pesticide_id=model.pesticide_id,
+            site_id=model.site_id,
+            site_destination_id=model.site_destination_id,
+            quantite=float(model.quantite),
+            unite=model.unite,
+            date_mouvement=model.date_mouvement,
+            created_at=model.created_at,
+        )
+
+    async def create(self, mouvement: MouvementPesticide) -> MouvementPesticide:
+        model = MouvementPesticideModel(
+            id=mouvement.id,
+            type=mouvement.type,
+            pesticide_id=mouvement.pesticide_id,
+            site_id=mouvement.site_id,
+            site_destination_id=mouvement.site_destination_id,
+            quantite=mouvement.quantite,
+            unite=mouvement.unite,
+            date_mouvement=mouvement.date_mouvement,
+            created_at=mouvement.created_at,
+        )
+        self.session.add(model)
+        await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def solde(
+        self,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+    ) -> list[SoldePesticide]:
+        """Agrège les mouvements en trois branches signées, unifiées par UNION ALL puis
+        sommées par (site, pesticide, unité) — un `transfert` débite `site_id` et
+        crédite `site_destination_id` dans le même calcul (AC #606)."""
+        m = MouvementPesticideModel
+        entrees = select(
+            m.site_id.label("site_id"),
+            m.pesticide_id.label("pesticide_id"),
+            m.unite.label("unite"),
+            m.quantite.label("delta"),
+        ).where(m.type == "approvisionnement")
+        sorties = select(
+            m.site_id.label("site_id"),
+            m.pesticide_id.label("pesticide_id"),
+            m.unite.label("unite"),
+            (-m.quantite).label("delta"),
+        ).where(m.type.in_(("transfert", "consommation")))
+        credits_transfert = select(
+            m.site_destination_id.label("site_id"),
+            m.pesticide_id.label("pesticide_id"),
+            m.unite.label("unite"),
+            m.quantite.label("delta"),
+        ).where(m.type == "transfert")
+
+        mouvements = union_all(entrees, sorties, credits_transfert).subquery()
+        stmt = select(
+            mouvements.c.site_id,
+            mouvements.c.pesticide_id,
+            mouvements.c.unite,
+            func.sum(mouvements.c.delta).label("quantite"),
+        )
+        if site_id is not None:
+            stmt = stmt.where(mouvements.c.site_id == site_id)
+        if pesticide_id is not None:
+            stmt = stmt.where(mouvements.c.pesticide_id == pesticide_id)
+        stmt = stmt.group_by(mouvements.c.site_id, mouvements.c.pesticide_id, mouvements.c.unite)
+
+        result = await self.session.execute(stmt)
+        return [
+            SoldePesticide(
+                site_id=row.site_id,
+                pesticide_id=row.pesticide_id,
+                unite=row.unite,
+                quantite=float(row.quantite),
+            )
+            for row in result.all()
+        ]

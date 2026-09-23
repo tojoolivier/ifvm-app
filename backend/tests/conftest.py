@@ -363,6 +363,25 @@ async def base_aerienne(db_session: AsyncSession, equipe_aerienne):
 
 
 @pytest_asyncio.fixture
+async def autre_base_aerienne(db_session: AsyncSession, equipe_aerienne_bis):
+    """Second site aérien principal, équipe distincte (`site_aerienne.equipe_id`
+    UNIQUE) — pour les tests de transfert entre deux sites (#606)."""
+    from app.infrastructure.referentiel_model import SiteAerienneModel
+
+    base = SiteAerienneModel(
+        id=uuid.uuid4(),
+        equipe_id=equipe_aerienne_bis.id,
+        numero="BTK01",
+        localite="Betroka",
+        actif=True,
+    )
+    db_session.add(base)
+    await db_session.commit()
+    await db_session.refresh(base)
+    return base
+
+
+@pytest_asyncio.fixture
 async def chef_equipe(db_session: AsyncSession) -> Utilisateur:
     user = Utilisateur(
         id=uuid.uuid4(),

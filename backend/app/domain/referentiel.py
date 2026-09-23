@@ -555,3 +555,65 @@ class EquipeTerrestreIntrouvableError(Exception):
     """`equipe_terrestre_id` ne référence aucune `equipe` de type `terrestre`."""
 
     pass
+
+
+TYPES_MOUVEMENT_PESTICIDE = ("approvisionnement", "transfert", "consommation")
+# Reprend le vocabulaire de `traitement_rotation.unite` (ck_traitement_rotation_unite) —
+# une quantité de pesticide ne se compte jamais en un nombre unique (#606).
+UNITES_MOUVEMENT_PESTICIDE = ("L", "kg")
+
+
+class PesticideIntrouvableError(Exception):
+    """`pesticide_id` ne référence aucun `pesticide` existant."""
+
+    pass
+
+
+class SiteDestinationIncoherentError(Exception):
+    """`site_destination_id` doit être renseigné si et seulement si `type='transfert'`
+    (CHECK `ck_mouvement_pesticide_destination_coherente`) — vérifiée ici en amont pour
+    un message d'erreur explicite plutôt qu'une violation de contrainte brute."""
+
+    pass
+
+
+class SiteNonPrincipalError(Exception):
+    """Le stock de pesticides est rattaché au site aérien **principal** (#606) : un
+    mouvement visant un site secondaire/stand (`parent_site_id IS NOT NULL`) est
+    refusé — pas de garde-fou SQL possible (`site_aerienne.parent_site_id` n'est
+    pas visible depuis `mouvement_pesticide` sans jointure), validée côté
+    application."""
+
+    pass
+
+
+@dataclass
+class MouvementPesticide:
+    """Entrée (`approvisionnement`, origine hors système), sortie (`consommation`) ou
+    déplacement (`transfert`, entre deux sites principaux) de pesticide (#606).
+
+    Pas de colonne « stock actuel » dénormalisée : le solde par (site, pesticide,
+    unité) se calcule par agrégation de ces mouvements, source de vérité unique
+    (décision produit actée, cf. ticket #606)."""
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+    type: str = "approvisionnement"
+    pesticide_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    site_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    # Renseigné si et seulement si `type == 'transfert'`.
+    site_destination_id: uuid.UUID | None = None
+    quantite: float = 0.0
+    unite: str = "L"
+    date_mouvement: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@dataclass
+class SoldePesticide:
+    """Solde agrégé par (site, pesticide, unité) — jamais un nombre unique, une
+    quantité en L ne s'additionne jamais à une quantité en kg (#606)."""
+
+    site_id: uuid.UUID
+    pesticide_id: uuid.UUID
+    unite: str
+    quantite: float
