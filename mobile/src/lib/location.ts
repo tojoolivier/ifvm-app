@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import { PermissionError, PreconditionError } from './errors';
 import { logger } from './logger';
 import { PRECISION_GPS_CIBLE_M, PRECISION_GPS_TIMEOUT_MS } from './gps-precision';
+import { resoudreZoneHorsLigne } from './geo-administratif';
 
 const log = logger.child({ module: 'location' });
 
@@ -144,16 +145,25 @@ export interface AdministrativeArea {
  * Géocodage inverse best-effort : l'API d'Expo renvoie des champs administratifs
  * génériques (region/subregion/city) qui ne correspondent pas exactement au découpage
  * malgache région/district/commune — mapping heuristique, jamais bloquant en cas d'échec.
+ *
+ * `Location.reverseGeocodeAsync` a besoin des services natifs (Google/Apple), donc
+ * typiquement d'un accès réseau — il échoue normalement en brousse malgache hors
+ * couverture. `resoudreZoneHorsLigne` (`./geo-administratif.ts`, jeu de données GeoNames
+ * bundlé) comble alors, champ par champ, ce que le géocodeur natif n'a pas fourni —
+ * jamais l'inverse : le natif reste prioritaire quand il répond, plus précis qu'un
+ * plus-proche-voisin sur un jeu de données figé.
  */
 export async function reverseGeocode(latitude: number, longitude: number): Promise<AdministrativeArea> {
+  let natif: AdministrativeArea = { region: null, district: null, commune: null };
   try {
     const [result] = await Location.reverseGeocodeAsync({ latitude, longitude });
-    if (!result) return { region: null, district: null, commune: null };
-    return {
-      region: result.region ?? null,
-      district: result.subregion ?? null,
-      commune: result.city ?? result.district ?? null,
-    };
+    if (result) {
+      natif = {
+        region: result.region ?? null,
+        district: result.subregion ?? null,
+        commune: result.city ?? result.district ?? null,
+      };
+    }
   } catch (error) {
     // Silence délibéré : le géocodage inverse est un confort, et il échoue
     // normalement hors-ligne. Les coordonnées, elles, sont déjà acquises.
@@ -161,6 +171,16 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
       error,
       'Géocodage inverse indisponible — les coordonnées suffisent, la zone administrative est un confort.'
     );
-    return { region: null, district: null, commune: null };
   }
+
+  if (natif.region && natif.district && natif.commune) return natif;
+
+  const horsLigne = resoudreZoneHorsLigne(latitude, longitude);
+  if (!horsLigne) return natif;
+
+  return {
+    region: natif.region ?? horsLigne.region,
+    district: natif.district ?? horsLigne.district,
+    commune: natif.commune ?? horsLigne.commune,
+  };
 }

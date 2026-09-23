@@ -558,6 +558,9 @@ export default function ProfileScreen() {
           <ThemedText style={styles.footerText}>
             © 2026 CDV_IFVM · {formatVersionBuild(versionApp(), buildNatif())}
           </ThemedText>
+          {/* Attribution obligatoire (licence CC BY 4.0) : zones administratives
+              du géocodage inverse hors ligne, cf. src/lib/geo-administratif.ts */}
+          <ThemedText style={styles.footerText}>Zones administratives : GeoNames.org (CC BY 4.0)</ThemedText>
         </View>
       </ScrollView>
 

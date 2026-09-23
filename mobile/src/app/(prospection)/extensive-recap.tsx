@@ -218,11 +218,7 @@ function buildOperationRows(op: OperationAerienneRow): DetailRow[] {
     // Uniquement pour Divers — jamais affiché pour Convoyage/Prospection.
     ...(op.type_operation === 'divers' ? [{ label: 'Motif', value: op.motif_divers || '—' }] : []),
     { label: 'Début — Heure', value: op.debut_heure || '—' },
-    { label: 'Début — Température', value: op.debut_temperature_c != null ? `${op.debut_temperature_c} °C` : '—' },
-    { label: 'Début — Vent', value: op.debut_vent_ms != null ? `${op.debut_vent_ms} m/s` : '—' },
     { label: 'Fin — Heure', value: op.fin_heure || '—' },
-    { label: 'Fin — Température', value: op.fin_temperature_c != null ? `${op.fin_temperature_c} °C` : '—' },
-    { label: 'Fin — Vent', value: op.fin_vent_ms != null ? `${op.fin_vent_ms} m/s` : '—' },
     { label: 'Total heure de vol', value: formatDuree(op.duree_minutes) },
   ];
 }
