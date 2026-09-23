@@ -2,7 +2,7 @@ import {
   useRequestLogStore,
   RequestLogEntry,
 } from './request-log-store';
-import type { components } from './api-schema.generated';
+import type { components, paths } from './api-schema.generated';
 import { storage } from './storage';
 import { AuthError, NetworkError, isTypedError } from './errors';
 import { logger } from './logger';
@@ -12,6 +12,13 @@ const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
 const log = logger.child({ module: 'api-client' });
+
+/**
+ * Un chemin d'URL n'est accepté que s'il existe dans le contrat OpenAPI
+ * (`paths`) : une route supprimée côté backend casse `tsc` au lieu d'un 404 à
+ * l'exécution (#640, cf. `/bases-aeriennes` retirée par #604).
+ */
+const cheminDuContrat = <P extends keyof paths>(chemin: P): P => chemin;
 
 /**
  * Le statut HTTP, joint à l'erreur typée — ADR-012 décision 2, issue #173.
@@ -1113,56 +1120,32 @@ export const apiClient = {
   },
 
   /**
-   * Référentiels aériens (bases, stands, équipes) —
-   * `numero`/`localite` saisis à la main (pas d'auto-génération côté backend,
-   * cf. CreateBaseAerienne/CreateStandRemplissage), en ligne uniquement : ni
-   * `id` client, ni sync hors-ligne pour ces deux référentiels — même contrat
-   * que le web (ReferentielsPage.tsx), qui les crée de la même façon.
+   * Sites aériens (référentiel unifié, ADR-018 / #604) : un site principal
+   * (`parent_site_id` absent, `equipe_id` requis) ou un site secondaire — base
+   * secondaire ou stand — rattaché à son principal (`parent_site_id`).
+   * `numero`/`localite` saisis à la main, en ligne uniquement. Les coordonnées
+   * ne se saisissent plus à la création : elles vivent dans les positions
+   * datées du site (`/sites-aeriens/{id}/positions`, #643).
    */
-  listBasesAeriennes: async (
+  listSitesAeriens: async (
     token: string,
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['BaseAerienneRead'][]> => {
-    return makeRequest<components['schemas']['BaseAerienneRead'][]>(
-      '/bases-aeriennes',
+  ): Promise<components['schemas']['SiteAerienneRead'][]> => {
+    return makeRequest<components['schemas']['SiteAerienneRead'][]>(
+      cheminDuContrat('/sites-aeriens'),
       { method: 'GET' },
       token,
       onUnauthorized
     );
   },
 
-  createBaseAerienne: async (
+  createSiteAerien: async (
     token: string,
-    body: components['schemas']['BaseAerienneCreate'],
+    body: components['schemas']['SiteAerienneCreate'],
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['BaseAerienneRead']> => {
-    return makeRequest<components['schemas']['BaseAerienneRead']>(
-      '/bases-aeriennes',
-      { method: 'POST', body: JSON.stringify(body) },
-      token,
-      onUnauthorized
-    );
-  },
-
-  listStandsRemplissage: async (
-    token: string,
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['StandRemplissageRead'][]> => {
-    return makeRequest<components['schemas']['StandRemplissageRead'][]>(
-      '/stands-remplissage',
-      { method: 'GET' },
-      token,
-      onUnauthorized
-    );
-  },
-
-  createStandRemplissage: async (
-    token: string,
-    body: components['schemas']['StandRemplissageCreate'],
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['StandRemplissageRead']> => {
-    return makeRequest<components['schemas']['StandRemplissageRead']>(
-      '/stands-remplissage',
+  ): Promise<components['schemas']['SiteAerienneRead']> => {
+    return makeRequest<components['schemas']['SiteAerienneRead']>(
+      cheminDuContrat('/sites-aeriens'),
       { method: 'POST', body: JSON.stringify(body) },
       token,
       onUnauthorized

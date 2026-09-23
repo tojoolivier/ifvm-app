@@ -1,13 +1,12 @@
 /**
  * Écran de gestion des référentiels aériens (#equipe-aerienne) : équipe
- * aérienne, base principale, base secondaire, stand de remplissage.
+ * aérienne, base principale, base secondaire (sites aériens unifiés, #604/#640).
  * Cardinalités : 1 équipe = 1 chef de base = 1 base principale.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ReferentielsAeriensScreen from '@/app/(app)/equipes-aeriennes';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
-import { getCurrentPosition } from '@/lib/location';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
@@ -23,16 +22,10 @@ jest.mock('@/lib/api-client', () => ({
   apiClient: {
     listChefsDeBase: jest.fn(),
     listEquipesAeriennes: jest.fn(),
-    listBasesAeriennes: jest.fn(),
-    listStandsRemplissage: jest.fn(),
+    listSitesAeriens: jest.fn(),
     createEquipeAerienne: jest.fn(),
-    createBaseAerienne: jest.fn(),
-    createStandRemplissage: jest.fn(),
+    createSiteAerien: jest.fn(),
   },
-}));
-
-jest.mock('@/lib/location', () => ({
-  getCurrentPosition: jest.fn(),
 }));
 
 const CHEF = { id: 'chef-1', nom: 'Rabe', prenom: 'Toky', sigle: null };
@@ -42,17 +35,12 @@ describe('ReferentielsAeriensScreen', () => {
     useAuthStore.setState({ token: 'token-test', user: { id: 'chef-1', role: 'chef_de_base' } } as any);
     jest.mocked(apiClient.listChefsDeBase).mockReset().mockResolvedValue([CHEF] as any);
     jest.mocked(apiClient.listEquipesAeriennes).mockReset().mockResolvedValue([]);
-    jest.mocked(apiClient.listBasesAeriennes).mockReset().mockResolvedValue([]);
-    jest.mocked(apiClient.listStandsRemplissage).mockReset().mockResolvedValue([]);
+    jest.mocked(apiClient.listSitesAeriens).mockReset().mockResolvedValue([]);
     jest.mocked(apiClient.createEquipeAerienne).mockReset();
-    jest.mocked(apiClient.createBaseAerienne).mockReset();
-    jest.mocked(apiClient.createStandRemplissage).mockReset();
-    jest.mocked(getCurrentPosition)
-      .mockReset()
-      .mockResolvedValue({ latitude: -22.4, longitude: 46.1, altitude: 700, accuracy: 5, timestamp: 0 } as any);
+    jest.mocked(apiClient.createSiteAerien).mockReset();
   });
 
-  it('crée une équipe, une base principale, une base secondaire puis un stand', async () => {
+  it('crée une équipe, une base principale, une base secondaire', async () => {
     jest.mocked(apiClient.createEquipeAerienne).mockResolvedValue({
       id: 'equipe-1',
       nom: 'Équipe Ihosy',
@@ -60,12 +48,12 @@ describe('ReferentielsAeriensScreen', () => {
       membres: [{ user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' }],
       actif: true,
     } as any);
-    jest.mocked(apiClient.createBaseAerienne)
+    jest.mocked(apiClient.createSiteAerien)
       .mockResolvedValueOnce({
         id: 'base-1',
         numero: 'IHO01',
         localite: 'Ihosy',
-        parent_base_id: null,
+        parent_site_id: null,
         equipe_id: 'equipe-1',
         actif: true,
       } as any)
@@ -73,16 +61,10 @@ describe('ReferentielsAeriensScreen', () => {
         id: 'base-2',
         numero: 'IHO02',
         localite: 'Ihosy Sud',
-        parent_base_id: 'base-1',
+        parent_site_id: 'base-1',
         equipe_id: null,
         actif: true,
       } as any);
-    jest.mocked(apiClient.createStandRemplissage).mockResolvedValue({
-      id: 'stand-1',
-      numero: 'STD01',
-      localite: 'Ihosy',
-      actif: true,
-    } as any);
 
     await render(<ReferentielsAeriensScreen />);
     await screen.findByText('ÉQUIPES AÉRIENNES');
@@ -118,17 +100,13 @@ describe('ReferentielsAeriensScreen', () => {
     await fireEvent.press(screen.getByText('+ Nouvelle base principale'));
     await fireEvent.changeText(screen.getByPlaceholderText('Numéro (ex. IHO01)'), 'IHO01');
     await fireEvent.changeText(screen.getByPlaceholderText('Localité'), 'Ihosy');
-    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalled());
     await fireEvent.press(screen.getAllByText('Équipe Ihosy')[1]);
     await fireEvent.press(screen.getByText('Créer'));
     await waitFor(() =>
-      expect(apiClient.createBaseAerienne).toHaveBeenCalledWith('token-test', {
+      expect(apiClient.createSiteAerien).toHaveBeenCalledWith('token-test', {
         numero: 'IHO01',
         localite: 'Ihosy',
         equipe_id: 'equipe-1',
-        latitude: -22.4,
-        longitude: 46.1,
-        altitude: 700,
       })
     );
     await screen.findByText('IHO01 — Ihosy');
@@ -137,37 +115,16 @@ describe('ReferentielsAeriensScreen', () => {
     await fireEvent.press(screen.getByText('+ Nouvelle base secondaire'));
     await fireEvent.changeText(screen.getByPlaceholderText('Numéro (ex. IHO02)'), 'IHO02');
     await fireEvent.changeText(screen.getByPlaceholderText('Localité'), 'Ihosy Sud');
-    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(2));
     await fireEvent.press(screen.getByText('IHO01'));
     await fireEvent.press(screen.getByText('Créer'));
     await waitFor(() =>
-      expect(apiClient.createBaseAerienne).toHaveBeenCalledWith('token-test', {
+      expect(apiClient.createSiteAerien).toHaveBeenCalledWith('token-test', {
         numero: 'IHO02',
         localite: 'Ihosy Sud',
-        parent_base_id: 'base-1',
-        latitude: -22.4,
-        longitude: 46.1,
-        altitude: 700,
+        parent_site_id: 'base-1',
       })
     );
     await screen.findByText('IHO02 — Ihosy Sud');
-
-    // --- Stand de remplissage ---
-    await fireEvent.press(screen.getByText('+ Nouveau stand de remplissage'));
-    await fireEvent.changeText(screen.getByPlaceholderText('Numéro (ex. STD01)'), 'STD01');
-    await fireEvent.changeText(screen.getByPlaceholderText('Localité'), 'Ihosy');
-    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(3));
-    await fireEvent.press(screen.getByText('Créer'));
-    await waitFor(() =>
-      expect(apiClient.createStandRemplissage).toHaveBeenCalledWith('token-test', {
-        numero: 'STD01',
-        localite: 'Ihosy',
-        latitude: -22.4,
-        longitude: 46.1,
-        altitude: 700,
-      })
-    );
-    await screen.findByText('STD01 — Ihosy');
   });
 
   it('ajoute et retire un membre avant de créer une équipe', async () => {
@@ -222,35 +179,31 @@ describe('ReferentielsAeriensScreen', () => {
 
   // #referentiel-echec-partiel : /equipes-aeriennes non déployé sur un
   // environnement (404) ne doit pas retomber sur le bouton « Charger les
-  // référentiels » indéfiniment alors que les 3 autres référentiels ont bien
+  // référentiels » indéfiniment alors que les autres référentiels ont bien
   // été chargés — chacun d'eux est indépendant, l'écran doit rester utilisable.
-  it('reste utilisable (bases/stands) même si /equipes échoue', async () => {
+  it('reste utilisable (sites aériens) même si /equipes échoue', async () => {
     jest.mocked(apiClient.listEquipesAeriennes).mockRejectedValue(new Error('Not Found'));
-    jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([
+    jest.mocked(apiClient.listSitesAeriens).mockResolvedValue([
       {
         id: 'base-1',
         numero: 'IHO01',
         localite: 'Ihosy',
-        parent_base_id: null,
+        parent_site_id: null,
         equipe_id: 'equipe-1',
         actif: true,
       },
-    ] as any);
-    jest.mocked(apiClient.listStandsRemplissage).mockResolvedValue([
-      { id: 'stand-1', numero: 'STD01', localite: 'Ihosy', actif: true },
     ] as any);
 
     await render(<ReferentielsAeriensScreen />);
 
     await screen.findByText('IHO01 — Ihosy');
-    expect(screen.getByText('STD01 — Ihosy')).toBeTruthy();
     expect(screen.getByText(/équipes aériennes/)).toBeTruthy();
     expect(screen.queryByText('Charger les référentiels ›')).toBeNull();
   });
 
   // Seul le chef de base crée les lieux de SON équipe (le serveur répond 403 sinon) :
   // inutile de proposer des formulaires voués à l'échec aux autres rôles.
-  it("masque la création de bases et de stands à un rôle autre que chef de base", async () => {
+  it("masque la création de bases à un rôle autre que chef de base", async () => {
     useAuthStore.setState({ token: 'token-test', user: { id: 'pilote-1', role: 'pilote' } } as any);
     jest.mocked(apiClient.listEquipesAeriennes).mockResolvedValue([
       {
@@ -261,8 +214,8 @@ describe('ReferentielsAeriensScreen', () => {
         actif: true,
       },
     ] as any);
-    jest.mocked(apiClient.listBasesAeriennes).mockResolvedValue([
-      { id: 'base-1', numero: 'IHO01', localite: 'Ihosy', parent_base_id: null, equipe_id: 'equipe-1', actif: true },
+    jest.mocked(apiClient.listSitesAeriens).mockResolvedValue([
+      { id: 'base-1', numero: 'IHO01', localite: 'Ihosy', parent_site_id: null, equipe_id: 'equipe-1', actif: true },
     ] as any);
 
     await render(<ReferentielsAeriensScreen />);
@@ -270,7 +223,6 @@ describe('ReferentielsAeriensScreen', () => {
     await screen.findByText('IHO01 — Ihosy');
     expect(screen.queryByText('+ Nouvelle base principale')).toBeNull();
     expect(screen.queryByText('+ Nouvelle base secondaire')).toBeNull();
-    expect(screen.queryByText('+ Nouveau stand de remplissage')).toBeNull();
   });
 
   it("affiche l'hélicoptère de chaque équipe", async () => {
