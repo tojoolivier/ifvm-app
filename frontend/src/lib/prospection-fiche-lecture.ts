@@ -103,6 +103,15 @@ export function buildEspecesSynthese(
   })
 }
 
+/** Libellé du comportement d'une infestation (déplacement/repos), « — » si non renseigné. */
+export function comportementInfestationLabel(comportement: string | null): string {
+  return comportement === 'deplacement' ? 'Déplacement' : comportement === 'repos' ? 'Repos' : '—'
+}
+
+export function typeCibleLabel(typeCible: string): string {
+  return TYPE_CIBLE_OPTIONS.find((o) => o.value === typeCible)?.label ?? typeCible
+}
+
 export interface InfestationSyntheseViewModel {
   hasInfestation: boolean
   typeLabel: string
@@ -118,10 +127,9 @@ export function buildInfestationSynthese(infestations: InfestationRead[]): Infes
   }
   return {
     hasInfestation: true,
-    typeLabel: TYPE_CIBLE_OPTIONS.find((o) => o.value === infestation.type_cible)?.label ?? infestation.type_cible,
+    typeLabel: typeCibleLabel(infestation.type_cible),
     surfaceTotale: infestation.surface_totale,
-    comportementLabel:
-      infestation.comportement === 'deplacement' ? 'Déplacement' : infestation.comportement === 'repos' ? 'Repos' : '—',
+    comportementLabel: comportementInfestationLabel(infestation.comportement),
   }
 }
 

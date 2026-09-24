@@ -286,6 +286,10 @@ class TraitementRepositoryImpl(TraitementRepository):
                 traitement_origine_id=traitement.aerien.traitement_origine_id,
                 surface_cumulee_ha=traitement.aerien.surface_cumulee_ha,
                 surface_restante_ha=traitement.aerien.surface_restante_ha,
+                surface_restante_abandonnee=traitement.aerien.surface_restante_abandonnee,
+                motif_surface_restante_abandonnee=(
+                    traitement.aerien.motif_surface_restante_abandonnee
+                ),
                 taux_mortalite_pourcent=traitement.aerien.taux_mortalite_pourcent,
                 evaluation_efficacite_heures_apres=(
                     traitement.aerien.evaluation_efficacite_heures_apres
@@ -707,6 +711,10 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.surface_traitee_ha = traitement.aerien.surface_traitee_ha
             model.aerien.surface_protegee_ha = traitement.aerien.surface_protegee_ha
             model.aerien.surface_restante_ha = traitement.aerien.surface_restante_ha
+            model.aerien.surface_restante_abandonnee = traitement.aerien.surface_restante_abandonnee
+            model.aerien.motif_surface_restante_abandonnee = (
+                traitement.aerien.motif_surface_restante_abandonnee
+            )
             model.aerien.taux_mortalite_pourcent = traitement.aerien.taux_mortalite_pourcent
             model.aerien.evaluation_efficacite_heures_apres = (
                 traitement.aerien.evaluation_efficacite_heures_apres
@@ -954,6 +962,8 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_restante_ha=float(model.aerien.surface_restante_ha)
                 if model.aerien.surface_restante_ha is not None
                 else None,
+                surface_restante_abandonnee=model.aerien.surface_restante_abandonnee,
+                motif_surface_restante_abandonnee=model.aerien.motif_surface_restante_abandonnee,
                 taux_mortalite_pourcent=float(model.aerien.taux_mortalite_pourcent)
                 if model.aerien.taux_mortalite_pourcent is not None
                 else None,

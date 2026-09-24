@@ -240,6 +240,9 @@ class TraitementAerienModel(Base):
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     # pesticide_recu_l/pesticide_stock_restant_l supprimées (migration 0094, #609) :
     # le stock vit désormais dans `mouvement_pesticide` (#606), pas par fiche.
+    # Surface restante abandonnée ? (migration 0097) — mirroir de TraitementTerrestreModel.
+    surface_restante_abandonnee: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    motif_surface_restante_abandonnee: Mapped[str | None] = mapped_column(Text(), nullable=True)
     # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
     # seule évaluation par fiche (après l'ensemble des rotations), pas par
     # rotation individuelle — même patron que TraitementTerrestreModel ci-dessous.

@@ -134,6 +134,9 @@ export interface TraitementAerien {
   surface_restante_ha: number | null;
   // pesticide_recu_l/pesticide_stock_restant_l supprimés (#609) : le stock aérien
   // vit désormais dans `mouvement_pesticide` (#606).
+  // Surface restante abandonnée ? (migration backend 0097) — mirroir du Terrestre.
+  surface_restante_abandonnee: boolean | null;
+  motif_surface_restante_abandonnee: string | null;
   // Efficacité (migration backend 0058) : une seule évaluation par fiche
   // (après l'ensemble des rotations), pas par rotation individuelle — même
   // patron que TraitementTerrestre ci-dessous.
@@ -363,6 +366,31 @@ function normalizeTraitementRow(row: DraftTraitementRow): DraftTraitementRow {
 // CRÉATION
 // ==========================================
 
+/**
+ * #traitement-brouillon-distinct-fiche-creee : `statut_sync = 'brouillon'` — fiche
+ * encore en cours de saisie, jamais enregistrée (bouton « Enregistrer » du
+ * récapitulatif). Elle n'est PAS dans la file de synchronisation (ni « À synchro »,
+ * ni compteur, ni envoi automatique) ; `marquerTraitementEnregistre` la fait passer à
+ * `'local'` — fiche créée, en attente d'envoi. Même principe que `statut = 'brouillon'`
+ * côté prospection, mais porté par `statut_sync` car le `statut` d'un traitement
+ * ('brouillon' → 'validee') est celui du serveur et reste 'brouillon' jusqu'au premier
+ * envoi réussi. Les fiches créées avant ce changement restent 'local' (inchangées).
+ */
+export const STATUT_SYNC_BROUILLON = 'brouillon';
+
+/**
+ * Appelée par « Enregistrer » (recap.tsx), AVANT toute tentative d'envoi — hors ligne
+ * comprise : une fiche enregistrée sans réseau doit déjà compter comme « à synchro ».
+ * Sans effet sur une fiche déjà enregistrée/envoyée (`WHERE statut_sync = 'brouillon'`).
+ */
+export async function marquerTraitementEnregistre(id: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE traitement SET statut_sync = 'local', updated_at = ? WHERE id = ? AND statut_sync = 'brouillon'`,
+    [new Date().toISOString(), id]
+  );
+}
+
 export async function createDraftTraitementAerien(
   input: DraftTraitementAerienInput
 ): Promise<DraftTraitement> {
@@ -373,7 +401,7 @@ export async function createDraftTraitementAerien(
     `INSERT INTO traitement (
       id, prospection_id, equipe_id, type_traitement, date_traitement,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, 'AERIEN', ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, 'AERIEN', ?, 'brouillon', 'brouillon', ?, ?)`,
     [input.id, input.prospectionId, input.equipeId ?? null, input.dateTraitement ?? null, now, now]
   );
 
@@ -411,7 +439,7 @@ export async function createDraftTraitementTerrestre(
     `INSERT INTO traitement (
       id, prospection_id, equipe_id, type_traitement, date_traitement,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, 'TERRESTRE', ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, 'TERRESTRE', ?, 'brouillon', 'brouillon', ?, ?)`,
     [input.id, input.prospectionId, input.equipeId ?? null, input.dateTraitement ?? null, now, now]
   );
 
@@ -599,6 +627,27 @@ export async function updateTraitementAerien(
     throw new Error('Échec de la mise à jour de la fiche brouillon locale');
   }
   return updated;
+}
+
+/**
+ * Surface restante abandonnée ? (migration backend 0097) — décision de l'agent
+ * sur l'écran « Pesticides & rotations » (rotations.tsx), mirroir du Terrestre.
+ * Le motif n'a de sens que pour un abandon : remis à NULL sinon (même invariant
+ * que la CHECK `ck_traitement_aerien_motif_abandon` côté serveur).
+ */
+export async function updateTraitementAerienSurfaceRestante(
+  traitementId: string,
+  input: { abandonnee: boolean | null | undefined; motif: string | null | undefined }
+): Promise<void> {
+  const db = await getDb();
+  const abandonnee = input.abandonnee ?? null;
+  await db.runAsync(
+    `UPDATE traitement_aerien SET
+      surface_restante_abandonnee = ?,
+      motif_surface_restante_abandonnee = ?
+     WHERE traitement_id = ?`,
+    [abandonnee === null ? null : abandonnee ? 1 : 0, abandonnee ? input.motif ?? null : null, traitementId]
+  );
 }
 
 /**
@@ -1478,7 +1527,7 @@ export async function countUnsyncedTraitements(): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count
      FROM traitement
-     WHERE statut_sync != 'synced'`
+     WHERE statut_sync NOT IN ('synced', 'brouillon')`
   );
 
   return row?.count ?? 0;
@@ -1524,11 +1573,14 @@ export async function listToutesTraitementsLocal(): Promise<DraftTraitementRow[]
  * partielle.
  *
  * #traitement-aerien-brouillon-incomplet-bloque-synchro : `statut_sync =
- * 'local'` est posé dès la création de la fiche (createDraftTraitementAerien/
+ * 'local'` était posé dès la création de la fiche (createDraftTraitementAerien/
  * Terrestre), bien avant que l'écran Équipe & Références n'ait renseigné les
  * champs obligatoires côté backend. Une fiche fraîchement créée (ou abandonnée
  * en cours de route) était donc déjà éligible à l'envoi, et échouait à coup
- * sûr avec les messages Pydantic par défaut (anglais, illisibles). On
+ * sûr avec les messages Pydantic par défaut (anglais, illisibles). Depuis
+ * #traitement-brouillon-distinct-fiche-creee, une fiche neuve naît en
+ * `'brouillon'` (hors file) et ne passe à `'local'` qu'à « Enregistrer » ; les
+ * fiches plus anciennes restent `'local'`, d'où ce filtre qui subsiste. On
  * n'inclut plus dans la file qu'une fiche déjà prête pour son type
  * (`estAerienPretPourSynchro`/`estTerrestrePretPourSynchro`) — elle y entrera
  * dès que l'agent aura complété cet écran, sans qu'aucune action de sa part

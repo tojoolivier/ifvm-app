@@ -44,6 +44,8 @@ const IFVM_BG_LIGHT = '#FAF7EF';
 const CARD_BG = '#FFFFFF';
 const IFVM_AMBER = '#8A6D2F';
 const IFVM_AMBER_BG = '#FDF6E7';
+const IFVM_BROUILLON = '#6B7280';
+const IFVM_BROUILLON_BG = '#F3F4F6';
 const HEADER_BG = '#235A36';
 const TEXT_DARK = '#16201A';
 const TEXT_SECONDARY = '#6F6A59';
@@ -73,6 +75,10 @@ interface ActiviteItem {
   titre: string;
   sousTitre: string;
   synced: boolean;
+  /** #brouillon-prospection-hors-a-synchro : une prospection encore en cours de saisie
+   * (`statut = 'brouillon'`) n'est jamais « à synchro » — elle ne devient une fiche
+   * envoyable qu'une fois tout le parcours validé (`completeProspection`). */
+  brouillon: boolean;
   updatedAt: string;
 }
 
@@ -82,6 +88,7 @@ function prospectionVersActivite(fiche: DraftProspection): ActiviteItem {
     titre: stationLabel(fiche),
     sousTitre: `N°${fiche.n_fiche ?? '—'} · ${fiche.date_prospection}`,
     synced: fiche.statut_sync === 'synced',
+    brouillon: fiche.statut === 'brouillon',
     updatedAt: fiche.updated_at,
   };
 }
@@ -92,6 +99,8 @@ function traitementVersActivite(fiche: DraftTraitementRow): ActiviteItem {
     titre: fiche.localite || 'Localité non spécifiée',
     sousTitre: `N°${fiche.numero_fiche ?? '—'} · ${fiche.date_traitement ?? '—'}`,
     synced: fiche.statut_sync === 'synced',
+    // #traitement-brouillon-distinct-fiche-creee : jamais enregistrée = brouillon.
+    brouillon: fiche.statut_sync === 'brouillon',
     updatedAt: fiche.updated_at,
   };
 }
@@ -435,13 +444,22 @@ export default function DashboardScreen() {
                 <View
                   style={[
                     styles.statusBadge,
-                    { backgroundColor: item.synced ? IFVM_GREEN_BG : IFVM_AMBER_BG },
+                    {
+                      backgroundColor: item.brouillon
+                        ? IFVM_BROUILLON_BG
+                        : item.synced
+                          ? IFVM_GREEN_BG
+                          : IFVM_AMBER_BG,
+                    },
                   ]}
                 >
                   <ThemedText
-                    style={[styles.statusBadgeText, { color: item.synced ? IFVM_GREEN : IFVM_AMBER }]}
+                    style={[
+                      styles.statusBadgeText,
+                      { color: item.brouillon ? IFVM_BROUILLON : item.synced ? IFVM_GREEN : IFVM_AMBER },
+                    ]}
                   >
-                    {item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
+                    {item.brouillon ? 'BROUILLON' : item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
                   </ThemedText>
                 </View>
               </TouchableOpacity>

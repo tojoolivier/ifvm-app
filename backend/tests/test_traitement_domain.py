@@ -2027,6 +2027,36 @@ def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok():
     assert traitement.statut == "validee"
 
 
+def test_valider_aerien_surface_restante_abandonnee_sans_motif_bloque():
+    traitement = _traitement_aerien_valide()
+    traitement.aerien.surface_restante_abandonnee = True
+    traitement.aerien.motif_surface_restante_abandonnee = None
+    with pytest.raises(MotifAbandonManquantError):
+        traitement.valider(
+            date(2026, 8, 12),
+            [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        )
+
+
+def test_valider_aerien_surface_restante_abandonnee_avec_motif_ok():
+    traitement = _traitement_aerien_valide()
+    traitement.aerien.surface_restante_abandonnee = True
+    traitement.aerien.motif_surface_restante_abandonnee = "Zone inaccessible (crue)"
+    traitement.valider(
+        date(2026, 8, 12),
+        [
+            {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+            {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+            {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+        ],
+    )
+    assert traitement.statut == "validee"
+
+
 def test_valider_role_signature_invalide_pour_type_traitement():
     traitement = _traitement_terrestre_valide()
     with pytest.raises(ValueError):

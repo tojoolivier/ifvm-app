@@ -6,7 +6,9 @@
  * « Moyens & protection », avant le sous-titre "Kit de protection" (déjà
  * existant : Combinaison/Gants/Lunettes/Masques/Bottes). Communs à l'Aérien
  * et au Terrestre — comblent des cases du gabarit PDF jamais alimentées
- * jusqu'ici (issue #495).
+ * jusqu'ici (issue #495). La sous-section « Matériels » a ensuite été retirée du
+ * flux Aérien (décision produit) : « Humains » reste commune, « Matériels » ne
+ * concerne plus que le Terrestre.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MoyensScreen from '@/app/(traitement)/moyens';
@@ -64,7 +66,7 @@ beforeEach(() => {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
-describe.each([['TERRESTRE'], ['AERIEN']])('MoyensScreen (%s) — Humains/Matériels', (type) => {
+describe.each([['TERRESTRE']])('MoyensScreen (%s) — Humains/Matériels', (type) => {
   it('affiche "Humains" et "Matériels" avant "Kit de protection"', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue(draft({ type_traitement: type }));
 
@@ -75,11 +77,15 @@ describe.each([['TERRESTRE'], ['AERIEN']])('MoyensScreen (%s) — Humains/Matér
     expect(screen.getByText('Nb agents temporaires')).toBeVisible();
     expect(screen.getByText('Nb personnel local')).toBeVisible();
     expect(screen.getByText('Matériels')).toBeVisible();
-    expect(screen.getByText('Atomiseur')).toBeVisible();
+    // Renommés (#renomme-materiels-atomiseur) : « Atomiseur » → « Nb Atomiseur à dos »,
+    // « Ulvamast » → « Nb Atomiseur autoporté » (mêmes colonnes, simple libellé).
+    expect(screen.getByText('Nb Atomiseur à dos')).toBeVisible();
+    expect(screen.queryByText('Atomiseur')).toBeNull();
     expect(screen.getByText('Essence (litres)')).toBeVisible();
     expect(screen.getByText('Disque rotatif')).toBeVisible();
     expect(screen.getByText('Nombre de piles')).toBeVisible();
-    expect(screen.getByText('Ulvamast')).toBeVisible();
+    expect(screen.getByText('Nb Atomiseur autoporté')).toBeVisible();
+    expect(screen.queryByText('Ulvamast')).toBeNull();
     expect(screen.getByText('Kit de protection')).toBeVisible();
 
     const rendered = JSON.stringify(screen.toJSON());
@@ -153,5 +159,41 @@ describe.each([['TERRESTRE'], ['AERIEN']])('MoyensScreen (%s) — Humains/Matér
     expect(screen.getByDisplayValue('11')).toBeVisible();
     expect(screen.getByDisplayValue('12')).toBeVisible();
     expect(screen.getByDisplayValue('9')).toBeVisible();
+  });
+});
+
+describe('MoyensScreen (AERIEN) — Matériels retirés, Humains conservés', () => {
+  it('affiche "Humains" et "Kit de protection" mais plus "Matériels"', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue(draft({ type_traitement: 'AERIEN' }));
+
+    await render(<MoyensScreen />);
+    await screen.findByText('Humains');
+
+    expect(screen.getByText('Nb agents permanents')).toBeVisible();
+    expect(screen.getByText('Kit de protection')).toBeVisible();
+    expect(screen.queryByText('Matériels')).toBeNull();
+    expect(screen.queryByText('Nb Atomiseur à dos')).toBeNull();
+    expect(screen.queryByText('Essence (litres)')).toBeNull();
+    expect(screen.queryByText('Disque rotatif')).toBeNull();
+    expect(screen.queryByText('Nombre de piles')).toBeNull();
+    expect(screen.queryByText('Nb Atomiseur autoporté')).toBeNull();
+  });
+
+  it("réécrit telles quelles les valeurs de matériels déjà enregistrées (rien n'est perdu)", async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue(
+      draft({ type_traitement: 'AERIEN', moyens_atomiseur_nb: 3, moyens_essence_litres: 50.5 })
+    );
+
+    await render(<MoyensScreen />);
+    await screen.findByText('Humains');
+    await settle();
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementMoyens).toHaveBeenCalledWith(
+        'trait-1',
+        expect.objectContaining({ moyens_atomiseur_nb: 3, moyens_essence_litres: 50.5 })
+      )
+    );
   });
 });

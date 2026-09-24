@@ -24,6 +24,7 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
+  updateTraitementAerienSurfaceRestante: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
@@ -55,6 +56,7 @@ beforeEach(() => {
     type_traitement: 'AERIEN',
     cible: { surface_infestee_ha: 100 },
     aerien: {
+      surface_restante_abandonnee: false,
       taux_mortalite_pourcent: null,
       evaluation_efficacite_heures_apres: null,
       methode_evaluation_efficacite: null,

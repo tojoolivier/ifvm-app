@@ -154,6 +154,11 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         // côté serveur, plus un champ accepté par TraitementSyncPush.
         // pesticide_recu_l supprimé (#609) : le stock aérien vit désormais dans
         // `mouvement_pesticide` (#606), plus un champ de `TraitementAerienCreate`.
+        // Surface restante abandonnée ? (migration backend 0097) — SQLite stocke
+        // 0/1, l'API attend un booléen (même conversion que le Terrestre).
+        surface_restante_abandonnee:
+          draft.aerien.surface_restante_abandonnee == null ? null : !!draft.aerien.surface_restante_abandonnee,
+        motif_surface_restante_abandonnee: draft.aerien.motif_surface_restante_abandonnee,
         // Efficacité (migration backend 0058) — une seule évaluation par
         // fiche, après l'ensemble des rotations.
         taux_mortalite_pourcent: draft.aerien.taux_mortalite_pourcent,

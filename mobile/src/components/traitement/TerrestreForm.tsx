@@ -2,7 +2,12 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { UtilisateurEquipe, Pesticide } from '@/lib/referentiel-db';
 import { ProduitDraft, useTraitementCaptureStore } from '@/lib/traitement-capture-store';
-import { computePesticideConsommeSuggere, deriveNomCommercial } from '@/lib/traitement-validation';
+import {
+  computePesticideConsommeSuggere,
+  deriveNomCommercial,
+  messageTemperatureTropElevee,
+  messageVentTropFort,
+} from '@/lib/traitement-validation';
 import { generateId } from '@/lib/id';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
@@ -32,6 +37,7 @@ type TerrestreDecimalField =
   | 'vitesse_vent_ms'
   | 'temperature_c'
   | 'surface_atomiseur_ha'
+  | 'surface_atomiseur_autoporte_ha'
   | 'surface_disque_rotatif_ha'
   | 'taux_mortalite_pourcent'
   | 'evaluation_efficacite_heures_apres'
@@ -233,6 +239,11 @@ export function TerrestreForm({
         onChangeText={(v) => handleDecimalChange('vitesse_vent_ms', v)}
         onBlur={() => clearDecimalDraft('vitesse_vent_ms')}
       />
+      {/* #alerte-meteo-vent-temperature : avertissement en direct dès que la valeur
+          dépasse le seuil ; « Continuer » reste refusé tant qu'elle n'est pas corrigée. */}
+      {(messageVentTropFort(store.terrestre.vitesse_vent_ms) ?? errors.vitesseVentMs) && (
+        <Text style={styles.error}>{messageVentTropFort(store.terrestre.vitesse_vent_ms) ?? errors.vitesseVentMs}</Text>
+      )}
       <Text style={styles.label}>Température (°C) *</Text>
       <TextInput
         editable={!readOnly}
@@ -243,6 +254,11 @@ export function TerrestreForm({
         onChangeText={(v) => handleDecimalChange('temperature_c', v)}
         onBlur={() => clearDecimalDraft('temperature_c')}
       />
+      {(messageTemperatureTropElevee(store.terrestre.temperature_c) ?? errors.temperatureC) && (
+        <Text style={styles.error}>
+          {messageTemperatureTropElevee(store.terrestre.temperature_c) ?? errors.temperatureC}
+        </Text>
+      )}
       <Text style={styles.label}>Direction du vent</Text>
       <View style={styles.chipRow}>
         {DIRECTIONS_VENT.map((d) => (
@@ -266,6 +282,19 @@ export function TerrestreForm({
         onChangeText={(v) => handleDecimalChange('surface_atomiseur_ha', v)}
         onBlur={() => clearDecimalDraft('surface_atomiseur_ha')}
       />
+      <Text style={styles.label}>Atomiseur autoporté</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        value={
+          getDecimalDraft('surface_atomiseur_autoporte_ha') ??
+          formatDecimalDisplay(store.terrestre.surface_atomiseur_autoporte_ha)
+        }
+        onChangeText={(v) => handleDecimalChange('surface_atomiseur_autoporte_ha', v)}
+        onBlur={() => clearDecimalDraft('surface_atomiseur_autoporte_ha')}
+      />
       <Text style={styles.label}>Disque rotatif</Text>
       <TextInput
         editable={!readOnly}
@@ -279,6 +308,11 @@ export function TerrestreForm({
 
       <Card variant="derivee">
         <Text style={styles.label}>Traitée (ha)</Text>
+        <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
+      </Card>
+      {/* #surface-traitee-et-protegee : toujours égale à « Traitée (ha) », en lecture seule. */}
+      <Card variant="derivee">
+        <Text style={styles.label}>Surface traitée et protégée (ha)</Text>
         <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
       </Card>
       <Card variant="derivee">

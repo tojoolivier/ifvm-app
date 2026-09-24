@@ -26,6 +26,7 @@ import {
   clearSignatureLocal,
   countUnsyncedTraitements,
   deleteDraftTraitement,
+  marquerTraitementEnregistre,
 } from '../src/lib/traitement-repository';
 
 const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
@@ -152,6 +153,19 @@ describe('createDraftTraitementAerien', () => {
       expect.stringMatching(/INSERT INTO traitement \([\s\S]*equipe_id/),
       expect.arrayContaining(['eq-1'])
     );
+  });
+
+  // #traitement-brouillon-distinct-fiche-creee : une fiche neuve naît hors de la file de
+  // synchronisation (statut_sync = 'brouillon'), pas « local ».
+  it('crée la fiche avec statut_sync = brouillon (hors file de synchronisation)', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await createDraftTraitementAerien(AERIEN_INPUT);
+
+    const [sql] = runAsync.mock.calls.find(([q]) => String(q).includes('INSERT INTO traitement ('))!;
+    expect(sql).toContain("'brouillon', 'brouillon'");
+    expect(sql).not.toContain("'local'");
   });
 });
 
@@ -1104,8 +1118,9 @@ describe('countUnsyncedTraitements', () => {
     const result = await countUnsyncedTraitements();
 
     expect(result).toBe(3);
+    // #traitement-brouillon-distinct-fiche-creee : un brouillon (jamais enregistré) ne compte pas.
     expect(getFirstAsync).toHaveBeenCalledWith(
-      expect.stringContaining("statut_sync != 'synced'")
+      expect.stringContaining("statut_sync NOT IN ('synced', 'brouillon')")
     );
   });
 
@@ -1135,5 +1150,18 @@ describe('deleteDraftTraitement', () => {
     ).rejects.toThrow('Seules les fiches en brouillon peuvent être supprimées.');
 
     expect(runAsync).not.toHaveBeenCalled();
+  });
+});
+
+// #traitement-brouillon-distinct-fiche-creee : « Enregistrer » (recap.tsx) fait passer la
+// fiche de brouillon à « local » (à synchro) — et seulement elle.
+describe('marquerTraitementEnregistre', () => {
+  it('passe statut_sync de brouillon à local, sans jamais toucher une fiche déjà enregistrée/envoyée', async () => {
+    await marquerTraitementEnregistre('trait-1');
+
+    const [sql, params] = runAsync.mock.calls[0];
+    expect(sql).toContain("SET statut_sync = 'local'");
+    expect(sql).toContain("AND statut_sync = 'brouillon'");
+    expect(params).toEqual([expect.any(String), 'trait-1']);
   });
 });

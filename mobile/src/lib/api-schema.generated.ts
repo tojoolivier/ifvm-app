@@ -3973,6 +3973,10 @@ export interface components {
             base_secondaire_date_installation?: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef: string;
+            /** Surface Restante Abandonnee */
+            surface_restante_abandonnee?: boolean | null;
+            /** Motif Surface Restante Abandonnee */
+            motif_surface_restante_abandonnee?: string | null;
             /** Taux Mortalite Pourcent */
             taux_mortalite_pourcent?: number | null;
             /** Evaluation Efficacite Heures Apres */
@@ -4031,6 +4035,10 @@ export interface components {
             surface_cumulee_ha: number;
             /** Surface Restante Ha */
             surface_restante_ha: number | null;
+            /** Surface Restante Abandonnee */
+            surface_restante_abandonnee: boolean | null;
+            /** Motif Surface Restante Abandonnee */
+            motif_surface_restante_abandonnee: string | null;
             /** Taux Mortalite Pourcent */
             taux_mortalite_pourcent: number | null;
             /** Evaluation Efficacite Heures Apres */

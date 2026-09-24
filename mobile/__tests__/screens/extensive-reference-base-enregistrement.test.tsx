@@ -45,7 +45,7 @@ describe('ExtensiveReferenceScreen — Base principale/secondaire : enregistreme
     jest.mocked(getCurrentPosition).mockClear();
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-09-17',
         mode_extensif: 'aerien',

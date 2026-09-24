@@ -21,11 +21,15 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
+  updateTraitementAerienSurfaceRestante: jest.fn().mockResolvedValue(undefined),
   updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
-  listPesticides: jest.fn().mockResolvedValue([]),
+  listPesticides: jest.fn().mockResolvedValue([
+    { id: 'liquide', code: 'L1', nom: 'Fyfanon 440 ULV', matiere_active: null, dose_reference: '2 l/ha', type_produit: 'CHOC' },
+    { id: 'poudre', code: 'P1', nom: 'Green Muscle', matiere_active: null, dose_reference: '200 g/ha', type_produit: 'CHOC' },
+  ]),
 }));
 
 const RESET_STATE = {
@@ -49,13 +53,18 @@ beforeEach(() => {
     id: 'trait-1',
     type_traitement: 'AERIEN',
     cible: { surface_infestee_ha: 100 },
-    aerien: { rotations: [] },
+    aerien: { surface_restante_abandonnee: false, rotations: [] },
   } as any);
   jest.mocked(traitementRepository.addRotation).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear().mockResolvedValue(undefined);
   jest.mocked(traitementRepository.updateTraitementAerienEfficacite).mockClear().mockResolvedValue({} as any);
   useTraitementCaptureStore.setState(RESET_STATE);
 });
+
+/** Laisse un vrai tick s'écouler entre une saisie et un `fireEvent.press` — un
+ * `act(async () => {})` manuel imbriqué dans celui déjà posé par `fireEvent` casse
+ * le suivi interne des scopes act() (leçon déjà tirée ailleurs dans ce dépôt). */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 describe('RotationsScreen — numéro de cuve et unité', () => {
   it('affiche un numéro de cuve non éditable (1, 2, …), incrémenté à l’ajout d’une rotation', async () => {
@@ -231,5 +240,110 @@ describe('RotationsScreen — validation des heures de vanne', () => {
       .invocationCallOrder[0];
     const ordreAjout = jest.mocked(traitementRepository.addRotation).mock.invocationCallOrder[0];
     expect(ordrePurge).toBeLessThan(ordreAjout);
+  });
+});
+
+describe('RotationsScreen — unité automatique selon le produit', () => {
+  it("pose « Kilos (kg) » pour un produit en poudre", async () => {
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      aerien: { rotations: [{ localId: 'r1', produit_id: 'poudre', quantite: 10, unite: 'L', surface_ha: 5 }] },
+    });
+
+    await render(<RotationsScreen />);
+
+    expect(await screen.findByTestId('rotation-unite-auto-0')).toHaveTextContent('Kilos (kg)');
+    expect(useTraitementCaptureStore.getState().aerien.rotations[0].unite).toBe('kg');
+  });
+
+  it("garde « Litres (L) » pour un produit liquide", async () => {
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      aerien: { rotations: [{ localId: 'r1', produit_id: 'liquide', quantite: 10, unite: 'L', surface_ha: 5 }] },
+    });
+
+    await render(<RotationsScreen />);
+
+    expect(await screen.findByTestId('rotation-unite-auto-0')).toHaveTextContent('Litres (L)');
+  });
+});
+
+describe('RotationsScreen — surface restante abandonnée ? (comme le Terrestre)', () => {
+  const rotationsRestante = {
+    ...RESET_STATE,
+    aerien: { rotations: [{ localId: 'r1', produit_id: 'liquide', quantite: 10, unite: 'L' as const, surface_ha: 5 }] },
+  };
+
+  beforeEach(() => {
+    jest.mocked(traitementRepository.updateTraitementAerienSurfaceRestante).mockClear();
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'AERIEN',
+      cible: { surface_infestee_ha: 100 },
+      aerien: { rotations: [] },
+    } as any);
+  });
+
+  it("bloque « Continuer » tant que la surface restante n'est pas tranchée", async () => {
+    useTraitementCaptureStore.setState(rotationsRestante);
+    await render(<RotationsScreen />);
+    await screen.findByText('Surface restante abandonnée ?');
+    await settle(); // laisse l'hydratation asynchrone de la fiche finir avant toute saisie
+
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    expect(await screen.findByText('Vous devez indiquer si la surface restante est abandonnée')).toBeVisible();
+    expect(traitementRepository.updateTraitementAerienSurfaceRestante).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("exige un motif quand la surface restante est abandonnée", async () => {
+    useTraitementCaptureStore.setState(rotationsRestante);
+    await render(<RotationsScreen />);
+    await screen.findByText('Surface restante abandonnée ?');
+    await settle(); // laisse l'hydratation asynchrone de la fiche finir avant toute saisie
+
+    fireEvent.press(screen.getByText('Oui'));
+    await settle();
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    expect(await screen.findByText("Le motif d'abandon est obligatoire")).toBeVisible();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("enregistre la décision (abandon + motif) puis poursuit", async () => {
+    useTraitementCaptureStore.setState(rotationsRestante);
+    await render(<RotationsScreen />);
+    await screen.findByText('Surface restante abandonnée ?');
+    await settle(); // laisse l'hydratation asynchrone de la fiche finir avant toute saisie
+
+    fireEvent.press(screen.getByText('Oui'));
+    await settle();
+    fireEvent.changeText(screen.getByTestId('motif-abandon-input'), 'Zone inaccessible');
+    await settle();
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.updateTraitementAerienSurfaceRestante).toHaveBeenCalledWith('trait-1', {
+        abandonnee: true,
+        motif: 'Zone inaccessible',
+      })
+    );
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+  });
+
+  it("n'affiche pas le choix quand il ne reste aucune surface à traiter", async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'AERIEN',
+      cible: { surface_infestee_ha: 5 },
+      aerien: { rotations: [] },
+    } as any);
+    useTraitementCaptureStore.setState(rotationsRestante);
+
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+
+    expect(screen.queryByText('Surface restante abandonnée ?')).toBeNull();
   });
 });

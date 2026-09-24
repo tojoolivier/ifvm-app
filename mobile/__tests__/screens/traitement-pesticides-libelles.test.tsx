@@ -29,6 +29,7 @@ jest.mock('@/lib/traitement-repository', () => ({
   deleteAllProduitsForTraitementTerrestre: jest.fn().mockResolvedValue(undefined),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
+  updateTraitementAerienSurfaceRestante: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({

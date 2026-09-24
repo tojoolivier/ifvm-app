@@ -156,6 +156,8 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     await render(<RecapScreen />);
 
     expect(await screen.findByText('Fyfanon')).toBeVisible();
+    // #restaure-atomiseur-autoporte : la ligne est de retour dans ce bloc.
+    expect(screen.getByText('Atomiseur autoporté (ha)')).toBeVisible();
     // "L" majuscule : #produits-unite-l-kg, repli par défaut d'une fiche sans
     // pesticide_unite explicite (créée avant cet ajout).
     expect(screen.getByText('12 L')).toBeVisible();
@@ -174,7 +176,7 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
   it('affiche la carte Impacts & risque même sans empoisonnement/comportement/mortalité (tout à Non)', async () => {
     await render(<RecapScreen />);
 
-    await screen.findByText('Empoisonnement');
+    await screen.findByText("Cas d'empoisonnement");
     expect(screen.getAllByText('Non').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -194,6 +196,21 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     await screen.findByText('Répartition LMC');
     expect(screen.getByText('diffuse : 20 ind./ha · groupée : 3 ind./m²')).toBeVisible();
     expect(screen.queryByText('Répartition de la population')).toBeNull();
+  });
+
+  // #surface-traitee-et-protegee : ligne sous « Surface traitée (ha) », toujours égale à elle.
+  it('affiche « Surface traitée et protégée (ha) » sous « Surface traitée (ha) », avec la même valeur', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_TERRESTRE,
+      terrestre: { ...DRAFT_TERRESTRE.terrestre, surface_traitee_ha: 12.5, surface_cumulee_ha: 40, surface_restante_ha: 60 },
+    });
+
+    await render(<RecapScreen />);
+
+    await screen.findByText('Surface traitée et protégée (ha)');
+    expect(screen.getAllByText('12.5')).toHaveLength(2); // traitée + traitée et protégée
+    const rendu = JSON.stringify(screen.toJSON());
+    expect(rendu.indexOf('Surface traitée (ha)')).toBeLessThan(rendu.indexOf('Surface traitée et protégée (ha)'));
   });
 
   /** Migration backend 0083 : généralise au Terrestre la répartition traitée/
@@ -320,6 +337,11 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     expect(screen.getByText('77')).toBeVisible(); // Essence (litres)
     expect(screen.getByText('22')).toBeVisible(); // Disque rotatif
     expect(screen.getByText('99')).toBeVisible(); // Nombre de piles
-    expect(screen.getByText('3')).toBeVisible(); // Ulvamast
+    expect(screen.getByText('3')).toBeVisible(); // Nb Atomiseur autoporté (colonne moyens_ulvamast_nb)
+    // #renomme-materiels-atomiseur : libellés « Nb … », plus « Atomiseur » / « Ulvamast ».
+    expect(screen.getByText('Nb Atomiseur à dos')).toBeVisible();
+    expect(screen.getByText('Nb Atomiseur autoporté')).toBeVisible();
+    expect(screen.queryByText('Atomiseur')).toBeNull();
+    expect(screen.queryByText('Ulvamast')).toBeNull();
   });
 });

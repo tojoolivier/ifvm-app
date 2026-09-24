@@ -63,6 +63,32 @@ export function computeTotalPesticideAerienParUnite(
 }
 
 /**
+ * Unité (L ou kg) déduite de la « dose de référence » du référentiel pesticide
+ * (ex. « 2 l/ha » → 'L', « 200 g/ha » ou « 1,5 kg/ha » → 'kg') : un produit liquide se
+ * dose au litre, une poudre au poids. `null` si la dose est absente ou illisible — l'appelant
+ * garde alors le choix manuel.
+ */
+export function deriveUniteDepuisDoseReference(doseReference: string | null | undefined): 'L' | 'kg' | null {
+  if (!doseReference) return null;
+  const match = doseReference.toLowerCase().match(/\d\s*(kg|kilos?|mg|g|litres?|ml|cl|l)\b/);
+  if (!match) return null;
+  return ['kg', 'kilo', 'kilos', 'mg', 'g'].includes(match[1]) ? 'kg' : 'L';
+}
+
+/**
+ * Unité de « Approvisionnement » (Aérien) : c'est celle du produit employé. Une fiche
+ * n'utilise en pratique qu'un seul type de produit — kg seulement si tous les produits
+ * choisis sont dosés au poids, litres sinon (liquide, mélange, ou aucun produit encore
+ * choisi).
+ */
+export function computeUniteApprovisionnementAerien(
+  rotations: { produit_id?: string | null; unite?: 'L' | 'kg' | null }[]
+): 'L' | 'kg' {
+  const avecProduit = rotations.filter((r) => !!r.produit_id);
+  return avecProduit.length > 0 && avecProduit.every((r) => r.unite === 'kg') ? 'kg' : 'L';
+}
+
+/**
  * traitement_aerien.surface_traitee_ha n'est plus une saisie directe (migration 0046) :
  * dérivée de la somme des `surface_ha` de chaque rotation, même principe que
  * computeTotalPesticideAerienParUnite ci-dessus.
@@ -465,29 +491,88 @@ export interface RotationHeuresInput {
   heureFermetureVanne?: string | null;
 }
 
-/** Même règle que TerrestreConditionsInput.heureDebut/heureFin (backend :
- * ck_traitement_rotation_heures) pour heure_debut/heure_fin, et
- * ck_traitement_rotation_heures_vanne pour heure_ouverture_vanne/heure_fermeture_vanne
- * (migration 0046) — appliquées à chaque rotation aérienne, numérotées à partir de 1
- * dans le message, dans l'ordre de saisie. */
+/**
+ * Ordre chronologique STRICT d'une rotation aérienne (#ordre-heures-rotation-aerien) :
+ * heure de début < ouverture de vanne < fermeture de vanne < heure de fin. Le backend
+ * (ck_traitement_rotation_heures / ..._heures_vanne, migration 0046) tolère l'égalité ;
+ * la fiche est volontairement plus stricte, comme demandé.
+ *
+ * Seules les heures renseignées sont comparées, deux à deux dans cet ordre (une heure
+ * de vanne encore vide ne masque pas une incohérence début/fin). Un message par paire
+ * incohérente, sans préfixe de rotation — cf. `validateRotationsHeures`.
+ */
+export function messagesOrdreHeuresRotation(r: RotationHeuresInput): string[] {
+  const chaine: { heure: string | null | undefined; libelle: string }[] = [
+    { heure: r.heureDebut, libelle: "l'heure de début" },
+    { heure: r.heureOuvertureVanne, libelle: "l'heure d'ouverture de vanne" },
+    { heure: r.heureFermetureVanne, libelle: "l'heure de fermeture de vanne" },
+    { heure: r.heureFin, libelle: "l'heure de fin" },
+  ];
+  const renseignees = chaine.filter((e): e is { heure: string; libelle: string } => !!e.heure);
+  const messages: string[] = [];
+  for (let i = 1; i < renseignees.length; i++) {
+    if (renseignees[i].heure <= renseignees[i - 1].heure) {
+      messages.push(`${renseignees[i].libelle} doit être postérieure à ${renseignees[i - 1].libelle}`);
+    }
+  }
+  return messages;
+}
+
+/** Applique `messagesOrdreHeuresRotation` à chaque rotation aérienne, numérotées à partir
+ * de 1 dans le message, dans l'ordre de saisie. */
 export function validateRotationsHeures(rotations: RotationHeuresInput[]): ValidationError[] {
   const errors: ValidationError[] = [];
   rotations.forEach((r, index) => {
-    if (r.heureDebut && r.heureFin && r.heureFin <= r.heureDebut) {
-      errors.push({
-        field: 'rotations',
-        message: `Rotation ${index + 1} : l'heure de fin doit être postérieure à l'heure de début`,
-      });
+    for (const message of messagesOrdreHeuresRotation(r)) {
+      errors.push({ field: 'rotations', message: `Rotation ${index + 1} : ${message}` });
     }
-    if (
-      r.heureOuvertureVanne &&
-      r.heureFermetureVanne &&
-      r.heureFermetureVanne <= r.heureOuvertureVanne
-    ) {
-      errors.push({
-        field: 'rotations',
-        message: `Rotation ${index + 1} : l'heure de fermeture de vanne doit être postérieure à l'heure d'ouverture`,
-      });
+  });
+  return errors;
+}
+
+// ==========================================
+// CONDITIONS MÉTÉO (#alerte-meteo-vent-temperature)
+// ==========================================
+
+/** Au-delà de ces seuils (strictement supérieurs — 6 m/s et 35 °C pile restent
+ * autorisés), le traitement doit être annulé : « Continuer » est refusé tant que
+ * la valeur n'est pas corrigée. Valables pour l'Aérien (par rotation, début/fin)
+ * comme pour le Terrestre — une seule règle, appelée des deux côtés. */
+export const SEUIL_VENT_MAX_MS = 6;
+export const SEUIL_TEMPERATURE_MAX_C = 35;
+
+/** Message d'avertissement si la vitesse du vent dépasse le seuil, sinon `null`. */
+export function messageVentTropFort(ventMs: number | null | undefined): string | null {
+  if (ventMs == null || !(ventMs > SEUIL_VENT_MAX_MS)) return null;
+  return `⚠️ Vitesse du vent supérieure à ${SEUIL_VENT_MAX_MS} m/s : annulez le traitement, ou corrigez la valeur si elle est erronée.`;
+}
+
+/** Message d'avertissement si la température dépasse le seuil, sinon `null`. */
+export function messageTemperatureTropElevee(temperatureC: number | null | undefined): string | null {
+  if (temperatureC == null || !(temperatureC > SEUIL_TEMPERATURE_MAX_C)) return null;
+  return `⚠️ Température supérieure à ${SEUIL_TEMPERATURE_MAX_C} °C : annulez le traitement, ou corrigez la valeur si elle est erronée.`;
+}
+
+export interface RotationMeteoInput {
+  ventDebutMs?: number | null;
+  ventFinMs?: number | null;
+  temperatureDebutC?: number | null;
+  temperatureFinC?: number | null;
+}
+
+/** Une erreur bloquante par valeur hors seuil, préfixée « Rotation N : » (numérotée
+ * à partir de 1, dans l'ordre de saisie) — même convention que `validateRotationsHeures`. */
+export function validateRotationsMeteo(rotations: RotationMeteoInput[]): ValidationError[] {
+  const errors: ValidationError[] = [];
+  rotations.forEach((r, index) => {
+    const champs: [string, string | null][] = [
+      ['vent début', messageVentTropFort(r.ventDebutMs)],
+      ['vent fin', messageVentTropFort(r.ventFinMs)],
+      ['température début', messageTemperatureTropElevee(r.temperatureDebutC)],
+      ['température fin', messageTemperatureTropElevee(r.temperatureFinC)],
+    ];
+    for (const [champ, message] of champs) {
+      if (message) errors.push({ field: 'rotations', message: `Rotation ${index + 1} (${champ}) — ${message}` });
     }
   });
   return errors;
@@ -533,6 +618,12 @@ export function validateTerrestreConditions(input: TerrestreConditionsInput): Va
   if (input.heureDebut && input.heureFin && input.heureFin <= input.heureDebut) {
     errors.push({ field: 'heureFin', message: "L'heure de fin doit être postérieure à l'heure de début" });
   }
+
+  // #alerte-meteo-vent-temperature : bloquant tant que la valeur n'est pas corrigée.
+  const messageVent = messageVentTropFort(input.vitesseVentMs);
+  if (messageVent) errors.push({ field: 'vitesseVentMs', message: messageVent });
+  const messageTemperature = messageTemperatureTropElevee(input.temperatureC);
+  if (messageTemperature) errors.push({ field: 'temperatureC', message: messageTemperature });
 
   if (input.surfaceRestanteHa > 0) {
     if (input.surfaceRestanteAbandonnee === null || input.surfaceRestanteAbandonnee === undefined) {
@@ -675,6 +766,12 @@ export interface RecapAggregateInput {
   aerienRotations: RotationSyncPreconditionInput[];
   /** Même garde-fou côté Terrestre — cf. `produitsTerrestrePretsPourSynchro`. */
   terrestreProduits: ProduitUtiliseSyncPreconditionInput[];
+  /** #alerte-meteo-vent-temperature : vent/température de chaque rotation aérienne
+   * (le Terrestre passe par `terrestreConditions`). Optionnel : absent = aucune vérification. */
+  aerienRotationsMeteo?: RotationMeteoInput[];
+  /** #ordre-heures-rotation-aerien : heures de chaque rotation aérienne. Optionnel : absent =
+   * aucune vérification. */
+  aerienRotationsHeures?: RotationHeuresInput[];
   signatureMatrix: SignatureRequirementWithState[];
 }
 
@@ -698,6 +795,14 @@ export function aggregateRecapErrors(input: RecapAggregateInput): ValidationErro
       field: 'rotations',
       message: 'Chaque rotation doit avoir un produit et une quantité renseignés',
     });
+  }
+
+  if (input.typeTraitement === 'AERIEN' && input.aerienRotationsHeures) {
+    errors.push(...validateRotationsHeures(input.aerienRotationsHeures));
+  }
+
+  if (input.typeTraitement === 'AERIEN' && input.aerienRotationsMeteo) {
+    errors.push(...validateRotationsMeteo(input.aerienRotationsMeteo));
   }
 
   if (input.typeTraitement === 'TERRESTRE' && !produitsTerrestrePretsPourSynchro(input.terrestreProduits)) {

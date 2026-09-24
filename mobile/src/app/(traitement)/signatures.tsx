@@ -181,7 +181,7 @@ export default function SignaturesScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <ProgressBar
-          currentIndex={typeTraitement === 'TERRESTRE' ? 5 : 7}
+          currentIndex={typeTraitement === 'TERRESTRE' ? 5 : 6}
           segments={typeTraitement === 'TERRESTRE' ? PROGRESS_SEGMENTS_TERRESTRE : PROGRESS_SEGMENTS_AERIEN}
         />
         <Text style={styles.title}>Signatures</Text>

@@ -313,6 +313,9 @@ export function statutFicheDe(statutSync: string): StatutFiche {
  * deux écrans qui composent un lot ne puissent pas en juger différemment.
  */
 export function estDansLaFile(statutSync: string): boolean {
+  // #traitement-brouillon-distinct-fiche-creee : un brouillon (jamais enregistré) n'est
+  // pas dans la file — sinon la valeur inconnue retomberait sur « en attente ».
+  if (statutSync === 'brouillon') return false;
   const statut = statutFicheDe(statutSync);
   return statut === 'en-attente' || statut === 'conflit';
 }

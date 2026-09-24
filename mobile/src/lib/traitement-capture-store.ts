@@ -102,6 +102,9 @@ export interface AerienDraft {
   // pesticideRecuL supprimé (#609) : le stock aérien vit désormais dans
   // `mouvement_pesticide` (#606), débité automatiquement des rotations — plus de
   // saisie manuelle d'un « reçu » par fiche (Terrestre le conserve, cf. TerrestreDraft).
+  // Surface restante abandonnée ? (migration backend 0097) — mirroir de TerrestreDraft.
+  surfaceRestanteAbandonnee?: boolean | null;
+  motifSurfaceRestanteAbandonnee?: string | null;
   // Efficacité (migration backend 0058) : gérée directement en local state sur
   // l'écran « Moyens & protection » (moyens.tsx, #efficacite-moyens-protection),
   // pas dans ce store — n'y figure donc plus depuis son déplacement.

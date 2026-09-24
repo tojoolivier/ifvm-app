@@ -333,6 +333,10 @@ class TraitementAerien:
     # NOT NULL défaut 0, contrairement à son équivalent Terrestre (nullable) —
     # même choix que les autres champs dérivés ci-dessus.
     surface_cumulee_ha: float = 0.0
+    # Surface restante abandonnée ? (migration 0097) — mirroir de TraitementTerrestre :
+    # None = pas encore tranché, motif obligatoire à la validation si True (CDG §9).
+    surface_restante_abandonnee: bool | None = None
+    motif_surface_restante_abandonnee: str | None = None
     # Efficacité (fiche CRT papier, section "Traitement") : taux de mortalité
     # observé, quelques heures après le traitement — une seule évaluation par
     # fiche (après l'ensemble des rotations), pas par rotation individuelle,
@@ -710,10 +714,11 @@ class Traitement:
                 + ", ".join(manquants)
             )
 
+        specifique = self.terrestre if self.type_traitement == "TERRESTRE" else self.aerien
         if (
-            self.type_traitement == "TERRESTRE"
-            and self.terrestre.surface_restante_abandonnee
-            and not self.terrestre.motif_surface_restante_abandonnee
+            specifique is not None
+            and specifique.surface_restante_abandonnee
+            and not specifique.motif_surface_restante_abandonnee
         ):
             raise MotifAbandonManquantError(
                 "motif_surface_restante_abandonnee est obligatoire lorsque "
@@ -820,6 +825,8 @@ _CHAMPS_CONTENU_AERIEN = (
     # pesticide_recu_l/pesticide_stock_restant_l supprimées de TraitementAerien
     # (#609) — remplacées par des mouvements `mouvement_pesticide`, hors du
     # payload de synchronisation au même titre que les rotations.
+    "surface_restante_abandonnee",
+    "motif_surface_restante_abandonnee",
     "taux_mortalite_pourcent",
     "evaluation_efficacite_heures_apres",
     "methode_evaluation_efficacite",

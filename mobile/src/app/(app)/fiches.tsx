@@ -66,6 +66,8 @@ function stationLabel(item: { station_nom?: string | null; station_libre?: strin
  * pour un brouillon jamais synchronisé.
  */
 function statutTraitementAffiche(traitement: DraftTraitementRow): string {
+  // #traitement-brouillon-distinct-fiche-creee : parcours pas terminé, jamais enregistré.
+  if (traitement.statut_sync === 'brouillon') return 'brouillon';
   if (traitement.statut_sync === 'echec') return 'echec_synchro';
   if (traitement.statut_sync !== 'synced') return 'a_synchro';
   return traitement.statut === 'validee' ? 'validee' : 'brouillon';
