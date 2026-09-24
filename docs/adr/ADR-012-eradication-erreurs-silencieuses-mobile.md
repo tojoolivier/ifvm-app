@@ -150,6 +150,8 @@ Conséquence : **un vide muet devient impossible à produire** — précisément
 
 **`ErrorBoundary` : une par route**, la racine restant en filet. Et `reset()` (`error-boundary.tsx:34`) est remplacé par un **retour en arrière** : remonter le même arbre avec les mêmes props ne peut pas réussir si la cause persiste — le bouton s'appelle « Réessayer » et n'a structurellement aucune chance. Revenir change les props.
 
+**Amendement du 2026-09-24 ([#673](https://github.com/tojoolivier/ifvm-app/issues/673)) — un refus métier n'est pas une panne réseau.** `erreurHttp` type toute réponse HTTP non-401 en `NetworkError`, et la ligne `NetworkError → Réessayer` affichait « Connexion au serveur impossible » pour un 409 dont le serveur avait pourtant donné la raison. Or « le message brut ne sort jamais » vise les messages du moteur (piles JavaScript, « undefined is not an object »), pas le `detail` d'un **4xx**, écrit par le backend pour être lu. Règle cible : un refus 4xx (hors 401, 408, 425, 429) montre le message du serveur, ou une phrase française de repli par statut, **sans** « Réessayer » ; panne réseau, 5xx et bugs gardent le tableau ci-dessus. État actuel : la règle vit dans `messageRefusServeur` / `surRefusAfficher` (`lib/erreur-serveur.ts`) et n'est branchée que sur les écrans équipes et parc aéronefs ; son passage dans `toFriendlyError` pour toute l'app reste à faire (#673).
+
 ## Décision 6 — Expurgation par nom de clé, dans `sink()`, à l'écriture
 
 ([#161](https://github.com/tojoolivier/ifvm-app/issues/161)) `sink()` est le passage obligé de toute ligne de journal : un filtre posé là est **exhaustif par construction**, là où une liste d'URL doit être tenue à jour route par route — et c'est cette granularité qui a fait échouer `redactBody`.

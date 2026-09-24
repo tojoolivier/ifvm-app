@@ -1,18 +1,20 @@
 import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import type { AffectationLocale } from '@/lib/equipe-db';
+import { jourMoisAnnee, joursDepuis } from '@/lib/equipe-regles';
 import { EQ } from './tokens';
 
 interface Props {
-  immatriculation: string;
-  societe: string;
+  affectation: Pick<AffectationLocale, 'immatriculation' | 'societe' | 'date_debut'>;
+  /** Date du jour (AAAA-MM-JJ) : la durée est calculée d'ici, pas par chaque écran. */
+  aujourdhui: string;
   equipeNom?: string | null;
-  /** Début de l'affectation, déjà formaté (« 01/09/2026 »). */
-  depuis: string;
-  jours: number;
 }
 
 /** Carte « AFFECTATION ACTIVE » du parc aéronefs (Figma 81:692) : l'appareil en service mis en avant. */
-export function AffectationActiveCard({ immatriculation, societe, equipeNom, depuis, jours }: Props) {
+export function AffectationActiveCard({ affectation, aujourdhui, equipeNom }: Props) {
+  const { immatriculation, societe, date_debut } = affectation;
+  const jours = joursDepuis(date_debut, aujourdhui);
   return (
     <View style={styles.carte} accessibilityLabel={`Affectation active : ${immatriculation}`}>
       <ThemedText style={styles.etiquette}>AFFECTATION ACTIVE</ThemedText>
@@ -20,7 +22,7 @@ export function AffectationActiveCard({ immatriculation, societe, equipeNom, dep
       <ThemedText style={styles.societe}>{societe}</ThemedText>
       {equipeNom ? <ThemedText style={styles.equipe}>{equipeNom}</ThemedText> : null}
       <View style={styles.meta}>
-        <ThemedText style={styles.depuis}>{`Depuis le ${depuis}`}</ThemedText>
+        <ThemedText style={styles.depuis}>{`Depuis le ${jourMoisAnnee(date_debut)}`}</ThemedText>
         <ThemedText style={styles.jours}>{jours <= 1 ? `${jours} jour` : `${jours} jours`}</ThemedText>
       </View>
     </View>

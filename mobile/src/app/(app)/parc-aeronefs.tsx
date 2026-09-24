@@ -17,7 +17,7 @@ import {
   listAffectationsEquipe,
   listParcAeronefs,
 } from '@/lib/equipe-db';
-import { affectationActive, jourMoisAnnee, joursDepuis } from '@/lib/equipe-regles';
+import { affectationActive } from '@/lib/equipe-regles';
 
 /**
  * Parc aéronefs (#642, Figma « Parc aéronefs ») : l'affectation active de l'équipe de travail mise
@@ -59,13 +59,7 @@ export default function ParcAeronefsScreen() {
       />
       <ScrollView contentContainerStyle={styles.contenu}>
         {active && (
-          <AffectationActiveCard
-            immatriculation={active.immatriculation}
-            societe={active.societe}
-            equipeNom={courante?.nom}
-            depuis={jourMoisAnnee(active.date_debut)}
-            jours={joursDepuis(active.date_debut, aujourdhuiIso())}
-          />
+          <AffectationActiveCard affectation={active} aujourdhui={aujourdhuiIso()} equipeNom={courante?.nom} />
         )}
         <ThemedText style={styles.section}>TOUS LES AÉRONEFS</ThemedText>
         {parc.length === 0 && <ThemedText style={styles.vide}>Aucun aéronef dans le parc.</ThemedText>}

@@ -100,7 +100,7 @@ describe('EquipeDetailScreen', () => {
     useAuthStore.setState({ user: { id: 'u-1', role: 'admin' } } as any);
     await render(<EquipeDetailScreen />);
     await screen.findByText('Jean Rakoto');
-    expect(screen.getByText('Terminer l’affectation')).toBeVisible();
+    expect(screen.getByText(/Terminer l’affectation/)).toBeVisible();
     expect(screen.getByText('Affecter à partir d’aujourd’hui')).toBeVisible();
   });
 
@@ -108,7 +108,7 @@ describe('EquipeDetailScreen', () => {
     await render(<EquipeDetailScreen />);
     await screen.findByText('Jean Rakoto');
 
-    expect(screen.queryByText('Terminer l’affectation')).toBeNull();
+    expect(screen.queryByText(/Terminer l’affectation/)).toBeNull();
     expect(screen.queryByText('Affecter à partir d’aujourd’hui')).toBeNull();
   });
 });

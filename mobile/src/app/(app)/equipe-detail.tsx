@@ -22,7 +22,7 @@ import {
   MembreEquipeLocal,
   SiteEquipe,
 } from '@/lib/equipe-db';
-import { affectationActive, jourMois, jourMoisAnnee, joursDepuis, libelleFonction, libelleSite } from '@/lib/equipe-regles';
+import { affectationActive, jourMois, jourMoisAnnee, libelleFonction, libelleSite } from '@/lib/equipe-regles';
 import { EquipeLocale, getEquipeLocale } from '@/lib/referentiel-db';
 import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
@@ -205,12 +205,7 @@ export default function EquipeDetailScreen() {
             {!active && <ThemedText style={styles.vide}>Aucun aéronef affecté.</ThemedText>}
             {active && (
               <>
-                <AffectationActiveCard
-                  immatriculation={active.immatriculation}
-                  societe={active.societe}
-                  depuis={jourMoisAnnee(active.date_debut)}
-                  jours={joursDepuis(active.date_debut, aujourdhui)}
-                />
+                <AffectationActiveCard affectation={active} aujourdhui={aujourdhui} />
                 {gestionParc && active.date_fin === null && (
                   <TouchableOpacity
                     style={[styles.terminer, isRunning && { opacity: 0.6 }]}
@@ -218,7 +213,7 @@ export default function EquipeDetailScreen() {
                     disabled={isRunning}
                     accessibilityRole="button"
                   >
-                    <ThemedText style={styles.terminerTexte}>Terminer l’affectation</ThemedText>
+                    <ThemedText style={styles.terminerTexte}>Terminer l’affectation · nécessite le réseau</ThemedText>
                   </TouchableOpacity>
                 )}
               </>
