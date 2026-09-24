@@ -1,13 +1,10 @@
 /**
  * Section « Moyens & surfaces » du Terrestre (écran Équipe, TerrestreForm.tsx) :
  * « Atomiseur » devient « Atomiseur à dos » (colonne surface_atomiseur_ha
- * inchangée, pur renommage) ; « Disque rotatif » est inchangé.
- *
- * « Atomiseur autoporté » (surface_atomiseur_autoporte_ha) a été retiré de
- * l'écran (demande explicite, Terrestre uniquement) — la colonne backend/
- * SQLite reste en place et continue d'être transmise telle quelle à chaque
- * enregistrement (jamais réinitialisée), pour ne pas effacer silencieusement
- * une valeur déjà saisie sur une fiche existante avant ce retrait.
+ * inchangée, pur renommage) ; ULVAmast est remplacé par « Atomiseur autoporté »
+ * (colonne surface_atomiseur_autoporte_ha, migration backend 0060), retiré puis
+ * rétabli à la demande de l'utilisateur (#restaure-atomiseur-autoporte).
+ * « Disque rotatif » est inchangé.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import TraitementScreen from '@/app/(traitement)/traitement';
@@ -75,14 +72,14 @@ const TERRESTRE_DRAFT = {
   ],
 };
 
-describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / Disque rotatif (autoporté retiré)', () => {
+describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / autoporté / Disque rotatif', () => {
   beforeEach(() => {
     mockRouteParams = { traitementId: 'trait-1' };
     jest.mocked(traitementRepository.updateTraitementTerrestre).mockClear().mockResolvedValue({} as any);
     useTraitementCaptureStore.setState({ ...RESET_STATE });
   });
 
-  it('affiche Atomiseur à dos et Disque rotatif, jamais ULVAmast, « Atomiseur » seul, ni Atomiseur autoporté', async () => {
+  it('affiche les 3 choix, jamais ULVAmast ni « Atomiseur » seul', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
       id: 'trait-1',
       type_traitement: 'TERRESTRE',
@@ -93,13 +90,13 @@ describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / Disque ro
     await render(<TraitementScreen />);
     await waitFor(() => expect(screen.getByText('Atomiseur à dos')).toBeVisible());
 
+    expect(screen.getByText('Atomiseur autoporté')).toBeVisible();
     expect(screen.getByText('Disque rotatif')).toBeVisible();
     expect(screen.queryByText('ULVAmast')).toBeNull();
     expect(screen.queryByText('Atomiseur')).toBeNull();
-    expect(screen.queryByText('Atomiseur autoporté')).toBeNull();
   });
 
-  it('saisit les 2 surfaces restantes et les enregistre sous les bons champs', async () => {
+  it('saisit les 3 surfaces et les enregistre sous les bons champs', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
       id: 'trait-1',
       type_traitement: 'TERRESTRE',
@@ -110,12 +107,13 @@ describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / Disque ro
     await render(<TraitementScreen />);
     await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
 
-    // Ordre de rendu (efficacité déplacée sur Moyens & protection, #efficacite-moyens-
-    // protection ; Atomiseur autoporté retiré) : vitesse du vent (0), température (1),
-    // atomiseur à dos (2), disque rotatif (3).
+    // Ordre de rendu : vitesse du vent (0), température (1), atomiseur à dos (2),
+    // atomiseur autoporté (3), disque rotatif (4).
     fireEvent.changeText(screen.getAllByPlaceholderText('0')[2], '10');
     expect(await screen.findByDisplayValue('10')).toBeVisible();
-    fireEvent.changeText(screen.getAllByPlaceholderText('0')[3], '5');
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[3], '3');
+    expect(await screen.findByDisplayValue('3')).toBeVisible();
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[4], '5');
     expect(await screen.findByDisplayValue('5')).toBeVisible();
 
     fireEvent.press(screen.getByText('Continuer  ›'));
@@ -125,13 +123,14 @@ describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / Disque ro
         'trait-1',
         expect.objectContaining({
           surface_atomiseur_ha: 10,
+          surface_atomiseur_autoporte_ha: 3,
           surface_disque_rotatif_ha: 5,
         })
       )
     );
   });
 
-  it("préserve une surface autoportée déjà enregistrée (round-trip silencieux), sans jamais l'afficher ni la réinitialiser", async () => {
+  it('restaure une surface autoportée déjà enregistrée', async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
       id: 'trait-1',
       type_traitement: 'TERRESTRE',
@@ -144,15 +143,6 @@ describe('TraitementScreen (Équipe, Terrestre) — Atomiseur à dos / Disque ro
     await waitFor(() =>
       expect(useTraitementCaptureStore.getState().terrestre.surface_atomiseur_autoporte_ha).toBe(7.5)
     );
-    expect(screen.queryByDisplayValue('7,5')).toBeNull();
-
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementTerrestre).toHaveBeenCalledWith(
-        'trait-1',
-        expect.objectContaining({ surface_atomiseur_autoporte_ha: 7.5 })
-      )
-    );
+    expect(screen.getByDisplayValue('7,5')).toBeVisible();
   });
 });
