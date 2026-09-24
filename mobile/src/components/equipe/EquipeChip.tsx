@@ -36,7 +36,10 @@ export function EquipeChip({ equipe, onChanger }: Props) {
           {equipe.nom}
         </ThemedText>
       </View>
-      <EquipeBadge texte={equipe.type === 'aerien' ? 'AÉRIENNE' : 'TERRESTRE'} ton={equipe.type === 'aerien' ? 'vertDoux' : 'ambre'} />
+      {/* `EquipeBadge` s'aligne en haut (`alignSelf: flex-start`) : ce conteneur le recentre avec le reste de la ligne. */}
+      <View style={styles.badgeCentre}>
+        <EquipeBadge texte={equipe.type === 'aerien' ? 'AÉRIENNE' : 'TERRESTRE'} ton={equipe.type === 'aerien' ? 'vertDoux' : 'ambre'} />
+      </View>
       <TouchableOpacity
         onPress={onChanger}
         accessibilityRole="button"
@@ -70,6 +73,7 @@ const styles = StyleSheet.create({
   etiquetteVide: { color: EQ.ambre, opacity: 1 },
   aideVide: { color: EQ.ambre },
   texte: { flex: 1, gap: 2 },
+  badgeCentre: { alignSelf: 'center' },
   etiquette: { fontSize: 9, fontWeight: '500', opacity: 0.75, color: EQ.surMarque },
   nom: { fontSize: 12, fontWeight: '600', color: EQ.surMarque },
   aide: { fontSize: 10.5, color: EQ.surMarque },
