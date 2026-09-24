@@ -40,6 +40,9 @@ function emptyResponse(serverTime: string) {
     lieux_aeriens: { upserts: [], server_time: serverTime },
     equipes: { upserts: [], server_time: serverTime },
     equipe_membres: { upserts: [], server_time: serverTime },
+    sites_aeriens: { upserts: [], server_time: serverTime },
+    aeronefs: { upserts: [], server_time: serverTime },
+    equipe_aeronefs: { upserts: [], server_time: serverTime },
   };
 }
 
@@ -62,6 +65,9 @@ describe('pullReferentiel', () => {
         lieux_aeriens: null,
         equipes: null,
         equipe_membres: null,
+        sites_aeriens: null,
+        aeronefs: null,
+        equipe_aeronefs: null,
       },
       undefined
     );
@@ -112,6 +118,9 @@ describe('pullReferentiel', () => {
         lieux_aeriens: null,
         equipes: null,
         equipe_membres: null,
+        sites_aeriens: null,
+        aeronefs: null,
+        equipe_aeronefs: null,
       },
       undefined
     );
@@ -150,6 +159,53 @@ describe('pullReferentiel', () => {
     const membre = appels.find(([sql]) => sql.includes('INSERT INTO equipe_membre'));
     expect(membre?.[0]).toContain('ON CONFLICT(equipe_id, user_id) DO UPDATE');
     expect(membre?.[1]).toEqual(['eq-1', 'u-1', 'chef', 'Rakoto', 'Jean']);
+  });
+
+  it('upserts les sites aériens (avec leur position active), les aéronefs et leurs affectations', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      sites_aeriens: {
+        upserts: [
+          {
+            id: 'site-1',
+            parent_site_id: null,
+            equipe_id: 'eq-1',
+            numero: 'n°03',
+            localite: 'Isoanala',
+            actif: true,
+            latitude: -22.1,
+            longitude: 46.2,
+            altitude: null,
+            date_debut_position: '2026-09-12',
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      aeronefs: {
+        upserts: [
+          { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', volume_cuve_l: 800, actif: true, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      equipe_aeronefs: {
+        upserts: [
+          { id: 'aff-1', equipe_id: 'eq-1', aeronef_id: 'ae-1', date_debut: '2026-08-01', date_fin: null, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    const appels = runAsync.mock.calls.map(([sql, params]) => [String(sql), params]);
+    const site = appels.find(([sql]) => sql.includes('INSERT INTO site_aerien'));
+    expect(site?.[0]).toContain('ON CONFLICT(id) DO UPDATE');
+    expect(site?.[1]).toEqual(['site-1', null, 'eq-1', 'n°03', 'Isoanala', 1, -22.1, 46.2, null, '2026-09-12', '2026-08-01T00:00:00Z']);
+    const aeronef = appels.find(([sql]) => sql.includes('INSERT INTO aeronef'));
+    expect(aeronef?.[1]).toEqual(['ae-1', '5R-MHR', 'Cessna 188', 800, 1, '2026-08-01T00:00:00Z']);
+    const affectation = appels.find(([sql]) => sql.includes('INSERT INTO equipe_aeronef'));
+    expect(affectation?.[1]).toEqual(['aff-1', 'eq-1', 'ae-1', '2026-08-01', null, '2026-08-01T00:00:00Z']);
   });
 
   it('upserts each poste acridien idempotently by id', async () => {

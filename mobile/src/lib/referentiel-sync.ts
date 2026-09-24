@@ -2,7 +2,9 @@ import {
   apiClient,
   CampagneSync,
   CodeStadeSync,
+  AeronefSync,
   CultureSync,
+  EquipeAeronefSync,
   EquipeMembreSync,
   EquipeSync,
   LieuAerienSync,
@@ -10,6 +12,7 @@ import {
   PosteAcridienSync,
   ReferentielPullResponse,
   ReferentielSinceCursors,
+  SiteAerienSync,
   StationFixeSync,
   UtilisateurEquipeSync,
 } from './api-client';
@@ -28,6 +31,9 @@ const ENTITY_TYPES: EntityType[] = [
   'lieux_aeriens',
   'equipes',
   'equipe_membres',
+  'sites_aeriens',
+  'aeronefs',
+  'equipe_aeronefs',
 ];
 
 const TABLE_PAR_ENTITE: Record<EntityType, string> = {
@@ -41,6 +47,9 @@ const TABLE_PAR_ENTITE: Record<EntityType, string> = {
   lieux_aeriens: 'lieu_aerien',
   equipes: 'equipe',
   equipe_membres: 'equipe_membre',
+  sites_aeriens: 'site_aerien',
+  aeronefs: 'aeronef',
+  equipe_aeronefs: 'equipe_aeronef',
 };
 
 /**
@@ -153,6 +162,86 @@ async function upsertEquipeMembres(
        ON CONFLICT(equipe_id, user_id) DO UPDATE SET
          fonction = excluded.fonction, nom = excluded.nom, prenom = excluded.prenom`,
       [membre.equipe_id, membre.user_id, membre.fonction, membre.nom ?? null, membre.prenom ?? null]
+    );
+  }
+}
+
+async function upsertSitesAeriens(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  upserts: SiteAerienSync[]
+): Promise<void> {
+  for (const site of upserts) {
+    await db.runAsync(
+      `INSERT INTO site_aerien
+         (id, parent_site_id, equipe_id, numero, localite, actif,
+          latitude, longitude, altitude, date_debut_position, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         parent_site_id = excluded.parent_site_id, equipe_id = excluded.equipe_id,
+         numero = excluded.numero, localite = excluded.localite, actif = excluded.actif,
+         latitude = excluded.latitude, longitude = excluded.longitude, altitude = excluded.altitude,
+         date_debut_position = excluded.date_debut_position, updated_at = excluded.updated_at`,
+      [
+        site.id,
+        site.parent_site_id,
+        site.equipe_id,
+        site.numero,
+        site.localite,
+        site.actif ? 1 : 0,
+        site.latitude ?? null,
+        site.longitude ?? null,
+        site.altitude ?? null,
+        site.date_debut_position ?? null,
+        site.updated_at,
+      ]
+    );
+  }
+}
+
+async function upsertAeronefs(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  upserts: AeronefSync[]
+): Promise<void> {
+  for (const aeronef of upserts) {
+    await db.runAsync(
+      `INSERT INTO aeronef (id, immatriculation, societe, volume_cuve_l, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         immatriculation = excluded.immatriculation, societe = excluded.societe,
+         volume_cuve_l = excluded.volume_cuve_l, actif = excluded.actif,
+         updated_at = excluded.updated_at`,
+      [
+        aeronef.id,
+        aeronef.immatriculation,
+        aeronef.societe,
+        aeronef.volume_cuve_l,
+        aeronef.actif ? 1 : 0,
+        aeronef.updated_at,
+      ]
+    );
+  }
+}
+
+async function upsertEquipeAeronefs(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  upserts: EquipeAeronefSync[]
+): Promise<void> {
+  for (const affectation of upserts) {
+    await db.runAsync(
+      `INSERT INTO equipe_aeronef (id, equipe_id, aeronef_id, date_debut, date_fin, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         equipe_id = excluded.equipe_id, aeronef_id = excluded.aeronef_id,
+         date_debut = excluded.date_debut, date_fin = excluded.date_fin,
+         updated_at = excluded.updated_at`,
+      [
+        affectation.id,
+        affectation.equipe_id,
+        affectation.aeronef_id,
+        affectation.date_debut,
+        affectation.date_fin ?? null,
+        affectation.updated_at,
+      ]
     );
   }
 }
@@ -337,6 +426,9 @@ export async function pullReferentiel(token: string, onUnauthorized?: () => void
   await upsertLieuxAeriens(db, response.lieux_aeriens.upserts);
   await upsertEquipes(db, response.equipes.upserts);
   await upsertEquipeMembres(db, response.equipe_membres.upserts);
+  await upsertSitesAeriens(db, response.sites_aeriens.upserts);
+  await upsertAeronefs(db, response.aeronefs.upserts);
+  await upsertEquipeAeronefs(db, response.equipe_aeronefs.upserts);
 
   for (const entityType of ENTITY_TYPES) {
     await updateSyncCursor(db, entityType, response[entityType].server_time);

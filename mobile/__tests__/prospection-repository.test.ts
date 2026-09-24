@@ -32,6 +32,7 @@ import {
   deleteProspectionInfestation,
   listAllProspectionInfestations,
   deleteProspection,
+  derniereInterventionEquipe,
 } from '../src/lib/prospection-repository';
 
 const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
@@ -1613,5 +1614,25 @@ describe('deleteProspection', () => {
     const result = await deleteProspection('missing-id');
 
     expect(result).toBe(false);
+  });
+});
+describe('derniereInterventionEquipe (#641)', () => {
+  it('rend la date de la dernière prospection ou du dernier traitement rattaché à l’équipe', async () => {
+    getFirstAsync.mockResolvedValueOnce({ derniere: '2026-09-20' });
+
+    expect(await derniereInterventionEquipe('eq-1')).toBe('2026-09-20');
+
+    const [sql, params] = getFirstAsync.mock.calls[getFirstAsync.mock.calls.length - 1];
+    expect(sql).toContain('FROM prospection');
+    expect(sql).toContain('FROM traitement');
+    expect(params).toEqual(['eq-1', 'eq-1']);
+  });
+
+  it('rend null quand l’équipe n’a encore aucune intervention locale', async () => {
+    getFirstAsync.mockResolvedValueOnce({ derniere: null });
+    expect(await derniereInterventionEquipe('eq-1')).toBeNull();
+
+    getFirstAsync.mockResolvedValueOnce(null);
+    expect(await derniereInterventionEquipe('eq-1')).toBeNull();
   });
 });

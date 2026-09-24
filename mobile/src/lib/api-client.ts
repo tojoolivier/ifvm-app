@@ -372,6 +372,10 @@ export type LieuAerienSync = components['schemas']['LieuAerienSyncRead'];
 export type EquipeSync = components['schemas']['EquipeSyncRead'];
 export type EquipeMembreSync = components['schemas']['EquipeMembreSyncRead'];
 
+export type SiteAerienSync = components['schemas']['SiteAerienneSyncRead'];
+export type AeronefSync = components['schemas']['AeronefSyncRead'];
+export type EquipeAeronefSync = components['schemas']['EquipeAeronefSyncRead'];
+
 export interface ReferentielPullResponse {
   postes_acridiens: EntityPull<PosteAcridienSync>;
   stations_fixes: EntityPull<StationFixeSync>;
@@ -383,6 +387,9 @@ export interface ReferentielPullResponse {
   lieux_aeriens: EntityPull<LieuAerienSync>;
   equipes: EntityPull<EquipeSync>;
   equipe_membres: EntityPull<EquipeMembreSync>;
+  sites_aeriens: EntityPull<SiteAerienSync>;
+  aeronefs: EntityPull<AeronefSync>;
+  equipe_aeronefs: EntityPull<EquipeAeronefSync>;
 }
 
 /**
@@ -1061,6 +1068,18 @@ export const apiClient = {
 
     if (cursors.equipe_membres) {
       query.set('since_equipe_membres', cursors.equipe_membres);
+    }
+
+    if (cursors.sites_aeriens) {
+      query.set('since_sites_aeriens', cursors.sites_aeriens);
+    }
+
+    if (cursors.aeronefs) {
+      query.set('since_aeronefs', cursors.aeronefs);
+    }
+
+    if (cursors.equipe_aeronefs) {
+      query.set('since_equipe_aeronefs', cursors.equipe_aeronefs);
     }
 
     const qs = query.toString();

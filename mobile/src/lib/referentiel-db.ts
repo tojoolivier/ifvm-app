@@ -117,6 +117,9 @@ const TABLES_REFERENTIEL = [
   'lieu_aerien',
   'equipe',
   'equipe_membre',
+  'site_aerien',
+  'aeronef',
+  'equipe_aeronef',
 ];
 
 /**
@@ -500,6 +503,42 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     );
 
     CREATE INDEX IF NOT EXISTS ix_equipe_membre_user_id ON equipe_membre(user_id);
+
+    CREATE TABLE IF NOT EXISTS site_aerien (
+      id TEXT PRIMARY KEY NOT NULL,
+      parent_site_id TEXT,
+      equipe_id TEXT,
+      numero TEXT NOT NULL,
+      localite TEXT NOT NULL,
+      actif INTEGER NOT NULL DEFAULT 1,
+      latitude REAL,
+      longitude REAL,
+      altitude REAL,
+      date_debut_position TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_site_aerien_equipe_id ON site_aerien(equipe_id);
+
+    CREATE TABLE IF NOT EXISTS aeronef (
+      id TEXT PRIMARY KEY NOT NULL,
+      immatriculation TEXT NOT NULL,
+      societe TEXT NOT NULL,
+      volume_cuve_l REAL NOT NULL,
+      actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS equipe_aeronef (
+      id TEXT PRIMARY KEY NOT NULL,
+      equipe_id TEXT NOT NULL,
+      aeronef_id TEXT NOT NULL,
+      date_debut TEXT NOT NULL,
+      date_fin TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_equipe_aeronef_equipe_id ON equipe_aeronef(equipe_id);
 
     CREATE TABLE IF NOT EXISTS referentiel_sync_meta (
       entity_type TEXT PRIMARY KEY NOT NULL,

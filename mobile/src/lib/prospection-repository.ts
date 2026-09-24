@@ -1872,6 +1872,24 @@ export async function countUnsyncedProspections(): Promise<number> {
   return row?.count ?? 0;
 }
 
+/**
+ * Date de la dernière intervention (prospection ou traitement) rattachée à l'équipe sur CET
+ * appareil — position courante déductible d'une équipe mobile terrestre (#607/#641), affichée sur
+ * l'Accueil et l'écran Équipes. `null` sans intervention locale.
+ */
+export async function derniereInterventionEquipe(equipeId: string): Promise<string | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ derniere: string | null }>(
+    `SELECT MAX(d) AS derniere FROM (
+       SELECT date_prospection AS d FROM prospection WHERE equipe_id = ?
+       UNION ALL
+       SELECT date_traitement AS d FROM traitement WHERE equipe_id = ?
+     )`,
+    [equipeId, equipeId]
+  );
+  return row?.derniere ?? null;
+}
+
 export async function deleteProspection(id: string): Promise<boolean> {
   const db = await getDb();
   const result = await db.runAsync(`DELETE FROM prospection WHERE id = ?`, [id]);
