@@ -157,3 +157,14 @@ export function validerNouvelAeronef(aeronef: NouvelAeronef): string[] {
 export function aeronefPreselectionne(aeronefsAffectes: { immatriculation: string }[]): string {
   return aeronefsAffectes.length === 1 ? aeronefsAffectes[0].immatriculation : '';
 }
+
+/**
+ * Affectation en service à la date donnée : commencée (`date_debut <= aujourdhui`) et non terminée
+ * (`date_fin` absente ou pas encore passée). Une affectation future n'est pas « active ».
+ */
+export function affectationActive<T extends { date_debut: string; date_fin: string | null }>(
+  affectations: T[],
+  aujourdhui: string
+): T | null {
+  return affectations.find((a) => a.date_debut <= aujourdhui && (a.date_fin === null || a.date_fin >= aujourdhui)) ?? null;
+}

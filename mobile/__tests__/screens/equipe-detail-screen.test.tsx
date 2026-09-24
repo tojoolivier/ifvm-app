@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import EquipeDetailScreen from '@/app/(app)/equipe-detail';
 import { useAuthStore } from '@/lib/auth-store';
-import { listAeronefsActifs, listAffectationsEquipe, listMembresEquipe, listSitesEquipe } from '@/lib/equipe-db';
+import { listAffectationsEquipe, listParcAeronefs, listMembresEquipe, listSitesEquipe } from '@/lib/equipe-db';
 import { getEquipeLocale } from '@/lib/referentiel-db';
 
 const mockPush = jest.fn();
@@ -16,7 +16,7 @@ jest.mock('@/lib/equipe-db', () => ({
   listMembresEquipe: jest.fn(),
   listSitesEquipe: jest.fn(),
   listAffectationsEquipe: jest.fn(),
-  listAeronefsActifs: jest.fn(),
+  listParcAeronefs: jest.fn(),
 }));
 jest.mock('@/lib/referentiel-sync', () => ({ pullReferentiel: jest.fn() }));
 jest.mock('@/lib/referentiel-db', () => ({ getEquipeLocale: jest.fn() }));
@@ -39,9 +39,9 @@ beforeEach(() => {
     { id: 'af-2', aeronef_id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', date_debut: '2026-09-01', date_fin: null },
     { id: 'af-1', aeronef_id: 'ae-2', immatriculation: '5R-MJK', societe: 'Cessna 188', date_debut: '2026-05-01', date_fin: '2026-08-31' },
   ]);
-  jest.mocked(listAeronefsActifs).mockResolvedValue([
-    { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188' },
-    { id: 'ae-2', immatriculation: '5R-MJK', societe: 'Cessna 188' },
+  jest.mocked(listParcAeronefs).mockResolvedValue([
+    { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', volume_cuve_l: 800, equipe_id: 'eq-sud', equipe_nom: 'Équipe Sud' },
+    { id: 'ae-2', immatriculation: '5R-MJK', societe: 'Cessna 188', volume_cuve_l: 800, equipe_id: null, equipe_nom: null },
   ]);
 });
 

@@ -267,7 +267,10 @@ export default function ReferencesScreen() {
                   // Aéronef : affectation active de l'équipe à la date de saisie (#642).
                   immatriculeAeronef: aeronefPreselectionne(
                     equipeId && store.ref.dateTraitement
-                      ? await listAeronefsEquipe(equipeId, store.ref.dateTraitement)
+                      ? await listAeronefsEquipe(equipeId, store.ref.dateTraitement).catch((error) => {
+                          logger.ignore(error, 'aéronef non pré-rempli : la saisie reste libre');
+                          return [];
+                        })
                       : []
                   ),
                 })

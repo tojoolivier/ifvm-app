@@ -43,7 +43,6 @@ describe('ParcAeronefsScreen', () => {
     await render(<ParcAeronefsScreen />);
     await screen.findByText('AFFECTATION ACTIVE');
 
-    expect(screen.queryByText('＋ Ajouter un appareil')).toBeNull();
     expect(screen.queryByText('＋ Appareil')).toBeNull();
   });
 
@@ -51,6 +50,6 @@ describe('ParcAeronefsScreen', () => {
     useAuthStore.setState({ user: { id: 'u-1', role: 'admin' } } as any);
     await render(<ParcAeronefsScreen />);
 
-    expect(await screen.findByText('＋ Ajouter un appareil')).toBeVisible();
+    expect(await screen.findByText('＋ Appareil')).toBeVisible();
   });
 });

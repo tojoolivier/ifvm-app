@@ -15,14 +15,14 @@ import { peutCreerEquipe, peutGererParcAeronefs } from '@/lib/equipe-aerienne-ac
 import {
   aujourdhuiIso,
   AffectationLocale,
-  listAeronefsActifs,
   listAffectationsEquipe,
+  listParcAeronefs,
   listMembresEquipe,
   listSitesEquipe,
   MembreEquipeLocal,
   SiteEquipe,
 } from '@/lib/equipe-db';
-import { jourMois, jourMoisAnnee, joursDepuis, libelleFonction, libelleSite } from '@/lib/equipe-regles';
+import { affectationActive, jourMois, jourMoisAnnee, joursDepuis, libelleFonction, libelleSite } from '@/lib/equipe-regles';
 import { EquipeLocale, getEquipeLocale } from '@/lib/referentiel-db';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
@@ -62,16 +62,17 @@ export default function EquipeDetailScreen() {
       listMembresEquipe(id),
       listSitesEquipe(id),
       listAffectationsEquipe(id),
-      listAeronefsActifs(),
+      listParcAeronefs(aujourdhuiIso()),
     ])
-      .then(([e, m, s, a, actifs]) => {
+      .then(([e, m, s, a, parc]) => {
         setEquipe(e);
         setMembres(m);
         setSites(s);
         setAffectations(a);
-        const enCours = new Set(a.filter((x) => x.date_fin === null).map((x) => x.aeronef_id));
+        // Seuls les appareils libres sont proposés : un appareil déjà affecté (ici ou ailleurs) ferait
+        // rejeter l'affectation par le serveur.
         setAeronefsLibres(
-          actifs.filter((x) => !enCours.has(x.id)).map((x) => ({ valeur: x.id, libelle: `${x.immatriculation} · ${x.societe}` }))
+          parc.filter((x) => x.equipe_id === null).map((x) => ({ valeur: x.id, libelle: `${x.immatriculation} · ${x.societe}` }))
         );
       })
       .catch((error) => signalerChargement(error, { equipeId: id }));
@@ -84,8 +85,8 @@ export default function EquipeDetailScreen() {
   );
 
   const aujourdhui = aujourdhuiIso();
-  const active = affectations.find((a) => a.date_fin === null || a.date_fin >= aujourdhui) ?? null;
-  const historique = affectations.filter((a) => a !== active);
+  const active = affectationActive(affectations, aujourdhui);
+  const historique = affectations.filter((a) => a.id !== active?.id);
   const gestionParc = peutGererParcAeronefs(role);
 
   // Écritures en ligne uniquement (#642) : hors-ligne, l'erreur réseau s'affiche telle quelle et

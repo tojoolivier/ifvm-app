@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { AffectationActiveCard } from '@/components/equipe/AffectationActiveCard';
@@ -17,7 +17,7 @@ import {
   listAffectationsEquipe,
   listParcAeronefs,
 } from '@/lib/equipe-db';
-import { jourMoisAnnee, joursDepuis } from '@/lib/equipe-regles';
+import { affectationActive, jourMoisAnnee, joursDepuis } from '@/lib/equipe-regles';
 
 /**
  * Parc aéronefs (#642, Figma « Parc aéronefs ») : l'affectation active de l'équipe de travail mise
@@ -40,7 +40,7 @@ export default function ParcAeronefsScreen() {
       Promise.all([listParcAeronefs(aujourdhui), equipeId ? listAffectationsEquipe(equipeId) : Promise.resolve([])])
         .then(([p, affectations]) => {
           setParc(p);
-          setActive(affectations.find((a) => a.date_fin === null || a.date_fin >= aujourdhui) ?? null);
+          setActive(affectationActive(affectations, aujourdhui));
         })
         .catch((error) => signalerChargement(error, { source: 'parc-aeronefs' }));
     }, [equipeId, signalerChargement])
@@ -81,15 +81,6 @@ export default function ParcAeronefsScreen() {
             {a.equipe_nom ? <EquipeBadge texte={a.equipe_nom} /> : <EquipeBadge texte="Libre" ton="neutre" />}
           </View>
         ))}
-        {peutGererParcAeronefs(role) && (
-          <TouchableOpacity
-            style={styles.ajout}
-            onPress={() => router.push('/(app)/aeronef-nouveau' as any)}
-            accessibilityRole="button"
-          >
-            <ThemedText style={styles.ajoutTexte}>＋ Ajouter un appareil</ThemedText>
-          </TouchableOpacity>
-        )}
       </ScrollView>
     </View>
   );
@@ -117,6 +108,4 @@ const styles = StyleSheet.create({
   textes: { flex: 1 },
   immat: { fontSize: 13, fontWeight: '700', fontFamily: 'monospace', color: EQ.encre },
   societe: { fontSize: 10, fontWeight: '500', color: EQ.etiquette },
-  ajout: { paddingVertical: 12, alignItems: 'center' },
-  ajoutTexte: { fontSize: 12, fontWeight: '700', color: EQ.vert },
 });
