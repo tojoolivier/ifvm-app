@@ -23,19 +23,18 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
 
 /** Même composant/style que `DetailRows` côté Extensif (extensive-recap.tsx) —
  * une ligne label/valeur, jamais masquée silencieusement (« — » si absent). */
 function DetailRows({ rows }: { rows: DetailRowViewModel[] }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <>
       {rows.map((row) => (
@@ -61,7 +60,8 @@ export default function ReviewScreen() {
   const signalerChargement = useSignalerChargement('review');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   useEffect(() => {
     if (!draft) return;
@@ -297,9 +297,9 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   headerGreen: { backgroundColor: GREEN, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16 },
   headerRowGreen: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -307,21 +307,21 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   titleWhite: { fontSize: typeSizes.titleWhite, fontWeight: '700', color: '#fff' },
   subtitleWhite: { fontSize: typeSizes.subtitleWhite, fontWeight: '500', color: '#ffffffcc', marginTop: 2 },
   scroll: { flex: 1 },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 11 },
   checkBadge: { width: 24, height: 24, borderRadius: 7, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
   checkBadgeText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.checkBadgeText },
-  checkLabel: { fontSize: typeSizes.checkLabel, fontWeight: '600', color: '#2a2a22' },
-  detailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginTop: -2 },
+  checkLabel: { fontSize: typeSizes.checkLabel, fontWeight: '600', color: theme.text },
+  detailCard: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 11, marginTop: -2 },
   detailSubtitle: { fontSize: typeSizes.detailSubtitle, fontWeight: '700', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  detailSubtitleSmall: { fontSize: typeSizes.detailSubtitleSmall, fontWeight: '700', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
-  detailLine: { fontSize: typeSizes.detailLine, color: '#5c5848', lineHeight: 17 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  detailSubtitleSmall: { fontSize: typeSizes.detailSubtitleSmall, fontWeight: '700', color: theme.faint, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  detailLine: { fontSize: typeSizes.detailLine, color: theme.muted, lineHeight: 17 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.border },
   // #lisibilite-terrain : libellés/valeurs agrandis (au lieu de 11.5px) pour rester
   // lisibles sur le terrain, y compris pour la densité.
-  detailRowLabel: { fontSize: typeSizes.detailRowLabel, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
-  detailRowValue: { fontSize: typeSizes.detailRowValue, color: TEXT, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
-  offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
-  offlineText: { fontSize: typeSizes.offlineText, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
+  detailRowLabel: { fontSize: typeSizes.detailRowLabel, fontWeight: '600', color: theme.muted, flexShrink: 1 },
+  detailRowValue: { fontSize: typeSizes.detailRowValue, color: theme.text, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
+  offlineBanner: { marginTop: 6, backgroundColor: theme.warnBg, borderWidth: 1, borderColor: theme.warnBorder, borderRadius: 11, padding: 12 },
+  offlineText: { fontSize: typeSizes.offlineText, lineHeight: 16, color: theme.warn, fontWeight: '500' },
   footer: { padding: 16 },
   saveButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.saveButtonText },

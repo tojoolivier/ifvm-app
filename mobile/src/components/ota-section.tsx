@@ -24,6 +24,8 @@ import {
   type EtatOta,
 } from '@/lib/ota';
 import { PRIMARY } from '@/components/erreurs/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 /**
  * Trios sémantiques de DESIGN.md (fond / texte), une famille par état.
@@ -71,7 +73,8 @@ export function OtaSection() {
   const [techOuvert, setTechOuvert] = useState(false);
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   useEffect(() => {
     if (!actif) return;
@@ -203,7 +206,8 @@ export function OtaSection() {
 function TechLigne({ label, value }: { label: string; value: string }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   return (
     <View style={styles.techLigne}>
@@ -234,12 +238,12 @@ function computeTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     section: { paddingHorizontal: 16, marginBottom: 16 },
-    sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '600', color: '#1A237E', marginBottom: 10 },
+    sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '600', color: theme.title, marginBottom: 10 },
     card: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderRadius: 14,
       padding: 16,
       shadowColor: '#000',
@@ -258,7 +262,7 @@ function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
       borderBottomColor: '#F0F0F0',
     },
     headerTexts: { flex: 1 },
-    version: { fontSize: typeSizes.version, fontWeight: '600', color: '#1A237E' },
+    version: { fontSize: typeSizes.version, fontWeight: '600', color: theme.title },
     date: { fontSize: typeSizes.date, color: FOREGROUND_TERTIARY, marginTop: 2 },
     badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
     badgeText: { fontSize: typeSizes.badgeText, fontWeight: '700' },
@@ -270,8 +274,8 @@ function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
       marginTop: 12,
     },
     boutonText: { fontSize: typeSizes.boutonText, color: PRIMARY, fontWeight: '600' },
-    boutonTextOff: { color: '#9E9E9E' },
-    fleche: { fontSize: typeSizes.fleche, color: '#9E9E9E' },
+    boutonTextOff: { color: theme.faint },
+    fleche: { fontSize: typeSizes.fleche, color: theme.faint },
     hint: { fontSize: typeSizes.hint, color: FOREGROUND_TERTIARY, marginTop: 8 },
     hintErreur: { color: DANGER_TEXT },
     techToggle: { marginTop: 12 },
@@ -283,7 +287,7 @@ function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
       flex: 1,
       textAlign: 'right',
       fontSize: typeSizes.techValue,
-      color: '#1A237E',
+      color: theme.title,
       fontFamily: 'monospace',
     },
     copier: { marginTop: 8, alignSelf: 'flex-start', paddingVertical: 6 },

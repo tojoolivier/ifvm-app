@@ -23,6 +23,8 @@ import { logger } from '@/lib/logger';
 import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -97,7 +99,8 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const [prospections, setProspections] = useState<DraftProspection[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
@@ -437,7 +440,8 @@ function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
   const max = Math.max(1, ...data.map((d) => d.count));
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   return (
     <View style={styles.weekChart}>
@@ -490,7 +494,7 @@ const BASE_TYPE_SIZES = {
   footerText: 12,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: {
       flex: 1,
@@ -795,7 +799,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       paddingVertical: 20,
     },
     footerText: {
-      color: '#BDBDBD',
+      color: theme.faint,
       fontSize: typeSizes.footerText,
     },
   });

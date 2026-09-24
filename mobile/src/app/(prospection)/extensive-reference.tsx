@@ -43,19 +43,15 @@ import { scaleTypeSizes } from '@/lib/typography';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
-const AUTO_BG = '#eaf2ec';
-const INACTIVE_BG = '#efeada';
 // Teinte dédiée aux zones à REMPLIR du bloc aéronef/équipe (distincte du vert
 // AUTO_BG déjà réservé aux informations auto-remplies À LIRE) — un crème plus
 // doré que le fond de page (BG), volontairement subtil (cf. demande UX : « ne
 // pas utiliser des couleurs trop fortes »).
-const FILL_BG = '#fdf6e3';
 
 /**
  * Auto-généré côté client comme n_fiche (cf. reference.tsx), faute de
@@ -172,7 +168,8 @@ function AerienField({
   const isFocused = focusedField === label;
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <View style={[styles.aerienFieldGroup, style]}>
       <Text style={styles.aerienFieldLabel}>{label}</Text>
@@ -207,7 +204,8 @@ function LocalisationBaseField({
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <View style={styles.gpsBaseRow}>
       <TouchableOpacity
@@ -335,7 +333,8 @@ export default function ExtensiveReferenceScreen() {
   const { run: runCapturerPositionBaseSecondaire, isRunning: isRunningCapturerPositionBaseSecondaire } = useAsyncAction();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   // Récupération automatique des coordonnées GPS
   useEffect(() => {
@@ -1098,40 +1097,40 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
-  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
+  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: theme.chipBg },
   progressActive: { backgroundColor: GREEN },
   scroll: { flex: 1 },
-  quoteBanner: { backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 10, padding: 11, marginBottom: 10 },
-  quoteText: { fontSize: typeSizes.quoteText, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
+  quoteBanner: { backgroundColor: theme.warnBg, borderWidth: 1, borderColor: theme.warnBorder, borderRadius: 10, padding: 11, marginBottom: 10 },
+  quoteText: { fontSize: typeSizes.quoteText, lineHeight: 16, color: theme.warn, fontWeight: '500' },
   row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   flex1: { flex: 1 },
-  autoCard: { backgroundColor: AUTO_BG, borderRadius: 10, padding: 9, marginBottom: 8 },
+  autoCard: { backgroundColor: theme.successBg, borderRadius: 10, padding: 9, marginBottom: 8 },
   autoLabel: { fontSize: typeSizes.autoLabel, fontWeight: '600', color: GREEN, textTransform: 'uppercase' },
-  autoValue: { fontSize: typeSizes.autoValue, fontWeight: '700', color: TEXT },
-  autoValueMono: { fontSize: typeSizes.autoValueMono, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
-  autoInputMono: { fontSize: typeSizes.autoInputMono, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9, marginBottom: 8 },
-  label: { fontSize: typeSizes.label, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
-  input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, padding: 0 },
+  autoValue: { fontSize: typeSizes.autoValue, fontWeight: '700', color: theme.text },
+  autoValueMono: { fontSize: typeSizes.autoValueMono, fontWeight: '700', color: theme.text, fontFamily: 'monospace' },
+  autoInputMono: { fontSize: typeSizes.autoInputMono, fontWeight: '700', color: theme.text, fontFamily: 'monospace', padding: 0 },
+  card: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 9, marginBottom: 8 },
+  label: { fontSize: typeSizes.label, fontWeight: '600', color: theme.faint, textTransform: 'uppercase' },
+  input: { fontSize: typeSizes.input, fontWeight: '600', color: theme.text, padding: 0 },
   // #revalidation-verrouillage-localisation : Station non modifiable.
-  inputLocked: { color: TEXT_SECONDARY },
-  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 7 },
-  requiredLabel: { color: '#c0412b' },
+  inputLocked: { color: theme.muted },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '700', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 7 },
+  requiredLabel: { color: theme.danger },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { 
     fontSize: typeSizes.chip, 
     fontWeight: '600', 
-    color: TEXT_SECONDARY, 
-    backgroundColor: INACTIVE_BG, 
+    color: theme.muted, 
+    backgroundColor: theme.inputBg, 
     paddingHorizontal: 12, 
     paddingVertical: 8, 
     borderRadius: 8, 
@@ -1142,24 +1141,24 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
     color: '#fff', 
     fontWeight: '700' 
   },
-  hintText: { fontSize: typeSizes.hintText, color: '#9a9484', marginTop: 8, marginBottom: 10 },
+  hintText: { fontSize: typeSizes.hintText, color: theme.faint, marginTop: 8, marginBottom: 10 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.continueButtonText },
   gpsLoading: { 
     fontSize: typeSizes.gpsLoading, 
     fontWeight: '600', 
-    color: TEXT_SECONDARY,
+    color: theme.muted,
     fontStyle: 'italic'
   },
   gpsErrorText: {
     fontSize: typeSizes.gpsErrorText,
-    color: '#d32f2f',
+    color: theme.danger,
     marginTop: 2
   },
   stationAutoHint: {
     fontSize: typeSizes.stationAutoHint,
-    color: TEXT_SECONDARY,
+    color: theme.muted,
     fontStyle: 'italic',
     marginTop: 4,
   },
@@ -1167,37 +1166,37 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   // Bloc « Informations aéronef / équipe » (#ux-aerien) : un conteneur visuel
   // dédié — icône + titre, sous-groupes Aéronef/Équipe/Base — pour que l'agent
   // identifie la zone d'un coup d'œil, plutôt que des champs mêlés au reste.
-  aerienInfoBlock: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 12, marginBottom: 10 },
-  aerienInfoHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10, paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: BORDER },
+  aerienInfoBlock: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 12, padding: 12, marginBottom: 10 },
+  aerienInfoHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10, paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: theme.inputBorder },
   aerienInfoIcon: { fontSize: typeSizes.aerienInfoIcon, color: GREEN },
   aerienInfoTitle: { fontSize: typeSizes.aerienInfoTitle, fontWeight: '800', color: GREEN, letterSpacing: 0.5, textTransform: 'uppercase' },
-  aerienSubgroupLabel: { fontSize: typeSizes.aerienSubgroupLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
+  aerienSubgroupLabel: { fontSize: typeSizes.aerienSubgroupLabel, fontWeight: '700', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
   // Zone À REMPLIR (vs. les `autoCard`/`card` de lecture ailleurs sur cet écran) :
-  // fond FILL_BG, bordure GREEN en focus — cf. commentaire de FILL_BG plus haut.
+  // fond theme.warnBg, bordure GREEN en focus — cf. commentaire de theme.warnBg plus haut.
   aerienFieldGroup: { marginBottom: 10 },
   aerienFieldNoMargin: { marginBottom: 0 },
-  aerienFieldLabel: { fontSize: typeSizes.aerienFieldLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
-  aerienFieldBox: { backgroundColor: FILL_BG, borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9 },
+  aerienFieldLabel: { fontSize: typeSizes.aerienFieldLabel, fontWeight: '600', color: theme.faint, textTransform: 'uppercase', marginBottom: 4 },
+  aerienFieldBox: { backgroundColor: theme.warnBg, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9 },
   aerienFieldBoxFocused: { borderColor: GREEN, borderWidth: 1.5 },
-  aerienFieldInput: { fontSize: typeSizes.aerienFieldInput, fontWeight: '600', color: TEXT, padding: 0 },
+  aerienFieldInput: { fontSize: typeSizes.aerienFieldInput, fontWeight: '600', color: theme.text, padding: 0 },
   aerienFieldRowSplit: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   gpsBaseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   gpsBaseButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12 },
   gpsBaseButtonText: { fontSize: typeSizes.gpsBaseButtonText, fontWeight: '700', color: '#fff' },
-  gpsBaseValue: { fontSize: typeSizes.gpsBaseValue, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
+  gpsBaseValue: { fontSize: typeSizes.gpsBaseValue, fontWeight: '600', color: theme.muted, flexShrink: 1 },
   // « Motif du divers » (#ux-aerien) : même style de zone à remplir que le bloc
   // aéronef/équipe, réutilisé ici pour rester cohérent visuellement.
   operationMotifDivers: { marginTop: 4 },
   operationHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   operationTitle: { fontSize: typeSizes.operationTitle, fontWeight: '800', color: GREEN, letterSpacing: 0.4 },
-  operationRemove: { fontSize: typeSizes.operationRemove, fontWeight: '700', color: '#c0412b' },
+  operationRemove: { fontSize: typeSizes.operationRemove, fontWeight: '700', color: theme.danger },
   operationSubLabel: { marginTop: 10, marginBottom: 6 },
   operationRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  operationCell: { flex: 1, backgroundColor: AUTO_BG, borderRadius: 8, padding: 8 },
+  operationCell: { flex: 1, backgroundColor: theme.successBg, borderRadius: 8, padding: 8 },
   operationCellLabel: { fontSize: typeSizes.operationCellLabel, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 3 },
-  operationInput: { fontSize: typeSizes.operationInput, fontWeight: '700', color: TEXT, padding: 0 },
-  operationTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: BORDER },
-  operationTotalLabel: { fontSize: typeSizes.operationTotalLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase' },
+  operationInput: { fontSize: typeSizes.operationInput, fontWeight: '700', color: theme.text, padding: 0 },
+  operationTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.inputBorder },
+  operationTotalLabel: { fontSize: typeSizes.operationTotalLabel, fontWeight: '700', color: theme.muted, textTransform: 'uppercase' },
   operationTotalValue: { fontSize: typeSizes.operationTotalValue, fontWeight: '800', color: GREEN, fontFamily: 'monospace' },
   addOperationButton: { borderWidth: 1.5, borderColor: GREEN, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
   addOperationButtonText: { fontSize: typeSizes.addOperationButtonText, fontWeight: '700', color: GREEN },

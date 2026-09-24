@@ -13,6 +13,8 @@ import { runTask } from '@/lib/run-task';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const IFVM_GREEN_DARK = '#163F16';
 
@@ -27,7 +29,8 @@ function LogRow({ entry }: { entry: RequestLogEntry }) {
   const time = new Date(entry.startedAt).toLocaleTimeString('fr-FR');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   return (
     <TouchableOpacity style={styles.row} onPress={() => setExpanded((e) => !e)} activeOpacity={0.7}>
@@ -65,7 +68,8 @@ function ErrorRow({ entry }: { entry: ErrorLogEntry }) {
   const time = new Date(entry.occurredAt).toLocaleTimeString('fr-FR');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   return (
     <TouchableOpacity style={styles.row} onPress={() => setExpanded((e) => !e)} activeOpacity={0.7}>
@@ -106,7 +110,8 @@ export default function DebugLogsScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const entries = useRequestLogStore((s) => s.entries);
   const clear = useRequestLogStore((s) => s.clear);
   const errorEntries = useErrorLogStore((s) => s.entries);
@@ -235,9 +240,9 @@ const BASE_TYPE_SIZES = {
   emptyTitle: 16,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#F3F4F6' },
+    root: { flex: 1, backgroundColor: theme.inputBg },
     header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
     headerContent: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
     backBtn: {
@@ -256,9 +261,9 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     clearBtnText: { color: '#FFFFFF', fontSize: typeSizes.clearBtnText, fontWeight: '600' },
     container: { flex: 1 },
     contentContainer: { padding: 16, paddingBottom: 40 },
-    sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
+    sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '700', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
     notice: {
-      backgroundColor: '#FEF3C7',
+      backgroundColor: theme.warnBg,
       borderWidth: 1,
       borderColor: '#FCD34D',
       borderRadius: 10,
@@ -278,7 +283,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     alerteText: { fontSize: typeSizes.alerteText, color: '#a5341c' },
     row: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderRadius: 10,
       padding: 12,
       marginBottom: 8,
@@ -290,17 +295,17 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     statusDot: { width: 8, height: 8, borderRadius: 4 },
-    method: { fontSize: typeSizes.method, fontWeight: '700', color: '#111827', width: 44 },
-    url: { flex: 1, fontSize: typeSizes.url, color: '#374151' },
+    method: { fontSize: typeSizes.method, fontWeight: '700', color: theme.text, width: 44 },
+    url: { flex: 1, fontSize: typeSizes.url, color: theme.muted },
     rowMeta: { marginTop: 4, marginLeft: 16 },
-    metaText: { fontSize: typeSizes.metaText, color: '#9CA3AF' },
+    metaText: { fontSize: typeSizes.metaText, color: theme.faint },
     detail: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-    detailError: { fontSize: typeSizes.detailError, color: '#DC2626', marginBottom: 4 },
-    detailLabel: { fontSize: typeSizes.detailLabel, fontWeight: '700', color: '#6B7280', marginTop: 4 },
-    detailBody: { fontSize: typeSizes.detailBody, color: '#111827', fontFamily: 'monospace' },
+    detailError: { fontSize: typeSizes.detailError, color: theme.danger, marginBottom: 4 },
+    detailLabel: { fontSize: typeSizes.detailLabel, fontWeight: '700', color: theme.muted, marginTop: 4 },
+    detailBody: { fontSize: typeSizes.detailBody, color: theme.text, fontFamily: 'monospace' },
     emptyContainer: { alignItems: 'center', paddingVertical: 60 },
     emptyIcon: { fontSize: typeSizes.emptyIcon, marginBottom: 8 },
-    emptyTitle: { fontSize: typeSizes.emptyTitle, fontWeight: '600', color: '#111827' },
+    emptyTitle: { fontSize: typeSizes.emptyTitle, fontWeight: '600', color: theme.text },
   });
 }
 

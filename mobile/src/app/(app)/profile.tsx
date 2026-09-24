@@ -18,11 +18,11 @@ import { logger } from '@/lib/logger';
 import { OtaSection } from '@/components/ota-section';
 import { buildNatif, formatVersionBuild, versionApp } from '@/lib/ota';
 import { useThemeStore } from '@/lib/theme-store';
+import { useTheme } from '@/hooks/use-theme';
+
+type ThemePalette = ReturnType<typeof useTheme>;
 
 const IFVM_GREEN = '#1B5E1B';
-const IFVM_GREEN_BG = '#E8F5E9';
-const IFVM_BG_LIGHT = '#F0F2F5';
-const CARD_BG = '#FFFFFF';
 const IFVM_RED = '#E74C3C';
 const IFVM_BLUE = '#2196F3';
 const IFVM_ORANGE = '#E67E22';
@@ -34,7 +34,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const token = useAuthStore((s) => s.token);
@@ -713,7 +714,8 @@ export default function ProfileScreen() {
 function InfoItem({ label, value }: { label: string; value: string }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <View style={styles.infoItem}>
       <ThemedText style={styles.infoLabel}>{label}</ThemedText>
@@ -732,7 +734,8 @@ function PreferenceItem({ icon, label, hint, value, onToggle }: {
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <View style={styles.preferenceItem}>
       <View style={styles.preferenceLeft}>
@@ -745,9 +748,9 @@ function PreferenceItem({ icon, label, hint, value, onToggle }: {
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: '#D1D5DB', true: IFVM_GREEN }}
+        trackColor={{ false: theme.switchTrackOff, true: IFVM_GREEN }}
         thumbColor={value ? '#FFFFFF' : '#FFFFFF'}
-        ios_backgroundColor="#D1D5DB"
+        ios_backgroundColor={theme.switchTrackOff}
       />
     </View>
   );
@@ -766,7 +769,8 @@ function PreferenceChoice({ icon, label, value, onChange }: {
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <View style={[styles.preferenceItem, styles.preferenceChoiceItem]}>
       <View style={styles.preferenceLeft}>
@@ -829,15 +833,18 @@ const BASE_TYPE_SIZES = {
   inputHint: 11,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(
+  typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>,
+  theme: ThemePalette,
+) {
   return StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: IFVM_BG_LIGHT,
+      backgroundColor: theme.screen,
     },
     container: {
       flex: 1,
-      backgroundColor: IFVM_BG_LIGHT,
+      backgroundColor: theme.screen,
     },
     contentContainer: {
       paddingBottom: 40,
@@ -969,12 +976,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     userName: {
       fontSize: typeSizes.userName,
       fontWeight: '700',
-      color: '#1A237E',
+      color: theme.title,
       marginTop: 12,
     },
     userRole: {
       fontSize: typeSizes.userRole,
-      color: '#757575',
+      color: theme.muted,
       marginTop: 2,
     },
     changePhotoButton: {
@@ -982,7 +989,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       paddingHorizontal: 16,
       paddingVertical: 6,
       borderRadius: 12,
-      backgroundColor: IFVM_GREEN_BG,
+      backgroundColor: theme.greenSoft,
     },
     changePhotoText: {
       fontSize: typeSizes.changePhotoText,
@@ -996,11 +1003,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     sectionTitle: {
       fontSize: typeSizes.sectionTitle,
       fontWeight: '600',
-      color: '#1A237E',
+      color: theme.title,
       marginBottom: 10,
     },
     infoCard: {
-      backgroundColor: CARD_BG,
+      backgroundColor: theme.card,
       borderRadius: 14,
       padding: 16,
       shadowColor: '#000',
@@ -1015,22 +1022,22 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       alignItems: 'center',
       paddingVertical: 10,
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
+      borderBottomColor: theme.border,
     },
     infoLabel: {
       fontSize: typeSizes.infoLabel,
-      color: '#757575',
+      color: theme.muted,
     },
     infoValue: {
       fontSize: typeSizes.infoValue,
-      color: '#1A237E',
+      color: theme.title,
       fontWeight: '500',
     },
     securityButton: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: CARD_BG,
+      backgroundColor: theme.card,
       borderRadius: 14,
       padding: 16,
       shadowColor: '#000',
@@ -1049,19 +1056,19 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     securityText: {
       fontSize: typeSizes.securityText,
-      color: '#1A237E',
+      color: theme.title,
       fontWeight: '500',
     },
     securityArrow: {
       fontSize: typeSizes.securityArrow,
-      color: '#9E9E9E',
+      color: theme.faint,
     },
     preferencesSection: {
       paddingHorizontal: 16,
       marginBottom: 16,
     },
     preferencesCard: {
-      backgroundColor: CARD_BG,
+      backgroundColor: theme.card,
       borderRadius: 14,
       padding: 4,
       shadowColor: '#000',
@@ -1077,7 +1084,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       paddingVertical: 12,
       paddingHorizontal: 12,
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
+      borderBottomColor: theme.border,
     },
     preferenceLeft: {
       flexDirection: 'row',
@@ -1095,14 +1102,14 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     preferenceLabel: {
       fontSize: typeSizes.preferenceLabel,
-      color: '#1A237E',
+      color: theme.title,
       fontWeight: '500',
     },
     // Jeton `foreground-tertiary` de DESIGN.md ; le reste de ce fichier porte des
     // hex ad hoc antérieurs, ne pas les recopier.
     preferenceHint: {
       fontSize: typeSizes.preferenceHint,
-      color: '#6f6a59',
+      color: theme.muted,
       marginTop: 2,
     },
     preferenceChoiceItem: {
@@ -1117,7 +1124,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       paddingVertical: 6,
       paddingHorizontal: 10,
       borderRadius: 20,
-      backgroundColor: '#F0F2F5',
+      backgroundColor: theme.chipBg,
     },
     fontScaleChipActive: {
       backgroundColor: IFVM_GREEN,
@@ -1125,7 +1132,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     fontScaleChipText: {
       fontSize: typeSizes.fontScaleChipText,
       fontWeight: '600',
-      color: '#6f6a59',
+      color: theme.muted,
     },
     fontScaleChipTextActive: {
       color: '#FFFFFF',
@@ -1136,19 +1143,19 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     versionText: {
       fontSize: typeSizes.versionText,
-      color: '#BDBDBD',
+      color: theme.faint,
     },
     logoutButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: CARD_BG,
+      backgroundColor: theme.card,
       marginHorizontal: 16,
       marginTop: 16,
       paddingVertical: 16,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: '#FCE4EC',
+      borderColor: theme.dangerBorder,
       gap: 10,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
@@ -1170,7 +1177,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     footerText: {
       fontSize: typeSizes.footerText,
-      color: '#BDBDBD',
+      color: theme.faint,
     },
     // Modal styles
     modalOverlay: {
@@ -1180,7 +1187,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       alignItems: 'center',
     },
     modalContainer: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderRadius: 20,
       width: '90%',
       maxWidth: 400,
@@ -1197,16 +1204,16 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       alignItems: 'center',
       padding: 20,
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
+      borderBottomColor: theme.border,
     },
     modalTitle: {
       fontSize: typeSizes.modalTitle,
       fontWeight: '700',
-      color: '#1A237E',
+      color: theme.title,
     },
     modalClose: {
       fontSize: typeSizes.modalClose,
-      color: '#757575',
+      color: theme.muted,
       padding: 4,
     },
     modalBody: {
@@ -1218,7 +1225,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     inputLabel: {
       fontSize: typeSizes.inputLabel,
       fontWeight: '500',
-      color: '#1A237E',
+      color: theme.title,
       marginBottom: 6,
     },
     input: {
@@ -1226,15 +1233,15 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       paddingVertical: 12,
       paddingHorizontal: 14,
       fontSize: typeSizes.input,
-      color: '#1A237E',
+      color: theme.title,
     },
     passwordInputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#F5F5F5',
+      backgroundColor: theme.inputBg,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: '#E0E0E0',
+      borderColor: theme.inputBorder,
     },
     eyeButton: {
       padding: 12,
@@ -1244,7 +1251,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     inputHint: {
       fontSize: typeSizes.inputHint,
-      color: '#9E9E9E',
+      color: theme.faint,
       marginTop: 4,
     },
     modalButtons: {
@@ -1260,12 +1267,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       alignItems: 'center',
     },
     modalButtonCancel: {
-      backgroundColor: '#F5F5F5',
+      backgroundColor: theme.inputBg,
       borderWidth: 1,
-      borderColor: '#E0E0E0',
+      borderColor: theme.inputBorder,
     },
     modalButtonCancelText: {
-      color: '#757575',
+      color: theme.muted,
       fontWeight: '600',
     },
     modalButtonConfirm: {

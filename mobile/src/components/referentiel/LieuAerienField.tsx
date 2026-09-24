@@ -7,6 +7,8 @@ import { getCurrentPosition } from '@/lib/location';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 interface LieuAerienFieldProps {
   label: string;
@@ -60,7 +62,8 @@ export function LieuAerienField({ label, value, onChangeText, focusedField, setF
   const { run: runCreation, isRunning: isCreating } = useAsyncAction();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const charger = useCallback(
     () =>
@@ -275,16 +278,16 @@ function computeTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     group: { marginBottom: 10 },
-    label: { fontSize: typeSizes.label, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
+    label: { fontSize: typeSizes.label, fontWeight: '600', color: theme.faint, textTransform: 'uppercase', marginBottom: 4 },
     box: { backgroundColor: FILL_BG, borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9 },
     boxFocused: { borderColor: GREEN, borderWidth: 1.5 },
     input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, padding: 0 },
     actionsRow: { flexDirection: 'row', gap: 14, marginTop: 6 },
     actionLink: { fontSize: typeSizes.actionLink, fontWeight: '700', color: GREEN },
-    panel: { marginTop: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 9, padding: 9, gap: 7 },
+    panel: { marginTop: 8, backgroundColor: theme.card, borderWidth: 1, borderColor: BORDER, borderRadius: 9, padding: 9, gap: 7 },
     vide: { fontSize: typeSizes.vide, color: TEXT_SECONDARY, fontStyle: 'italic' },
     option: { borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8, backgroundColor: FILL_BG },
     optionText: { fontSize: typeSizes.optionText, fontWeight: '600', color: TEXT },
@@ -299,10 +302,10 @@ function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
       padding: 8,
     },
     typeRow: { flexDirection: 'row', gap: 6 },
-    equipeLabel: { fontSize: typeSizes.equipeLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+    equipeLabel: { fontSize: typeSizes.equipeLabel, fontWeight: '600', color: theme.faint, textTransform: 'uppercase' },
     equipeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     typeChip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
-    typeChipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
+    typeChipSelectionne: { borderColor: GREEN, backgroundColor: theme.successBg },
     typeChipText: { fontSize: typeSizes.typeChipText, fontWeight: '600', color: TEXT_SECONDARY },
     typeChipTextSelectionne: { color: GREEN },
     gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
