@@ -601,14 +601,17 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     badgeOffline: {
       backgroundColor: '#FDF6E7',
       paddingHorizontal: 16,
-      height: 24,
+      paddingVertical: 5,
+      minHeight: 24,
       borderRadius: 12,
       justifyContent: 'center',
     },
     badgeOfflineText: {
       color: '#8A6D2F',
       fontSize: typeSizes.networkStatus,
+      lineHeight: typeSizes.networkStatus + 4,
       fontWeight: '700',
+      includeFontPadding: false,
     },
     gearIcon: {
       fontSize: typeSizes.gearIcon,
@@ -667,8 +670,8 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       alignItems: 'center',
       backgroundColor: 'rgba(0,0,0,0.22)',
       paddingHorizontal: 10,
-      paddingVertical: 4,
-      height: 24,
+      paddingVertical: 5,
+      minHeight: 24,
       borderRadius: 12,
     },
     badgeDot: {
@@ -681,7 +684,9 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     badgeAvailableText: {
       color: '#FFFFFF',
       fontSize: typeSizes.badgeAvailableText,
+      lineHeight: typeSizes.badgeAvailableText + 4,
       fontWeight: '700',
+      includeFontPadding: false,
     },
     scrollContent: {
       padding: 16,
