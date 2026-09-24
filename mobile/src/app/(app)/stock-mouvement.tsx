@@ -10,9 +10,8 @@ import { useAuthStore } from '@/lib/auth-store';
 import { type Pesticide, listPesticides } from '@/lib/referentiel-db';
 import { type SiteStock, creerMouvement, listSitesPrincipaux } from '@/lib/stock-db';
 import { envoyerStockSiEnLigne } from '@/lib/stock-envoi';
-import { type TypeMouvementSaisi, type UniteStock, validerMouvement } from '@/lib/stock-regles';
+import { type TypeMouvementSaisi, UNITES_STOCK, type UniteStock, validerMouvement } from '@/lib/stock-regles';
 
-const UNITES: UniteStock[] = ['L', 'kg'];
 const libelleSite = (s: SiteStock) => `${s.localite} · n°${s.numero}`;
 
 /**
@@ -106,7 +105,7 @@ export default function StockMouvementScreen() {
 
         <ThemedText style={styles.etiquette}>Unité *</ThemedText>
         <View style={styles.choix}>
-          {UNITES.map((u) => {
+          {UNITES_STOCK.map((u) => {
             const actif = u === unite;
             return (
               <TouchableOpacity

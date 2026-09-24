@@ -22,6 +22,7 @@ import { envoyerStockSiEnLigne } from '@/lib/stock-envoi';
 import {
   type LigneSolde,
   calculerSoldes,
+  cleLigneSolde,
   formaterQuantite,
   formaterVariation,
 } from '@/lib/stock-regles';
@@ -138,7 +139,7 @@ export default function StockScreen() {
         <ThemedText style={styles.section}>SOLDES</ThemedText>
         {lignes.length === 0 && <ThemedText style={styles.vide}>Aucun stock enregistré pour ce site.</ThemedText>}
         {lignes.map((l) => (
-          <View key={`${l.pesticideId}|${l.unite}`} style={styles.solde} testID={`stock-solde-${l.pesticideId}-${l.unite}`}>
+          <View key={cleLigneSolde(l.pesticideId, l.unite)} style={styles.solde} testID={`stock-solde-${l.pesticideId}-${l.unite}`}>
             <View style={styles.icone}>
               <ThemedText style={styles.iconeTexte}>⬡</ThemedText>
             </View>

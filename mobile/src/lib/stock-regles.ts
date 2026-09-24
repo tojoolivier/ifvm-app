@@ -6,8 +6,23 @@ import type { components } from './api-schema.generated';
  * l'affichage seulement. L et kg ne s'additionnent jamais : l'unité fait partie de la clé.
  */
 
-export type UniteStock = 'L' | 'kg';
+export const UNITES_STOCK = ['L', 'kg'] as const;
+export type UniteStock = (typeof UNITES_STOCK)[number];
 export type TypeMouvementSaisi = 'approvisionnement' | 'transfert';
+
+export function libelleTypeMouvement(type: TypeMouvementSaisi): string {
+  return type === 'transfert' ? 'Transfert' : 'Approvisionnement';
+}
+
+/** Les champs qui font un mouvement, identiques à `MouvementPesticideCreate` : une seule définition. */
+export interface MouvementStock {
+  type: TypeMouvementSaisi;
+  pesticide_id: string;
+  site_id: string;
+  site_destination_id: string | null;
+  quantite: number;
+  unite: UniteStock;
+}
 
 export interface MouvementSaisi {
   type: TypeMouvementSaisi;
@@ -40,14 +55,11 @@ export function validerMouvement(saisie: MouvementSaisi): string[] {
 
 export type SoldeServeur = components['schemas']['SoldePesticideRead'];
 
-export interface MouvementEnAttente {
-  type: TypeMouvementSaisi;
-  pesticide_id: string;
-  site_id: string;
-  site_destination_id: string | null;
-  quantite: number;
-  unite: UniteStock;
-}
+/** Un mouvement saisi ici et pas encore parti : seul son effet sur le solde compte. */
+export type MouvementEnAttente = MouvementStock;
+
+/** Clé d'une ligne de solde : l'unité en fait partie, L et kg ne se confondent jamais. */
+export const cleLigneSolde = (pesticideId: string, unite: string) => `${pesticideId}|${unite}`;
 
 export interface LigneSolde {
   siteId: string;
@@ -73,12 +85,12 @@ function effetSurSite(mouvement: MouvementEnAttente, siteId: string): number {
 /** Une ligne par (produit, unité) du site : le solde serveur, les mouvements locaux, le total affiché. */
 export function calculerSoldes(
   serveur: SoldeServeur[],
-  enAttente: MouvementEnAttente[],
+  mouvementsLocaux: MouvementEnAttente[],
   siteId: string
 ): LigneSolde[] {
   const lignes = new Map<string, LigneSolde>();
-  const ligne = (pesticideId: string, unite: string): LigneSolde => {
-    const cle = `${pesticideId}|${unite}`;
+  const ligneDe = (pesticideId: string, unite: string): LigneSolde => {
+    const cle = cleLigneSolde(pesticideId, unite);
     let existante = lignes.get(cle);
     if (!existante) {
       existante = { siteId, pesticideId, unite, serveur: 0, enAttente: 0, affiche: 0 };
@@ -88,13 +100,13 @@ export function calculerSoldes(
   };
 
   for (const solde of serveur) {
-    if (solde.site_id === siteId) ligne(solde.pesticide_id, solde.unite).serveur = solde.quantite;
+    if (solde.site_id === siteId) ligneDe(solde.pesticide_id, solde.unite).serveur = solde.quantite;
   }
-  for (const mouvement of enAttente) {
+  for (const mouvement of mouvementsLocaux) {
     const effet = effetSurSite(mouvement, siteId);
-    if (effet !== 0) ligne(mouvement.pesticide_id, mouvement.unite).enAttente += effet;
+    if (effet !== 0) ligneDe(mouvement.pesticide_id, mouvement.unite).enAttente += effet;
   }
-  for (const l of lignes.values()) l.affiche = l.serveur + l.enAttente;
+  for (const ligneSolde of lignes.values()) ligneSolde.affiche = ligneSolde.serveur + ligneSolde.enAttente;
   return [...lignes.values()];
 }
 

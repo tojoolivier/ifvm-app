@@ -8,6 +8,7 @@ import {
   marquerMouvementSynchronise,
   remplacerSoldesServeur,
 } from './stock-db';
+import { libelleTypeMouvement } from './stock-regles';
 import { type LotSync, type ResumeSync, syncAll } from './sync-lot';
 
 /**
@@ -27,21 +28,14 @@ async function exigerSiteSynchronise(siteId: string): Promise<void> {
 const lotMouvement: LotSync<MouvementLocal> = {
   nom: 'stock.mouvement',
   idDe: (mouvement) => mouvement.id,
-  labelDe: (mouvement) => `${mouvement.type === 'transfert' ? 'Transfert' : 'Approvisionnement'} · ${mouvement.date_mouvement}`,
+  labelDe: (mouvement) => `${libelleTypeMouvement(mouvement.type)} · ${mouvement.date_mouvement}`,
   marquerEchec: marquerMouvementEnEchec,
   syncOne: async (mouvement, token) => {
     await exigerSiteSynchronise(mouvement.site_id);
     if (mouvement.site_destination_id) await exigerSiteSynchronise(mouvement.site_destination_id);
-    await apiClient.createMouvementPesticide(token, {
-      id: mouvement.id,
-      type: mouvement.type,
-      pesticide_id: mouvement.pesticide_id,
-      site_id: mouvement.site_id,
-      site_destination_id: mouvement.site_destination_id,
-      quantite: mouvement.quantite,
-      unite: mouvement.unite,
-      date_mouvement: mouvement.date_mouvement,
-    });
+    // Tout `MouvementLocal` sauf son statut local est déjà le corps du contrat.
+    const { statut_sync: _statutLocal, ...corps } = mouvement;
+    await apiClient.createMouvementPesticide(token, corps);
     await marquerMouvementSynchronise(mouvement.id);
   },
 };

@@ -4,9 +4,8 @@ import { getReferentielDb } from './referentiel-db';
 import {
   type MouvementEnAttente,
   type MouvementSaisi,
+  type MouvementStock,
   type SoldeServeur,
-  type TypeMouvementSaisi,
-  type UniteStock,
   lireQuantite,
   validerMouvement,
 } from './stock-regles';
@@ -18,14 +17,8 @@ import {
 
 export type StatutSyncMouvement = 'local' | 'synced' | 'echec';
 
-export interface MouvementLocal {
+export interface MouvementLocal extends MouvementStock {
   id: string;
-  type: TypeMouvementSaisi;
-  pesticide_id: string;
-  site_id: string;
-  site_destination_id: string | null;
-  quantite: number;
-  unite: UniteStock;
   date_mouvement: string;
   statut_sync: StatutSyncMouvement;
 }
@@ -72,15 +65,7 @@ export async function listMouvementsEnAttente(): Promise<MouvementLocal[]> {
  * refusé par le serveur n'a pas eu lieu, il ne compte pas.
  */
 export async function listMouvementsPourSolde(): Promise<MouvementEnAttente[]> {
-  const mouvements = await listMouvementsEnAttente();
-  return mouvements.map(({ type, pesticide_id, site_id, site_destination_id, quantite, unite }) => ({
-    type,
-    pesticide_id,
-    site_id,
-    site_destination_id,
-    quantite,
-    unite,
-  }));
+  return listMouvementsEnAttente();
 }
 
 /** Derniers mouvements saisis qui touchent le site (source ou destination), du plus récent au plus ancien. */
