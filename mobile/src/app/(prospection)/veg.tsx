@@ -22,13 +22,10 @@ import {
 import { updateProspectionVegetation } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { StrateFormValues, VegetationFormValues } from '@/lib/prospection-vegetation-schema';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
-const INACTIVE_BG = '#efeada';
 
 // ==========================================
 // HELPER : Arrondir au multiple de 5 le plus proche
@@ -96,7 +93,8 @@ export default function VegetationScreen() {
   const signalerChargement = useSignalerChargement('veg');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   // Filet de sécurité si cet écran est atteint sans passer par reference.tsx (deep-link,
   // app relancée en plein milieu du parcours) : le store peut ne pas encore porter cette
@@ -640,53 +638,53 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   scroll: { flex: 1 },
-  hint: { fontSize: typeSizes.hint, lineHeight: 15, color: '#9a9484', marginBottom: 14 },
-  hintSmall: { fontSize: typeSizes.hintSmall, color: '#9a9484', marginBottom: 8, fontStyle: 'italic' },
-  stepHint: { fontSize: typeSizes.stepHint, color: '#9a9484', marginTop: 2, fontStyle: 'italic' },
+  hint: { fontSize: typeSizes.hint, lineHeight: 15, color: theme.faint, marginBottom: 14 },
+  hintSmall: { fontSize: typeSizes.hintSmall, color: theme.faint, marginBottom: 8, fontStyle: 'italic' },
+  stepHint: { fontSize: typeSizes.stepHint, color: theme.faint, marginTop: 2, fontStyle: 'italic' },
   selectionInfo: { fontSize: typeSizes.selectionInfo, color: GREEN, fontWeight: '600', textAlign: 'center', marginTop: 4 },
-  strateCard: { marginBottom: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 11, padding: 13 },
+  strateCard: { marginBottom: 8, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 11, padding: 13 },
   strateCardExpanded: { borderWidth: 2, borderColor: GREEN },
   strateHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  strateLabel: { fontSize: typeSizes.strateLabel, fontWeight: '600', color: TEXT },
+  strateLabel: { fontSize: typeSizes.strateLabel, fontWeight: '600', color: theme.text },
   strateLabelExpanded: { fontWeight: '700' },
   stratePct: { fontSize: typeSizes.stratePct, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   strateDetail: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1ede1' },
-  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
-  smallLabel: { fontSize: typeSizes.smallLabel, color: '#9a9484', marginBottom: 5 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14, marginBottom: 11 },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '600', color: theme.faint, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 },
+  smallLabel: { fontSize: typeSizes.smallLabel, color: theme.faint, marginBottom: 5 },
+  card: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 12, padding: 14, marginBottom: 11 },
   cardError: { borderColor: '#c0412b', borderWidth: 1.5 },
-  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', color: TEXT, marginBottom: 11 },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', color: theme.text, marginBottom: 11 },
   fieldsRow: { flexDirection: 'row', gap: 7, marginBottom: 9 },
   field: { flex: 1 },
-  fieldLabel: { fontSize: typeSizes.fieldLabel, color: '#9a9484', marginBottom: 2 },
-  fieldInput: { backgroundColor: '#f6f3e9', borderRadius: 6, padding: 7, fontSize: typeSizes.fieldInput, fontWeight: '600', color: TEXT },
+  fieldLabel: { fontSize: typeSizes.fieldLabel, color: theme.faint, marginBottom: 2 },
+  fieldInput: { backgroundColor: theme.inputBg, borderRadius: 6, padding: 7, fontSize: typeSizes.fieldInput, fontWeight: '600', color: theme.text },
   recouvrementRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  recouvrementLabel: { fontSize: typeSizes.recouvrementLabel, color: '#5c5848' },
+  recouvrementLabel: { fontSize: typeSizes.recouvrementLabel, color: theme.muted },
   recouvrementValue: { fontSize: typeSizes.recouvrementValue, fontWeight: '700', color: GREEN, fontFamily: 'monospace' },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
-  stepperButton: { width: 32, height: 32, borderRadius: 8, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
+  stepperButton: { width: 32, height: 32, borderRadius: 8, backgroundColor: theme.inputBg, alignItems: 'center', justifyContent: 'center' },
   stepperButtonAdd: { backgroundColor: GREEN },
-  stepperButtonText: { fontSize: typeSizes.stepperButtonText, fontWeight: '700', color: TEXT_SECONDARY },
+  stepperButtonText: { fontSize: typeSizes.stepperButtonText, fontWeight: '700', color: theme.muted },
   stepperButtonAddText: { color: '#fff' },
   recBarTrack: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#f1ede1', overflow: 'hidden' },
   recBarFill: { height: '100%', backgroundColor: GREEN, borderRadius: 3 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 9 },
-  smallChip: { paddingHorizontal: 4, paddingVertical: 9, borderRadius: 8, backgroundColor: INACTIVE_BG, flexGrow: 1, alignItems: 'center', minWidth: 60 },
+  smallChip: { paddingHorizontal: 4, paddingVertical: 9, borderRadius: 8, backgroundColor: theme.inputBg, flexGrow: 1, alignItems: 'center', minWidth: 60 },
   smallChipActive: { backgroundColor: GREEN },
-  smallChipText: { fontSize: typeSizes.smallChipText, fontWeight: '600', color: TEXT_SECONDARY },
+  smallChipText: { fontSize: typeSizes.smallChipText, fontWeight: '600', color: theme.muted },
   smallChipTextActive: { fontWeight: '700', color: '#fff' },
-  errorText: { color: '#c0412b', fontSize: typeSizes.errorText, marginBottom: 4 },
-  totalRec: { textAlign: 'center', fontSize: typeSizes.totalRec, fontWeight: '600', color: '#9a9484', letterSpacing: 0.3, paddingVertical: 4 },
-  totalRecInvalide: { color: '#c0412b' },
+  errorText: { color: theme.danger, fontSize: typeSizes.errorText, marginBottom: 4 },
+  totalRec: { textAlign: 'center', fontSize: typeSizes.totalRec, fontWeight: '600', color: theme.faint, letterSpacing: 0.3, paddingVertical: 4 },
+  totalRecInvalide: { color: theme.danger },
   totalRepartition: { fontSize: typeSizes.totalRepartition, fontWeight: '600', color: GREEN, marginTop: 6 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },

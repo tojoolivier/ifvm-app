@@ -35,6 +35,8 @@ import { statutFicheAffiche } from '@/lib/prospection-statut';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 type FilterKey = 'TOUS' | 'PROSPECTION' | 'CRT' | 'METEO';
 
@@ -98,7 +100,8 @@ export default function FichesScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
@@ -430,7 +433,7 @@ const BASE_TYPE_SIZES = {
   emptySub: 14,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: {
       flex: 1,
@@ -481,11 +484,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     resultCountContainer: {
       paddingHorizontal: 16,
       paddingVertical: 8,
-      backgroundColor: '#F9FAFB',
+      backgroundColor: theme.inputBg,
     },
     resultCount: {
       fontSize: typeSizes.resultCount,
-      color: '#6B7280',
+      color: theme.muted,
       fontWeight: '500',
     },
     listContent: {
@@ -503,12 +506,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     emptyTitle: {
       fontSize: typeSizes.emptyTitle,
       fontWeight: '600',
-      color: '#111827',
+      color: theme.text,
       marginBottom: 8,
     },
     emptySub: {
       fontSize: typeSizes.emptySub,
-      color: '#6B7280',
+      color: theme.muted,
       textAlign: 'center',
     },
   });

@@ -13,6 +13,8 @@ import { Chip } from '@/components/traitement/Chip';
 import { OuiNonToggle } from '@/components/traitement/OuiNonToggle';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const AXES_RISQUE: { key: 'ressources_eau' | 'sol' | 'faune_non_cible' | 'abeilles'; label: string }[] = [
   { key: 'ressources_eau', label: "Ressources en eau" },
@@ -32,7 +34,8 @@ export default function ImpactsScreen() {
   const signalerChargement = useSignalerChargement('impacts');
   const typeTraitement = store.typeTraitement;
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   useEffect(() => {
     if (!traitementId) return;
@@ -364,7 +367,7 @@ export default function ImpactsScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp },
     keyboardAvoidingView: { flex: 1 },
@@ -385,7 +388,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       fontFamily: traitementFonts.ui,
       fontSize: typeSizes.corps,
       color: traitementColors.texteTitre,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
     textarea: { minHeight: 88, textAlignVertical: 'top', paddingTop: 10 },
     error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },
@@ -404,7 +407,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       borderRadius: traitementRadii.chip,
       padding: 10,
       gap: 6,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
     evaluationTitle: { fontFamily: traitementFonts.uiSemiBold, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
     addEvaluationButton: {

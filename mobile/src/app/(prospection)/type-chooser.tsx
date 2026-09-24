@@ -8,12 +8,10 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
 
 export default function TypeChooserScreen() {
   const router = useRouter();
@@ -23,7 +21,8 @@ export default function TypeChooserScreen() {
   const { run, isRunning: isCreating } = useAsyncAction();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const chooseIntensive = () =>
     run(
@@ -124,20 +123,20 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   content: { paddingHorizontal: 16 },
-  card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: '#fff', borderWidth: 1.5, borderColor: BORDER },
+  card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.inputBorder },
   cardIntensive: { backgroundColor: GREEN, borderWidth: 0 },
   cardDashed: { borderStyle: 'dashed', borderColor: '#bdb6a2' },
-  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '800', color: TEXT },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '800', color: theme.text },
   cardTitleIntensive: { fontSize: typeSizes.cardTitleIntensive, fontWeight: '800', color: '#fff' },
-  cardSubtitle: { fontSize: typeSizes.cardSubtitle, lineHeight: 16, color: TEXT_SECONDARY, marginTop: 4 },
+  cardSubtitle: { fontSize: typeSizes.cardSubtitle, lineHeight: 16, color: theme.muted, marginTop: 4 },
   cardSubtitleIntensive: { fontSize: typeSizes.cardSubtitleIntensive, lineHeight: 16, color: '#ffffffd9', marginTop: 4 },
 });
 }

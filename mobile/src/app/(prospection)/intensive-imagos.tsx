@@ -34,13 +34,11 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
-const INACTIVE_BG = '#efeada';
 
 const ESPECE_LABEL = { LMC: 'Locusta', NSE: 'Nomadacris' } as const;
 
@@ -115,7 +113,8 @@ export default function IntensiveImagosScreen() {
   const signalerChargement = useSignalerChargement('intensive-imagos');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const isInitialized = useRef(false);
   const isHydrated = useRef(false);
@@ -1101,18 +1100,18 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   speciesRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
-  speciesButton: { flex: 1, borderRadius: 10, paddingVertical: 9, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  speciesButton: { flex: 1, borderRadius: 10, paddingVertical: 9, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, alignItems: 'center' },
   speciesButtonActive: { backgroundColor: GREEN, borderWidth: 0 },
-  speciesButtonText: { fontSize: typeSizes.speciesButtonText, fontWeight: '800', color: TEXT_SECONDARY },
+  speciesButtonText: { fontSize: typeSizes.speciesButtonText, fontWeight: '800', color: theme.muted },
   speciesButtonTextActive: { color: '#fff' },
   statsRow: { marginHorizontal: 16, marginBottom: 10, flexDirection: 'row', gap: 9 },
   statCardPrimary: { flex: 1, backgroundColor: GREEN, borderRadius: 12, padding: 10 },
@@ -1121,74 +1120,74 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   statValueMax: { fontSize: typeSizes.statValueMax, color: '#ffffffb3' },
   scroll: { flex: 1 },
   chargementBloc: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  chargementTexte: { fontSize: typeSizes.chargementTexte, color: TEXT_SECONDARY, fontWeight: '600' },
-  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 6 },
-  totalCaptureSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 8 },
+  chargementTexte: { fontSize: typeSizes.chargementTexte, color: theme.muted, fontWeight: '600' },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '700', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 6 },
+  totalCaptureSection: { backgroundColor: theme.card, borderRadius: 10, borderWidth: 1, borderColor: theme.inputBorder, padding: 12, marginBottom: 8 },
   totalCaptureInputContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  totalCaptureInput: { flex: 1, backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: typeSizes.totalCaptureInput, fontWeight: '700', color: TEXT },
-  totalCaptureMax: { fontSize: typeSizes.totalCaptureMax, fontWeight: '600', color: TEXT_SECONDARY },
-  tableSection: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 10, marginBottom: 8 },
-  summaryBar: { backgroundColor: '#f8f6f0', borderRadius: 6, padding: 8, marginBottom: 10, alignItems: 'center' },
-  summaryBarText: { fontSize: typeSizes.summaryBarText, color: TEXT_SECONDARY, textAlign: 'center' },
-  summaryBarSub: { fontSize: typeSizes.summaryBarSub, color: TEXT_SECONDARY, marginTop: 3 },
+  totalCaptureInput: { flex: 1, backgroundColor: theme.screen, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: typeSizes.totalCaptureInput, fontWeight: '700', color: theme.text },
+  totalCaptureMax: { fontSize: typeSizes.totalCaptureMax, fontWeight: '600', color: theme.muted },
+  tableSection: { backgroundColor: theme.card, borderRadius: 10, borderWidth: 1, borderColor: theme.inputBorder, padding: 10, marginBottom: 8 },
+  summaryBar: { backgroundColor: theme.screen, borderRadius: 6, padding: 8, marginBottom: 10, alignItems: 'center' },
+  summaryBarText: { fontSize: typeSizes.summaryBarText, color: theme.muted, textAlign: 'center' },
+  summaryBarSub: { fontSize: typeSizes.summaryBarSub, color: theme.muted, marginTop: 3 },
   summaryBarValue: { fontWeight: '700', fontSize: typeSizes.summaryBarValue },
   validValue: { color: GREEN },
-  invalidValue: { color: '#dc2626' },
-  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, paddingBottom: 6, marginBottom: 6 },
-  tableHeaderCell: { fontSize: typeSizes.tableHeaderCell, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase' },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  invalidValue: { color: theme.danger },
+  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: theme.inputBorder, paddingBottom: 6, marginBottom: 6 },
+  tableHeaderCell: { fontSize: typeSizes.tableHeaderCell, fontWeight: '700', color: theme.muted, textTransform: 'uppercase' },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: theme.border },
   tableCell: { fontSize: typeSizes.tableCell, paddingVertical: 4 },
   tableCellStade: { flex: 1.2 },
   tableCellValue: { flex: 1, textAlign: 'center' },
   tableCellActions: { flex: 1.2, alignItems: 'center' },
-  tableCellText: { fontWeight: '600', color: TEXT },
-  tableInput: { backgroundColor: '#f8f6f0', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, textAlign: 'center', fontSize: typeSizes.tableInput, fontWeight: '700', color: TEXT },
+  tableCellText: { fontWeight: '600', color: theme.text },
+  tableInput: { backgroundColor: theme.screen, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, textAlign: 'center', fontSize: typeSizes.tableInput, fontWeight: '700', color: theme.text },
   tableActionsRow: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
-  tableFooter: { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: BORDER, alignItems: 'center' },
-  tableFooterText: { fontSize: typeSizes.tableFooterText, color: TEXT_SECONDARY },
+  tableFooter: { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: theme.inputBorder, alignItems: 'center' },
+  tableFooterText: { fontSize: typeSizes.tableFooterText, color: theme.muted },
   tableFooterValue: { fontWeight: '700', color: GREEN, fontSize: typeSizes.tableFooterValue },
-  smallCounterButton: { width: 28, height: 28, borderRadius: 6, backgroundColor: INACTIVE_BG, alignItems: 'center', justifyContent: 'center' },
+  smallCounterButton: { width: 28, height: 28, borderRadius: 6, backgroundColor: theme.inputBg, alignItems: 'center', justifyContent: 'center' },
   smallCounterButtonAdd: { backgroundColor: GREEN },
-  smallCounterText: { fontSize: typeSizes.smallCounterText, fontWeight: '700', color: TEXT_SECONDARY },
+  smallCounterText: { fontSize: typeSizes.smallCounterText, fontWeight: '700', color: theme.muted },
   smallCounterTextAdd: { color: '#fff' },
-  referentielManquant: { padding: 14, backgroundColor: '#fdf3e3', borderRadius: 10, marginTop: 8 },
-  referentielManquantText: { fontSize: typeSizes.referentielManquantText, lineHeight: 17, color: '#8a5a12', fontWeight: '600' },
-  sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: INACTIVE_BG, borderRadius: 11, padding: 4, marginBottom: 11 },
+  referentielManquant: { padding: 14, backgroundColor: theme.warnBg, borderRadius: 10, marginTop: 8 },
+  referentielManquantText: { fontSize: typeSizes.referentielManquantText, lineHeight: 17, color: theme.warn, fontWeight: '600' },
+  sexeRow: { flexDirection: 'row', gap: 7, backgroundColor: theme.inputBg, borderRadius: 11, padding: 4, marginBottom: 11 },
   sexeToggle: { flex: 1, borderRadius: 8, padding: 9, alignItems: 'center' },
-  sexeToggleActive: { backgroundColor: '#fff' },
-  sexeText: { fontWeight: '700', fontSize: typeSizes.sexeText, color: '#9a9484' },
-  sexeTextActive: { color: TEXT },
+  sexeToggleActive: { backgroundColor: theme.card },
+  sexeText: { fontWeight: '700', fontSize: typeSizes.sexeText, color: theme.faint },
+  sexeTextActive: { color: theme.text },
   fieldsRow: { flexDirection: 'row', gap: 9, marginBottom: 4 },
-  field: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 10, marginBottom: 8 },
+  field: { flex: 1, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 10, marginBottom: 8 },
   fieldError: { borderColor: '#c0412b', borderWidth: 1.5 },
   // #lisibilite-terrain : libellé agrandi et assombri (au lieu de 9.5px gris clair,
   // difficile à lire en plein soleil) — même niveau de lisibilité que sectionLabel.
-  fieldLabel: { fontSize: typeSizes.fieldLabel, fontWeight: '700', color: TEXT_SECONDARY, marginBottom: 3 },
-  requiredLabel: { color: '#c0412b' },
-  fieldInput: { fontSize: typeSizes.fieldInput, fontWeight: '700', color: TEXT, padding: 0 },
-  errorText: { color: '#c0412b', fontSize: typeSizes.errorText, marginTop: -2, marginBottom: 10 },
+  fieldLabel: { fontSize: typeSizes.fieldLabel, fontWeight: '700', color: theme.muted, marginBottom: 3 },
+  requiredLabel: { color: theme.danger },
+  fieldInput: { fontSize: typeSizes.fieldInput, fontWeight: '700', color: theme.text, padding: 0 },
+  errorText: { color: theme.danger, fontSize: typeSizes.errorText, marginTop: -2, marginBottom: 10 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: INACTIVE_BG },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: theme.inputBg },
   chipActive: { backgroundColor: GREEN },
-  chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: TEXT_SECONDARY },
+  chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: theme.muted },
   chipTextActive: { fontWeight: '700', color: '#fff' },
-  summaryContainer: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginTop: 12, borderWidth: 1, borderColor: BORDER },
-  summaryTitle: { fontSize: typeSizes.summaryTitle, fontWeight: '700', color: TEXT, marginBottom: 8, textAlign: 'center' },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
-  summaryLabel: { fontSize: typeSizes.summaryLabel, color: TEXT_SECONDARY },
-  summaryValue: { fontSize: typeSizes.summaryValue, fontWeight: '700', color: TEXT },
+  summaryContainer: { backgroundColor: theme.card, borderRadius: 10, padding: 14, marginTop: 12, borderWidth: 1, borderColor: theme.inputBorder },
+  summaryTitle: { fontSize: typeSizes.summaryTitle, fontWeight: '700', color: theme.text, marginBottom: 8, textAlign: 'center' },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: theme.border },
+  summaryLabel: { fontSize: typeSizes.summaryLabel, color: theme.muted },
+  summaryValue: { fontSize: typeSizes.summaryValue, fontWeight: '700', color: theme.text },
   summaryValueValid: { color: GREEN },
-  summaryValueInvalid: { color: '#dc2626' },
-  summaryDivider: { height: 1, backgroundColor: '#f0eee8', marginVertical: 4 },
-  ruleBox: { marginTop: 10, backgroundColor: '#f8f6f0', borderRadius: 7, padding: 8 },
-  ruleText: { fontSize: typeSizes.ruleText, color: TEXT_SECONDARY, textAlign: 'center', fontWeight: '600' },
-  successContainer: { backgroundColor: '#dcfce7', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#86efac' },
-  successText: { color: '#15803d', fontWeight: '700', fontSize: typeSizes.successText, textAlign: 'center' },
-  successDetail: { color: '#15803d', fontSize: typeSizes.successDetail, textAlign: 'center', marginTop: 3, lineHeight: 18 },
-  warningContainer: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#fca5a5' },
-  warningText: { color: '#dc2626', fontWeight: '700', fontSize: typeSizes.warningText, textAlign: 'center' },
-  warningDetail: { color: '#dc2626', fontSize: typeSizes.warningDetail, textAlign: 'center', marginTop: 5, lineHeight: 18 },
-  warningHint: { color: '#dc2626', fontSize: typeSizes.warningHint, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
+  summaryValueInvalid: { color: theme.danger },
+  summaryDivider: { height: 1, backgroundColor: theme.inputBg, marginVertical: 4 },
+  ruleBox: { marginTop: 10, backgroundColor: theme.screen, borderRadius: 7, padding: 8 },
+  ruleText: { fontSize: typeSizes.ruleText, color: theme.muted, textAlign: 'center', fontWeight: '600' },
+  successContainer: { backgroundColor: theme.successBg, borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: theme.successBorder },
+  successText: { color: theme.success, fontWeight: '700', fontSize: typeSizes.successText, textAlign: 'center' },
+  successDetail: { color: theme.success, fontSize: typeSizes.successDetail, textAlign: 'center', marginTop: 3, lineHeight: 18 },
+  warningContainer: { backgroundColor: theme.dangerBg, borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: theme.dangerBorder },
+  warningText: { color: theme.danger, fontWeight: '700', fontSize: typeSizes.warningText, textAlign: 'center' },
+  warningDetail: { color: theme.danger, fontSize: typeSizes.warningDetail, textAlign: 'center', marginTop: 5, lineHeight: 18 },
+  warningHint: { color: theme.danger, fontSize: typeSizes.warningHint, textAlign: 'center', marginTop: 5, fontStyle: 'italic' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },
