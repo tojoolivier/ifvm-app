@@ -17,7 +17,6 @@ import {
   listAffectationsEquipe,
   listParcAeronefs,
 } from '@/lib/equipe-db';
-import { affectationActive } from '@/lib/equipe-regles';
 
 /**
  * Parc aéronefs (#642, Figma « Parc aéronefs ») : l'affectation active de l'équipe de travail mise
@@ -37,10 +36,10 @@ export default function ParcAeronefsScreen() {
   useFocusEffect(
     useCallback(() => {
       const aujourdhui = aujourdhuiIso();
-      Promise.all([listParcAeronefs(aujourdhui), equipeId ? listAffectationsEquipe(equipeId) : Promise.resolve([])])
+      Promise.all([listParcAeronefs(aujourdhui), equipeId ? listAffectationsEquipe(equipeId, aujourdhui) : Promise.resolve([])])
         .then(([p, affectations]) => {
           setParc(p);
-          setActive(affectationActive(affectations, aujourdhui));
+          setActive(affectations.find((a) => a.en_service === 1) ?? null);
         })
         .catch((error) => signalerChargement(error, { source: 'parc-aeronefs' }));
     }, [equipeId, signalerChargement])

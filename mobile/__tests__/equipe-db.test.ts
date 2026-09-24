@@ -79,7 +79,13 @@ describe('listAeronefsEquipe', () => {
 
 describe('aujourdhui', () => {
   it('formate la date du jour au format ISO (AAAA-MM-JJ)', () => {
-    expect(aujourdhuiIso(new Date('2026-09-24T10:00:00Z'))).toBe('2026-09-24');
+    expect(aujourdhuiIso(new Date(2026, 8, 24, 10, 0))).toBe('2026-09-24');
+  });
+
+  it('donne le jour du calendrier LOCAL, pas celui d’UTC (Madagascar : UTC+3)', () => {
+    // 01h00 locale : en UTC (ou UTC+3 → 22h la veille) `toISOString()` rendrait le mauvais jour.
+    expect(aujourdhuiIso(new Date(2026, 8, 24, 1, 0))).toBe('2026-09-24');
+    expect(aujourdhuiIso(new Date(2026, 8, 24, 23, 30))).toBe('2026-09-24');
   });
 });
 
@@ -192,12 +198,23 @@ describe('listParcAeronefs', () => {
 
 describe('listAffectationsEquipe', () => {
   it('rend l’historique des affectations de l’équipe, la plus récente d’abord', async () => {
-    await listAffectationsEquipe('eq-1');
+    await listAffectationsEquipe('eq-1', '2026-09-24');
 
     const [sql, params] = getAllAsync.mock.calls[0];
     expect(sql).toContain('FROM equipe_aeronef');
     expect(sql).toContain('JOIN aeronef');
     expect(sql).toMatch(/ORDER BY ea\.date_debut DESC/);
-    expect(params).toEqual(['eq-1']);
+    expect(params).toEqual(['2026-09-24', '2026-09-24', 'eq-1']);
+  });
+
+  it('marque en_service avec la même règle d’intervalle que les autres requêtes', async () => {
+    await listAffectationsEquipe('eq-1', '2026-09-24');
+    const [affectations] = getAllAsync.mock.calls[0];
+    await listAeronefsEquipe('eq-1', '2026-09-24');
+    await listParcAeronefs('2026-09-24');
+    const regle = 'ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin > ?)';
+
+    for (const [sql] of getAllAsync.mock.calls) expect(sql).toContain(regle);
+    expect(affectations).toContain('AS en_service');
   });
 });

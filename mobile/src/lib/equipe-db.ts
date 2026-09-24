@@ -37,8 +37,14 @@ export interface AeronefEquipe {
   societe: string;
 }
 
+/**
+ * Jour du calendrier LOCAL de l'appareil (AAAA-MM-JJ). Pas `toISOString()` : il donne le jour UTC, et
+ * à Madagascar (UTC+3) entre minuit et 3 h il rendrait la veille — une affectation datée « aujourd'hui »
+ * paraîtrait future, une terminée aujourd'hui encore en cours.
+ */
 export function aujourdhuiIso(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
+  const deuxChiffres = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${deuxChiffres(now.getMonth() + 1)}-${deuxChiffres(now.getDate())}`;
 }
 
 /** Équipes actives, terrestres et aériennes, avec leur chef et leur effectif. */
@@ -84,6 +90,14 @@ export async function listSitesEquipe(equipeId: string): Promise<SiteEquipe[]> {
 }
 
 /**
+ * LA règle « affectation en service à la date donnée » — unique, réutilisée par toutes les requêtes
+ * ci-dessous (alias `ea`, deux paramètres : la date, deux fois). Intervalle semi-ouvert
+ * `[date_debut, date_fin)` comme côté serveur : commencée, et non terminée le jour de `date_fin`.
+ * Aucune copie TypeScript : les écrans lisent la colonne `en_service` plutôt que de la recalculer.
+ */
+const AFFECTATION_EN_SERVICE_SQL = 'ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin > ?)';
+
+/**
  * Aéronefs actuellement affectés à l'équipe : l'affectation couvre la date donnée. L'intervalle est
  * semi-ouvert `[date_debut, date_fin)` comme côté serveur : le jour de `date_fin`, l'appareil est déjà libre.
  */
@@ -93,7 +107,7 @@ export async function listAeronefsEquipe(equipeId: string, aujourdhui: string): 
     `SELECT a.id, a.immatriculation, a.societe
      FROM equipe_aeronef ea JOIN aeronef a ON a.id = ea.aeronef_id
      WHERE ea.equipe_id = ? AND a.actif = 1
-       AND ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin > ?)
+       AND ${AFFECTATION_EN_SERVICE_SQL}
      ORDER BY a.immatriculation`,
     [equipeId, aujourdhui, aujourdhui]
   );
@@ -116,7 +130,7 @@ export async function listParcAeronefs(aujourdhui: string): Promise<AeronefParc[
     `SELECT a.id, a.immatriculation, a.societe, a.volume_cuve_l, e.id AS equipe_id, e.nom AS equipe_nom
      FROM aeronef a
      LEFT JOIN equipe_aeronef ea ON ea.aeronef_id = a.id
-       AND ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin > ?)
+       AND ${AFFECTATION_EN_SERVICE_SQL}
      LEFT JOIN equipe e ON e.id = ea.equipe_id
      WHERE a.actif = 1
      ORDER BY a.immatriculation`,
@@ -130,19 +144,22 @@ export interface AffectationLocale {
   immatriculation: string;
   societe: string;
   date_debut: string;
-  /** `null` : affectation en cours. */
+  /** `null` : affectation sans fin planifiée. */
   date_fin: string | null;
+  /** 1 si l'affectation est en service à la date demandée (règle `AFFECTATION_EN_SERVICE_SQL`), sinon 0. */
+  en_service: 0 | 1;
 }
 
-/** Historique des affectations d'une équipe, la plus récente d'abord. */
-export async function listAffectationsEquipe(equipeId: string): Promise<AffectationLocale[]> {
+/** Historique des affectations d'une équipe, la plus récente d'abord ; `en_service` dit laquelle est active à `aujourdhui`. */
+export async function listAffectationsEquipe(equipeId: string, aujourdhui: string): Promise<AffectationLocale[]> {
   const db = await getReferentielDb();
   return db.getAllAsync<AffectationLocale>(
-    `SELECT ea.id, ea.aeronef_id, a.immatriculation, a.societe, ea.date_debut, ea.date_fin
+    `SELECT ea.id, ea.aeronef_id, a.immatriculation, a.societe, ea.date_debut, ea.date_fin,
+       CASE WHEN ${AFFECTATION_EN_SERVICE_SQL} THEN 1 ELSE 0 END AS en_service
      FROM equipe_aeronef ea JOIN aeronef a ON a.id = ea.aeronef_id
      WHERE ea.equipe_id = ?
      ORDER BY ea.date_debut DESC`,
-    [equipeId]
+    [aujourdhui, aujourdhui, equipeId]
   );
 }
 

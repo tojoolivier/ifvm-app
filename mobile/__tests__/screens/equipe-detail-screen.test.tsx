@@ -36,8 +36,8 @@ beforeEach(() => {
     { id: 's2', parent_site_id: 's1', numero: 'n°01', localite: 'Isoanala', date_debut_position: null },
   ]);
   jest.mocked(listAffectationsEquipe).mockResolvedValue([
-    { id: 'af-2', aeronef_id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', date_debut: '2026-09-01', date_fin: null },
-    { id: 'af-1', aeronef_id: 'ae-2', immatriculation: '5R-MJK', societe: 'Cessna 188', date_debut: '2026-05-01', date_fin: '2026-08-31' },
+    { id: 'af-2', aeronef_id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', date_debut: '2026-09-01', date_fin: null, en_service: 1 as const },
+    { id: 'af-1', aeronef_id: 'ae-2', immatriculation: '5R-MJK', societe: 'Cessna 188', date_debut: '2026-05-01', date_fin: '2026-08-31', en_service: 0 as const },
   ]);
   jest.mocked(listParcAeronefs).mockResolvedValue([
     { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', volume_cuve_l: 800, equipe_id: 'eq-sud', equipe_nom: 'Équipe Sud' },

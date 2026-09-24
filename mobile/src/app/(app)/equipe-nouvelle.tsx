@@ -5,13 +5,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ChoixField, OptionChoix } from '@/components/equipe/ChoixField';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import { EQ } from '@/components/equipe/tokens';
-import { useAsyncAction } from '@/hooks/use-async-action';
+import { useEcritureServeur } from '@/hooks/use-ecriture-serveur';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { apiClient } from '@/lib/api-client';
-import { useAuthStore } from '@/lib/auth-store';
 import { listAeronefsActifs, listAnnuaire } from '@/lib/equipe-db';
 import { TypeEquipe, validerNouvelleEquipe } from '@/lib/equipe-regles';
-import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
 /** Rôles de l'annuaire qui peuvent être chef d'une équipe de ce type (même règle que le portail web). */
@@ -24,8 +22,6 @@ const ROLES_CHEF: Record<TypeEquipe, string[]> = { aerien: ['chef_de_base'], ter
  */
 export default function EquipeNouvelleScreen() {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
-  const { run, isRunning } = useAsyncAction();
   const signalerChargement = useSignalerChargement('equipe-nouvelle');
 
   const [nom, setNom] = useState('');
@@ -35,6 +31,7 @@ export default function EquipeNouvelleScreen() {
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [aeronefs, setAeronefs] = useState<OptionChoix[]>([]);
   const [chefs, setChefs] = useState<OptionChoix[]>([]);
+  const { ecrire, isRunning } = useEcritureServeur('equipe-nouvelle', (message) => setErreurs([message]));
 
   useEffect(() => {
     listAeronefsActifs()
@@ -58,24 +55,17 @@ export default function EquipeNouvelleScreen() {
     const trouvees = validerNouvelleEquipe({ nom, type, aeronefId, chefId });
     setErreurs(trouvees);
     if (trouvees.length > 0) return;
-    void run(
-      () =>
-        surRefusAfficher(
-          async () => {
-            await apiClient.createEquipe(token as string, {
-              nom: nom.trim(),
-              type,
-              aeronef_id: type === 'aerien' ? aeronefId : null,
-              membres: [{ user_id: chefId as string, fonction: 'chef' }],
-            });
-            // L'équipe n'existe localement qu'après le prochain pull : on le fait tout de suite.
-            await pullReferentiel(token as string);
-            router.back();
-          },
-          (message) => setErreurs([message])
-        ),
-      { screen: 'equipe-nouvelle', precondition: !!token, preconditionMessage: 'Session expirée — reconnectez-vous.' }
-    );
+    void ecrire(async (token) => {
+      await apiClient.createEquipe(token, {
+        nom: nom.trim(),
+        type,
+        aeronef_id: type === 'aerien' ? aeronefId : null,
+        membres: [{ user_id: chefId as string, fonction: 'chef' }],
+      });
+      // L'équipe n'existe localement qu'après le prochain pull : on le fait tout de suite.
+      await pullReferentiel(token);
+      router.back();
+    });
   };
 
   return (

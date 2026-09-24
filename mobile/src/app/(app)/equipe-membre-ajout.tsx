@@ -5,14 +5,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ChoixField, OptionChoix } from '@/components/equipe/ChoixField';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import { EQ } from '@/components/equipe/tokens';
-import { useAsyncAction } from '@/hooks/use-async-action';
+import { useEcritureServeur } from '@/hooks/use-ecriture-serveur';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { apiClient } from '@/lib/api-client';
-import { useAuthStore } from '@/lib/auth-store';
 import { listAnnuaire, listChefsDAutresEquipes, listMembresEquipe, UtilisateurAnnuaire } from '@/lib/equipe-db';
 import { libelleFonction, ROLES_A_LA_VOLEE, validerAjoutMembre } from '@/lib/equipe-regles';
 import { getEquipeLocale } from '@/lib/referentiel-db';
-import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
 type Mode = 'existant' | 'nouveau';
@@ -31,8 +29,6 @@ const options = (fonctions: readonly string[]): OptionChoix[] =>
 export default function EquipeMembreAjoutScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const token = useAuthStore((s) => s.token);
-  const { run, isRunning } = useAsyncAction();
   const signalerChargement = useSignalerChargement('equipe-membre-ajout');
 
   const [nomEquipe, setNomEquipe] = useState('');
@@ -43,6 +39,7 @@ export default function EquipeMembreAjoutScreen() {
   const [nom, setNom] = useState('');
   const [prenom, setPrenom] = useState('');
   const [erreurs, setErreurs] = useState<string[]>([]);
+  const { ecrire, isRunning } = useEcritureServeur('equipe-membre-ajout', (message) => setErreurs([message]));
 
   useEffect(() => {
     if (!id) return;
@@ -65,8 +62,8 @@ export default function EquipeMembreAjoutScreen() {
   };
 
   const ajouter = (userId: string | null) => {
-    void run(
-      async () => {
+    void ecrire(
+      async (token) => {
         const [membres, chefsAilleurs] = await Promise.all([listMembresEquipe(id), listChefsDAutresEquipes(id)]);
         const trouvees = validerAjoutMembre(
           mode === 'existant' ? { mode, userId, fonction } : { mode, nom, prenom, fonction },
@@ -75,22 +72,17 @@ export default function EquipeMembreAjoutScreen() {
         setErreurs(trouvees);
         if (trouvees.length > 0) return;
 
-        await surRefusAfficher(
-          async () => {
-            await apiClient.ajouterMembreEquipe(
-              token as string,
-              id,
-              mode === 'existant'
-                ? { user_id: userId, fonction: fonction as never }
-                : { nom: nom.trim(), prenom: prenom.trim() || null, fonction: fonction as never }
-            );
-            await pullReferentiel(token as string);
-            router.back();
-          },
-          (message) => setErreurs([message])
+        await apiClient.ajouterMembreEquipe(
+          token,
+          id,
+          mode === 'existant'
+            ? { user_id: userId, fonction: fonction as never }
+            : { nom: nom.trim(), prenom: prenom.trim() || null, fonction: fonction as never }
         );
+        await pullReferentiel(token);
+        router.back();
       },
-      { screen: 'equipe-membre-ajout', precondition: !!token && !!id, preconditionMessage: 'Session expirée — reconnectez-vous.' }
+      { precondition: !!id }
     );
   };
 

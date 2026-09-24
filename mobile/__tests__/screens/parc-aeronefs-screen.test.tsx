@@ -25,7 +25,7 @@ beforeEach(() => {
     { id: 'ae-2', immatriculation: '5R-MLP', societe: 'Air Tractor', volume_cuve_l: 1200, equipe_id: null, equipe_nom: null },
   ]);
   jest.mocked(listAffectationsEquipe).mockResolvedValue([
-    { id: 'af-1', aeronef_id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', date_debut: '2026-09-01', date_fin: null },
+    { id: 'af-1', aeronef_id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', date_debut: '2026-09-01', date_fin: null, en_service: 1 as const },
   ]);
 });
 

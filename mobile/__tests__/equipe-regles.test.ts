@@ -5,7 +5,6 @@ import {
   prefillTraitementAerien,
   ROLES_A_LA_VOLEE,
   aeronefPreselectionne,
-  affectationActive,
   jourMoisAnnee,
   joursDepuis,
   validerNouvelAeronef,
@@ -191,21 +190,5 @@ describe('aeronefPreselectionne', () => {
   it('ne présélectionne rien sans affectation ou si plusieurs appareils sont affectés', () => {
     expect(aeronefPreselectionne([])).toBe('');
     expect(aeronefPreselectionne([{ immatriculation: '5R-MHR' }, { immatriculation: '5R-MJK' }])).toBe('');
-  });
-});
-
-describe('affectationActive', () => {
-  const affectation = (date_debut: string, date_fin: string | null) => ({ date_debut, date_fin });
-
-  it('rend l’affectation en cours ou dont la fin n’est pas passée', () => {
-    expect(affectationActive([affectation('2026-09-01', null)], '2026-09-24')).toEqual(affectation('2026-09-01', null));
-    expect(affectationActive([affectation('2026-09-01', '2026-09-25')], '2026-09-24')).not.toBeNull();
-  });
-
-  it('ignore une affectation future ou déjà terminée', () => {
-    expect(affectationActive([affectation('2026-10-01', null)], '2026-09-24')).toBeNull();
-    expect(affectationActive([affectation('2026-05-01', '2026-08-31')], '2026-09-24')).toBeNull();
-    // Terminée aujourd'hui : intervalle semi-ouvert, l'appareil est déjà libre.
-    expect(affectationActive([affectation('2026-09-01', '2026-09-24')], '2026-09-24')).toBeNull();
   });
 });

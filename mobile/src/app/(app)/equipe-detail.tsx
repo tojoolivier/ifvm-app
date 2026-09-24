@@ -7,7 +7,7 @@ import { AffectationActiveCard } from '@/components/equipe/AffectationActiveCard
 import { ChoixField, OptionChoix } from '@/components/equipe/ChoixField';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import { EQ } from '@/components/equipe/tokens';
-import { useAsyncAction } from '@/hooks/use-async-action';
+import { useEcritureServeur } from '@/hooks/use-ecriture-serveur';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/auth-store';
@@ -22,9 +22,8 @@ import {
   MembreEquipeLocal,
   SiteEquipe,
 } from '@/lib/equipe-db';
-import { affectationActive, jourMois, jourMoisAnnee, libelleFonction, libelleSite } from '@/lib/equipe-regles';
+import { jourMois, jourMoisAnnee, libelleFonction, libelleSite } from '@/lib/equipe-regles';
 import { EquipeLocale, getEquipeLocale } from '@/lib/referentiel-db';
-import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
 function initiales(m: MembreEquipeLocal): string {
@@ -46,8 +45,6 @@ export default function EquipeDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const role = useAuthStore((s) => s.user?.role);
-  const token = useAuthStore((s) => s.token);
-  const { run, isRunning } = useAsyncAction();
   const signalerChargement = useSignalerChargement('equipe-detail');
   const [equipe, setEquipe] = useState<EquipeLocale | null>(null);
   const [membres, setMembres] = useState<MembreEquipeLocal[]>([]);
@@ -56,6 +53,7 @@ export default function EquipeDetailScreen() {
   const [aeronefsLibres, setAeronefsLibres] = useState<OptionChoix[]>([]);
   const [aeronefChoisi, setAeronefChoisi] = useState<string | null>(null);
   const [refus, setRefus] = useState<string | null>(null);
+  const { ecrire, isRunning } = useEcritureServeur('equipe-detail', setRefus);
 
   const charger = useCallback(() => {
     if (!id) return Promise.resolve();
@@ -63,7 +61,7 @@ export default function EquipeDetailScreen() {
       getEquipeLocale(id),
       listMembresEquipe(id),
       listSitesEquipe(id),
-      listAffectationsEquipe(id),
+      listAffectationsEquipe(id, aujourdhuiIso()),
       listParcAeronefs(aujourdhuiIso()),
     ])
       .then(([e, m, s, a, parc]) => {
@@ -87,40 +85,32 @@ export default function EquipeDetailScreen() {
   );
 
   const aujourdhui = aujourdhuiIso();
-  const active = affectationActive(affectations, aujourdhui);
+  const active = affectations.find((a) => a.en_service === 1) ?? null;
   const historique = affectations.filter((a) => a.id !== active?.id);
   const gestionParc = peutGererParcAeronefs(role);
 
   // Écritures en ligne uniquement (#642) : hors-ligne, l'erreur réseau s'affiche telle quelle et
   // rien n'est mis en file ; le serveur juge les chevauchements de dates.
-  const apresEcriture = async () => {
-    await pullReferentiel(token as string);
+  const apresEcriture = async (token: string) => {
+    await pullReferentiel(token);
     await charger();
   };
   const affecter = () =>
-    void run(
-      () =>
-        surRefusAfficher(async () => {
-          setRefus(null);
-          await apiClient.affecterAeronef(token as string, id as string, {
-            aeronef_id: aeronefChoisi as string,
-            date_debut: aujourdhui,
-          });
-          setAeronefChoisi(null);
-          await apresEcriture();
-        }, setRefus),
-      { screen: 'equipe-detail', precondition: !!token && !!aeronefChoisi, preconditionMessage: 'Choisissez un aéronef.' }
+    void ecrire(
+      async (token) => {
+        setRefus(null);
+        await apiClient.affecterAeronef(token, id as string, { aeronef_id: aeronefChoisi as string, date_debut: aujourdhui });
+        setAeronefChoisi(null);
+        await apresEcriture(token);
+      },
+      { precondition: !!aeronefChoisi, preconditionMessage: 'Choisissez un aéronef.' }
     );
   const terminer = (affectationId: string) =>
-    void run(
-      () =>
-        surRefusAfficher(async () => {
-          setRefus(null);
-          await apiClient.cloturerAffectationAeronef(token as string, id as string, affectationId, { date_fin: aujourdhui });
-          await apresEcriture();
-        }, setRefus),
-      { screen: 'equipe-detail', precondition: !!token, preconditionMessage: 'Session expirée — reconnectez-vous.' }
-    );
+    void ecrire(async (token) => {
+      setRefus(null);
+      await apiClient.cloturerAffectationAeronef(token, id as string, affectationId, { date_fin: aujourdhui });
+      await apresEcriture(token);
+    });
 
   const aerienne = equipe?.type === 'aerien';
   const principal = sites.find((s) => s.parent_site_id === null);
