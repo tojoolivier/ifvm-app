@@ -63,7 +63,8 @@ describe('FichesScreen — filtre par équipe de travail courante', () => {
     expect(await screen.findByText('Ambovombe · 2026-09-17')).toBeVisible();
     expect(screen.getByText('Morondava · 2026-09-17')).toBeVisible();
     expect(screen.queryByText('Toliara · 2026-09-17')).toBeNull();
-    expect(screen.getByText('Équipe · Équipe Nord')).toBeVisible();
+    expect(screen.getByTestId('bandeau-equipe')).toBeVisible();
+    expect(screen.getByText('Équipe Nord')).toBeVisible();
   });
 
   it('« Toutes les équipes » lève le filtre', async () => {
@@ -82,5 +83,6 @@ describe('FichesScreen — filtre par équipe de travail courante', () => {
 
     expect(await screen.findByText('Toliara · 2026-09-17')).toBeVisible();
     expect(screen.queryByTestId('fiches-toutes-equipes')).toBeNull();
+    expect(screen.getByTestId('bandeau-equipe-vide')).toBeVisible();
   });
 });

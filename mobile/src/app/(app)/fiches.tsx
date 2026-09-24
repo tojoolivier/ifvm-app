@@ -34,6 +34,7 @@ import {
 import { statutFicheAffiche } from '@/lib/prospection-statut';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
+import { BandeauEquipe } from '@/components/equipe/BandeauEquipe';
 import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
@@ -391,11 +392,9 @@ export default function FichesScreen() {
         onFilterChange={setFilterKey}
       />
 
-      {courante ? (
-        <View style={styles.equipeBar}>
-          <Text style={styles.equipeLabel} numberOfLines={1}>
-            Équipe · {courante.nom}
-          </Text>
+      <View style={styles.equipeBar}>
+        <BandeauEquipe equipe={courante} />
+        {courante ? (
           <TouchableOpacity
             testID="fiches-toutes-equipes"
             onPress={() => setToutesEquipes((v) => !v)}
@@ -408,8 +407,8 @@ export default function FichesScreen() {
               Toutes les équipes
             </Text>
           </TouchableOpacity>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
 
       <View style={styles.resultCountContainer}>
         <Text style={styles.resultCount}>
@@ -479,20 +478,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       backgroundColor: FICHES_BG,
     },
     equipeBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
+      gap: 6,
       paddingHorizontal: 16,
       paddingBottom: 6,
     },
-    equipeLabel: {
-      flex: 1,
-      fontSize: typeSizes.equipeLabel,
-      fontWeight: '700',
-      color: theme.muted,
-    },
     equipeToggle: {
+      alignSelf: 'flex-end',
       borderRadius: 999,
       borderWidth: 1,
       borderColor: EQ.bordure,

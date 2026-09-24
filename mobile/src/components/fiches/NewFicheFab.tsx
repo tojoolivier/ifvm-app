@@ -9,6 +9,7 @@ import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
+import { BandeauEquipe } from '@/components/equipe/BandeauEquipe';
 import { AppIcon, type AppIconName } from '@/components/ui/AppIcon';
 import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
@@ -78,7 +79,7 @@ export function NewFicheFab() {
 
   return (
     <>
-      <TouchableOpacity style={styles.fab} onPress={() => setMenuVisible(true)} activeOpacity={0.85}>
+      <TouchableOpacity testID="fab-nouvelle-fiche" style={styles.fab} onPress={() => setMenuVisible(true)} activeOpacity={0.85}>
         <AppIcon name="ajouter" size={24} color={EQ.surMarque} />
       </TouchableOpacity>
 
@@ -142,6 +143,9 @@ export function NewFicheFab() {
               <>
                 <Text style={styles.title}>Nouvelle fiche</Text>
                 <Text style={styles.subtitle}>Choisissez le type de fiche à remplir.</Text>
+                <View style={styles.equipe}>
+                  <BandeauEquipe equipe={courante} onChanger={changerEquipe} />
+                </View>
                 <View style={styles.cards}>
                   <CarteChoix
                     styles={styles}
@@ -284,6 +288,9 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     subtitle: {
       fontSize: typeSizes.subtitle,
       color: EQ.attenue,
+    },
+    equipe: {
+      marginTop: 12,
     },
     cards: {
       gap: 10,
