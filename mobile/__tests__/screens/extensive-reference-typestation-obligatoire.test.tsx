@@ -35,7 +35,7 @@ describe('ExtensiveReferenceScreen — Type de station (biotope) désormais obli
   beforeEach(() => {
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
         surface_infestee: 3.5,

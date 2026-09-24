@@ -9,13 +9,11 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
 const BLUE = '#31567f';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
 
 type ModeExtensif = 'terrestre' | 'aerien';
 
@@ -45,7 +43,8 @@ export default function ExtensiveModeChooserScreen() {
 
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const handleContinue = () =>
     run(
@@ -132,21 +131,21 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   content: { flex: 1, paddingHorizontal: 16 },
-  hint: { fontSize: typeSizes.hint, lineHeight: 17, color: TEXT_SECONDARY, marginBottom: 14 },
-  card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: '#fff', borderWidth: 1.5, borderColor: BORDER },
-  cardActiveGreen: { borderColor: GREEN, borderWidth: 2, backgroundColor: '#eaf2ec' },
+  hint: { fontSize: typeSizes.hint, lineHeight: 17, color: theme.muted, marginBottom: 14 },
+  card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.inputBorder },
+  cardActiveGreen: { borderColor: GREEN, borderWidth: 2, backgroundColor: theme.successBg },
   cardActiveBlue: { borderColor: BLUE, borderWidth: 2, backgroundColor: '#eaf0f7' },
   cardIcon: { fontSize: typeSizes.cardIcon, marginBottom: 4 },
-  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '800', color: TEXT },
-  cardSubtitle: { fontSize: typeSizes.cardSubtitle, lineHeight: 16, color: TEXT_SECONDARY, marginTop: 4 },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '800', color: theme.text },
+  cardSubtitle: { fontSize: typeSizes.cardSubtitle, lineHeight: 16, color: theme.muted, marginTop: 4 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   continueButtonDisabled: { opacity: 0.5 },

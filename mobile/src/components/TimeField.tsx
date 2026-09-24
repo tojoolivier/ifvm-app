@@ -3,6 +3,8 @@ import { Text, TouchableOpacity, View, StyleSheet, Platform, Modal, StyleProp, V
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 interface TimeFieldProps {
   /** Heure au format "HH:mm", ou null/vide si non renseignée. */
@@ -49,7 +51,8 @@ export function TimeField({
   const hhmmValue = value && value.trim().length > 0 ? value : null;
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => computeTypeSizes(scale), [scale]);
-  const defaultStyles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const defaultStyles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const onValueChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
     setShow(false);
@@ -107,19 +110,19 @@ function computeTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     input: {
       minHeight: 44,
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: '#e7e0cd',
+      borderColor: theme.inputBorder,
       borderRadius: 8,
       paddingHorizontal: 10,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
-    value: { fontSize: typeSizes.value, fontWeight: '600', color: '#16201a' },
-    placeholder: { fontSize: typeSizes.placeholder, fontWeight: '600', color: '#6f6a59' },
+    value: { fontSize: typeSizes.value, fontWeight: '600', color: theme.text },
+    placeholder: { fontSize: typeSizes.placeholder, fontWeight: '600', color: theme.muted },
     backdrop: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.35)',
@@ -127,7 +130,7 @@ function createStyles(typeSizes: ReturnType<typeof computeTypeSizes>) {
       alignItems: 'center',
     },
     pickerCard: {
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
       borderRadius: 8,
       padding: 8,
       overflow: 'hidden',

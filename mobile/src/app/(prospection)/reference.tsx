@@ -26,18 +26,14 @@ import { scaleTypeSizes } from '@/lib/typography';
 import { useErrorLogStore } from '@/lib/error-log-store';
 import { toFriendlyError } from '@/lib/friendly-error';
 import { logger } from '@/lib/logger';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
-const INACTIVE_BG = '#efeada';
 const INACTIVE_TEXT = '#9a9484';
-const GPS_BADGE_BG = '#eaf2ec';
 
 type SelectMode = 'auto' | 'manuel';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
 
 const BIOTOPE_OPTIONS = [
   { label: 'Xérophyle', value: 'xerophyle' },
@@ -105,7 +101,8 @@ function SelecteurReferentiel<T extends OptionReferentiel>({
 
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const filtres = useMemo(() => {
     const q = recherche.trim().toLowerCase();
@@ -202,7 +199,8 @@ export default function ReferenceScreen() {
 
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   // Retour visuel continu sur la qualité du fix : la précision n'empêche jamais
   // d'enregistrer, c'est donc ici — sous les yeux de l'agent pendant qu'il saisit —
@@ -1002,9 +1000,9 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: {
@@ -1015,10 +1013,10 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
     alignItems: 'center',
     gap: 10,
   },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
-  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
+  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: theme.chipBg },
   progressActive: { backgroundColor: GREEN },
   scroll: { flex: 1 },
   gpsCard: { backgroundColor: GREEN, borderRadius: 13, padding: 14, marginBottom: 12 },
@@ -1054,9 +1052,9 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   gpsFieldValue: { color: '#fff', fontWeight: '600', fontSize: typeSizes.gpsFieldValue },
   gpsAdminText: { color: '#ffffffd9', fontSize: typeSizes.gpsAdminText },
   refCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.inputBorder,
     borderRadius: 12,
     padding: 13,
     marginBottom: 11,
@@ -1070,62 +1068,62 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   refLabel: {
     fontSize: typeSizes.refLabel,
     fontWeight: '700',
-    color: INACTIVE_TEXT,
+    color: theme.faint,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  toggleTrack: { flexDirection: 'row', backgroundColor: INACTIVE_BG, borderRadius: 8, padding: 2, gap: 2 },
+  toggleTrack: { flexDirection: 'row', backgroundColor: theme.inputBg, borderRadius: 8, padding: 2, gap: 2 },
   toggleSegment: {
     fontSize: typeSizes.toggleSegment,
     fontWeight: '700',
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 6,
-    color: INACTIVE_TEXT,
+    color: theme.faint,
     overflow: 'hidden',
   },
   toggleSegmentActive: { backgroundColor: GREEN, color: '#fff' },
   autoValueRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  autoValueText: { fontSize: typeSizes.autoValueText, fontWeight: '700', color: TEXT },
+  autoValueText: { fontSize: typeSizes.autoValueText, fontWeight: '700', color: theme.text },
   manualInput: {
     fontSize: typeSizes.manualInput,
     fontWeight: '700',
-    color: TEXT,
-    backgroundColor: INACTIVE_BG,
+    color: theme.text,
+    backgroundColor: theme.inputBg,
     borderRadius: 8,
     paddingHorizontal: 11,
     paddingVertical: 9,
   },
-  gpsBadge: { backgroundColor: GPS_BADGE_BG, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  gpsBadge: { backgroundColor: theme.successBg, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
   gpsBadgeText: { fontSize: typeSizes.gpsBadgeText, fontWeight: '600', color: GREEN },
   selectTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   selectTriggerDisabled: { opacity: 0.55 },
-  selectTriggerText: { flex: 1, fontSize: typeSizes.selectTriggerText, fontWeight: '700', color: TEXT },
-  selectTriggerPlaceholder: { color: INACTIVE_TEXT, fontWeight: '600' },
-  selectChevron: { fontSize: typeSizes.selectChevron, color: TEXT_SECONDARY, marginLeft: 8 },
+  selectTriggerText: { flex: 1, fontSize: typeSizes.selectTriggerText, fontWeight: '700', color: theme.text },
+  selectTriggerPlaceholder: { color: theme.faint, fontWeight: '600' },
+  selectChevron: { fontSize: typeSizes.selectChevron, color: theme.muted, marginLeft: 8 },
   selectVoile: { flex: 1, backgroundColor: 'rgba(22,32,26,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   selectCarte: {
     width: '100%',
     maxWidth: 380,
     maxHeight: '75%',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.inputBorder,
     padding: 16,
     gap: 10,
   },
   selectListe: { flexGrow: 0 },
-  selectVide: { fontSize: typeSizes.selectVide, color: TEXT_SECONDARY, padding: 12 },
-  selectLigne: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
-  selectLigneTexte: { fontSize: typeSizes.selectLigneTexte, fontWeight: '600', color: TEXT },
-  selectLien: { color: TEXT_SECONDARY, fontSize: typeSizes.selectLien, fontWeight: '700', textAlign: 'center', paddingVertical: 8 },
+  selectVide: { fontSize: typeSizes.selectVide, color: theme.muted, padding: 12 },
+  selectLigne: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.inputBorder },
+  selectLigneTexte: { fontSize: typeSizes.selectLigneTexte, fontWeight: '600', color: theme.text },
+  selectLien: { color: theme.muted, fontSize: typeSizes.selectLien, fontWeight: '700', textAlign: 'center', paddingVertical: 8 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     fontSize: typeSizes.chip,
     fontWeight: '600',
-    color: TEXT_SECONDARY,
-    backgroundColor: INACTIVE_BG,
+    color: theme.muted,
+    backgroundColor: theme.inputBg,
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 8,
@@ -1135,30 +1133,30 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   metaRow: { flexDirection: 'row', gap: 9, marginBottom: 14 },
   metaField: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.inputBorder,
     borderRadius: 10,
     padding: 9,
   },
-  metaLabel: { fontSize: typeSizes.metaLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
-  metaValue: { fontSize: typeSizes.metaValue, fontWeight: '600', color: TEXT },
+  metaLabel: { fontSize: typeSizes.metaLabel, fontWeight: '600', color: theme.faint, textTransform: 'uppercase' },
+  metaValue: { fontSize: typeSizes.metaValue, fontWeight: '600', color: theme.text },
   sectionLabel: {
     fontSize: typeSizes.sectionLabel,
     fontWeight: '700',
-    color: TEXT_SECONDARY,
+    color: theme.muted,
     textTransform: 'uppercase',
     marginBottom: 9,
   },
   requiredLabel: {
-    color: '#c0412b',
+    color: theme.danger,
   },
   surfacesRow: { flexDirection: 'row', gap: 9, marginBottom: 8 },
   surfaceField: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.inputBorder,
     borderRadius: 10,
     padding: 9,
   },
@@ -1166,17 +1164,17 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
     padding: 16,
     paddingBottom: 24,
   },
-  surfaceLabel: { fontSize: typeSizes.surfaceLabel, color: '#9a9484', marginBottom: 2 },
-  surfaceInput: { fontSize: typeSizes.surfaceInput, fontWeight: '700', color: TEXT, padding: 0 },
+  surfaceLabel: { fontSize: typeSizes.surfaceLabel, color: theme.faint, marginBottom: 2 },
+  surfaceInput: { fontSize: typeSizes.surfaceInput, fontWeight: '700', color: theme.text, padding: 0 },
   biotopeContainer: { marginTop: 4, marginBottom: 12 },
   biotopeOptions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   biotopeChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: INACTIVE_BG,
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.inputBorder,
   },
   biotopeChipActive: {
     backgroundColor: GREEN,
@@ -1185,16 +1183,16 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   biotopeChipText: {
     fontSize: typeSizes.biotopeChipText,
     fontWeight: '600',
-    color: TEXT_SECONDARY,
+    color: theme.muted,
   },
   biotopeChipTextActive: {
     color: '#fff',
   },
-  hintText: { fontSize: typeSizes.hintText, color: '#9a9484', paddingHorizontal: 2 },
-  errorText: { color: '#c0412b', fontSize: typeSizes.errorText, marginBottom: 4 },
+  hintText: { fontSize: typeSizes.hintText, color: theme.faint, paddingHorizontal: 2 },
+  errorText: { color: theme.danger, fontSize: typeSizes.errorText, marginBottom: 4 },
   infoText: {
     fontSize: typeSizes.infoText,
-    color: '#6f6a59',
+    color: theme.muted,
     marginBottom: 8,
     fontStyle: 'italic',
     backgroundColor: '#f0ede6',
@@ -1204,7 +1202,7 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   footer: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    backgroundColor: BG,
+    backgroundColor: theme.screen,
   },
   continueButton: {
     backgroundColor: GREEN,

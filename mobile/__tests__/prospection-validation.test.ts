@@ -9,6 +9,7 @@ import {
   classifyLarvalPopulation,
   classifyAerialPopulation,
   validateEcartHistorique,
+  validateSurfaceInfesteeExtensif,
   ECART_HISTORIQUE_SEUIL_RATIO,
 } from '../src/lib/prospection-validation';
 
@@ -531,5 +532,39 @@ describe('validateEcartHistorique — écart vs dernière observation au même s
       derniereDensiteMoyConnue: 1,
     });
     expect(blocages).toEqual([]);
+  });
+});
+
+describe('validateSurfaceInfesteeExtensif — infestée ≤ prospectée (Validation / Revalidation)', () => {
+  const base = { surfaceProspectee: 10, surfaceProspecteeHeritee: null, surfaceInfestee: 5 };
+
+  it('bloque une surface infestée supérieure à la surface prospectée saisie', () => {
+    const { blocages } = validateSurfaceInfesteeExtensif({ ...base, surfaceInfestee: 10.5 });
+    expect(blocages).toEqual(['La surface infestée (10.5 ha) ne peut pas dépasser la surface prospectée (10 ha).']);
+  });
+
+  it('accepte une surface infestée inférieure ou égale à la surface prospectée', () => {
+    expect(validateSurfaceInfesteeExtensif({ ...base, surfaceInfestee: 10 }).blocages).toEqual([]);
+    expect(validateSurfaceInfesteeExtensif({ ...base, surfaceInfestee: 0.1 }).blocages).toEqual([]);
+  });
+
+  it('ne demande rien quand la surface infestée est vide ou nulle, même sans surface prospectée', () => {
+    for (const surfaceInfestee of [null, 0, Number.NaN]) {
+      expect(
+        validateSurfaceInfesteeExtensif({ surfaceProspectee: null, surfaceProspecteeHeritee: null, surfaceInfestee }).blocages
+      ).toEqual([]);
+    }
+  });
+
+  it('exige la surface prospectée dès qu’une surface infestée positive est saisie', () => {
+    const { blocages } = validateSurfaceInfesteeExtensif({ surfaceProspectee: null, surfaceProspecteeHeritee: null, surfaceInfestee: 3 });
+    expect(blocages).toEqual([expect.stringContaining('Renseignez la surface prospectée')]);
+  });
+
+  it('applique aussi la surface prospectée héritée d’une revalidation, la plus petite l’emporte', () => {
+    const heritee = validateSurfaceInfesteeExtensif({ surfaceProspectee: null, surfaceProspecteeHeritee: 5, surfaceInfestee: 8 });
+    expect(heritee.blocages).toEqual([expect.stringContaining('(5 ha)')]);
+    const plusPetite = validateSurfaceInfesteeExtensif({ surfaceProspectee: 20, surfaceProspecteeHeritee: 5, surfaceInfestee: 8 });
+    expect(plusPetite.blocages).toEqual([expect.stringContaining('(5 ha)')]);
   });
 });

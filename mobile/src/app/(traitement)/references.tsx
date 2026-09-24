@@ -31,6 +31,8 @@ import { DateField } from '@/components/traitement/DateField';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { SegmentedControl } from '@/components/traitement/SegmentedControl';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 function formatDateFr(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -68,7 +70,8 @@ export default function ReferencesScreen() {
   // (prospection-picker.tsx : n_fiche, puis n_message).
   const [prospectionNFiche, setProspectionNFiche] = useState<string | null>(null);
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const readOnly = isValidationView === '1';
   // #zone-a-reprendre-numero-annexe : présence d'`origineId` = fiche démarrée
@@ -493,7 +496,7 @@ export default function ReferencesScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp },
     keyboardAvoidingView: { flex: 1 },
@@ -521,7 +524,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       fontFamily: traitementFonts.ui,
       fontSize: typeSizes.corps,
       color: traitementColors.texteTitre,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
     monoReadonly: { fontFamily: traitementFonts.mono, fontSize: typeSizes.corps, color: traitementColors.texteSecondaire },
     error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },

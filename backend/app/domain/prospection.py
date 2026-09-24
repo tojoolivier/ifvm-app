@@ -50,15 +50,26 @@ class SurfaceInfesteeSuperieureError(ValueError):
 
 
 def valider_surfaces_prospection(
-    surface_prospectee: float | None, surface_infestee: float | None
+    surface_prospectee: float | None,
+    surface_infestee: float | None,
+    surface_station: float | None = None,
 ) -> None:
-    """Aucun contrôle si l'une des deux surfaces est inconnue — rien à comparer."""
-    if surface_prospectee is None or surface_infestee is None:
+    """La surface infestée ne dépasse jamais la surface prospectée.
+
+    Sur les fiches Extensif / Validation / Revalidation, l'écran mobile ne collecte
+    pas `surface_prospectee` : le champ « Surface prospectée » qu'il affiche est
+    enregistré dans `surface_station`. À défaut de `surface_prospectee`, c'est donc
+    `surface_station` qui sert de plafond — sinon ces fiches (revalidations comprises)
+    échappaient à tout contrôle. Aucun contrôle si la surface infestée ou tout plafond
+    est inconnu — rien à comparer.
+    """
+    plafond = surface_prospectee if surface_prospectee is not None else surface_station
+    if plafond is None or surface_infestee is None:
         return
-    if surface_infestee > surface_prospectee:
+    if surface_infestee > plafond:
         raise SurfaceInfesteeSuperieureError(
             f"La surface infestée ({surface_infestee} ha) dépasse la surface "
-            f"prospectée ({surface_prospectee} ha)."
+            f"prospectée ({plafond} ha)."
         )
 
 

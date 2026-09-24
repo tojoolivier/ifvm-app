@@ -18,6 +18,8 @@ import { AuthError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -35,7 +37,8 @@ export default function LoginScreen() {
   const signaler = useErrorStore((s) => s.signaler);
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -199,11 +202,11 @@ const BASE_TYPE_SIZES = {
   footerVersion: 11,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
     },
     container: {
       flex: 1,
@@ -241,12 +244,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     title: {
       fontSize: typeSizes.title,
       fontWeight: '700',
-      color: '#111827',
+      color: theme.text,
       letterSpacing: 0.5,
     },
     subtitle: {
       fontSize: typeSizes.subtitle,
-      color: '#6B7280',
+      color: theme.muted,
       textAlign: 'center',
       marginTop: 4,
       maxWidth: 300,
@@ -262,19 +265,19 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     inputLabel: {
       fontSize: typeSizes.inputLabel,
       fontWeight: '600',
-      color: '#374151',
+      color: theme.muted,
       marginBottom: 6,
     },
     input: {
       width: '100%',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor: '#F9FAFB',
+      backgroundColor: theme.inputBg,
       borderWidth: 1,
-      borderColor: '#D1D5DB',
+      borderColor: theme.inputBorder,
       borderRadius: 10,
       fontSize: typeSizes.input,
-      color: '#111827',
+      color: theme.text,
     },
     inputFilled: {
       borderColor: IFVM_GREEN,
@@ -283,9 +286,9 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     passwordContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#F9FAFB',
+      backgroundColor: theme.inputBg,
       borderWidth: 1,
-      borderColor: '#D1D5DB',
+      borderColor: theme.inputBorder,
       borderRadius: 10,
       overflow: 'hidden',
     },
@@ -294,7 +297,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       paddingHorizontal: 16,
       paddingVertical: 12,
       fontSize: typeSizes.passwordInput,
-      color: '#111827',
+      color: theme.text,
       backgroundColor: 'transparent',
     },
     eyeButton: {
@@ -318,9 +321,9 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     errorContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#FEF2F2',
+      backgroundColor: theme.dangerBg,
       borderWidth: 1,
-      borderColor: '#FCA5A5',
+      borderColor: theme.dangerBorder,
       borderRadius: 10,
       padding: 12,
       marginBottom: 16,
@@ -332,7 +335,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     errorText: {
       flex: 1,
       fontSize: typeSizes.errorText,
-      color: '#DC2626',
+      color: theme.danger,
     },
     loginButton: {
       width: '100%',
@@ -367,7 +370,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     footerText: {
       fontSize: typeSizes.footerText,
-      color: '#9CA3AF',
+      color: theme.faint,
     },
     footerVersion: {
       fontSize: typeSizes.footerVersion,

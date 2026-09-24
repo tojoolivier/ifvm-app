@@ -12,6 +12,8 @@ import {
 import { FICHES_GREEN, FICHES_GREEN_DARK, FICHES_GREEN_LIGHT } from './tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH_DEFAULT } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH_DEFAULT < 380;
@@ -46,7 +48,8 @@ export function SearchAndFilterBar<T extends string>({
   const showIcons = windowWidth >= 400;
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   return (
     <>
@@ -122,19 +125,19 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     searchContainer: {
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderBottomWidth: 1,
-      borderBottomColor: '#E5E7EB',
+      borderBottomColor: theme.border,
     },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#F3F4F6',
+      backgroundColor: theme.inputBg,
       borderRadius: 10,
       paddingHorizontal: 12,
       height: isSmallScreen ? 40 : 44,
@@ -146,7 +149,7 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
     searchInput: {
       flex: 1,
       fontSize: typeSizes.searchInput,
-      color: '#111827',
+      color: theme.text,
       paddingVertical: 8,
     },
     clearButton: {
@@ -154,12 +157,12 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
     },
     clearIcon: {
       fontSize: typeSizes.clearIcon,
-      color: '#9CA3AF',
+      color: theme.faint,
     },
     filtersWrapper: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderBottomWidth: 1,
-      borderBottomColor: '#E5E7EB',
+      borderBottomColor: theme.border,
     },
     filtersContainer: {
       paddingVertical: 8,
@@ -172,9 +175,9 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
       paddingHorizontal: isSmallScreen ? 12 : 14,
       paddingVertical: isSmallScreen ? 5 : 6,
       borderRadius: 20,
-      backgroundColor: '#F3F4F6',
+      backgroundColor: theme.inputBg,
       borderWidth: 1,
-      borderColor: '#D1D5DB',
+      borderColor: theme.inputBorder,
     },
     filterChipActive: {
       backgroundColor: FICHES_GREEN_LIGHT,
@@ -185,7 +188,7 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
     },
     filterChipText: {
       fontSize: typeSizes.filterChipText,
-      color: '#6B7280',
+      color: theme.muted,
       fontWeight: '500',
     },
     filterChipTextActive: {
@@ -193,7 +196,7 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
       fontWeight: '600',
     },
     filterChipTextDisabled: {
-      color: '#9CA3AF',
+      color: theme.faint,
     },
   });
 }

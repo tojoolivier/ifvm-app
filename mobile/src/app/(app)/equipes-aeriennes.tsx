@@ -10,6 +10,8 @@ import { logger } from '@/lib/logger';
 import { peutCreerLieuAerien } from '@/lib/equipe-aerienne-access';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const log = logger.child({ module: 'referentiels-aeriens' });
 
@@ -58,7 +60,8 @@ export default function ReferentielsAeriensScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.user?.role);
   const utilisateurId = useAuthStore((s) => s.user?.id);
@@ -248,7 +251,8 @@ function SectionEquipes({
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const [creation, setCreation] = useState(false);
   const [nom, setNom] = useState('');
   const [chefDeBaseId, setChefDeBaseId] = useState<string | null>(null);
@@ -492,7 +496,8 @@ function SectionBasePrincipale({
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const [creation, setCreation] = useState(false);
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
@@ -639,7 +644,8 @@ function SectionBaseSecondaire({
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const [creation, setCreation] = useState(false);
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
@@ -779,7 +785,8 @@ function SectionStand({
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const [creation, setCreation] = useState(false);
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
@@ -897,7 +904,7 @@ const BASE_TYPE_SIZES = {
   creerButtonText: 13,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: BG },
     safe: { flex: 1 },
@@ -917,7 +924,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     avertissementTexte: { fontSize: typeSizes.avertissementTexte, color: '#7a5a26', lineHeight: 16 },
     avertissementLien: { fontSize: typeSizes.avertissementLien, fontWeight: '700', color: GREEN },
-    section: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 13, gap: 8 },
+    section: { backgroundColor: theme.card, borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 13, gap: 8 },
     sectionTitle: { fontSize: typeSizes.sectionTitle, fontWeight: '700', color: TEXT_SECONDARY, letterSpacing: 0.5 },
     vide: { fontSize: typeSizes.vide, color: TEXT_SECONDARY, fontStyle: 'italic' },
     item: { borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8, backgroundColor: BG, gap: 2 },
@@ -927,12 +934,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     nouveauLinkText: { fontSize: typeSizes.nouveauLinkText, fontWeight: '700', color: GREEN },
     formulaire: { gap: 8, marginTop: 4 },
     input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 8 },
-    sousLabel: { fontSize: typeSizes.sousLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase' },
+    sousLabel: { fontSize: typeSizes.sousLabel, fontWeight: '600', color: theme.faint, textTransform: 'uppercase' },
     chipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
     membreRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     membreInput: { flex: 1 },
     chip: { borderWidth: 1, borderColor: BORDER, borderRadius: 14, paddingVertical: 5, paddingHorizontal: 10 },
-    chipSelectionne: { borderColor: GREEN, backgroundColor: '#eaf3ec' },
+    chipSelectionne: { borderColor: GREEN, backgroundColor: theme.successBg },
     chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: TEXT_SECONDARY },
     chipTextSelectionne: { color: GREEN },
     gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

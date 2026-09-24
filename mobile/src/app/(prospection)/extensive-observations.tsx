@@ -17,16 +17,13 @@ import { SignaturePad } from '@/components/traitement/SignaturePad';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
-const INACTIVE_BG = '#efeada';
 // Auto-signature du prospecteur (section Signature, après Remarques) — même
 // teinte que la carte "Prospecteur" de observations.tsx (Intensif).
-const AUTO_BG = '#eaf2ec';
 
 // La colonne backend `hauteur_herbe_cm` reste en centimètres (partagée avec l'intensif,
 // cf. reference.tsx/observations.tsx) : seule l'unité affichée/saisie à l'écran devient
@@ -220,7 +217,8 @@ export default function ExtensiveObservationsScreen() {
 
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   useEffect(() => {
     if (!isAerien) return;
@@ -759,35 +757,35 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 12 },
-  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
+  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: theme.chipBg },
   progressActive: { backgroundColor: GREEN },
   scroll: { flex: 1 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 9 },
-  label: { fontSize: typeSizes.label, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
-  input: { fontSize: typeSizes.input, fontWeight: '700', color: TEXT, fontFamily: 'monospace', padding: 0 },
+  card: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 11, marginBottom: 9 },
+  label: { fontSize: typeSizes.label, fontWeight: '500', color: theme.faint, textTransform: 'uppercase', marginBottom: 5 },
+  input: { fontSize: typeSizes.input, fontWeight: '700', color: theme.text, fontFamily: 'monospace', padding: 0 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   // Verdure strate herbeuse (%) — même principe que le stepper Dégâts d'origine :
   // valeur + unité affichée à côté, dans la carte.
   pourcentageRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   pourcentageInput: { flex: 1 },
-  pourcentageUnit: { fontSize: typeSizes.pourcentageUnit, fontWeight: '700', color: TEXT },
-  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 5 },
+  pourcentageUnit: { fontSize: typeSizes.pourcentageUnit, fontWeight: '700', color: theme.text },
+  sectionLabel: { fontSize: typeSizes.sectionLabel, fontWeight: '600', color: theme.faint, textTransform: 'uppercase', marginBottom: 5 },
   chipsRow: { flexDirection: 'row', gap: 6 },
-  chip: { fontSize: typeSizes.chip, fontWeight: '600', color: TEXT_SECONDARY, backgroundColor: INACTIVE_BG, paddingVertical: 8, textAlign: 'center', borderRadius: 8, overflow: 'hidden' },
+  chip: { fontSize: typeSizes.chip, fontWeight: '600', color: theme.muted, backgroundColor: theme.inputBg, paddingVertical: 8, textAlign: 'center', borderRadius: 8, overflow: 'hidden' },
   chipCompact: { fontSize: typeSizes.chipCompact, paddingVertical: 6, paddingHorizontal: 2 },
   chipActive: { backgroundColor: GREEN, color: '#fff', fontWeight: '700' },
   row: { flexDirection: 'row', gap: 8, marginTop: 9, marginBottom: 9 },
   flex1: { flex: 1 },
-  footerNote: { marginTop: 14, backgroundColor: '#eaf2ec', borderRadius: 10, padding: 11 },
+  footerNote: { marginTop: 14, backgroundColor: theme.successBg, borderRadius: 10, padding: 11 },
   footerNoteText: { fontSize: typeSizes.footerNoteText, lineHeight: 16, color: GREEN, fontWeight: '500' },
   footer: { padding: 16 },
   continueButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
@@ -800,17 +798,17 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   // horizontal plutôt que de compter sur le flex pour se dimensionner.
   agentChipsRow: { flexWrap: 'wrap' },
   agentChip: { paddingHorizontal: 12 },
-  signatureValue: { fontSize: typeSizes.signatureValue, fontWeight: '700', color: TEXT },
-  signatureStamp: { fontSize: typeSizes.signatureStamp, color: TEXT_SECONDARY, fontFamily: 'monospace' },
+  signatureValue: { fontSize: typeSizes.signatureValue, fontWeight: '700', color: theme.text },
+  signatureStamp: { fontSize: typeSizes.signatureStamp, color: theme.muted, fontFamily: 'monospace' },
   signButton: { backgroundColor: GREEN, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
   signButtonDone: { backgroundColor: '#9a9484' },
   signButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.signButtonText },
-  modifyButton: { borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
-  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: typeSizes.modifyButtonText },
+  modifyButton: { borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
+  modifyButtonText: { color: theme.text, fontWeight: '800', fontSize: typeSizes.modifyButtonText },
   // ===== Signature (auto-signature du prospecteur, après Remarques) =====
-  autoCardVisa: { backgroundColor: AUTO_BG, borderRadius: 10, padding: 11, marginBottom: 9 },
+  autoCardVisa: { backgroundColor: theme.successBg, borderRadius: 10, padding: 11, marginBottom: 9 },
   autoLabelVisa: { fontSize: typeSizes.autoLabelVisa, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
-  autoValueVisa: { fontSize: typeSizes.autoValueVisa, fontWeight: '700', color: TEXT },
+  autoValueVisa: { fontSize: typeSizes.autoValueVisa, fontWeight: '700', color: theme.text },
   // ===== Remarques (terrestre + aérien) =====
   remarquesCard: { marginBottom: 9 },
   remarquesInput: { minHeight: 90, fontFamily: 'System', fontWeight: '500' },

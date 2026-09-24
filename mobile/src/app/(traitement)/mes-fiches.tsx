@@ -9,6 +9,8 @@ import { runTask } from '@/lib/run-task';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { navigateToTraitement } from '@/lib/fiche-routing';
 import { EtatVide } from '@/components/erreurs/etat-vide';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 /**
  * Écran "Mes fiches" (traitement) — brouillons locaux (`listDraftTraitements`),
@@ -24,7 +26,8 @@ export default function TraitementMesFichesScreen() {
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
   const { run: runDelete } = useAsyncAction();
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const charger = useCallback(() => {
     void runTask(() => listDraftTraitements(), {
@@ -138,7 +141,7 @@ export default function TraitementMesFichesScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
     title: {
@@ -148,7 +151,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
     },
     list: { flex: 1 },
     row: {
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: traitementColors.bordure,
       borderRadius: traitementRadii.carte,

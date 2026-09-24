@@ -13,7 +13,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
 }));
 
-describe('TypeChooserScreen — Prospections à revalider', () => {
+describe('TypeChooserScreen — Revalidation', () => {
   beforeEach(() => {
     mockPush.mockClear();
     useAuthStore.setState({
@@ -25,9 +25,9 @@ describe('TypeChooserScreen — Prospections à revalider', () => {
   it('affiche la carte sous « Vérifier un signalement » et navigue vers la liste à revalider', async () => {
     await render(<TypeChooserScreen />);
 
-    expect(screen.getByText('🔁 Prospections à revalider')).toBeTruthy();
+    expect(screen.getByText('🔁 Revalidation')).toBeTruthy();
 
-    await fireEvent.press(screen.getByText('🔁 Prospections à revalider'));
+    await fireEvent.press(screen.getByText('🔁 Revalidation'));
 
     expect(mockPush).toHaveBeenCalledWith('/(prospection)/revalidation-liste');
   });

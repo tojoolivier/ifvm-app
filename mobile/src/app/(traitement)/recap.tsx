@@ -507,6 +507,12 @@ export default function RecapScreen() {
       produitId: r.produit_id,
       quantite: r.quantite,
     })),
+    aerienRotationsMeteo: (draft.aerien?.rotations ?? []).map((r) => ({
+      ventDebutMs: r.vent_debut_ms,
+      ventFinMs: r.vent_fin_ms,
+      temperatureDebutC: r.temperature_debut_c,
+      temperatureFinC: r.temperature_fin_c,
+    })),
     terrestreProduits: (draft.terrestre?.produits ?? []).map((p) => ({
       produitId: p.produit_id,
       quantiteL: p.quantite_l,
@@ -736,6 +742,7 @@ export default function RecapScreen() {
               <Text style={styles.sectionTitle}>Moyens & produits (Terrestre)</Text>
               <Text style={styles.subsectionTitle}>Surfaces</Text>
               <RecapLigne label="Atomiseur à dos (ha)" value={display(draft.terrestre.surface_atomiseur_ha)} />
+              <RecapLigne label="Atomiseur autoporté (ha)" value={display(draft.terrestre.surface_atomiseur_autoporte_ha)} />
               <RecapLigne label="Disque rotatif (ha)" value={display(draft.terrestre.surface_disque_rotatif_ha)} />
               {draft.mode_traitement === 'BARRIERE' ? (
                 <RecapLigne label="Surface protégée (ha)" value={display(draft.terrestre.surface_protegee_ha)} />

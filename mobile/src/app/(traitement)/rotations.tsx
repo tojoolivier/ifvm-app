@@ -23,6 +23,9 @@ import {
   computeDureesRotation,
   formatDureeRotation,
   validateRotationsHeures,
+  validateRotationsMeteo,
+  messageVentTropFort,
+  messageTemperatureTropElevee,
   deriveNomCommercial,
   rotationsAerienPretesPourSynchro,
 } from '@/lib/traitement-validation';
@@ -275,6 +278,20 @@ export default function RotationsScreen() {
           setError(heuresErrors[0].message);
           return;
         }
+        // #alerte-meteo-vent-temperature : vent > 6 m/s ou température > 35 °C =
+        // traitement à annuler — on n'avance pas tant que la valeur n'est pas corrigée.
+        const meteoErrors = validateRotationsMeteo(
+          store.aerien.rotations.map((r) => ({
+            ventDebutMs: r.vent_debut_ms,
+            ventFinMs: r.vent_fin_ms,
+            temperatureDebutC: r.temperature_debut_c,
+            temperatureFinC: r.temperature_fin_c,
+          }))
+        );
+        if (meteoErrors.length > 0) {
+          setError(meteoErrors[0].message);
+          return;
+        }
         // #traitement-aerien-sync-apres-enregistrement : une rotation ajoutée
         // (bouton « + ») mais jamais remplie (produit non choisi, quantité
         // vide) passait inaperçue jusqu'ici — seule la synchronisation, bien
@@ -520,6 +537,13 @@ export default function RotationsScreen() {
                   />
                 </View>
               </View>
+              {[messageTemperatureTropElevee(rotation.temperature_debut_c), messageTemperatureTropElevee(rotation.temperature_fin_c)]
+                .filter((m, i, all) => m && all.indexOf(m) === i)
+                .map((m) => (
+                  <Text key={m} style={formStyles.error}>
+                    {m}
+                  </Text>
+                ))}
 
               <View style={formStyles.row}>
                 <View style={formStyles.flex1}>
@@ -549,6 +573,13 @@ export default function RotationsScreen() {
                   />
                 </View>
               </View>
+              {[messageVentTropFort(rotation.vent_debut_ms), messageVentTropFort(rotation.vent_fin_ms)]
+                .filter((m, i, all) => m && all.indexOf(m) === i)
+                .map((m) => (
+                  <Text key={m} style={formStyles.error}>
+                    {m}
+                  </Text>
+                ))}
 
               {/* Durées calculées, jamais saisies (critère d'acceptation). */}
               <View style={formStyles.row}>
