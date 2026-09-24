@@ -154,6 +154,8 @@ const MIGRATED_COLUMNS = [
   // Migration backend 0081 : produit de barrière → surface protégée.
   { name: 'surface_protegee_ha' },
   { name: 'surface_restante_ha' },
+  // FK référentiel site_aerien (migration backend 0087, #605).
+  { name: 'site_principal_id' },
   // Migration backend 0047 (quantite_l -> quantite + unite, surface_ha, vanne)
   { name: 'total_pesticide_kg' },
   // pilote/mecanicien/consultant_international (texte libre) -> FK utilisateur
