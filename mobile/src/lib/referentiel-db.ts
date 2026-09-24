@@ -653,6 +653,30 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
   ]);
   await migrateCodeStade(db);
   await migrateUtilisateurEquipe(db);
+  await migrateColonnesAeriennes(db);
+}
+
+/**
+ * `CREATE TABLE IF NOT EXISTS` ne complète pas une table déjà créée par une version antérieure du
+ * schéma : un appareil de développement qui portait `site_aerien_deplacement` sans `renomme`
+ * refusait toute écriture (« no column named renomme »). On ajoute donc les colonnes manquantes.
+ */
+async function migrateColonnesAeriennes(db: SQLite.SQLiteDatabase): Promise<void> {
+  await addColumnsIfMissing(db, 'site_aerien_deplacement', [
+    { name: 'renomme', type: 'INTEGER NOT NULL DEFAULT 0' },
+    { name: 'dependants_json', type: "TEXT NOT NULL DEFAULT '[]'" },
+    { name: 'vol_json', type: 'TEXT' },
+    { name: 'erreur', type: 'TEXT' },
+  ]);
+  await addColumnsIfMissing(db, 'vol', [
+    { name: 'site_principal_id', type: 'TEXT' },
+    { name: 'stand_id', type: 'TEXT' },
+    { name: 'base_secondaire_id', type: 'TEXT' },
+    { name: 'motif', type: 'TEXT' },
+    { name: 'lieu_depart', type: 'TEXT' },
+    { name: 'lieu_arrivee', type: 'TEXT' },
+    { name: 'libelle_lieu', type: 'TEXT' },
+  ]);
 }
 
 /**
