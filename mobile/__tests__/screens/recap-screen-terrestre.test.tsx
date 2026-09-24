@@ -176,7 +176,7 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
   it('affiche la carte Impacts & risque même sans empoisonnement/comportement/mortalité (tout à Non)', async () => {
     await render(<RecapScreen />);
 
-    await screen.findByText('Empoisonnement');
+    await screen.findByText("Cas d'empoisonnement");
     expect(screen.getAllByText('Non').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -196,6 +196,21 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     await screen.findByText('Répartition LMC');
     expect(screen.getByText('diffuse : 20 ind./ha · groupée : 3 ind./m²')).toBeVisible();
     expect(screen.queryByText('Répartition de la population')).toBeNull();
+  });
+
+  // #surface-traitee-et-protegee : ligne sous « Surface traitée (ha) », toujours égale à elle.
+  it('affiche « Surface traitée et protégée (ha) » sous « Surface traitée (ha) », avec la même valeur', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_TERRESTRE,
+      terrestre: { ...DRAFT_TERRESTRE.terrestre, surface_traitee_ha: 12.5, surface_cumulee_ha: 40, surface_restante_ha: 60 },
+    });
+
+    await render(<RecapScreen />);
+
+    await screen.findByText('Surface traitée et protégée (ha)');
+    expect(screen.getAllByText('12.5')).toHaveLength(2); // traitée + traitée et protégée
+    const rendu = JSON.stringify(screen.toJSON());
+    expect(rendu.indexOf('Surface traitée (ha)')).toBeLessThan(rendu.indexOf('Surface traitée et protégée (ha)'));
   });
 
   /** Migration backend 0083 : généralise au Terrestre la répartition traitée/

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -214,10 +214,10 @@ const AXES_RISQUE_LABELS: Record<string, string> = {
   abeilles: 'Abeilles/pollinisateurs',
 };
 
-function displayEvaluationRisque(dict: Record<string, boolean>): string {
-  const entries = Object.entries(AXES_RISQUE_LABELS).filter(([key]) => dict[key] !== undefined);
-  if (entries.length === 0) return 'non renseigné';
-  return entries.map(([key, label]) => `${label} : ${dict[key] ? 'Oui' : 'Non'}`).join(' · ');
+/** Un axe de risque : Oui / Non, ou « non renseigné » s'il n'a pas été évalué. */
+function displayOuiNonAxe(value: boolean | undefined): string {
+  if (value === undefined) return 'non renseigné';
+  return value ? 'Oui' : 'Non';
 }
 
 /** Zones exposées (moyens.tsx/synthese.tsx, `ZONES`) — dupliqué ici, même choix. */
@@ -710,6 +710,11 @@ export default function RecapScreen() {
               ) : (
                 <RecapLigne label="Surface traitée (ha)" value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null} />
               )}
+              {/* #surface-traitee-et-protegee : égale à « Surface traitée (ha) ». */}
+              <RecapLigne
+                label="Surface traitée et protégée (ha)"
+                value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null}
+              />
               <RecapLigne label="Surface cumulée (ha)" value={display(draft.aerien.surface_cumulee_ha)} />
               <RecapLigne label="Surface restante (ha)" value={display(surfaceRestanteAerien)} />
               {(draft.aerien.surface_restante_abandonnee != null || (surfaceRestanteAerien ?? 0) > 0) && (
@@ -760,6 +765,11 @@ export default function RecapScreen() {
               ) : (
                 <RecapLigne label="Surface traitée (ha)" value={display(draft.terrestre.surface_traitee_ha ?? surfaceTraitee)} />
               )}
+              {/* #surface-traitee-et-protegee : égale à « Surface traitée (ha) ». */}
+              <RecapLigne
+                label="Surface traitée et protégée (ha)"
+                value={display(draft.terrestre.surface_traitee_ha ?? surfaceTraitee)}
+              />
               <RecapLigne label="Surface cumulée (ha)" value={display(draft.terrestre.surface_cumulee_ha ?? surfaceCumulee)} />
               <RecapLigne label="Surface restante (ha)" value={display(draft.terrestre.surface_restante_ha ?? surfaceRestante)} />
               {(draft.terrestre.surface_restante_abandonnee != null || surfaceRestante > 0) && (
@@ -852,7 +862,10 @@ export default function RecapScreen() {
 
         <Card>
           <Text style={styles.sectionTitle}>Impacts & risque</Text>
-          <RecapLigne label="Empoisonnement" value={displayBool(draft.empoisonnement)} />
+          {/* #recap-impacts-risque-ordonne : mêmes rubriques, dans le même ordre que l'écran de
+              saisie (impacts.tsx), en sous-sections — une ligne par information. */}
+          <Text style={styles.subsectionTitle}>Empoisonnement</Text>
+          <RecapLigne label="Cas d'empoisonnement" value={displayBool(draft.empoisonnement)} />
           {draft.empoisonnement && (
             <>
               <RecapLigne label="Personne concernée" value={displayPersonneConcernee(draft.empoisonnement_type)} />
@@ -862,7 +875,15 @@ export default function RecapScreen() {
               )}
             </>
           )}
-          <RecapLigne label="Évaluation du risque" value={displayEvaluationRisque(parseJsonDictSafe(draft.evaluation_risque))} />
+          <Text style={styles.subsectionTitle}>Évaluation du risque</Text>
+          {Object.entries(AXES_RISQUE_LABELS).map(([axe, libelle]) => (
+            <RecapLigne
+              key={axe}
+              label={libelle}
+              value={displayOuiNonAxe(parseJsonDictSafe(draft.evaluation_risque)[axe])}
+            />
+          ))}
+          <Text style={styles.subsectionTitle}>Comportement et mortalité</Text>
           <RecapLigne label="Comportement anormal" value={displayBool(draft.comportement_anormal)} />
           {draft.comportement_anormal && (
             <RecapLigne label="Espèces concernées" value={displayListe(parseJsonArraySafe(draft.comportement_non_cibles))} />
@@ -873,21 +894,20 @@ export default function RecapScreen() {
           )}
           {(draft.evaluations_risque_population ?? []).length > 0 && (
             <>
-              <Text style={styles.sousTitre}>Évaluation du risque pour la population</Text>
+              <Text style={styles.subsectionTitle}>Évaluation du risque pour la population</Text>
               {(draft.evaluations_risque_population ?? []).map((evaluation, index) => (
-                <RecapLigne
-                  key={evaluation.id}
-                  label={`Évaluation ${index + 1}`}
-                  value={`${display(evaluation.habitat_proche)} · ${
-                    evaluation.distance_km != null ? `${evaluation.distance_km} km` : 'non renseigné'
-                  } · ${
-                    evaluation.sensibilisation == null
-                      ? 'non renseigné'
-                      : evaluation.sensibilisation
-                        ? 'sensibilisée'
-                        : 'non sensibilisée'
-                  }`}
-                />
+                <Fragment key={evaluation.id}>
+                  <Text style={styles.sousTitre}>{`Évaluation ${index + 1}`}</Text>
+                  <RecapLigne label="Habitat le plus proche" value={display(evaluation.habitat_proche)} />
+                  <RecapLigne
+                    label="Distance (km)"
+                    value={evaluation.distance_km != null ? String(evaluation.distance_km) : 'non renseigné'}
+                  />
+                  <RecapLigne
+                    label="Sensibilisation"
+                    value={displayBool(evaluation.sensibilisation == null ? null : !!evaluation.sensibilisation)}
+                  />
+                </Fragment>
               ))}
             </>
           )}

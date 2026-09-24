@@ -310,6 +310,11 @@ export function TerrestreForm({
         <Text style={styles.label}>Traitée (ha)</Text>
         <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
       </Card>
+      {/* #surface-traitee-et-protegee : toujours égale à « Traitée (ha) », en lecture seule. */}
+      <Card variant="derivee">
+        <Text style={styles.label}>Surface traitée et protégée (ha)</Text>
+        <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
+      </Card>
       <Card variant="derivee">
         <Text style={styles.label}>Cumulée (ha)</Text>
         <Text style={styles.derivedValue}>{surfaceCumulee}</Text>
