@@ -1159,6 +1159,16 @@ async def list_sites_aeriens(
     return await use_case.execute(actif=None if inclure_inactifs else True)
 
 
+def _parent_absent_http(exc: SiteAerienneParentAbsentError) -> HTTPException:
+    """409 rejouable : le mobile hors-ligne peut envoyer un dépendant avant son principal (#655).
+    Le mobile le reconnaît au préfixe « parent_site_id inconnu » — `traduireErreurCreation`,
+    mobile/src/lib/site-aerien-sync.ts. Le changer là-bas aussi."""
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=f"parent_site_id inconnu du serveur, à rejouer après son principal : {exc.args[0]}",
+    )
+
+
 @router.post("/sites-aeriens", response_model=SiteAerienneRead, status_code=201)
 async def create_site_aerienne(
     body: SiteAerienneCreate,
@@ -1191,13 +1201,7 @@ async def create_site_aerienne(
             detail=f"l'identifiant {exc.args[0]} est déjà utilisé par un site différent",
         ) from exc
     except SiteAerienneParentAbsentError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            # Le mobile reconnaît ce 409 (rejouable) au préfixe « parent_site_id inconnu » :
-            # `traduireErreurCreation`, mobile/src/lib/site-aerien-sync.ts. Le changer là-bas aussi.
-            detail=f"parent_site_id inconnu du serveur, à rejouer après son principal : "
-            f"{exc.args[0]}",
-        ) from exc
+        raise _parent_absent_http(exc) from exc
     except EquipeNonAutoriseeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except SiteAerienneParentInvalideError as exc:
@@ -1262,10 +1266,7 @@ async def update_site_aerienne(
     except EquipeNonAutoriseeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except SiteAerienneParentAbsentError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"parent_site_id inconnu du serveur : {exc.args[0]}",
-        ) from exc
+        raise _parent_absent_http(exc) from exc
     except SiteAerienneParentInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

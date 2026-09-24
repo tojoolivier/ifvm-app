@@ -117,6 +117,18 @@ export function validerVolMiseEnPlace(vol: VolMiseEnPlaceSaisi, contexte: { nbSt
   return erreurs;
 }
 
+/**
+ * Relit `site_aerien_deplacement.dependants_json`. Une colonne corrompue lève au lieu d'envoyer au
+ * serveur une liste que personne n'a saisie : un cast `as string[]` aurait tout laissé passer.
+ */
+export function lireDependants(json: string): string[] {
+  const valeur: unknown = JSON.parse(json);
+  if (!Array.isArray(valeur) || !valeur.every((id) => typeof id === 'string')) {
+    throw new Error('dependants_json corrompu : liste d’identifiants attendue.');
+  }
+  return valeur;
+}
+
 const JOUR_MS = 24 * 60 * 60 * 1000;
 
 /** La veille d'une date `YYYY-MM-DD` : le déplacement clôt l'ancienne position à J-1 (comme le serveur). */

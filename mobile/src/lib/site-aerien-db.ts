@@ -6,6 +6,7 @@ import {
   type SiteSaisi,
   type VolMiseEnPlaceSaisi,
   jourPrecedent,
+  lireDependants,
   validerCreationGroupee,
   validerDeplacement,
   validerSiteSecondaire,
@@ -160,7 +161,7 @@ export async function marquerDeplacementSynchronise(deplacementId: string): Prom
   await db.withTransactionAsync(async () => {
     await db.runAsync("UPDATE site_aerien_deplacement SET statut_sync = 'synced' WHERE id = ?", [deplacementId]);
     if (!ligne) return;
-    const sites = [ligne.site_id, ...(JSON.parse(ligne.dependants_json) as string[])];
+    const sites = [ligne.site_id, ...lireDependants(ligne.dependants_json)];
     for (const siteId of sites) {
       await db.runAsync("UPDATE site_aerien_position SET statut_sync = 'synced' WHERE site_id = ?", [siteId]);
     }

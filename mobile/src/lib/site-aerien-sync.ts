@@ -11,6 +11,7 @@ import {
   marquerSiteEnEchec,
   marquerSiteSynchronise,
 } from './site-aerien-db';
+import { lireDependants } from './site-aerien-regles';
 import { type LotSync, type ResumeSync, syncAll } from './sync-lot';
 
 /**
@@ -22,7 +23,8 @@ import { type LotSync, type ResumeSync, syncAll } from './sync-lot';
  * `'file'`) : c'est l'état normal d'un principal encore hors-ligne, pas un échec de l'agent.
  */
 
-const attendre = (message: string) => new NetworkError(message);
+/** Ce qui manque n'est pas une faute de l'agent : `NetworkError` garde la ligne dans la file (`'file'`). */
+const erreurEnAttente = (message: string) => new NetworkError(message);
 
 /**
  * Un 409 à la création d'un site est un refus de **contenu** (numéro déjà pris, id déjà utilisé),
@@ -33,7 +35,7 @@ function traduireErreurCreation(error: unknown): unknown {
   if (statutHttpDe(error) !== 409) return error;
   const message = error instanceof Error ? error.message : 'Le serveur a refusé ce site.';
   if (message.includes('parent_site_id inconnu')) {
-    return attendre('Le site principal n’est pas encore connu du serveur — le dépendant repartira ensuite.');
+    return erreurEnAttente('Le site principal n’est pas encore connu du serveur — le dépendant repartira ensuite.');
   }
   return Object.assign(new NetworkError(message), { status: 422 });
 }
@@ -47,10 +49,10 @@ const lotCreation: LotSync<SiteAerienLocal> = {
     if (site.parent_site_id) {
       const statutParent = await getStatutSite(site.parent_site_id);
       if (statutParent === 'echec') {
-        throw attendre('Le site principal a été refusé par le serveur : corrigez-le avant ses dépendants.');
+        throw erreurEnAttente('Le site principal a été refusé par le serveur : corrigez-le avant ses dépendants.');
       }
       if (statutParent !== 'synced') {
-        throw attendre('Le site principal n’est pas encore synchronisé — le dépendant partira ensuite.');
+        throw erreurEnAttente('Le site principal n’est pas encore synchronisé — le dépendant partira ensuite.');
       }
     }
 
@@ -81,10 +83,10 @@ const lotDeplacement: LotSync<DeplacementLocal> = {
   labelDe: (deplacement) => `Déplacement · ${deplacement.localite}`,
   marquerEchec: marquerDeplacementEnEchec,
   syncOne: async (deplacement, token) => {
-    const dependants = JSON.parse(deplacement.dependants_json) as string[];
+    const dependants = lireDependants(deplacement.dependants_json);
     for (const siteId of [deplacement.site_id, ...dependants]) {
       if ((await getStatutSite(siteId)) === 'local') {
-        throw attendre('Le site déplacé n’est pas encore synchronisé — le déplacement partira ensuite.');
+        throw erreurEnAttente('Le site déplacé n’est pas encore synchronisé — le déplacement partira ensuite.');
       }
     }
 

@@ -2,6 +2,7 @@ import {
   type SiteSaisi,
   dureeImplantationJours,
   jourPrecedent,
+  lireDependants,
   validerCreationGroupee,
   validerDeplacement,
   validerPosition,
@@ -199,6 +200,17 @@ describe('validerDeplacement', () => {
         position: { latitude: 0, longitude: 200, altitude: null },
       })
     ).toEqual(['La longitude doit être comprise entre −180 et 180.']);
+  });
+});
+
+describe('lireDependants', () => {
+  it('relit la liste d’ids stockée en JSON', () => {
+    expect(lireDependants('["st-1","bs-1"]')).toEqual(['st-1', 'bs-1']);
+    expect(lireDependants('[]')).toEqual([]);
+  });
+
+  it.each(['{"a":1}', '["st-1", 2]', '"st-1"', 'null'])('refuse une colonne corrompue : %s', (json) => {
+    expect(() => lireDependants(json)).toThrow('dependants_json');
   });
 });
 

@@ -877,7 +877,7 @@ class CreateSiteAerienne:
         self,
         repository: SiteAerienneRepository,
         equipe_aerienne_repository: EquipeRepository,
-        position_repository: SiteAeriennePositionRepository | None = None,
+        position_repository: SiteAeriennePositionRepository,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository
@@ -942,8 +942,6 @@ class CreateSiteAerienne:
     async def _installer_position_initiale(
         self, site_id: uuid.UUID, position: tuple[float, float, float | None]
     ) -> None:
-        if self.position_repository is None:
-            return
         if await self.position_repository.list_par_site(site_id):
             return  # déjà installée (rejeu) ou site déjà déplacé depuis : on n'y touche pas
         latitude, longitude, altitude = position
