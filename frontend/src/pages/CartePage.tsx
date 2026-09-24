@@ -16,10 +16,16 @@ import {
 } from '@/components/ui/select'
 import type { InfestationRead } from '@/lib/prospection-fiche-lecture'
 import {
+  buildBaseAerienneMarkers,
   buildCarteMarkers,
   buildTraitementMarkers,
+  COUCHES_CARTE,
   filterProspectionsForCarte,
+  prospectionVisible,
+  TOUTES_LES_COUCHES,
+  traitementVisible,
   type CarteTraitement,
+  type CoucheCarte,
   type SeveriteNiveau,
 } from '@/lib/prospection-carte'
 import { MODE_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
@@ -50,6 +56,15 @@ interface Prospection {
   infestations: InfestationRead[]
   surface_infestee: number | null
   type_prospection: string
+  base: string | null
+  base_numero: number | null
+  base_date_installation: string | null
+  base_latitude: number | null
+  base_longitude: number | null
+  base_secondaire: string | null
+  base_secondaire_date_installation: string | null
+  base_secondaire_latitude: number | null
+  base_secondaire_longitude: number | null
 }
 
 const SEVERITE_STYLE: Record<SeveriteNiveau, { color: string; radius: number }> = {
@@ -67,6 +82,10 @@ const SEVERITE_LABELS: Record<SeveriteNiveau, string> = {
 // Surfaces traitées : bleu, trait épais et centre translucide — distinct des points
 // d'infestation (jaune→rouge, pleins) pour que les deux couches restent lisibles ensemble.
 const TRAITEMENT_STYLE = { color: '#2563eb', radius: 10 }
+
+// Bases aériennes : violet, plein pour la base principale, translucide pour la secondaire
+// (celle qui matérialise un déplacement de base).
+const BASE_STYLE = { color: '#7c3aed', radius: 8 }
 
 const MADAGASCAR_CENTER: [number, number] = [-19, 47]
 
@@ -139,8 +158,33 @@ export function CartePage() {
     return buildTraitementMarkers(traitementsVisibles, prospections, stations)
   }, [traitements, prospections, stations, filtreCampagne, filtreStationId])
 
-  const [afficherInfestations, setAfficherInfestations] = useState(true)
-  const [afficherTraitements, setAfficherTraitements] = useState(true)
+  // Fiches affichées : toutes cochées par défaut, l'utilisateur en retire via le bouton
+  // « Fiches affichées » (prospection intensive/extensive/validation, traitement
+  // aérien/terrestre, déplacement de base aérienne).
+  const [couches, setCouches] = useState<Set<CoucheCarte>>(() => new Set(TOUTES_LES_COUCHES))
+  const [panneauOuvert, setPanneauOuvert] = useState(false)
+
+  function basculerCouche(couche: CoucheCarte) {
+    setCouches((prev) => {
+      const next = new Set(prev)
+      if (next.has(couche)) next.delete(couche)
+      else next.add(couche)
+      return next
+    })
+  }
+
+  const markersVisibles = useMemo(
+    () => markers.filter((m) => prospectionVisible(m.typeProspection, couches)),
+    [markers, couches],
+  )
+  const traitementMarkersVisibles = useMemo(
+    () => traitementMarkers.filter((m) => traitementVisible(m.typeTraitement, couches)),
+    [traitementMarkers, couches],
+  )
+  const baseMarkers = useMemo(
+    () => (couches.has('base_aerienne') ? buildBaseAerienneMarkers(filtered) : []),
+    [filtered, couches],
+  )
 
   const hasFiltres = filtreStatut || filtreCampagne || filtreStationId
 
@@ -205,25 +249,51 @@ export function CartePage() {
             </Button>
           )}
 
-          <fieldset className="flex items-center gap-4 text-sm">
-            <legend className="sr-only">Couches affichées</legend>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={afficherInfestations}
-                onChange={(e) => setAfficherInfestations(e.target.checked)}
-              />
-              Infestations
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={afficherTraitements}
-                onChange={(e) => setAfficherTraitements(e.target.checked)}
-              />
-              Surfaces traitées
-            </label>
-          </fieldset>
+          <div className="relative flex flex-col gap-2">
+            <Label>Fiches affichées</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-expanded={panneauOuvert}
+              aria-controls="panneau-fiches-affichees"
+              onClick={() => setPanneauOuvert((ouvert) => !ouvert)}
+            >
+              Fiches affichées ({couches.size}/{TOUTES_LES_COUCHES.length})
+            </Button>
+            {panneauOuvert && (
+              <div
+                id="panneau-fiches-affichees"
+                className="absolute left-0 top-full z-[1000] mt-1 w-72 rounded-lg border bg-card p-3 shadow-md"
+              >
+                {COUCHES_CARTE.map((groupe) => (
+                  <fieldset key={groupe.groupe} className="mb-2 last:mb-0">
+                    <legend className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+                      {groupe.groupe}
+                    </legend>
+                    {groupe.couches.map((couche) => (
+                      <label key={couche.key} className="flex items-center gap-2 py-0.5 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={couches.has(couche.key)}
+                          onChange={() => basculerCouche(couche.key)}
+                        />
+                        {couche.label}
+                      </label>
+                    ))}
+                  </fieldset>
+                ))}
+                <div className="mt-2 flex gap-2 border-t pt-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setCouches(new Set(TOUTES_LES_COUCHES))}>
+                    Tout afficher
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setCouches(new Set())}>
+                    Tout masquer
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-4 ml-auto text-xs text-muted-foreground">
             {(Object.keys(SEVERITE_LABELS) as SeveriteNiveau[]).map((s) => (
@@ -246,6 +316,13 @@ export function CartePage() {
               />
               Surface traitée
             </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block rounded-full border-2"
+                style={{ borderColor: BASE_STYLE.color, backgroundColor: BASE_STYLE.color, width: 10, height: 10 }}
+              />
+              Base aérienne
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -255,10 +332,13 @@ export function CartePage() {
       ) : (
         <>
           <p className="text-sm text-muted-foreground mb-3">
-            {markers.length} fiche{markers.length > 1 ? 's' : ''} avec infestation
+            {markersVisibles.length} fiche{markersVisibles.length > 1 ? 's' : ''} avec infestation
             {' · '}
-            {traitementMarkers.length} surface{traitementMarkers.length > 1 ? 's' : ''} traitée
-            {traitementMarkers.length > 1 ? 's' : ''}
+            {traitementMarkersVisibles.length} surface{traitementMarkersVisibles.length > 1 ? 's' : ''} traitée
+            {traitementMarkersVisibles.length > 1 ? 's' : ''}
+            {' · '}
+            {baseMarkers.length} base{baseMarkers.length > 1 ? 's' : ''} aérienne
+            {baseMarkers.length > 1 ? 's' : ''}
           </p>
           <Card className="flex-1 overflow-hidden">
             <CardContent className="p-0 h-full min-h-[480px]">
@@ -267,8 +347,43 @@ export function CartePage() {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {afficherTraitements &&
-                  traitementMarkers.map((marker) => (
+                {baseMarkers.map((base) => (
+                  <CircleMarker
+                    key={`base-${base.key}`}
+                    center={[base.latitude, base.longitude]}
+                    radius={BASE_STYLE.radius}
+                    pathOptions={{
+                      color: BASE_STYLE.color,
+                      fillColor: BASE_STYLE.color,
+                      fillOpacity: base.type === 'principale' ? 0.8 : 0.3,
+                      weight: 3,
+                    }}
+                    eventHandlers={{
+                      click: () => navigate(`/prospections/${base.prospectionId}`),
+                    }}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-semibold">
+                          Base {base.type === 'principale' ? 'principale' : 'secondaire'}
+                          {base.nom ? ` — ${base.nom}` : ''}
+                        </p>
+                        {base.numero != null && <p>Base n° {base.numero}</p>}
+                        <p>Installée le : {base.dateInstallation ?? '—'}</p>
+                        <p>
+                          Déclarée sur {base.nbFiches} fiche{base.nbFiches > 1 ? 's' : ''}
+                        </p>
+                        <button
+                          className="text-primary underline"
+                          onClick={() => navigate(`/prospections/${base.prospectionId}`)}
+                        >
+                          Voir la fiche
+                        </button>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                ))}
+                {traitementMarkersVisibles.map((marker) => (
                     <CircleMarker
                       key={`traitement-${marker.traitementId}`}
                       center={[marker.latitude, marker.longitude]}
@@ -307,7 +422,7 @@ export function CartePage() {
                       </Popup>
                     </CircleMarker>
                   ))}
-                {afficherInfestations && markers.map((marker) => (
+                {markersVisibles.map((marker) => (
                   <CircleMarker
                     key={marker.prospectionId}
                     center={[marker.latitude, marker.longitude]}
