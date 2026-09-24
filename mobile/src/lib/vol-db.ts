@@ -1,6 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 import { PreconditionError } from './errors';
 import { generateId } from './id';
+import { creerOutbox } from './outbox';
 import { getReferentielDb } from './referentiel-db';
 import type { VolMiseEnPlaceCorps } from './site-aerien-regles';
 import { type CategorieVol, type VolSaisi, validerVol } from './vol-regles';
@@ -137,15 +138,10 @@ export async function listVolsEnAttente(volId?: string): Promise<VolEnAttenteLoc
   );
 }
 
-export async function marquerVolSynchronise(volId: string): Promise<void> {
-  const db = await getReferentielDb();
-  await db.runAsync("UPDATE vol SET statut_sync = 'synced' WHERE id = ?", [volId]);
-}
+const outboxVol = creerOutbox({ table: 'vol', base: () => getReferentielDb() });
 
-export async function marquerVolEnEchec(volId: string): Promise<void> {
-  const db = await getReferentielDb();
-  await db.runAsync("UPDATE vol SET statut_sync = 'echec' WHERE id = ?", [volId]);
-}
+export const marquerVolSynchronise = outboxVol.marquerSynchronise;
+export const marquerVolEnEchec = outboxVol.marquerEnEchec;
 
 export type TypeLienVol = 'traitement' | 'prospection';
 
