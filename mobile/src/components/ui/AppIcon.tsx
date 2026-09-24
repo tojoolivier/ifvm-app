@@ -1,3 +1,4 @@
+import { EQ } from '@/components/equipe/tokens';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
 
 /**
@@ -72,7 +73,7 @@ interface Props {
   color?: string;
 }
 
-export function AppIcon({ name, size = 24, color = '#235A36' }: Props) {
+export function AppIcon({ name, size = 24, color = EQ.vert }: Props) {
   const trait = { stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
   const recadre = RECADREES[name];
 

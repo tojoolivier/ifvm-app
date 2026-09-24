@@ -1,4 +1,5 @@
 import {
+  Alert,
   View,
   ScrollView,
   TouchableOpacity,
@@ -25,6 +26,8 @@ import { EquipeChip } from '@/components/equipe/EquipeChip';
 import { EquipeSheet } from '@/components/equipe/EquipeSheet';
 import { MenuDrawer } from '@/components/menu/MenuDrawer';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { EQ } from '@/components/equipe/tokens';
+import { libelleRole } from '@/lib/role-libelle';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
@@ -36,31 +39,17 @@ import type { ThemePalette } from '@/constants/theme';
 // ============================================
 
 const IFVM_GREEN = '#235A36';
-const IFVM_GREEN_LIGHT = '#235A36';
 const IFVM_GREEN_BG = '#EAF2EC';
 const IFVM_BG_LIGHT = '#FAF7EF';
 const CARD_BG = '#FFFFFF';
-const IFVM_ORANGE = '#8A6D2F';
-const IFVM_ORANGE_BG = '#FDF6E7';
+const IFVM_AMBER = '#8A6D2F';
+const IFVM_AMBER_BG = '#FDF6E7';
 const HEADER_BG = '#235A36';
-const TEXT_BLACK = '#16201A';
 const TEXT_DARK = '#16201A';
 const TEXT_SECONDARY = '#6F6A59';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
-
-const LIBELLES_ROLE: Record<string, string> = {
-  prospecteur: 'Prospecteur',
-  chef_de_base: 'Chef de base',
-  chef_equipe: "Chef d'équipe",
-  pilote: 'Pilote',
-  mecanicien: 'Mécanicien',
-  admin: 'Administrateur',
-};
-function libelleRole(role: string): string {
-  return LIBELLES_ROLE[role] ?? role;
-}
 
 const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -292,7 +281,7 @@ export default function DashboardScreen() {
                 accessibilityLabel="Ouvrir le menu"
                 testID="dashboard-menu-button"
               >
-                <AppIcon name="menu" size={24} color="#FFFFFF" />
+                <AppIcon name="menu" size={24} color={EQ.surMarque} />
               </TouchableOpacity>
             </View>
 
@@ -363,7 +352,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(app)/prospection')}
               activeOpacity={0.85}
             >
-              <AppIcon name="ajouter" size={24} color={'#FFFFFF'} />
+              <AppIcon name="ajouter" size={24} color={EQ.surMarque} />
               <ThemedText style={styles.quickTileTextPrimary}>Nouvelle prospection</ThemedText>
             </TouchableOpacity>
 
@@ -419,7 +408,6 @@ export default function DashboardScreen() {
             <View style={[styles.quickTile, styles.quickTileDisabled]}>
               <AppIcon name="notifications" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Alertes</ThemedText>
-              <ThemedText style={styles.quickTileSoon}>Bientôt disponible</ThemedText>
             </View>
           </View>
         </Animated.View>
@@ -447,11 +435,11 @@ export default function DashboardScreen() {
                 <View
                   style={[
                     styles.statusBadge,
-                    { backgroundColor: item.synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
+                    { backgroundColor: item.synced ? IFVM_GREEN_BG : IFVM_AMBER_BG },
                   ]}
                 >
                   <ThemedText
-                    style={[styles.statusBadgeText, { color: item.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
+                    style={[styles.statusBadgeText, { color: item.synced ? IFVM_GREEN : IFVM_AMBER }]}
                   >
                     {item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
                   </ThemedText>
@@ -488,7 +476,10 @@ export default function DashboardScreen() {
         ]}
         onDeconnexion={() => {
           setMenuVisible(false);
-          void logout();
+          Alert.alert('Se déconnecter', 'Vos fiches non synchronisées restent sur cet appareil.', [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Se déconnecter', style: 'destructive', onPress: () => void logout() },
+          ]);
         }}
       />
 
@@ -550,7 +541,6 @@ function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
 
 const BASE_TYPE_SIZES = {
   networkStatus: 12,
-  gearIcon: 18,
   headerGreeting: 13,
   headerName: 20,
   headerRole: 12,
@@ -568,7 +558,6 @@ const BASE_TYPE_SIZES = {
   quickTileIcon: 26,
   quickTileText: 13,
   quickTileTextPrimary: 13,
-  quickTileSoon: 10,
   footerText: 12,
 };
 
@@ -613,9 +602,6 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontWeight: '700',
       includeFontPadding: false,
     },
-    gearIcon: {
-      fontSize: typeSizes.gearIcon,
-    },
     headerContent: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -638,7 +624,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       width: 36,
       height: 36,
       borderRadius: 11,
-      backgroundColor: 'rgba(0,0,0,0.22)',
+      backgroundColor: EQ.surVert,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -668,7 +654,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     badgeAvailable: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: 'rgba(0,0,0,0.22)',
+      backgroundColor: EQ.surVert,
       paddingHorizontal: 10,
       paddingVertical: 5,
       minHeight: 24,
@@ -736,12 +722,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontWeight: '700',
     },
     syncBanner: {
-      backgroundColor: IFVM_ORANGE_BG,
+      backgroundColor: IFVM_AMBER_BG,
       borderRadius: 14,
       padding: 14,
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: IFVM_ORANGE + '40',
+      borderColor: IFVM_AMBER + '40',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
@@ -758,7 +744,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     syncBannerTitle: {
       fontSize: typeSizes.syncBannerTitle,
       fontWeight: '600',
-      color: IFVM_ORANGE,
+      color: IFVM_AMBER,
     },
     syncBannerSub: {
       fontSize: typeSizes.syncBannerSub,
@@ -819,7 +805,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     ficheTitle: {
       fontSize: typeSizes.ficheTitle,
       fontWeight: '700',
-      color: TEXT_BLACK,
+      color: TEXT_DARK,
     },
     ficheSub: {
       fontSize: typeSizes.ficheSub,
@@ -850,7 +836,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       backgroundColor: CARD_BG,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: '#E7E0CD',
+      borderColor: EQ.bordure,
       padding: 12,
       gap: 8,
       alignItems: 'flex-start',
@@ -880,11 +866,6 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontSize: typeSizes.quickTileTextPrimary,
       fontWeight: '700',
       color: '#FFFFFF',
-    },
-    quickTileSoon: {
-      fontSize: typeSizes.quickTileSoon,
-      color: TEXT_SECONDARY,
-      marginTop: 4,
     },
     footer: {
       alignItems: 'center',

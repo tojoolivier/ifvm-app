@@ -111,7 +111,7 @@ export function MenuDrawer({ visible, onFermer, nom, email, role, navigation, co
 
 const styles = StyleSheet.create({
   racine: { flex: 1, flexDirection: 'row' },
-  voile: { flex: 1, backgroundColor: 'rgba(22,32,26,0.45)' },
+  voile: { flex: 1, backgroundColor: EQ.voile },
   panneau: {
     width: '82%',
     maxWidth: 360,
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 9,
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    backgroundColor: EQ.surVert,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#F6F3E9',
+    backgroundColor: EQ.separateur,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -188,11 +188,11 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#D32F2F',
+    borderColor: EQ.danger,
     backgroundColor: EQ.carte,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deconnexionTexte: { fontSize: 12, fontWeight: '600', color: '#D32F2F' },
+  deconnexionTexte: { fontSize: 12, fontWeight: '600', color: EQ.danger },
   version: { textAlign: 'center', fontSize: 9, fontWeight: '500', color: EQ.etiquette },
 });

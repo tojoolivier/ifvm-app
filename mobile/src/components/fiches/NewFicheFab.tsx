@@ -5,7 +5,9 @@ import { useAuthStore } from '@/lib/auth-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { FICHES_CARD_BG, FICHES_ORANGE, FICHES_TEXT_DARK, FICHES_TEXT_SECONDARY } from './tokens';
+import { FICHES_CARD_BG, FICHES_TEXT_DARK, FICHES_TEXT_SECONDARY } from './tokens';
+import { AppIcon } from '@/components/ui/AppIcon';
+import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 
@@ -51,7 +53,7 @@ export function NewFicheFab() {
   return (
     <>
       <TouchableOpacity style={styles.fab} onPress={() => setMenuVisible(true)} activeOpacity={0.85}>
-        <Text style={styles.fabIcon}>+</Text>
+        <AppIcon name="ajouter" size={24} color={EQ.surMarque} />
       </TouchableOpacity>
 
       <Modal animationType="slide" transparent visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
@@ -109,7 +111,6 @@ export function NewFicheFab() {
 }
 
 const BASE_TYPE_SIZES = {
-  fabIcon: 28,
   title: 22,
   subtitle: 14,
   cardIcon: 24,
@@ -123,10 +124,10 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       position: 'absolute',
       right: 20,
       bottom: 28,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: FICHES_ORANGE,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: EQ.vert,
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: '#000',
@@ -134,12 +135,6 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       shadowOpacity: 0.25,
       shadowRadius: 8,
       elevation: 8,
-    },
-    fabIcon: {
-      color: '#FFFFFF',
-      fontSize: typeSizes.fabIcon,
-      fontWeight: '700',
-      lineHeight: 30,
     },
     overlay: {
       flex: 1,

@@ -15,4 +15,10 @@ export const EQ = {
   attenue: '#6F6A59',
   etiquette: '#9A9484',
   surMarque: '#FFFFFF',
+  /** Fond sombre translucide posé sur le vert de marque (bouton menu, pastille, fermer). */
+  surVert: 'rgba(0,0,0,0.22)',
+  /** Voile derrière le tiroir et la feuille. */
+  surVertClair: 'rgba(255,255,255,0.16)',
+  voile: 'rgba(22,32,26,0.45)',
+  danger: '#C0412B',
 } as const;

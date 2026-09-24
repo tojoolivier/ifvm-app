@@ -62,7 +62,7 @@ function Contenu({ equipes, equipeId, peutCreer, onFermer, onConfirmer, onCreer 
                 <View style={styles.carteTexte}>
                   <ThemedText style={styles.nom}>{equipe.nom}</ThemedText>
                   <ThemedText style={styles.meta}>
-                    {equipe.type === 'aerien' ? 'Aérienne' : 'Terrestre'} · {equipe.nb_membres} membres
+                    {equipe.type === 'aerien' ? 'Aérienne' : 'Terrestre'} · {equipe.nb_membres} {equipe.nb_membres > 1 ? 'membres' : 'membre'}
                   </ThemedText>
                 </View>
                 <BadgeTypeEquipe type={equipe.type} />
@@ -83,11 +83,6 @@ function Contenu({ equipes, equipeId, peutCreer, onFermer, onConfirmer, onCreer 
           ) : null}
         </ScrollView>
 
-        <ThemedText style={styles.note}>
-          Le bouton « Créer une équipe » n’apparaît que pour ces rôles. Les autres agents choisissent parmi les
-          équipes auxquelles ils appartiennent.
-        </ThemedText>
-
         <TouchableOpacity
           style={[styles.cta, !choix && styles.ctaInactif]}
           disabled={!choix}
@@ -103,7 +98,7 @@ function Contenu({ equipes, equipeId, peutCreer, onFermer, onConfirmer, onCreer 
 }
 
 const styles = StyleSheet.create({
-  voile: { flex: 1, backgroundColor: 'rgba(22,32,26,0.45)' },
+  voile: { flex: 1, backgroundColor: EQ.voile },
   feuille: {
     maxHeight: '85%',
     backgroundColor: EQ.fond,
@@ -149,7 +144,6 @@ const styles = StyleSheet.create({
   },
   creerIcone: { width: 28, height: 28, borderRadius: 9, backgroundColor: EQ.vert, alignItems: 'center', justifyContent: 'center' },
   creerTitre: { fontSize: 12, fontWeight: '600', color: EQ.vert },
-  note: { marginTop: 12, fontSize: 9.5, color: EQ.etiquette },
   cta: { marginTop: 14, height: 48, borderRadius: 13, backgroundColor: EQ.vert, alignItems: 'center', justifyContent: 'center' },
   ctaInactif: { opacity: 0.5 },
   ctaTexte: { fontSize: 15, fontWeight: '800', color: EQ.surMarque },
