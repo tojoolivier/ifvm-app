@@ -979,6 +979,103 @@ async def test_update_prospection_surface_infestee_superieure_rejetee(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("type_prospection", ["extensive", "validation"])
+async def test_create_prospection_surface_infestee_superieure_a_station_rejetee(
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    type_prospection: str,
+):
+    """Extensif / Validation : l'écran mobile enregistre le champ « Surface prospectée »
+    dans `surface_station` (jamais `surface_prospectee`) — c'est lui le plafond."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": type_prospection,
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-09-22",
+            "biotope": ["xerophyle"],
+            "surface_station": 5.0,
+            "surface_infestee": 8.0,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert "surface" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_surface_infestee_egale_a_station_acceptee(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-09-22",
+            "biotope": ["xerophyle"],
+            "surface_station": 5.0,
+            "surface_infestee": 5.0,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_prospection_surface_prospectee_prime_sur_station(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    """Quand `surface_prospectee` est connue, elle reste le plafond (Intensif) : la
+    surface station, plus grande, ne desserre pas la règle."""
+    response = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-09-22",
+            "biotope": ["xerophyle"],
+            "surface_station": 100.0,
+            "surface_prospectee": 10.0,
+            "surface_infestee": 15.0,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_prospection_surface_infestee_superieure_a_station_rejetee(
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+):
+    create_resp = await client.post(
+        "/prospections",
+        json={
+            "type_prospection": "extensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-09-22",
+            "biotope": ["xerophyle"],
+            "surface_station": 5.0,
+        },
+        headers=auth_headers,
+    )
+    prospection_id = create_resp.json()["id"]
+
+    response = await client.put(
+        f"/prospections/{prospection_id}",
+        json={"surface_infestee": 8.0},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_create_prospection_deplacement_perchee_rejete(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
 ):

@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentPosition, reverseGeocode } from '@/lib/location';
-import { validateGpsPosition } from '@/lib/prospection-validation';
+import { validateGpsPosition, validateSurfaceInfesteeExtensif } from '@/lib/prospection-validation';
 import { useAuthStore } from '@/lib/auth-store';
 import {
   OperationAerienneRow,
@@ -601,21 +601,20 @@ export default function ExtensiveReferenceScreen() {
     }
 
     // Cohérence relationnelle prospectée >= infestée (ADR-006), même règle que
-    // reference.tsx (Intensif) — cet écran ne collecte jamais `surface_prospectee`
-    // (l'Extensif/la Validation ne connaissent que Station et Infestée), mais la
-    // colonne peut déjà porter une valeur héritée d'une revalidation
-    // (`demarrerRevalidation` clone TOUTES les colonnes sauf celles listées dans
-    // `COLONNES_REVALIDATION_NON_CLONEES`, y compris `surface_prospectee`). Sans
-    // ce contrôle, une fiche revalidée où l'agent relève une surface infestée plus
-    // grande qu'avant échouait silencieusement à la synchronisation
-    // (`SurfaceInfesteeSuperieureError`, backend) sans qu'aucun champ visible ici
-    // n'explique pourquoi.
-    const surfaceInfesteeNum = surfaceInfestee ? parseFloat(surfaceInfestee) : 0;
-    if (draft?.surface_prospectee != null && surfaceInfesteeNum > draft.surface_prospectee) {
-      Alert.alert(
-        'Surface infestée invalide',
-        `La surface infestée (${surfaceInfesteeNum} ha) ne peut pas dépasser la surface prospectée (${draft.surface_prospectee} ha) déjà connue pour cette fiche.`
-      );
+    // reference.tsx (Intensif). Le champ « Surface prospectée (ha) » de cet écran est
+    // stocké dans `surface_station` (cf. `surfaceStation`) : c'est lui — et non la
+    // colonne `surface_prospectee`, jamais renseignée ici — que l'agent voit et compare
+    // à la surface infestée. On garde aussi la `surface_prospectee` héritée d'une
+    // revalidation d'une fiche Intensif (`demarrerRevalidation` clone cette colonne).
+    // Sans ce contrôle, la validation et la revalidation acceptaient une surface
+    // infestée plus grande que la surface prospectée.
+    const { blocages: blocagesSurfaces } = validateSurfaceInfesteeExtensif({
+      surfaceProspectee: surfaceStation ? parseFloat(surfaceStation) : null,
+      surfaceProspecteeHeritee: draft?.surface_prospectee ?? null,
+      surfaceInfestee: surfaceInfestee ? parseFloat(surfaceInfestee) : 0,
+    });
+    if (blocagesSurfaces.length > 0) {
+      Alert.alert('Surface infestée invalide', blocagesSurfaces.join('\n'));
       return;
     }
 
@@ -1027,6 +1026,7 @@ export default function ExtensiveReferenceScreen() {
               <TextInput
                 value={surfaceStation}
                 onChangeText={setSurfaceStation}
+                accessibilityLabel="Surface prospectée (ha)"
                 keyboardType="decimal-pad"
                 style={styles.input}
               />

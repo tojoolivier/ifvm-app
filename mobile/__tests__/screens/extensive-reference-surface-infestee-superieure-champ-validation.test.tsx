@@ -1,9 +1,11 @@
 /**
- * Surface infestée (ha) facultative — cf. extensive-reference-surface-infestee-vide.test.tsx
- * pour le contexte (#surface-infestee-facultative). Une valeur positive
- * saisie continue bien sûr d'être transmise normalement. Fichier séparé (un
- * seul montage d'écran par fichier), même mise en garde que
- * extensive-reference-screen-restore.test.tsx.
+ * Prospection de validation (signalement).
+ * La surface infestée ne peut jamais dépasser la « Surface prospectée (ha) »
+ * affichée sur cet écran (ADR-006). Ce champ est stocké dans `surface_station` —
+ * la colonne `surface_prospectee` n'est jamais renseignée ici —, donc l'ancien
+ * contrôle (qui ne regardait que la colonne héritée d'une revalidation) laissait
+ * passer une infestée plus grande que le champ affiché. Un seul montage d'écran
+ * par fichier, même mise en garde que extensive-reference-screen-restore.test.tsx.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
@@ -18,7 +20,7 @@ jest.mock('expo-router', () =>
 jest.mock('@/lib/prospection-repository', () => ({
   updateProspectionExtensiveReference: jest.fn().mockResolvedValue({
     id: 'draft-123',
-    type_prospection: 'extensive',
+    type_prospection: 'validation',
     date_prospection: '2026-08-25',
   }),
   listOperationsAeriennes: jest.fn().mockResolvedValue([]),
@@ -29,37 +31,33 @@ jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({ latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: Date.now() }),
 }));
 
-describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
+describe('ExtensiveReferenceScreen — infestée > surface prospectée saisie (validation)', () => {
   beforeEach(() => {
     useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', surface_station: 1000, type_prospection: 'extensive', date_prospection: '2026-08-25' } as any,
+      draft: { id: 'draft-123', type_prospection: 'validation', date_prospection: '2026-08-25' } as any,
       captures: [],
     });
   });
 
-  it('laisse passer « Suivant » dès qu’une surface infestée positive est saisie', async () => {
+  it('bloque « Suivant » quand la surface infestée dépasse la surface prospectée saisie', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     await render(<ExtensiveReferenceScreen />);
     await waitFor(() => expect(screen.getByText('Suivant : Imagos ›')).toBeVisible());
 
-    fireEvent.changeText(screen.getByPlaceholderText('0'), '2.5');
-    // Laisse React réconcilier avant de presser « Suivant » — sinon son
-    // gestionnaire reste lié à la fermeture du rendu précédent (surfaceInfestee
-    // encore vide), même prudence que les autres tests de cet écran.
-    expect(await screen.findByDisplayValue('2.5')).toBeVisible();
-    // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
-    // testé ici — hors sujet de ce test (surface infestée).
+    fireEvent.changeText(screen.getByLabelText('Surface prospectée (ha)'), '5');
+    fireEvent.changeText(screen.getByPlaceholderText('0'), '8');
+
     fireEvent.press(screen.getByText('Xerophyle'));
     await screen.findByText('Xerophyle ✓');
     fireEvent.press(screen.getByText('Suivant : Imagos ›'));
 
     await waitFor(() =>
-      expect(prospectionRepository.updateProspectionExtensiveReference).toHaveBeenCalledWith(
-        'draft-123',
-        expect.objectContaining({ surfaceInfestee: 2.5 })
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Surface infestée invalide',
+        'La surface infestée (8 ha) ne peut pas dépasser la surface prospectée (5 ha).'
       )
     );
-    expect(alertSpy).not.toHaveBeenCalledWith('Surface infestée requise', expect.any(String));
+    expect(prospectionRepository.updateProspectionExtensiveReference).not.toHaveBeenCalled();
   });
 });
