@@ -99,7 +99,7 @@ export default function TypeChooserScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={chooseRevalidation} activeOpacity={0.85}>
-            <Text style={styles.cardTitle}>🔁 Prospections à revalider</Text>
+            <Text style={styles.cardTitle}>🔁 Revalidation</Text>
             <Text style={styles.cardSubtitle}>
               Fiches validées depuis plus de 5 jours sans traitement, à revalider avant traitement.
             </Text>

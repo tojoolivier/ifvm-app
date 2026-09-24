@@ -129,7 +129,7 @@ export default function RevalidationListeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Prospections à revalider</Text>
+      <Text style={styles.title}>Revalidation</Text>
       <Text style={styles.sousTitre}>
         Validées depuis plus de 5 jours sans traitement — la situation sur le
         terrain a pu changer, à revérifier avant de démarrer un traitement.
@@ -152,7 +152,7 @@ export default function RevalidationListeScreen() {
           ListEmptyComponent={
             <EtatVide
               erreur={erreurDeLecture}
-              titreVide="Aucune prospection à revalider pour le moment."
+              titreVide="Aucune revalidation en attente pour le moment."
               onReessayer={charger}
             />
           }
