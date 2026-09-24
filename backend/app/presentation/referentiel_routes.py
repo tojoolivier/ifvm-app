@@ -1193,6 +1193,8 @@ async def create_site_aerienne(
     except SiteAerienneParentAbsentError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
+            # Le mobile reconnaît ce 409 (rejouable) au préfixe « parent_site_id inconnu » :
+            # `traduireErreurCreation`, mobile/src/lib/site-aerien-sync.ts. Le changer là-bas aussi.
             detail=f"parent_site_id inconnu du serveur, à rejouer après son principal : "
             f"{exc.args[0]}",
         ) from exc

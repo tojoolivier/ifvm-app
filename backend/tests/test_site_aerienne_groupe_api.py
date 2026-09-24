@@ -297,3 +297,27 @@ async def test_deplacement_site_inexistant_404(client: AsyncClient, admin_header
         headers=admin_headers,
     )
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_dependant_na_pas_dequipe_propre_et_pointe_vers_son_principal(
+    client: AsyncClient, admin_headers: dict, base_aerienne
+):
+    """#655 : le principal porte l'équipe, le dépendant n'en a pas (ck_..._equipe_coherente)."""
+    dependant = (await _creer_dependant(client, admin_headers, base_aerienne.id)).json()
+    assert dependant["equipe_id"] is None
+    assert dependant["parent_site_id"] == str(base_aerienne.id)
+
+
+@pytest.mark.asyncio
+async def test_rattacher_a_un_parent_inconnu_par_put_409(
+    client: AsyncClient, admin_headers: dict, base_aerienne
+):
+    dependant = (await _creer_dependant(client, admin_headers, base_aerienne.id)).json()
+    response = await client.put(
+        f"/sites-aeriens/{dependant['id']}",
+        json={"parent_site_id": str(uuid.uuid4())},
+        headers=admin_headers,
+    )
+    assert response.status_code == 409
+    assert "parent_site_id inconnu" in response.json()["detail"]
