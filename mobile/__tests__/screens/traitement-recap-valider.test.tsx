@@ -24,6 +24,7 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   countUnsyncedTraitements: jest.fn().mockResolvedValue(0),
   markTraitementValidee: jest.fn().mockResolvedValue({}),
+  marquerTraitementEnregistre: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/lib/traitement-sync', () => ({
@@ -89,6 +90,7 @@ beforeEach(() => {
   jest.mocked(traitementRepository.getTraitement).mockReset().mockResolvedValue(DRAFT_PRET_A_ENREGISTRER as any);
   jest.mocked(traitementRepository.countUnsyncedTraitements).mockReset().mockResolvedValue(0);
   jest.mocked(traitementRepository.markTraitementValidee).mockClear().mockResolvedValue({} as any);
+  jest.mocked(traitementRepository.marquerTraitementEnregistre).mockClear().mockResolvedValue(undefined);
   jest.mocked(traitementSync.enregistrerEtSynchroniserTraitement).mockReset().mockResolvedValue({
     reussies: ['trait-1'],
     echouees: [],
@@ -107,6 +109,20 @@ beforeEach(() => {
 });
 
 describe('RecapScreen — Enregistrer appelle réellement /valider (dernier verrou serveur)', () => {
+  // #traitement-brouillon-distinct-fiche-creee : « Enregistrer » est le moment où le brouillon
+  // devient une fiche créée (à synchro) — AVANT toute tentative d'envoi, pour qu'un
+  // enregistrement hors ligne la laisse bien « à synchro » et non « brouillon ».
+  it('marque la fiche enregistrée (brouillon → à synchro) avant de tenter la synchronisation', async () => {
+    await render(<RecapScreen />);
+    fireEvent.press(await screen.findByText('Enregistrer'));
+
+    await waitFor(() => expect(traitementRepository.marquerTraitementEnregistre).toHaveBeenCalledWith('trait-1'));
+    const ordreMarque = jest.mocked(traitementRepository.marquerTraitementEnregistre).mock.invocationCallOrder[0];
+    await waitFor(() => expect(traitementSync.enregistrerEtSynchroniserTraitement).toHaveBeenCalled());
+    const ordreSync = jest.mocked(traitementSync.enregistrerEtSynchroniserTraitement).mock.invocationCallOrder[0];
+    expect(ordreMarque).toBeLessThan(ordreSync);
+  });
+
   it('envoie les signatures persistées localement à validerTraitement puis réécrit la fiche avec la réponse serveur', async () => {
     await render(<RecapScreen />);
     fireEvent.press(await screen.findByText('Enregistrer'));

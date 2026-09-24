@@ -6,6 +6,7 @@ import {
   getTraitement,
   countUnsyncedTraitements,
   markTraitementValidee,
+  marquerTraitementEnregistre,
   DraftTraitement,
   Cible,
 } from '@/lib/traitement-repository';
@@ -531,6 +532,10 @@ export default function RecapScreen() {
       async () => {
         // Déjà visible à l'écran (liste des points à corriger) : pas de second signal.
         if (errors.length > 0) return;
+        // #traitement-brouillon-distinct-fiche-creee : c'est ICI que le brouillon devient une
+        // fiche créée (à synchro) — avant tout envoi, pour qu'un enregistrement hors ligne
+        // la laisse bien « à synchro » et non « brouillon ».
+        await marquerTraitementEnregistre(draft.id);
         const resume = await enregistrerEtSynchroniserTraitement(draft, token!);
         // La fiche est enregistrée localement dans tous les cas ; seul l'envoi
         // peut avoir échoué. Annoncer « Fiche enregistrée » sans regarder le

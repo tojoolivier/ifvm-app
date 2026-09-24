@@ -93,7 +93,8 @@ function traitementVersActivite(fiche: DraftTraitementRow): ActiviteItem {
     titre: fiche.localite || 'Localité non spécifiée',
     sousTitre: `N°${fiche.numero_fiche ?? '—'} · ${fiche.date_traitement ?? '—'}`,
     synced: fiche.statut_sync === 'synced',
-    brouillon: false,
+    // #traitement-brouillon-distinct-fiche-creee : jamais enregistrée = brouillon.
+    brouillon: fiche.statut_sync === 'brouillon',
     updatedAt: fiche.updated_at,
   };
 }

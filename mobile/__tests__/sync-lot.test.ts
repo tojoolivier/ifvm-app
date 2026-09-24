@@ -274,6 +274,11 @@ describe('statutFicheDe — le badge se lit en base, il survit au départ de l�
 });
 
 describe('estDansLaFile — la sortie de file se décide dans le modèle', () => {
+  // #traitement-brouillon-distinct-fiche-creee : un brouillon n'est pas dans la file.
+  it('exclut un brouillon (fiche jamais enregistrée)', () => {
+    expect(estDansLaFile('brouillon')).toBe(false);
+  });
+
   it('garde en file une fiche en attente ou en conflit', () => {
     // Le conflit a rafraîchi `server_updated_at` : le renvoi peut aboutir.
     expect(estDansLaFile('local')).toBe(true);

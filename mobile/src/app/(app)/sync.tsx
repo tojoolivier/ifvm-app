@@ -114,7 +114,11 @@ export default function SyncScreen() {
   // `statut === 'en_attente'` : une fiche de traitement reste `'brouillon'`
   // jusqu'à son premier envoi réussi (cf. listUnsyncedTraitements), donc
   // l'exiger ici l'aurait rendue hors de portée de toute synchronisation.
-  const pendingTraitements = traitements.filter((item) => item.statut_sync !== 'synced');
+  // #traitement-brouillon-distinct-fiche-creee : un brouillon (parcours non terminé, jamais
+  // enregistré) n'est pas une fiche à synchroniser.
+  const pendingTraitements = traitements.filter(
+    (item) => item.statut_sync !== 'synced' && item.statut_sync !== 'brouillon'
+  );
   const syncedTraitements = traitements.filter((item) => item.statut_sync === 'synced');
 
   const stats = {
