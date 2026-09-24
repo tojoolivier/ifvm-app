@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
@@ -120,6 +120,19 @@ from app.domain.referentiel import (
     ZoneAntiAcridienIntrouvableError,
 )
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
+from app.infrastructure.referentiel_model import (
+    AeronefModel,
+    CodeStadeModel,
+    CultureModel,
+    EquipeAeronefModel,
+    EquipeModel,
+    LieuAerienModel,
+    PesticideModel,
+    PosteAcridienModel,
+    SiteAerienneModel,
+    StationFixeModel,
+    ZoneAntiAcridienModel,
+)
 from app.infrastructure.referentiel_repository import (
     CommuneRepositoryImpl,
     PosteAcridienRepositoryImpl,
@@ -192,6 +205,11 @@ from app.presentation.referentiel_schemas import (
     ZoneAntiAcridienCreate,
     ZoneAntiAcridienRead,
     ZoneAntiAcridienUpdate,
+)
+from app.presentation.suppression_routes import (
+    ajouter_route_suppression,
+    charger_ligne_vivante,
+    marquer_supprime,
 )
 
 router = APIRouter()
@@ -325,9 +343,9 @@ async def create_poste_acridien(
         ) from exc
 
 
-# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
-# upserts, une suppression physique resterait sur les téléphones déjà synchronisés.
-# La désactivation logique passe par `PUT` avec `actif: false`.
+# Suppression : soft-delete `deleted_at` (#674) — cf. `suppression_routes.py`. Le pull
+# renvoie la ligne avec `deleted_at`, les mobiles la purgent. `PUT actif:false` reste la
+# désactivation restaurable.
 @router.put("/postes-acridiens/{pa_id}", response_model=PosteAcridienRead)
 async def update_poste_acridien(
     pa_id: uuid.UUID,
@@ -1790,3 +1808,43 @@ async def pull_referentiel(
         aeronefs=EntityPull(upserts=result.aeronefs, server_time=result.server_time),
         equipe_aeronefs=EntityPull(upserts=result.equipe_aeronefs, server_time=result.server_time),
     )
+
+
+ajouter_route_suppression(
+    router,
+    "/zones-anti-acridiennes/{item_id}",
+    ZoneAntiAcridienModel,
+    "Zone anti-acridienne",
+    enfants=((PosteAcridienModel, "za_id", "postes acridiens"),),
+)
+ajouter_route_suppression(
+    router,
+    "/postes-acridiens/{item_id}",
+    PosteAcridienModel,
+    "Poste acridien",
+    enfants=((StationFixeModel, "pa_id", "stations"),),
+)
+ajouter_route_suppression(router, "/stations/{item_id}", StationFixeModel, "Station")
+ajouter_route_suppression(router, "/codes-stades/{item_id}", CodeStadeModel, "Code stade")
+ajouter_route_suppression(router, "/cultures/{item_id}", CultureModel, "Culture")
+ajouter_route_suppression(router, "/lieux-aeriens/{item_id}", LieuAerienModel, "Lieu aérien")
+ajouter_route_suppression(router, "/equipes/{item_id}", EquipeModel, "Équipe")
+ajouter_route_suppression(router, "/aeronefs/{item_id}", AeronefModel, "Aéronef")
+ajouter_route_suppression(router, "/sites-aeriens/{item_id}", SiteAerienneModel, "Site aérien")
+ajouter_route_suppression(router, "/pesticides/{item_id}", PesticideModel, "Pesticide")
+
+
+@router.delete(
+    "/equipes/{equipe_id}/aeronefs/{affectation_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def supprimer_affectation_aeronef(
+    equipe_id: uuid.UUID,
+    affectation_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(require_admin)],
+) -> Response:
+    ligne = await charger_ligne_vivante(db, EquipeAeronefModel, affectation_id, "Affectation")
+    if ligne.equipe_id != equipe_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Affectation non trouvée")
+    await marquer_supprime(db, ligne)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

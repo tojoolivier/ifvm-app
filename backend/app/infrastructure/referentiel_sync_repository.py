@@ -65,6 +65,7 @@ from app.infrastructure.referentiel_model import (
     StadeModel,
     VolModel,
 )
+from app.infrastructure.soft_delete import INCLURE_SUPPRIMES
 from app.models.users import Utilisateur
 
 
@@ -89,7 +90,7 @@ class UtilisateurEquipeRepositoryImpl(UtilisateurEquipeRepository):
         stmt = select(Utilisateur).order_by(Utilisateur.nom)
         if since is not None:
             stmt = stmt.where(Utilisateur.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [
             UtilisateurEquipe(
                 id=m.id,
@@ -112,7 +113,7 @@ class PesticideRepositoryImpl(PesticideRepository):
         stmt = select(PesticideModel).order_by(PesticideModel.code)
         if since is not None:
             stmt = stmt.where(PesticideModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[Pesticide]:
@@ -180,6 +181,7 @@ class PesticideRepositoryImpl(PesticideRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
 
@@ -191,7 +193,7 @@ class CultureRepositoryImpl(CultureRepository):
         stmt = select(CultureModel).order_by(CultureModel.code)
         if since is not None:
             stmt = stmt.where(CultureModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[Culture]:
@@ -251,6 +253,7 @@ class CultureRepositoryImpl(CultureRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
 
@@ -283,13 +286,14 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
             equipe_aerienne_nom=row.equipe_aerienne_nom,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
     async def list_since(self, since: datetime | None) -> list[LieuAerien]:
         stmt = self._select_with_equipe().order_by(LieuAerienModel.nom)
         if since is not None:
             stmt = stmt.where(LieuAerienModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(row) for row in result.all()]
 
     async def list_all(
@@ -367,13 +371,14 @@ class SiteAerienneRepositoryImpl(SiteAerienneRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
     async def list_since(self, since: datetime | None) -> list[SiteAerienne]:
         stmt = select(SiteAerienneModel).order_by(SiteAerienneModel.numero)
         if since is not None:
             stmt = stmt.where(SiteAerienneModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         sites = [self._to_domain(m) for m in result.scalars().all()]
         if sites:
             # Une requête pour toutes les positions actives : pas de N+1 sur le pull.
@@ -621,7 +626,7 @@ class EquipeRepositoryImpl(EquipeRepository):
         stmt = select(EquipeModel).options(*self._CHARGEMENT).order_by(EquipeModel.nom)
         if since is not None:
             stmt = stmt.where(EquipeModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().unique().all()]
 
     async def list_membres_since(self, since: datetime | None) -> list[MembreEquipe]:
@@ -649,6 +654,7 @@ class EquipeRepositoryImpl(EquipeRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
             membres=[_membre_to_domain(m) for m in model.membres],
         )
 
@@ -794,6 +800,7 @@ def _affectation_to_domain(model: EquipeAeronefModel) -> AffectationAeronef:
         aeronef=_aeronef_to_domain(model.aeronef) if model.aeronef is not None else None,
         created_at=model.created_at,
         updated_at=model.updated_at,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -809,7 +816,7 @@ class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
         )
         if since is not None:
             stmt = stmt.where(EquipeAeronefModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [_affectation_to_domain(m) for m in result.scalars().all()]
 
     async def list_par_equipe(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
@@ -979,6 +986,7 @@ def _aeronef_to_domain(model: AeronefModel) -> Aeronef:
         actif=model.actif,
         created_at=model.created_at,
         updated_at=model.updated_at,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -990,7 +998,7 @@ class AeronefRepositoryImpl(AeronefRepository):
         stmt = select(AeronefModel).order_by(AeronefModel.immatriculation)
         if since is not None:
             stmt = stmt.where(AeronefModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [_aeronef_to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[Aeronef]:
@@ -1059,7 +1067,7 @@ class CodeStadeRepositoryImpl(CodeStadeRepository):
         stmt = self._select_ordonne()
         if since is not None:
             stmt = stmt.where(CodeStadeModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[CodeStade]:
@@ -1146,6 +1154,7 @@ class CodeStadeRepositoryImpl(CodeStadeRepository):
             ordre=model.ordre,
             actif=model.actif,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
 

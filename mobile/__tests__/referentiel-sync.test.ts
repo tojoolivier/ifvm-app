@@ -410,6 +410,67 @@ describe('pullReferentiel', () => {
     );
   });
 
+  it('purge du cache local une ligne reçue avec deleted_at, sans la réinsérer (#674)', async () => {
+    const vivant = {
+      id: 'pa-vivant',
+      code: 'PA-1',
+      nom: 'Vivant',
+      za_id: 'za-1',
+      actif: true,
+      updated_at: '2026-08-02T00:00:00Z',
+      deleted_at: null,
+    };
+    const supprime = {
+      ...vivant,
+      id: 'pa-supprime',
+      code: 'PA-2',
+      deleted_at: '2026-08-02T00:00:00Z',
+    };
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      postes_acridiens: { upserts: [vivant, supprime], server_time: '2026-08-02T00:00:00Z' },
+    });
+
+    await pullReferentiel('token-1');
+
+    const suppressions = runAsync.mock.calls.filter(([sql]) =>
+      String(sql).includes('DELETE FROM poste_acridien')
+    );
+    expect(suppressions).toHaveLength(1);
+    expect(suppressions[0][1]).toEqual(['pa-supprime']);
+
+    const insertions = runAsync.mock.calls.filter(([sql]) =>
+      String(sql).includes('INSERT INTO poste_acridien')
+    );
+    expect(insertions.map(([, params]) => params[0])).toEqual(['pa-vivant']);
+  });
+
+  it('supprime les enfants avant leur parent quand le pull contient les deux (#674)', async () => {
+    const base = {
+      actif: true,
+      updated_at: '2026-08-02T00:00:00Z',
+      deleted_at: '2026-08-02T00:00:00Z',
+    };
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      postes_acridiens: {
+        upserts: [{ ...base, id: 'pa-1', code: 'PA', nom: 'PA', za_id: 'za' }],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      stations_fixes: {
+        upserts: [{ ...base, id: 'st-1', code: 'ST', nom: 'ST', pa_id: 'pa-1' }],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    } as never);
+
+    await pullReferentiel('token-1');
+
+    const tables = runAsync.mock.calls
+      .map(([sql]) => /DELETE FROM (\w+)/.exec(String(sql))?.[1])
+      .filter(Boolean);
+    expect(tables.indexOf('station_fixe')).toBeLessThan(tables.indexOf('poste_acridien'));
+  });
+
   it('updates the sync cursor for every entity type to its own response server_time', async () => {
     mockPullReferentiel.mockResolvedValue(emptyResponse('2026-08-02T00:00:00Z'));
 

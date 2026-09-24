@@ -20,6 +20,7 @@ from app.infrastructure.referentiel_model import (
     StationFixeModel,
     ZoneAntiAcridienModel,
 )
+from app.infrastructure.soft_delete import INCLURE_SUPPRIMES
 
 
 class ZoneAntiAcridienRepositoryImpl(ZoneAntiAcridienRepository):
@@ -50,7 +51,7 @@ class ZoneAntiAcridienRepositoryImpl(ZoneAntiAcridienRepository):
         stmt = select(ZoneAntiAcridienModel).order_by(ZoneAntiAcridienModel.code)
         if since is not None:
             stmt = stmt.where(ZoneAntiAcridienModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def code_pris_par_un_autre(self, code: str, exclude_id: uuid.UUID | None = None) -> bool:
@@ -101,6 +102,7 @@ class ZoneAntiAcridienRepositoryImpl(ZoneAntiAcridienRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
 
@@ -164,7 +166,7 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
         stmt = self._select_with_zone().order_by(PosteAcridienModel.code)
         if since is not None:
             stmt = stmt.where(PosteAcridienModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(row) for row in result.all()]
 
     async def _relire(self, pa_id: uuid.UUID) -> PosteAcridien:
@@ -217,6 +219,7 @@ class PosteAcridienRepositoryImpl(PosteAcridienRepository):
             nb_stations=row.nb_stations,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
 
@@ -259,6 +262,7 @@ class StationFixeRepositoryImpl(StationFixeRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
     async def list_by_filters(
@@ -350,7 +354,7 @@ class StationFixeRepositoryImpl(StationFixeRepository):
         if since is not None:
             stmt = stmt.where(StationFixeModel.updated_at > since)
 
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(row) for row in result.all()]
 
     async def _relire(self, station_id: uuid.UUID) -> StationFixe:

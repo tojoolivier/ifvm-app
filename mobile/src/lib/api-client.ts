@@ -298,6 +298,8 @@ export interface PosteAcridienSync {
   za_id: string;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 export interface StationFixeSync {
@@ -313,6 +315,8 @@ export interface StationFixeSync {
   region: string;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 export interface UtilisateurEquipeSync {
@@ -340,6 +344,8 @@ export interface CultureSync {
   nom: string;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 /**
@@ -355,6 +361,8 @@ export interface CampagneSync {
   end_date: string | null;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 /**

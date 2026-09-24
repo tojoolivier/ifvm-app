@@ -411,6 +411,47 @@ async function updateSyncCursor(
  * rattraper les entités qu'un pull incrémental antérieur (curseur déjà avancé) ne redemandera
  * jamais, faute de modification depuis.
  */
+type Supprimable = { id: string; deleted_at?: string | null };
+
+/**
+ * Soft-delete du référentiel (#674) : le serveur renvoie une ligne supprimée avec
+ * `deleted_at` non nul. Elle est purgée du cache local plutôt que masquée, pour que les
+ * lectures n'aient rien à filtrer. Enfants avant parents (les FK locales suivent celles du
+ * serveur) ; les membres d'une équipe supprimée partent avec elle.
+ */
+const PURGE_ENFANTS_D_ABORD: EntityType[] = [
+  'equipe_aeronefs',
+  'stations_fixes',
+  'sites_aeriens',
+  'lieux_aeriens',
+  'aeronefs',
+  'equipes',
+  'postes_acridiens',
+  'pesticides',
+  'cultures',
+  'codes_stades',
+  'campagnes',
+];
+
+function vivantes<T extends { deleted_at?: string | null }>(upserts: T[]): T[] {
+  return upserts.filter((ligne) => !ligne.deleted_at);
+}
+
+async function purgerSupprimes(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  response: ReferentielPullResponse
+): Promise<void> {
+  for (const entity of PURGE_ENFANTS_D_ABORD) {
+    const upserts = response[entity].upserts as Supprimable[];
+    for (const ligne of upserts.filter((l) => l.deleted_at)) {
+      if (entity === 'equipes') {
+        await db.runAsync('DELETE FROM equipe_membre WHERE equipe_id = ?', [ligne.id]);
+      }
+      await db.runAsync(`DELETE FROM ${TABLE_PAR_ENTITE[entity]} WHERE id = ?`, [ligne.id]);
+    }
+  }
+}
+
 export async function resetReferentielSyncCursors(): Promise<void> {
   const db = await getReferentielDb();
   await db.runAsync('DELETE FROM referentiel_sync_meta');
@@ -423,19 +464,20 @@ export async function pullReferentiel(token: string, onUnauthorized?: () => void
 
   const response = await apiClient.pullReferentiel(token, cursors, onUnauthorized);
 
-  await upsertPostesAcridiens(db, response.postes_acridiens.upserts);
-  await upsertStationsFixes(db, response.stations_fixes.upserts);
+  await purgerSupprimes(db, response);
+  await upsertPostesAcridiens(db, vivantes(response.postes_acridiens.upserts));
+  await upsertStationsFixes(db, vivantes(response.stations_fixes.upserts));
   await upsertUtilisateursEquipe(db, response.utilisateurs_equipe.upserts);
-  await upsertPesticides(db, response.pesticides.upserts);
-  await upsertCultures(db, response.cultures.upserts);
-  await upsertCodesStades(db, response.codes_stades.upserts);
-  await upsertCampagnes(db, response.campagnes.upserts);
-  await upsertLieuxAeriens(db, response.lieux_aeriens.upserts);
-  await upsertEquipes(db, response.equipes.upserts);
+  await upsertPesticides(db, vivantes(response.pesticides.upserts));
+  await upsertCultures(db, vivantes(response.cultures.upserts));
+  await upsertCodesStades(db, vivantes(response.codes_stades.upserts));
+  await upsertCampagnes(db, vivantes(response.campagnes.upserts));
+  await upsertLieuxAeriens(db, vivantes(response.lieux_aeriens.upserts));
+  await upsertEquipes(db, vivantes(response.equipes.upserts));
   await upsertEquipeMembres(db, response.equipe_membres.upserts);
-  await upsertSitesAeriens(db, response.sites_aeriens.upserts);
-  await upsertAeronefs(db, response.aeronefs.upserts);
-  await upsertEquipeAeronefs(db, response.equipe_aeronefs.upserts);
+  await upsertSitesAeriens(db, vivantes(response.sites_aeriens.upserts));
+  await upsertAeronefs(db, vivantes(response.aeronefs.upserts));
+  await upsertEquipeAeronefs(db, vivantes(response.equipe_aeronefs.upserts));
 
   for (const entityType of ENTITY_TYPES) {
     await updateSyncCursor(db, entityType, response[entityType].server_time);

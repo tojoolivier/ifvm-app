@@ -10,6 +10,8 @@ from app.models.base import Base
 
 class CampagneModel(Base):
     __tablename__ = "campagne"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200), nullable=False)

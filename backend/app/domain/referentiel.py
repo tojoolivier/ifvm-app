@@ -73,6 +73,7 @@ class ZoneAntiAcridien:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -93,6 +94,7 @@ class PosteAcridien:
     nb_stations: int = 0
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -126,6 +128,7 @@ class StationFixe:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -150,6 +153,7 @@ class Pesticide:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -167,6 +171,7 @@ class Culture:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -182,6 +187,7 @@ class CodeStade:
     ordre: int = 0
     actif: bool = True
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
 
 
 class StadeInconnuError(Exception):
@@ -224,6 +230,7 @@ class LieuAerien:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
     # Rattachement à l'équipe aérienne propriétaire du lieu (migration 0074) —
     # nullable (lieux existants "sans équipe"), obligatoire côté application pour
     # toute nouvelle création (cf. CreateLieuAerien).
@@ -446,6 +453,7 @@ class Aeronef:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -469,6 +477,7 @@ class AffectationAeronef:
     aeronef: Aeronef | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -514,6 +523,7 @@ class Equipe:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
     membres: list[MembreEquipe] = field(default_factory=list)
 
     def chef(self) -> MembreEquipe | None:
@@ -543,6 +553,7 @@ class SiteAerienne:
     actif: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None
     # Renseignée par `SiteAerienneRepository.list_since` seulement (pull mobile, #638).
     position_active: "SiteAeriennePosition | None" = None
 

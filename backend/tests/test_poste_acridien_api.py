@@ -341,12 +341,13 @@ async def test_update_ignore_nb_stations_champ_derive(
 
 
 @pytest.mark.asyncio
-async def test_aucune_route_delete(client: AsyncClient, auth_headers: dict, poste_acridien):
-    """Le pull ne transporte que des upserts : une ligne supprimée resterait sur les
-    téléphones déjà synchronisés. La désactivation logique est la seule sortie."""
+async def test_suppression_reservee_a_ladmin(
+    client: AsyncClient, auth_headers: dict, poste_acridien
+):
+    """DELETE = soft-delete `deleted_at` (#674) : réservé à l'admin, un agent reçoit 403."""
     response = await client.delete(f"/postes-acridiens/{poste_acridien.id}", headers=auth_headers)
 
-    assert response.status_code == 405
+    assert response.status_code == 403
 
 
 # --- Propagation au pull hors-ligne --------------------------------------------

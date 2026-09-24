@@ -87,11 +87,10 @@ async def test_desactiver_une_campagne_n_orpheline_pas_les_prospections(
 
 
 @pytest.mark.asyncio
-async def test_delete_campagne_n_existe_plus(
+async def test_suppression_reservee_a_ladmin(
     client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
 ):
-    """La route DELETE est retirée : campagne suit désormais la politique de
-    désactivation logique des 6 autres référentiels (ADR-010, #137)."""
+    """DELETE = soft-delete `deleted_at` (#674) : réservé à l'admin, un agent reçoit 403."""
     response = await client.delete(f"/campagnes/{campagne_id}", headers=auth_headers)
 
-    assert response.status_code == 405
+    assert response.status_code == 403

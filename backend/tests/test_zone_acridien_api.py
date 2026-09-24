@@ -201,9 +201,11 @@ async def test_update_inexistante_retourne_404(client: AsyncClient, auth_headers
 
 
 @pytest.mark.asyncio
-async def test_aucune_route_delete(client: AsyncClient, auth_headers: dict, zone_anti_acridien):
+async def test_suppression_reservee_a_ladmin(
+    client: AsyncClient, auth_headers: dict, zone_anti_acridien
+):
     response = await client.delete(
         f"/zones-anti-acridiennes/{zone_anti_acridien.id}", headers=auth_headers
     )
 
-    assert response.status_code == 405
+    assert response.status_code == 403

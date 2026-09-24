@@ -42,6 +42,8 @@ def _equipe_type_genere(colonne_fk: str, type_equipe: str) -> Computed:
 
 class ZoneAntiAcridienModel(Base):
     __tablename__ = "zone_anti_acridien"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
@@ -55,6 +57,8 @@ class ZoneAntiAcridienModel(Base):
 
 class PosteAcridienModel(Base):
     __tablename__ = "poste_acridien"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
@@ -128,6 +132,8 @@ class CommuneModel(Base):
 
 class StationFixeModel(Base):
     __tablename__ = "station_fixe"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
@@ -162,6 +168,8 @@ class LieuAerienModel(Base):
     """
 
     __tablename__ = "lieu_aerien"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     type_lieu: Mapped[str] = mapped_column(Text(), nullable=False)
@@ -204,6 +212,8 @@ class AeronefModel(Base):
     (#621) ; ses affectations successives vivent dans `equipe_aeronef` (#603)."""
 
     __tablename__ = "aeronef"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     immatriculation: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -239,6 +249,8 @@ class EquipeModel(Base):
     """
 
     __tablename__ = "equipe"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
@@ -290,6 +302,8 @@ class EquipeAeronefModel(Base):
     (ADR-018) ; elle est validée côté application."""
 
     __tablename__ = "equipe_aeronef"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     equipe_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -426,6 +440,8 @@ class SiteAerienneModel(Base):
     """
 
     __tablename__ = "site_aerienne"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     parent_site_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -497,6 +513,8 @@ class SiteAeriennePositionModel(Base):
 
 class PesticideModel(Base):
     __tablename__ = "pesticide"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
@@ -681,6 +699,8 @@ class VolModel(Base):
 
 class CultureModel(Base):
     __tablename__ = "culture"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
@@ -711,6 +731,8 @@ class CodeStadeModel(Base):
     synchronisent pour construire leurs écrans de capture."""
 
     __tablename__ = "code_stade"
+    # Soft-delete (#674) : posé par les routes DELETE ; `since=` renvoie aussi ces lignes.
+    deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(Text(), ForeignKey("stade.code"), nullable=False)

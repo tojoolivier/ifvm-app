@@ -142,6 +142,7 @@ class ZoneAntiAcridienSyncRead(BaseModel):
     nom: str
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class PosteAcridienSyncRead(BaseModel):
@@ -152,6 +153,7 @@ class PosteAcridienSyncRead(BaseModel):
     za_id: uuid.UUID
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class StationFixeSyncRead(BaseModel):
@@ -168,6 +170,7 @@ class StationFixeSyncRead(BaseModel):
     region: str
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class UtilisateurEquipeSyncRead(BaseModel):
@@ -230,6 +233,7 @@ class PesticideSyncRead(BaseModel):
     type_produit: str | None
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class MouvementPesticideCreate(BaseModel):
@@ -656,6 +660,7 @@ class CultureSyncRead(BaseModel):
     nom: str
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class LieuAerienSyncRead(BaseModel):
@@ -669,6 +674,7 @@ class LieuAerienSyncRead(BaseModel):
     actif: bool
     equipe_aerienne_id: uuid.UUID | None = None
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class CodeStadeSyncRead(BaseModel):
@@ -683,6 +689,7 @@ class CodeStadeSyncRead(BaseModel):
     ordre: int
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class CodeStadeRead(BaseModel):
@@ -730,6 +737,7 @@ class CampagneSyncRead(BaseModel):
     end_date: date | None
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class SiteAerienneSyncRead(BaseModel):
@@ -750,6 +758,7 @@ class SiteAerienneSyncRead(BaseModel):
     altitude: float | None = None
     date_debut_position: date | None = None
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class EquipeSyncRead(BaseModel):
@@ -763,6 +772,7 @@ class EquipeSyncRead(BaseModel):
     type: Literal["terrestre", "aerien"]
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class EquipeMembreSyncRead(BaseModel):
@@ -783,6 +793,7 @@ class AeronefSyncRead(BaseModel):
     volume_cuve_l: float
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class EquipeAeronefSyncRead(BaseModel):
@@ -796,6 +807,7 @@ class EquipeAeronefSyncRead(BaseModel):
     date_debut: date
     date_fin: date | None = None
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 T = TypeVar("T")

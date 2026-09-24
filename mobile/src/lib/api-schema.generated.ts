@@ -201,6 +201,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campagnes/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Campagne */
+        delete: operations["supprimer_campagne_campagnes__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/zones-anti-acridiennes": {
         parameters: {
             query?: never;
@@ -515,7 +532,8 @@ export interface paths {
         /** Cloturer Affectation Aeronef */
         put: operations["cloturer_affectation_aeronef_equipes__equipe_id__aeronefs__affectation_id__put"];
         post?: never;
-        delete?: never;
+        /** Supprimer Affectation Aeronef */
+        delete: operations["supprimer_affectation_aeronef_equipes__equipe_id__aeronefs__affectation_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -784,6 +802,176 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/zones-anti-acridiennes/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Zone Anti Acridien */
+        delete: operations["supprimer_zone_anti_acridien_zones_anti_acridiennes__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/postes-acridiens/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Poste Acridien */
+        delete: operations["supprimer_poste_acridien_postes_acridiens__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stations/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Station Fixe */
+        delete: operations["supprimer_station_fixe_stations__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/codes-stades/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Code Stade */
+        delete: operations["supprimer_code_stade_codes_stades__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cultures/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Culture */
+        delete: operations["supprimer_culture_cultures__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lieux-aeriens/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Lieu Aerien */
+        delete: operations["supprimer_lieu_aerien_lieux_aeriens__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Equipe */
+        delete: operations["supprimer_equipe_equipes__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/aeronefs/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Aeronef */
+        delete: operations["supprimer_aeronef_aeronefs__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites-aeriens/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Site Aerienne */
+        delete: operations["supprimer_site_aerienne_sites_aeriens__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pesticides/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Pesticide */
+        delete: operations["supprimer_pesticide_pesticides__item_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1232,6 +1420,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * AeronefUpdate
@@ -1472,6 +1662,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * CampagneUpdate
@@ -1630,6 +1822,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * CodeStadeUpdate
@@ -1733,6 +1927,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * CultureUpdate
@@ -1944,6 +2140,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /** EquipeCreate */
         EquipeCreate: {
@@ -2042,6 +2240,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * EquipeUpdate
@@ -2349,6 +2549,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * LieuAerienUpdate
@@ -2675,6 +2877,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * PesticideUpdate
@@ -2896,6 +3100,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * PosteAcridienUpdate
@@ -3770,6 +3976,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * SiteAerienneUpdate
@@ -3926,6 +4134,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * StationFixeUpdate
@@ -5014,6 +5224,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
         };
         /**
          * ZoneAntiAcridienUpdate
@@ -5390,6 +5602,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CampagneRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_campagne_campagnes__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -6453,6 +6694,36 @@ export interface operations {
             };
         };
     };
+    supprimer_affectation_aeronef_equipes__equipe_id__aeronefs__affectation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+                affectation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_aeronefs_aeronefs_get: {
         parameters: {
             query?: {
@@ -7237,6 +7508,296 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ReferentielPullResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_zone_anti_acridien_zones_anti_acridiennes__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_poste_acridien_postes_acridiens__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_station_fixe_stations__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_code_stade_codes_stades__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_culture_cultures__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_lieu_aerien_lieux_aeriens__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_equipe_equipes__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_aeronef_aeronefs__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_site_aerienne_sites_aeriens__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_pesticide_pesticides__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
