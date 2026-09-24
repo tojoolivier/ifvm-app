@@ -8,7 +8,10 @@ import {
   assurerProspectionDisponibleLocalement,
   materialiserFichesDisponibles,
 } from '@/lib/prospection-accueil';
-import { listProspectionsDisponiblesPourTraitementLocal } from '@/lib/prospection-repository';
+import {
+  listProspectionIdsAvecTraitementLocal,
+  listProspectionsDisponiblesPourTraitementLocal,
+} from '@/lib/prospection-repository';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -83,9 +86,26 @@ export default function TraitementProspectionPickerScreen() {
         // dès qu'elle apparaît en ligne (pas seulement la fiche choisie), pour
         // qu'elle reste consultable au prochain passage hors connexion.
         await materialiserFichesDisponibles(outcome.value);
+        // #liste-nouveau-traitement-exclut-deja-traitees : le serveur n'exclut une fiche qu'une
+        // fois son traitement synchronisé — on retire aussi, tout de suite, celles pour
+        // lesquelles un traitement existe déjà sur cet appareil (brouillon, enregistré hors
+        // ligne…). Complément best-effort : s'il échoue, la liste serveur reste affichée telle quelle.
+        const dejaTraitees = await runTask(() => listProspectionIdsAvecTraitementLocal(), {
+          name: 'traitement.prospectionPicker.dejaTraitees',
+          criticality: 'best-effort',
+        });
+        const disponibles = dejaTraitees.ok
+          ? outcome.value.filter((p) => !dejaTraitees.value.has(p.id))
+          : outcome.value;
         setHorsLigne(false);
         setErreurDeLecture(null);
-        setProspections(outcome.value);
+        // Même liste (mêmes fiches, même ordre) : on garde l'état tel quel — évite un rendu
+        // inutile à chaque prise de focus (le filtre produit un nouveau tableau à chaque appel).
+        setProspections((precedentes) =>
+          precedentes.length === disponibles.length && precedentes.every((p, i) => p.id === disponibles[i].id)
+            ? precedentes
+            : disponibles
+        );
         setLoading(false);
         return;
       }
