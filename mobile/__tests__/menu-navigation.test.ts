@@ -8,7 +8,7 @@ describe('entreesNavigation — section NAVIGATION du tiroir', () => {
     '%s voit « Sites » et « Mes vols » entre « Équipes » et « Référentiels »',
     (role) => {
       const entrees = entreesNavigation(role, aller);
-      expect(entrees.map((e) => e.cle)).toEqual(['equipes', 'sites', 'vols', 'referentiels']);
+      expect(entrees.map((e) => e.cle)).toEqual(['equipes', 'sites', 'vols', 'stock', 'referentiels']);
     }
   );
 
@@ -20,7 +20,7 @@ describe('entreesNavigation — section NAVIGATION du tiroir', () => {
   );
 
   it('l’admin voit « Mes vols » mais pas « Sites »', () => {
-    expect(entreesNavigation('admin', aller).map((e) => e.cle)).toEqual(['equipes', 'vols', 'referentiels']);
+    expect(entreesNavigation('admin', aller).map((e) => e.cle)).toEqual(['equipes', 'vols', 'stock', 'referentiels']);
   });
 
   it('« Sites » ouvre l’écran des sites, pas l’ancienne liste des équipes aériennes', () => {
@@ -29,6 +29,11 @@ describe('entreesNavigation — section NAVIGATION du tiroir', () => {
     sites?.onPress();
 
     expect(aller).toHaveBeenCalledWith('/(app)/sites');
+  });
+
+  it('« Stock » ouvre le stock de pesticides', () => {
+    entreesNavigation('chef_de_base', aller).find((e) => e.cle === 'stock')?.onPress();
+    expect(aller).toHaveBeenCalledWith('/(app)/stock');
   });
 
   it('« Mes vols » ouvre la liste des vols', () => {

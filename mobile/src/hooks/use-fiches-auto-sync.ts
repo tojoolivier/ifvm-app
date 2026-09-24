@@ -8,6 +8,7 @@ import { listUnsyncedTraitements } from '@/lib/traitement-repository';
 import { syncAllTraitements } from '@/lib/traitement-sync';
 import { runTask } from '@/lib/run-task';
 import { synchroniserSitesAeriens } from '@/lib/site-aerien-sync';
+import { synchroniserStock } from '@/lib/stock-sync';
 
 interface ConnectivityTransition {
   /** `null` = pas encore observé (démarrage de l'app). */
@@ -94,6 +95,12 @@ export async function checkAndSyncFiches(
       // Sites aériens saisis sur le terrain (#643) : autre domaine, autre file — même retour du réseau.
       await runTask(() => synchroniserSitesAeriens(token).then(() => undefined), {
         name: 'sync.auto.sites-aeriens',
+        criticality: 'best-effort',
+      });
+
+      // Stock de pesticides (#645) : après les sites, dont ses mouvements dépendent.
+      await runTask(() => synchroniserStock(token).then(() => undefined), {
+        name: 'sync.auto.stock',
         criticality: 'best-effort',
       });
     },

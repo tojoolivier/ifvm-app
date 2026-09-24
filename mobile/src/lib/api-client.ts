@@ -1237,6 +1237,37 @@ export const apiClient = {
     );
   },
 
+  /**
+   * Mouvement de stock de pesticide (#606, #645) — idempotent par `id` client (#639) : rejouer après
+   * une coupure ne double pas le mouvement. Ici : approvisionnement et transfert (la consommation est
+   * générée par le serveur, #609).
+   */
+  createMouvementPesticide: async (
+    token: string,
+    body: components['schemas']['MouvementPesticideCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['MouvementPesticideRead']> => {
+    return makeRequest<components['schemas']['MouvementPesticideRead']>(
+      cheminDuContrat('/mouvements-pesticide'),
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Solde par (site, produit, unité) — jamais sommé entre unités (#606). */
+  getSoldesPesticide: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['SoldePesticideRead'][]> => {
+    return makeRequest<components['schemas']['SoldePesticideRead'][]>(
+      cheminDuContrat('/stock-pesticide/solde'),
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
   /** Rattache un vol d'application à son traitement (#610) — seul champ modifiable d'un vol. */
   updateVol: async (
     token: string,

@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { getDb } from './prospection-db';
 import { ReferentialError } from './errors';
+import { STOCK_DDL } from './stock-schema';
 import { VOL_DDL, migrerColonnesVol } from './vol-schema';
 
 /**
@@ -566,6 +567,8 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     );
 
     ${VOL_DDL}
+
+    ${STOCK_DDL}
 
     CREATE TABLE IF NOT EXISTS aeronef (
       id TEXT PRIMARY KEY NOT NULL,

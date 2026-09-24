@@ -41,6 +41,11 @@ jest.mock('@/lib/site-aerien-sync', () => ({
   synchroniserSitesAeriens: (...args: unknown[]) => synchroniserSitesAeriens(...args),
 }));
 
+const synchroniserStock = jest.fn();
+jest.mock('@/lib/stock-sync', () => ({
+  synchroniserStock: (...args: unknown[]) => synchroniserStock(...args),
+}));
+
 function enLigne() {
   getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
 }
@@ -55,6 +60,7 @@ beforeEach(() => {
   listUnsyncedTraitements.mockReset().mockResolvedValue([]);
   syncAllTraitements.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   synchroniserSitesAeriens.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
+  synchroniserStock.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   resetLoggerForTests();
 });
 
@@ -86,6 +92,22 @@ describe('checkAndSyncFiches — sites aériens (#643)', () => {
     expect(syncAllProspections).toHaveBeenCalled();
     expect(syncAllTraitements).toHaveBeenCalled();
     expect(apres).toBe(true);
+  });
+});
+
+describe('checkAndSyncFiches — stock de pesticides (#645)', () => {
+  it('envoie les mouvements de stock quand la connectivité revient', async () => {
+    enLigne();
+    await checkAndSyncFiches('tok', false);
+    expect(synchroniserStock).toHaveBeenCalledWith('tok');
+  });
+
+  it('une panne côté stock n’empêche pas les traitements', async () => {
+    enLigne();
+    listUnsyncedTraitements.mockResolvedValue([UN_TRAITEMENT]);
+    synchroniserStock.mockRejectedValue(new Error('réseau'));
+    await checkAndSyncFiches('tok', false);
+    expect(syncAllTraitements).toHaveBeenCalled();
   });
 });
 
