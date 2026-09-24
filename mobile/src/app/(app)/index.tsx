@@ -265,7 +265,7 @@ export default function DashboardScreen() {
     <View style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
             <View style={styles.headerContent}>
               <View style={styles.logoWrap}>
