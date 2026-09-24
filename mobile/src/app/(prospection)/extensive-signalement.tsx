@@ -11,12 +11,11 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { logger } from '@/lib/logger';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
 const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
 
 /** Signalement = un rapport externe (citoyen, agent local, autorité) qui déclenche cette prospection de vérification.
  * Il n'existe pas encore de liste de signalements côté serveur (cf. ADR-006) : saisie manuelle en attendant. */
@@ -34,7 +33,8 @@ export default function ExtensiveSignalementScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const canContinue = source.trim().length > 0 && description.trim().length > 0;
 
@@ -186,19 +186,19 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   scroll: { flex: 1 },
-  hint: { fontSize: typeSizes.hint, lineHeight: 16, color: TEXT_SECONDARY, marginBottom: 14 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 10 },
-  label: { fontSize: typeSizes.label, fontWeight: '600', color: '#9a9484', textTransform: 'uppercase', marginBottom: 4 },
-  input: { fontSize: typeSizes.input, fontWeight: '600', color: TEXT, padding: 0 },
+  hint: { fontSize: typeSizes.hint, lineHeight: 16, color: theme.muted, marginBottom: 14 },
+  card: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 11, marginBottom: 10 },
+  label: { fontSize: typeSizes.label, fontWeight: '600', color: theme.faint, textTransform: 'uppercase', marginBottom: 4 },
+  input: { fontSize: typeSizes.input, fontWeight: '600', color: theme.text, padding: 0 },
   dateFieldBox: { minHeight: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
   multiline: { minHeight: 60, textAlignVertical: 'top' },
   footer: { padding: 16 },

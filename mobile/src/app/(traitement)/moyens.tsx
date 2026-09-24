@@ -16,6 +16,8 @@ import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const KIT_ROWS: { key: 'kit_combinaison' | 'kit_gants' | 'kit_lunettes' | 'kit_masques' | 'kit_botte'; label: string }[] = [
   { key: 'kit_combinaison', label: 'Combinaison' },
@@ -103,7 +105,8 @@ export default function MoyensScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('moyens');
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   useEffect(() => {
     if (!traitementId) return;
@@ -521,7 +524,7 @@ export default function MoyensScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp },
     keyboardAvoidingView: { flex: 1 },
@@ -575,7 +578,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       fontFamily: traitementFonts.ui,
       fontSize: typeSizes.corps,
       color: traitementColors.texteTitre,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
     error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },
     continueButton: {

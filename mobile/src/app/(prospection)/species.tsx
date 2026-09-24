@@ -15,14 +15,10 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
-const INACTIVE_BG = '#f1ede1';
-const INACTIVE_TEXT = '#9a9484';
 
 export default function SpeciesScreen() {
   const router = useRouter();
@@ -40,7 +36,8 @@ export default function SpeciesScreen() {
   const signalerChargement = useSignalerChargement('species');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   // Reconstruit le store si l'app a été relancée directement sur cet écran
   // (même garde-fou que les autres écrans du parcours).
@@ -194,32 +191,32 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   progressRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 18, paddingBottom: 14 },
-  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: '#dcd5c2' },
+  progressBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: theme.chipBg },
   progressActive: { backgroundColor: GREEN },
   content: { flex: 1, paddingHorizontal: 16 },
-  hint: { fontSize: typeSizes.hint, lineHeight: 17, color: TEXT_SECONDARY, marginBottom: 14 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 13, padding: 14, marginBottom: 12 },
+  hint: { fontSize: typeSizes.hint, lineHeight: 17, color: theme.muted, marginBottom: 14 },
+  card: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 13, padding: 14, marginBottom: 12 },
   cardActive: { borderWidth: 2, borderColor: GREEN },
   // Nom scientifique en italique réel (fontStyle, pas des caractères Unicode) —
   // convention de nomenclature (Locusta migratoria capito / Nomadacris
   // septemfasciata), uniquement décoratif : n'affecte ni la valeur enregistrée
   // (`prospection.especes`, cf. prospection-especes.ts) ni aucune autre règle.
-  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', fontStyle: 'italic', color: TEXT },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', fontStyle: 'italic', color: theme.text },
   toggleRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  toggle: { flex: 1, borderRadius: 9, padding: 11, alignItems: 'center', backgroundColor: INACTIVE_BG },
+  toggle: { flex: 1, borderRadius: 9, padding: 11, alignItems: 'center', backgroundColor: theme.inputBg },
   toggleActive: { backgroundColor: GREEN },
-  toggleText: { fontWeight: '700', fontSize: typeSizes.toggleText, color: INACTIVE_TEXT },
+  toggleText: { fontWeight: '700', fontSize: typeSizes.toggleText, color: theme.faint },
   toggleTextActive: { color: '#fff' },
-  stepsHint: { marginTop: 4, backgroundColor: '#eaf2ec', borderRadius: 11, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stepsHint: { marginTop: 4, backgroundColor: theme.successBg, borderRadius: 11, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   stepsHintIcon: { fontSize: typeSizes.stepsHintIcon },
   stepsHintText: { flex: 1, fontSize: typeSizes.stepsHintText, lineHeight: 16, color: GREEN },
   stepsHintStrong: { fontWeight: '700' },

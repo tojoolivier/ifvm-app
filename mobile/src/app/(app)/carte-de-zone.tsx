@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_BG_LIGHT = '#F0F2F5';
@@ -13,7 +15,8 @@ export default function CarteDeZoneScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -42,7 +45,7 @@ const BASE_TYPE_SIZES = {
   sub: 13,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: {
       flex: 1,
@@ -65,7 +68,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     title: {
       fontSize: typeSizes.title,
       fontWeight: '700',
-      color: '#1A1A1A',
+      color: theme.text,
     },
     content: {
       flex: 1,
@@ -80,7 +83,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     message: {
       fontSize: typeSizes.message,
       fontWeight: '600',
-      color: '#1A1A1A',
+      color: theme.text,
       marginBottom: 8,
       textAlign: 'center',
     },

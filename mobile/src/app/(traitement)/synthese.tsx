@@ -11,6 +11,8 @@ import { logger } from '@/lib/logger';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 function display(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return 'non renseigné';
@@ -126,7 +128,8 @@ export default function SyntheseScreen() {
   const { run, isRunning: isSaving } = useAsyncAction();
   const signalerChargement = useSignalerChargement('synthese');
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   useEffect(() => {
     if (!traitementId) return;
@@ -355,7 +358,7 @@ export default function SyntheseScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp },
     keyboardAvoidingView: { flex: 1 },
@@ -395,7 +398,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       fontFamily: traitementFonts.ui,
       fontSize: typeSizes.corps,
       color: traitementColors.texteTitre,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
     error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },
     continueButton: {

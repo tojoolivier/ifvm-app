@@ -7,7 +7,7 @@ import {
   TabListProps,
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 
 import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
@@ -16,6 +16,7 @@ import { ThemedView } from './themed-view';
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuthStore } from '@/lib/auth-store';
 import { UserRole } from '@/lib/api-client';
+import { useThemeStore } from '@/lib/theme-store';
 
 const ROLE_TABS: Record<UserRole, string[]> = {
   prospecteur: ['/', 'prospection', 'sync', 'profile'],
@@ -72,8 +73,8 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
 }
 
 export function CustomTabList(props: TabListProps) {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const mode = useThemeStore((state) => state.mode);
+  const colors = Colors[mode];
 
   return (
     <View {...props} style={styles.tabListContainer}>

@@ -14,6 +14,8 @@ import { EtatVide } from '@/components/erreurs/etat-vide';
 import { FICHES_BG, FICHES_GREEN_DARK, FICHES_TEXT_SECONDARY, PROSPECTION_SUBTYPE_BADGE_CONFIG, STATUT_BADGE_CONFIG } from '@/components/fiches/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 /**
  * #dossier-brouillons : « dossier » dédié aux fiches de prospection encore en
@@ -46,7 +48,8 @@ export default function BrouillonsScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const [drafts, setDrafts] = useState<DraftProspection[]>([]);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
@@ -164,10 +167,10 @@ const BASE_TYPE_SIZES = {
   deleteActionText: 13,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: FICHES_BG },
-    header: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+    header: { backgroundColor: theme.card, borderBottomWidth: 1, borderBottomColor: theme.border },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 },
     back: { fontSize: typeSizes.back, fontWeight: '700', color: FICHES_TEXT_SECONDARY },
     title: { fontSize: typeSizes.title, fontWeight: '700', color: FICHES_GREEN_DARK },

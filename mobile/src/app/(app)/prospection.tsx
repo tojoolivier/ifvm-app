@@ -25,6 +25,8 @@ import {
 import { statutFicheAffiche, StatutFicheAffiche } from '@/lib/prospection-statut';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] };
 
@@ -72,7 +74,8 @@ export default function ProspectionScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const { justSaved, syncWarning } = useLocalSearchParams<{ justSaved?: string; syncWarning?: string }>();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
@@ -441,9 +444,9 @@ const BASE_TYPE_SIZES = {
   btnNouvelleText: 15,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#F3F4F6' },
+    root: { flex: 1, backgroundColor: theme.inputBg },
     header: { backgroundColor: FICHES_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 22 },
     offlineRow: { paddingTop: 8 },
     offlineText: { color: '#FFD27A', fontSize: typeSizes.offlineText, fontWeight: '700' },
@@ -464,7 +467,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       marginBottom: 16,
     },
     bannerIcon: { fontSize: typeSizes.bannerIcon },
-    bannerText: { flex: 1, color: '#8A5A00', fontSize: typeSizes.bannerText },
+    bannerText: { flex: 1, color: theme.warn, fontSize: typeSizes.bannerText },
     bannerTextStrong: { fontWeight: '700' },
     bannerSyncButton: {
       backgroundColor: '#1D4ED8',
@@ -474,24 +477,24 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     bannerSyncButtonText: { color: '#FFFFFF', fontSize: typeSizes.bannerSyncButtonText, fontWeight: '700' },
     toast: {
-      backgroundColor: '#DCFCE7',
+      backgroundColor: theme.successBg,
       borderRadius: 10,
       padding: 12,
       marginBottom: 12,
     },
-    toastText: { color: '#15803d', fontSize: typeSizes.toastText, fontWeight: '600', textAlign: 'center' },
-    toastError: { backgroundColor: '#FEE2E2' },
-    toastTextError: { color: '#DC2626' },
+    toastText: { color: theme.success, fontSize: typeSizes.toastText, fontWeight: '600', textAlign: 'center' },
+    toastError: { backgroundColor: theme.dangerBg },
+    toastTextError: { color: theme.danger },
     draftCard: {
-      backgroundColor: '#DCFCE7',
+      backgroundColor: theme.successBg,
       borderRadius: 10,
       padding: 14,
       marginBottom: 16,
     },
-    draftLabel: { color: '#15803d', fontSize: typeSizes.draftLabel, fontWeight: '700', marginBottom: 4 },
-    draftTitle: { color: '#111827', fontSize: typeSizes.draftTitle, fontWeight: '600' },
+    draftLabel: { color: theme.success, fontSize: typeSizes.draftLabel, fontWeight: '700', marginBottom: 4 },
+    draftTitle: { color: theme.text, fontSize: typeSizes.draftTitle, fontWeight: '600' },
     list: { gap: 8, marginBottom: 20 },
-    emptyText: { color: '#6B7280', fontSize: typeSizes.emptyText, textAlign: 'center', paddingVertical: 24 },
+    emptyText: { color: theme.muted, fontSize: typeSizes.emptyText, textAlign: 'center', paddingVertical: 24 },
     deleteAction: {
       backgroundColor: '#DC2626',
       justifyContent: 'center',
@@ -501,13 +504,13 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       marginLeft: 8,
     },
     deleteActionText: { color: '#FFFFFF', fontSize: typeSizes.deleteActionText, fontWeight: '700' },
-    errorText: { color: '#dc2626', fontSize: typeSizes.errorText, marginBottom: 12, textAlign: 'center' },
+    errorText: { color: theme.danger, fontSize: typeSizes.errorText, marginBottom: 12, textAlign: 'center' },
     footer: {
-      backgroundColor: '#F3F4F6',
+      backgroundColor: theme.inputBg,
       paddingHorizontal: 16,
       paddingTop: 10,
       borderTopWidth: 1,
-      borderTopColor: '#E5E7EB',
+      borderTopColor: theme.border,
     },
     btnNouvelle: {
       backgroundColor: FICHES_ORANGE,
