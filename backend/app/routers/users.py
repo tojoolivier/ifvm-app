@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user, hash_password
 from app.database import get_db
 from app.infrastructure.referentiel_model import PosteAcridienModel
+from app.infrastructure.soft_delete import INCLURE_SUPPRIMES
 from app.infrastructure.utilisateur_repository import construire_utilisateur_a_la_volee
 from app.models.users import ROLES_A_LA_VOLEE, Utilisateur
 from app.schemas.users import (
@@ -112,6 +113,8 @@ async def list_users(
         select(Utilisateur, PosteAcridienModel.code, PosteAcridienModel.nom)
         .outerjoin(PosteAcridienModel, Utilisateur.pa_id == PosteAcridienModel.id)
         .order_by(Utilisateur.nom)
+        # L'affectation d'un agent est de l'historique : elle survit à la suppression du poste.
+        .execution_options(**INCLURE_SUPPRIMES)
     )
     result = await db.execute(stmt)
     return [

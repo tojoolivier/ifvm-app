@@ -46,7 +46,7 @@ class ZoneAntiAcridienModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text(), nullable=False)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
@@ -61,7 +61,7 @@ class PosteAcridienModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text(), nullable=False)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     za_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("zone_anti_acridien.id"), nullable=False
@@ -136,7 +136,7 @@ class StationFixeModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text(), nullable=False)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     pa_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("poste_acridien.id"), nullable=False
@@ -224,7 +224,12 @@ class AeronefModel(Base):
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
 
     __table_args__ = (
-        UniqueConstraint("immatriculation", name="uq_aeronef_immatriculation"),
+        Index(
+            "uq_aeronef_immatriculation",
+            "immatriculation",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
         CheckConstraint("volume_cuve_l > 0", name="ck_aeronef_volume_cuve_positif"),
     )
 
@@ -351,13 +356,13 @@ class EquipeAeronefModel(Base):
             "uq_equipe_aeronef_ouverte_par_equipe",
             "equipe_id",
             unique=True,
-            postgresql_where=text("date_fin IS NULL"),
+            postgresql_where=text("date_fin IS NULL AND deleted_at IS NULL"),
         ),
         Index(
             "uq_equipe_aeronef_ouverte_par_aeronef",
             "aeronef_id",
             unique=True,
-            postgresql_where=text("date_fin IS NULL"),
+            postgresql_where=text("date_fin IS NULL AND deleted_at IS NULL"),
         ),
         Index("ix_equipe_aeronef_aeronef_id", "aeronef_id"),
     )
@@ -451,7 +456,7 @@ class SiteAerienneModel(Base):
     equipe_type: Mapped[str | None] = mapped_column(
         Text(), _equipe_type_genere("equipe_id", "aerien"), nullable=True
     )
-    numero: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    numero: Mapped[str] = mapped_column(Text(), nullable=False)
     localite: Mapped[str] = mapped_column(Text(), nullable=False)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
@@ -466,7 +471,12 @@ class SiteAerienneModel(Base):
             name="fk_site_aerienne_equipe_id",
             ondelete="RESTRICT",
         ),
-        UniqueConstraint("equipe_id", name="uq_site_aerienne_equipe_id"),
+        Index(
+            "uq_site_aerienne_equipe_id",
+            "equipe_id",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
         CheckConstraint(
             "(parent_site_id IS NULL AND equipe_id IS NOT NULL) OR "
             "(parent_site_id IS NOT NULL AND equipe_id IS NULL)",
@@ -517,7 +527,7 @@ class PesticideModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text(), nullable=False)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     matiere_active: Mapped[str | None] = mapped_column(Text(), nullable=True)
     dose_reference: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -703,7 +713,7 @@ class CultureModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(Text(), nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(Text(), nullable=False)
     nom: Mapped[str] = mapped_column(Text(), nullable=False)
     actif: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
@@ -759,5 +769,20 @@ class CodeStadeModel(Base):
             "espece",
             unique=True,
             postgresql_nulls_not_distinct=True,
+            postgresql_where=text("deleted_at IS NULL"),
         ),
     )
+
+
+# Unicité « parmi les lignes vivantes » (#674) : un code supprimé redevient disponible.
+# Index partiels plutôt que `unique=True`, qui garderait la ligne supprimée dans la contrainte.
+_VIVANTE = text("deleted_at IS NULL")
+for _modele, _colonne, _nom in (
+    (ZoneAntiAcridienModel, "code", "uq_zone_anti_acridien_code"),
+    (PosteAcridienModel, "code", "uq_poste_acridien_code"),
+    (StationFixeModel, "code", "uq_station_fixe_code"),
+    (PesticideModel, "code", "uq_pesticide_code"),
+    (CultureModel, "code", "uq_culture_code"),
+    (SiteAerienneModel, "numero", "uq_site_aerienne_numero"),
+):
+    Index(_nom, getattr(_modele, _colonne), unique=True, postgresql_where=_VIVANTE)

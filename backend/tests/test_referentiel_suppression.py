@@ -110,3 +110,49 @@ async def test_supprimer_une_zone_sans_poste(client, admin_headers, db_session, 
     assert (await client.delete(f"{chemin}/{zone.id}", headers=admin_headers)).status_code == 204
     upserts = await _upserts(client, admin_headers, entite, avant)
     assert next(z for z in upserts if z["id"] == str(zone.id))["deleted_at"] is not None
+
+
+async def test_le_code_dun_poste_supprime_est_reutilisable(
+    client, admin_headers, poste_acridien, zone_anti_acridien
+):
+    """Unicité limitée aux lignes vivantes (index partiel `WHERE deleted_at IS NULL`)."""
+    code = poste_acridien.code
+    await client.delete(f"/postes-acridiens/{poste_acridien.id}", headers=admin_headers)
+
+    reponse = await client.post(
+        "/postes-acridiens",
+        headers=admin_headers,
+        json={"code": code, "nom": "Recréé", "za_id": str(zone_anti_acridien.id)},
+    )
+
+    assert reponse.status_code == 201, reponse.text
+
+
+async def test_un_code_vivant_reste_unique(
+    client, admin_headers, poste_acridien, zone_anti_acridien
+):
+    reponse = await client.post(
+        "/postes-acridiens",
+        headers=admin_headers,
+        json={
+            "code": poste_acridien.code,
+            "nom": "Doublon",
+            "za_id": str(zone_anti_acridien.id),
+        },
+    )
+
+    assert reponse.status_code == 409
+
+
+async def test_la_liste_des_utilisateurs_garde_le_poste_dun_agent_apres_suppression(
+    client, admin_headers, admin, db_session, poste_acridien
+):
+    """L'affectation d'un agent est de l'historique : la jointure ne doit pas la perdre."""
+    admin.pa_id = poste_acridien.id
+    await db_session.commit()
+    await client.delete(f"/postes-acridiens/{poste_acridien.id}", headers=admin_headers)
+
+    reponse = await client.get("/users/", headers=admin_headers)
+
+    ligne = next(u for u in reponse.json() if u["id"] == str(admin.id))
+    assert ligne["pa_code"] == poste_acridien.code
