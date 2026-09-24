@@ -37,6 +37,8 @@ colors:
   bar-brouillon: "#bdb6a2"
   bar-verifiee: "#5b83b5"
   bar-fond: "#f1ecdd"
+  badge-blue-solid: "#4777a2"
+  badge-gray-solid: "#737373"
 typography:
   h1:
     fontFamily: Archivo, sans-serif
@@ -167,6 +169,16 @@ components:
   status-badge-verifiee:
     backgroundColor: "{colors.blue-bg}"
     textColor: "{colors.blue-text}"
+    rounded: "{rounded.full}"
+  vol-badge-prospection:
+    backgroundColor: "{colors.badge-blue-solid}"
+    textColor: "{colors.surface}"
+    typography: "{typography.badge}"
+    rounded: "{rounded.full}"
+  vol-badge-neutre:
+    backgroundColor: "{colors.badge-gray-solid}"
+    textColor: "{colors.surface}"
+    typography: "{typography.badge}"
     rounded: "{rounded.full}"
   error-banner:
     backgroundColor: "{colors.danger-bg}"
@@ -309,6 +321,11 @@ Chaque famille sémantique porte un trio **fond / texte / bordure** et ne s'empl
 
 `amber` (`#e89b2b`) et `danger` (`#c0412b`) pleins sont réservés aux pastilles et aux points de
 signalement, jamais à un fond de bloc.
+
+Les badges de catégorie de vol du mobile (« Mes vols », maquette M/Badge) sont **pleins**, texte blanc :
+vert `#235a36` (application), ambre `#8a6d2f` (convoyage), bleu `badge-blue-solid` `#4777a2`
+(prospection) et gris `badge-gray-solid` `#737373` (mise en place, divers). Comme `amber` et `danger`
+pleins, ils ne servent qu'aux pastilles, jamais à un fond de bloc.
 
 ### Graphiques
 

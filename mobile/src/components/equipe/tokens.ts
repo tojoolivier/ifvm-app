@@ -23,7 +23,7 @@ export const EQ = {
   surVertClair: 'rgba(255,255,255,0.16)',
   voile: 'rgba(22,32,26,0.45)',
   danger: '#C0412B',
-  /** Badges de catégorie de vol (Figma « M/Badge » : Gris plein, Bleu plein). */
-  gris: '#7C7C7C',
+  /** Badges de catégorie de vol (Figma « M/Badge » : Gris plein, Bleu plein) — DESIGN.md : badge-gray-solid, badge-blue-solid. */
+  gris: '#737373',
   bleu: '#4777A2',
 } as const;
