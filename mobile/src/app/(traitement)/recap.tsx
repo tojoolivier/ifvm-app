@@ -676,6 +676,7 @@ export default function RecapScreen() {
             <Card>
               <Text style={styles.sectionTitle}>Moyens & produits (Terrestre)</Text>
               <RecapLigne label="Atomiseur à dos (ha)" value={display(draft.terrestre.surface_atomiseur_ha)} />
+              <RecapLigne label="Atomiseur autoporté (ha)" value={display(draft.terrestre.surface_atomiseur_autoporte_ha)} />
               <RecapLigne label="Disque rotatif (ha)" value={display(draft.terrestre.surface_disque_rotatif_ha)} />
               {draft.mode_traitement === 'BARRIERE' ? (
                 <RecapLigne label="Surface protégée (ha)" value={display(draft.terrestre.surface_protegee_ha)} />
