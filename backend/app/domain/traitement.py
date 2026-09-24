@@ -330,6 +330,10 @@ class TraitementAerien:
     # « reste en stock » dérivé des deux.
     pesticide_recu_l: float | None = None
     pesticide_stock_restant_l: float | None = None
+    # Surface restante abandonnée ? (migration 0086) — mirroir de TraitementTerrestre :
+    # None = pas encore tranché, motif obligatoire à la validation si True (CDG §9).
+    surface_restante_abandonnee: bool | None = None
+    motif_surface_restante_abandonnee: str | None = None
     # Efficacité (fiche CRT papier, section "Traitement") : taux de mortalité
     # observé, quelques heures après le traitement — une seule évaluation par
     # fiche (après l'ensemble des rotations), pas par rotation individuelle,
@@ -399,9 +403,15 @@ class TraitementAerien:
         directement : reste utilisable lors d'une synchronisation où les rotations
         existantes ne sont pas rechargées (elles ne font pas partie du corps du push).
         """
-        self.pesticide_stock_restant_l = _stock_pesticide_restant(
-            self.pesticide_recu_l, self.total_pesticide_l
+        # « Approvisionnement » est saisi dans l'unité du produit (L pour un liquide,
+        # kg pour une poudre) : une fiche n'utilise en pratique qu'une seule des deux,
+        # on déduit donc la consommation dans l'unité réellement employée.
+        consomme = (
+            self.total_pesticide_kg
+            if self.total_pesticide_l == 0 and self.total_pesticide_kg > 0
+            else self.total_pesticide_l
         )
+        self.pesticide_stock_restant_l = _stock_pesticide_restant(self.pesticide_recu_l, consomme)
 
 
 @dataclass
@@ -704,10 +714,11 @@ class Traitement:
                 + ", ".join(manquants)
             )
 
+        specifique = self.terrestre if self.type_traitement == "TERRESTRE" else self.aerien
         if (
-            self.type_traitement == "TERRESTRE"
-            and self.terrestre.surface_restante_abandonnee
-            and not self.terrestre.motif_surface_restante_abandonnee
+            specifique is not None
+            and specifique.surface_restante_abandonnee
+            and not specifique.motif_surface_restante_abandonnee
         ):
             raise MotifAbandonManquantError(
                 "motif_surface_restante_abandonnee est obligatoire lorsque "
@@ -812,6 +823,8 @@ _CHAMPS_CONTENU_AERIEN = (
     # (sous-ressource distincte, absente du payload de synchronisation), au même
     # titre que nb_rotations/total_pesticide_l/total_pesticide_kg déjà exclus.
     "pesticide_recu_l",
+    "surface_restante_abandonnee",
+    "motif_surface_restante_abandonnee",
     "taux_mortalite_pourcent",
     "evaluation_efficacite_heures_apres",
     "methode_evaluation_efficacite",

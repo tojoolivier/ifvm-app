@@ -198,15 +198,60 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
     expect(screen.getByText('210')).toBeVisible();
   });
 
-  /** #moyens-humains-materiels : communs à l'Aérien et au Terrestre — cf. le
-   * même test côté Terrestre (recap-screen-terrestre.test.tsx). */
-  it('affiche les sous-sections Humains et Matériels de Moyens & protection', async () => {
+  /** Les Matériels (atomiseur, essence…) ont été retirés du flux Aérien : la sous-section
+   * Humains reste, Matériels n'apparaît plus (elle reste visible côté Terrestre, cf.
+   * recap-screen-terrestre.test.tsx). */
+  it('affiche la sous-section Humains mais plus Matériels dans Moyens & protection', async () => {
     await render(<RecapScreen />);
 
     await screen.findByText('Humains');
-    expect(screen.getByText('Matériels')).toBeVisible();
+    expect(screen.queryByText('Matériels')).toBeNull();
     expect(screen.getByText('12')).toBeVisible(); // Nb agents permanents
-    expect(screen.getByText('55')).toBeVisible(); // Essence (litres)
-    expect(screen.getByText('33')).toBeVisible(); // Nombre de piles
+    expect(screen.queryByText('Essence (litres)')).toBeNull();
+    expect(screen.queryByText('Nombre de piles')).toBeNull();
+  });
+
+  it('regroupe Pesticides & rotations en sous-sections et affiche la décision sur la surface restante', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_AERIEN,
+      aerien: {
+        ...DRAFT_AERIEN.aerien,
+        surface_restante_abandonnee: true,
+        motif_surface_restante_abandonnee: 'Zone inaccessible',
+      },
+    });
+    await render(<RecapScreen />);
+
+    await screen.findAllByText('Rotations');
+    for (const titre of ['Totaux', 'Surfaces', 'Stock', 'Efficacité', 'Végétation']) {
+      expect(screen.getAllByText(titre).length).toBeGreaterThanOrEqual(1);
+    }
+    expect(screen.getByText('Surface restante abandonnée')).toBeVisible();
+    expect(screen.getByText('Zone inaccessible')).toBeVisible();
+  });
+
+  it("libelle Approvisionnement et Reste en stock en kg pour une poudre", async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_AERIEN,
+      aerien: {
+        ...DRAFT_AERIEN.aerien,
+        rotations: [
+          { id: 'r1', produit_id: 'p1', quantite: 30, unite: 'kg', surface_ha: 10, nom_commercial: 'Green Muscle' },
+        ],
+      },
+    });
+    await render(<RecapScreen />);
+
+    expect(await screen.findByText('Approvisionnement (kg)')).toBeVisible();
+    expect(screen.getByText('Reste en stock (kg)')).toBeVisible();
+    expect(screen.getByText('Rotation 1 — Green Muscle')).toBeVisible();
+    expect(screen.getByText('30 kg · 10 ha')).toBeVisible();
+  });
+
+  it("n'affiche plus l'étape Surface traitée dans la liste de contrôle", async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('Humains');
+    expect(screen.queryByText('Surface traitée')).toBeNull();
   });
 });
