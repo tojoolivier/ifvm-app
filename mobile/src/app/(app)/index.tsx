@@ -292,7 +292,7 @@ export default function DashboardScreen() {
                 accessibilityLabel="Ouvrir le menu"
                 testID="dashboard-menu-button"
               >
-                <AppIcon name="menu" size={24} color={TEXT_DARK} />
+                <AppIcon name="menu" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
@@ -601,8 +601,8 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     badgeOffline: {
       backgroundColor: '#FDF6E7',
       paddingHorizontal: 16,
-      paddingVertical: 6,
-      borderRadius: 14,
+      height: 24,
+      borderRadius: 12,
       justifyContent: 'center',
     },
     badgeOfflineText: {
@@ -635,7 +635,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       width: 36,
       height: 36,
       borderRadius: 11,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: 'rgba(0,0,0,0.22)',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -665,22 +665,23 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     badgeAvailable: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 14,
+      backgroundColor: 'rgba(0,0,0,0.22)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      height: 24,
+      borderRadius: 12,
     },
     badgeDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
-      backgroundColor: IFVM_GREEN_LIGHT,
-      marginRight: 6,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#FFFFFF',
+      marginRight: 7,
     },
     badgeAvailableText: {
       color: '#FFFFFF',
       fontSize: typeSizes.badgeAvailableText,
-      fontWeight: '600',
+      fontWeight: '700',
     },
     scrollContent: {
       padding: 16,

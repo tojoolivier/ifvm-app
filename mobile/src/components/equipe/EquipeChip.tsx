@@ -16,10 +16,10 @@ interface Props {
 export function EquipeChip({ equipe, onChanger }: Props) {
   if (!equipe) {
     return (
-      <View style={styles.chip} testID="equipe-chip-vide">
+      <View style={[styles.chip, styles.chipVide]} testID="equipe-chip-vide">
         <View style={styles.texte}>
-          <ThemedText style={styles.etiquette}>AUCUNE ÉQUIPE ACTIVE</ThemedText>
-          <ThemedText style={styles.aide}>Choisissez ou créez votre équipe</ThemedText>
+          <ThemedText style={[styles.etiquette, styles.etiquetteVide]}>AUCUNE ÉQUIPE ACTIVE</ThemedText>
+          <ThemedText style={[styles.aide, styles.aideVide]}>Choisissez ou créez votre équipe</ThemedText>
         </View>
         <TouchableOpacity style={styles.definir} onPress={onChanger} accessibilityRole="button">
           <ThemedText style={styles.definirTexte}>Définir l’équipe</ThemedText>
@@ -61,11 +61,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
+  chipVide: {
+    backgroundColor: EQ.ambreFond,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: EQ.ambre,
+  },
+  etiquetteVide: { color: EQ.ambre, opacity: 1 },
+  aideVide: { color: EQ.ambre },
   texte: { flex: 1, gap: 2 },
   etiquette: { fontSize: 9, fontWeight: '500', opacity: 0.75, color: EQ.surMarque },
   nom: { fontSize: 12, fontWeight: '600', color: EQ.surMarque },
   aide: { fontSize: 10.5, color: EQ.surMarque },
   changer: { fontSize: 9, fontWeight: '700', color: EQ.surMarque },
-  definir: { backgroundColor: EQ.surMarque, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8 },
-  definirTexte: { fontSize: 9, fontWeight: '700', color: EQ.vert },
+  definir: { backgroundColor: EQ.ambre, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8 },
+  definirTexte: { fontSize: 9, fontWeight: '700', color: EQ.surMarque },
 });

@@ -74,7 +74,7 @@ export function MenuDrawer({ visible, onFermer, nom, email, role, navigation, co
                 accessibilityLabel="Fermer le menu"
                 testID="menu-fermer"
               >
-                <AppIcon name="fermer" size={24} color={EQ.vert} />
+                <AppIcon name="fermer" size={24} color={EQ.surMarque} />
               </TouchableOpacity>
             </View>
 
@@ -113,7 +113,8 @@ const styles = StyleSheet.create({
   racine: { flex: 1, flexDirection: 'row' },
   voile: { flex: 1, backgroundColor: 'rgba(22,32,26,0.45)' },
   panneau: {
-    width: 252,
+    width: '82%',
+    maxWidth: 360,
     backgroundColor: EQ.fond,
     borderTopRightRadius: 22,
     borderBottomRightRadius: 22,
@@ -145,7 +146,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 9,
-    backgroundColor: EQ.surMarque,
+    backgroundColor: 'rgba(0,0,0,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },
