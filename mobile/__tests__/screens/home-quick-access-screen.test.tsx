@@ -88,7 +88,7 @@ describe('DashboardScreen — Accès rapide', () => {
 
     expect(screen.getByText('Équipes aériennes')).toBeTruthy();
     expect(screen.queryByText('Fiche de vol')).toBeNull();
-    expect(screen.queryByText('Prospections à revalider')).toBeNull();
+    expect(screen.queryByText('Revalidation')).toBeNull();
   });
 
   it('« Équipes aériennes » n\'apparaît pas pour un rôle hors chef de base / équipe aérienne', async () => {
