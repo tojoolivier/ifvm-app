@@ -971,11 +971,22 @@ export async function updateProspectionEspeces(id: string, especes: string): Pro
  * question de recréer un brouillon comme dans le cas normal (`createDraftProspection`,
  * où `modeExtensif` est fixé une fois pour toutes à la création).
  */
-export async function setProspectionModeExtensif(id: string, modeExtensif: string): Promise<DraftProspection> {
+export async function setProspectionModeExtensif(
+  id: string,
+  modeExtensif: string,
+  equipeId: string | null
+): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
 
-  await db.runAsync('UPDATE prospection SET mode_extensif = ?, updated_at = ? WHERE id = ?', [modeExtensif, now, id]);
+  // L'équipe est reprise avec le mode : le brouillon a été créé avant que le mode soit connu, donc
+  // avant que le type de l'équipe puisse être contrôlé (#641).
+  await db.runAsync('UPDATE prospection SET mode_extensif = ?, equipe_id = ?, updated_at = ? WHERE id = ?', [
+    modeExtensif,
+    equipeId,
+    now,
+    id,
+  ]);
 
   const updated = await getProspection(id);
   if (!updated) throw new Error('Échec de la mise à jour de la fiche brouillon locale');

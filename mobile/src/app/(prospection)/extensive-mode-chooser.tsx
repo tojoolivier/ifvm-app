@@ -3,6 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
+import { peutCreerEquipe } from '@/lib/equipe-aerienne-access';
+import { EquipeSheet } from '@/components/equipe/EquipeSheet';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { setProspectionModeExtensif } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -40,6 +43,21 @@ export default function ExtensiveModeChooserScreen() {
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const { run, isRunning: isCreating } = useAsyncAction();
   const [mode, setMode] = useState<ModeExtensif | null>(null);
+  const [equipeSheetVisible, setEquipeSheetVisible] = useState(false);
+  const { equipes, courante, choisir } = useEquipesDeTravail();
+
+  // Même principe que le menu « Nouvelle fiche » : un mode incompatible avec l'équipe de travail
+  // n'est pas une erreur, c'est une invitation à changer d'équipe. Valable aussi pour une validation,
+  // dont le brouillon reprend l'équipe courante au moment où son mode est fixé.
+  const motifPour = (voulu: ModeExtensif): string | null => {
+    if (!courante || courante.type === voulu) return null;
+    const attendue = voulu === 'aerien' ? 'aérienne' : 'terrestre';
+    return `Demande une équipe ${attendue} — « ${courante.nom} » est ${courante.type === 'aerien' ? 'aérienne' : 'terrestre'}. Touchez pour changer d'équipe.`;
+  };
+  const choisirMode = (voulu: ModeExtensif) => {
+    if (motifPour(voulu)) setEquipeSheetVisible(true);
+    else setMode(voulu);
+  };
 
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
@@ -50,7 +68,7 @@ export default function ExtensiveModeChooserScreen() {
     run(
       async () => {
         const draft = existingDraftId
-          ? await setProspectionModeExtensif(existingDraftId, mode!)
+          ? await setProspectionModeExtensif(existingDraftId, mode!, courante?.id ?? null)
           : await startNewProspection({
               token: token!,
               prospecteurId: user!.id,
@@ -84,21 +102,21 @@ export default function ExtensiveModeChooserScreen() {
           <Text style={styles.hint}>Choisissez comment cette prospection a été réalisée.</Text>
 
           <TouchableOpacity
-            style={[styles.card, mode === 'terrestre' && styles.cardActiveGreen]}
-            onPress={() => setMode('terrestre')}
+            style={[styles.card, mode === 'terrestre' && styles.cardActiveGreen, motifPour('terrestre') && styles.cardIndisponible]}
+            onPress={() => choisirMode('terrestre')}
             activeOpacity={0.85}
           >
             <Text style={styles.cardTitle}>Prospection Terrestre</Text>
-            <Text style={styles.cardSubtitle}>Prospection réalisée au sol.</Text>
+            <Text style={styles.cardSubtitle}>{motifPour('terrestre') ?? 'Prospection réalisée au sol.'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.card, mode === 'aerien' && styles.cardActiveBlue]}
-            onPress={() => setMode('aerien')}
+            style={[styles.card, mode === 'aerien' && styles.cardActiveBlue, motifPour('aerien') && styles.cardIndisponible]}
+            onPress={() => choisirMode('aerien')}
             activeOpacity={0.85}
           >
             <Text style={styles.cardTitle}>Prospection Aérienne</Text>
-            <Text style={styles.cardSubtitle}>Prospection réalisée à partir d&apos;un aéronef.</Text>
+            <Text style={styles.cardSubtitle}>{motifPour('aerien') ?? "Prospection réalisée à partir d'un aéronef."}</Text>
           </TouchableOpacity>
         </View>
 
@@ -113,6 +131,23 @@ export default function ExtensiveModeChooserScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      <EquipeSheet
+        visible={equipeSheetVisible}
+        equipes={equipes}
+        equipeId={courante?.id ?? null}
+        peutCreer={peutCreerEquipe(user?.role)}
+        onFermer={() => setEquipeSheetVisible(false)}
+        onConfirmer={(id) => {
+          void choisir(id);
+          setEquipeSheetVisible(false);
+          setMode(null);
+        }}
+        onCreer={() => {
+          setEquipeSheetVisible(false);
+          router.push('/(app)/equipe-nouvelle' as any);
+        }}
+      />
     </View>
   );
 }
@@ -143,6 +178,7 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: Them
   card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.inputBorder },
   cardActiveGreen: { borderColor: GREEN, borderWidth: 2, backgroundColor: theme.successBg },
   cardActiveBlue: { borderColor: BLUE, borderWidth: 2, backgroundColor: '#eaf0f7' },
+  cardIndisponible: { opacity: 0.55 },
   cardIcon: { fontSize: typeSizes.cardIcon, marginBottom: 4 },
   cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '800', color: theme.text },
   cardSubtitle: { fontSize: typeSizes.cardSubtitle, lineHeight: 16, color: theme.muted, marginTop: 4 },

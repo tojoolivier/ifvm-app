@@ -381,16 +381,22 @@ describe('startNewProspection — équipe de travail (#641)', () => {
     expect(mockCreateDraft).toHaveBeenCalledWith(expect.objectContaining({ equipeId: null }));
   });
 
-  it.each(['intensive', 'validation'] as const)(
-    'bloque une prospection %s avec une équipe aérienne, en renvoyant vers Paramètres',
-    async (typeProspection) => {
-      useEquipeTravailStore.setState({ equipeId: 'eq-air' });
-      mockGetEquipeLocale.mockResolvedValue({ id: 'eq-air', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+  it('bloque une prospection intensive avec une équipe aérienne, en renvoyant vers Paramètres', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-air' });
+    mockGetEquipeLocale.mockResolvedValue({ id: 'eq-air', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
 
-      await expect(startNewProspection({ ...PARAMS, typeProspection })).rejects.toThrow(/Paramètres/);
-      expect(mockCreateDraft).not.toHaveBeenCalled();
-    }
-  );
+    await expect(startNewProspection({ ...PARAMS, typeProspection: 'intensive' })).rejects.toThrow(/Paramètres/);
+    expect(mockCreateDraft).not.toHaveBeenCalled();
+  });
+
+  it('crée un brouillon de validation avec l’équipe courante, quel que soit son type : le mode est choisi ensuite', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-air' });
+    mockGetEquipeLocale.mockResolvedValue({ id: 'eq-air', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+
+    await startNewProspection({ ...PARAMS, typeProspection: 'validation' });
+
+    expect(mockCreateDraft).toHaveBeenCalledWith(expect.objectContaining({ equipeId: 'eq-air' }));
+  });
 
   it('autorise une extensive aérienne avec une équipe aérienne', async () => {
     useEquipeTravailStore.setState({ equipeId: 'eq-air' });

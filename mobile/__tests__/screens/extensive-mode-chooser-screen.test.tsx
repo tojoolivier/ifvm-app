@@ -78,7 +78,7 @@ describe('ExtensiveModeChooserScreen', () => {
     fireEvent.press(screen.getByText('Continuer'));
 
     await waitFor(() =>
-      expect(prospectionRepository.setProspectionModeExtensif).toHaveBeenCalledWith('draft-validation-1', 'aerien')
+      expect(prospectionRepository.setProspectionModeExtensif).toHaveBeenCalledWith('draft-validation-1', 'aerien', null)
     );
     expect(startNewProspection).not.toHaveBeenCalled();
     await waitFor(() =>

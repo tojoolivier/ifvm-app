@@ -28,6 +28,9 @@ colors:
   danger-border: "#f0c4b9"
   blue-text: "#31567f"
   blue-bg: "#eaf0f7"
+  blue-sheet-bg: "#eaf1f7"
+  violet: "#6d3fc4"
+  violet-bg: "#f1edfb"
   blue-border: "#cdddef"
   green-bg: "#eaf2ec"
   green-border: "#cfe0d4"
@@ -170,6 +173,17 @@ components:
     backgroundColor: "{colors.blue-bg}"
     textColor: "{colors.blue-text}"
     rounded: "{rounded.full}"
+  nouvelle-fiche-icone-prospection:
+    backgroundColor: "{colors.green-bg}"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.header}"
+  nouvelle-fiche-icone-traitement:
+    backgroundColor: "{colors.violet-bg}"
+    textColor: "{colors.violet}"
+    rounded: "{rounded.header}"
+  nouvelle-fiche-icone-vol:
+    backgroundColor: "{colors.blue-sheet-bg}"
+    rounded: "{rounded.header}"
   vol-badge-prospection:
     backgroundColor: "{colors.badge-blue-solid}"
     textColor: "{colors.surface}"

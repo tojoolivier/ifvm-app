@@ -1,6 +1,7 @@
 import { apiClient, Campagne, ProspectionRead } from './api-client';
 import { generateId } from './id';
 import { STATUT_VALIDE } from './prospection-fiche-lecture';
+import { useEquipeTravailStore } from './equipe-travail-store';
 import { equipeDeTravailPour } from './equipe-travail';
 import { listCampagnesLocal, getStationById } from './referentiel-db';
 import {
@@ -436,13 +437,17 @@ export async function startNewProspection(params: {
   const agentConnecte = useAuthStore.getState().user;
   const prospecteurNom = agentConnecte ? `${agentConnecte.prenom} ${agentConnecte.nom}` : null;
 
-  // #641 : équipe de travail reprise automatiquement. Une intensive ou une validation est
-  // toujours terrestre ; seule une extensive en mode aérien se mène avec une équipe aérienne.
-  const equipeId = await equipeDeTravailPour(
-    (params.typeProspection ?? 'intensive') === 'extensive' && params.modeExtensif === 'aerien'
-      ? 'aerien'
-      : 'terrestre'
-  );
+  // #641 : équipe de travail reprise automatiquement. Une intensive est toujours terrestre ; une
+  // extensive se mène avec une équipe du type de son mode. Une validation, elle, choisit son mode
+  // APRÈS la création du brouillon (extensive-mode-chooser) : on reprend l'équipe courante sans
+  // contrôler son type, que l'écran de choix du mode vérifiera — et confirmera — ensuite.
+  const typeProspection = params.typeProspection ?? 'intensive';
+  const equipeId =
+    typeProspection === 'validation'
+      ? useEquipeTravailStore.getState().equipeId
+      : await equipeDeTravailPour(
+          typeProspection === 'extensive' && params.modeExtensif === 'aerien' ? 'aerien' : 'terrestre'
+        );
 
   const draft = await createDraftProspection({
     id: generateId(),

@@ -26,4 +26,10 @@ export const EQ = {
   /** Badges de catégorie de vol (Figma « M/Badge » : Gris plein, Bleu plein) — DESIGN.md : badge-gray-solid, badge-blue-solid. */
   gris: '#737373',
   bleu: '#4777A2',
+  /** Pastilles d'icône de la feuille « Nouvelle fiche » (Figma : status-violet-bg, status-blue-bg) — DESIGN.md : violet, violet-bg, blue-sheet-bg. */
+  violet: '#6D3FC4',
+  violetDoux: '#F1EDFB',
+  bleuDoux: '#EAF1F7',
+  /** Poignée de la feuille (Figma : border-strong). */
+  bordureForte: '#C9C0A6',
 } as const;

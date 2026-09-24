@@ -33,6 +33,8 @@ import {
 } from '@/components/fiches/tokens';
 import { statutFicheAffiche } from '@/lib/prospection-statut';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
+import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { useTheme } from '@/hooks/use-theme';
@@ -89,6 +91,8 @@ interface FicheRow {
   insigneBadge?: BadgeStyle | null;
   statutBadge: BadgeStyle;
   date: string;
+  /** Équipe de travail de la saisie (#641) — `null` : « Non renseignée », jamais masquée par le filtre d'équipe. */
+  equipeId: string | null;
   onPress: () => void;
   /**
    * Non-null seulement pour une fiche encore « à synchro »/« échec envoi » —
@@ -110,6 +114,10 @@ export default function FichesScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
+  // L'équipe de travail est le contexte : par défaut la liste n'en montre que les fiches (#678).
+  const { courante } = useEquipesDeTravail();
+  const [toutesEquipes, setToutesEquipes] = useState(false);
+  const filtreEquipe = courante && !toutesEquipes ? courante : null;
   const [draftsRecent, setDraftsRecent] = useState<DraftProspection[]>([]);
   const [validated, setValidated] = useState<ProspectionRead[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
@@ -301,6 +309,7 @@ export default function FichesScreen() {
           subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[draft.type_prospection] ?? null,
           statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
           date: draft.date_prospection,
+          equipeId: draft.equipe_id,
           onPress: () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
           onSyncPress: estEncoreASynchroniser(cleBadge) ? () => handleSyncProspection(draft) : null,
         };
@@ -317,6 +326,7 @@ export default function FichesScreen() {
       subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[prospection.type_prospection] ?? null,
       statutBadge: STATUT_BADGE_CONFIG[statutFicheAffiche(prospection.statut, 'synced')],
       date: prospection.date_prospection,
+      equipeId: prospection.equipe_id ?? null,
       onPress: () => navigateToProspectionConsult(router, prospection),
       onSyncPress: null,
     }));
@@ -333,6 +343,7 @@ export default function FichesScreen() {
         insigneBadge: reprenableIds.has(traitement.id) ? TRAITEMENT_INSIGNE_REPRISE : null,
         statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
         date: traitement.date_traitement ?? traitement.updated_at,
+        equipeId: traitement.equipe_id,
         onPress: () =>
           navigateToTraitement(router, traitement, { validationView: traitement.statut === 'validee' }),
         onSyncPress: estEncoreASynchroniser(cleBadge) ? () => handleSyncTraitement(traitement) : null,
@@ -349,9 +360,10 @@ export default function FichesScreen() {
         row.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
         row.meta.toLowerCase().includes(searchQuery.toLowerCase());
       const matchType = filterKey === 'TOUS' || row.filterKey === filterKey;
-      return matchSearch && matchType;
+      const matchEquipe = !filtreEquipe || row.equipeId === null || row.equipeId === filtreEquipe.id;
+      return matchSearch && matchType && matchEquipe;
     });
-  }, [rows, searchQuery, filterKey]);
+  }, [rows, searchQuery, filterKey, filtreEquipe]);
 
   return (
     <View style={styles.root}>
@@ -378,6 +390,26 @@ export default function FichesScreen() {
         activeFilter={filterKey}
         onFilterChange={setFilterKey}
       />
+
+      {courante ? (
+        <View style={styles.equipeBar}>
+          <Text style={styles.equipeLabel} numberOfLines={1}>
+            Équipe · {courante.nom}
+          </Text>
+          <TouchableOpacity
+            testID="fiches-toutes-equipes"
+            onPress={() => setToutesEquipes((v) => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: toutesEquipes }}
+            style={[styles.equipeToggle, toutesEquipes && styles.equipeToggleActif]}
+          >
+            <Text style={[styles.equipeToggleTexte, toutesEquipes && styles.equipeToggleTexteActif]}>
+              Toutes les équipes
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <View style={styles.resultCountContainer}>
         <Text style={styles.resultCount}>
@@ -410,7 +442,11 @@ export default function FichesScreen() {
             erreur={erreurDeLecture}
             titreVide="Aucune fiche trouvée"
             sousTitreVide={
-              searchQuery ? 'Essayez de modifier votre recherche' : 'Créez votre première fiche'
+              searchQuery
+                ? 'Essayez de modifier votre recherche'
+                : filtreEquipe
+                  ? `Aucune fiche pour « ${filtreEquipe.nom} » — essayez « Toutes les équipes »`
+                  : 'Créez votre première fiche'
             }
             onReessayer={refresh}
           />
@@ -430,6 +466,7 @@ const BASE_TYPE_SIZES = {
   headerTitle: 18,
   headerSub: 12,
   resultCount: 13,
+  equipeLabel: 12,
   emptyIcon: 48,
   emptyTitle: 18,
   emptySub: 14,
@@ -440,6 +477,40 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     root: {
       flex: 1,
       backgroundColor: FICHES_BG,
+    },
+    equipeBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingBottom: 6,
+    },
+    equipeLabel: {
+      flex: 1,
+      fontSize: typeSizes.equipeLabel,
+      fontWeight: '700',
+      color: theme.muted,
+    },
+    equipeToggle: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: EQ.bordure,
+      backgroundColor: EQ.carte,
+      paddingVertical: 5,
+      paddingHorizontal: 12,
+    },
+    equipeToggleActif: {
+      borderColor: EQ.vert,
+      backgroundColor: EQ.vertDoux,
+    },
+    equipeToggleTexte: {
+      fontSize: typeSizes.equipeLabel,
+      fontWeight: '600',
+      color: EQ.attenue,
+    },
+    equipeToggleTexteActif: {
+      color: EQ.vert,
     },
     header: {
       backgroundColor: FICHES_GREEN_DARK,
