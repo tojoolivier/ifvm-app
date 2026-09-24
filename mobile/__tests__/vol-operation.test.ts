@@ -74,6 +74,40 @@ describe('enregistrerVolOperation', () => {
   });
 });
 
+describe('« Ce vol couvre aussi » sur une fiche qui a déjà un vol (#644)', () => {
+  const prospection = {
+    ...demande,
+    categorie: 'prospection' as const,
+    liens: [
+      { type: 'prospection' as const, refId: 'p-1' },
+      { type: 'prospection' as const, refId: 'p-2' },
+    ],
+  };
+
+  it('rattache la fiche au vol courant et supprime l’ancien vol local devenu orphelin', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce(null) // p-1 n'a pas de vol
+      .mockResolvedValueOnce({ vol_id: 'vol-autre', statut_sync: 'local' }); // p-2 en a un
+    getAllAsync.mockResolvedValueOnce([]); // plus aucun lien sur l'ancien vol
+
+    const id = await enregistrerVolOperation(prospection);
+
+    const sql = runAsync.mock.calls.map(([q]) => String(q));
+    expect(sql).toContain('DELETE FROM vol_lien WHERE vol_id = ? AND ref_id = ?');
+    expect(runAsync).toHaveBeenCalledWith('DELETE FROM vol WHERE id = ?', ['vol-autre']);
+    expect(runAsync).toHaveBeenCalledWith('INSERT INTO vol_lien (vol_id, type, ref_id) VALUES (?, ?, ?)', [id, 'prospection', 'p-2']);
+  });
+
+  it('refuse de reprendre une fiche dont le vol est déjà envoyé', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ vol_id: 'vol-autre', statut_sync: 'synced' });
+
+    await expect(enregistrerVolOperation(prospection)).rejects.toThrow('déjà envoyé');
+    expect(runAsync).not.toHaveBeenCalled();
+  });
+});
+
 describe('getVolDeOperation', () => {
   it('rend le vol lié à l’opération', async () => {
     getFirstAsync.mockResolvedValueOnce({ id: 'v1' });

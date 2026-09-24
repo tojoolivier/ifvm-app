@@ -43,7 +43,7 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
   const [aeronef, setAeronef] = useState<{ id: string; immatriculation: string } | null>(null);
   const [principal, setPrincipal] = useState<SiteAerienLocal | null>(null);
   const [dependants, setDependants] = useState<SiteAerienLocal[]>([]);
-  const [candidates, setCandidates] = useState<{ id: string; libelle: string }[]>([]);
+  const [candidates, setCandidates] = useState<{ id: string; libelle: string; aDejaUnVol: boolean }[]>([]);
   const [volId, setVolId] = useState<string | null>(null);
   const [envoye, setEnvoye] = useState(false);
 
@@ -58,14 +58,12 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
   useEffect(() => {
     if (!equipeId) return;
     (async () => {
-      const [e, aeronefs, sites, existant] = await Promise.all([
+      const [e, sites, existant] = await Promise.all([
         getEquipeLocale(equipeId),
-        listAeronefsEquipe(equipeId, aujourdhuiIso()),
         listSitesAeriensEquipe(equipeId),
         getVolDeOperation(type, ficheId),
       ]);
       setEquipe(e ? { nom: e.nom, type: e.type } : null);
-      setAeronef(aeronefs[0] ?? null);
       const site = sites.find((s) => s.parent_site_id === null) ?? null;
       setPrincipal(site);
       setDependants(sites.filter((s) => site && s.parent_site_id === site.id));
@@ -80,16 +78,29 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
       }
       if (categorie === 'prospection') {
         const autres = await listProspectionsAeriennesDuJour(equipeId, dateParDefaut ?? aujourdhuiIso(), ficheId);
-        const libres = [];
+        const libres: { id: string; libelle: string; aDejaUnVol: boolean }[] = [];
         for (const autre of autres) {
-          if (!(await getVolDeOperation('prospection', autre.id))) {
-            libres.push({ id: autre.id, libelle: autre.n_fiche ? `Fiche ${autre.n_fiche}` : 'Autre prospection du jour' });
-          }
+          const vol = await getVolDeOperation('prospection', autre.id);
+          // Un vol déjà envoyé au serveur ne se défait pas : la fiche n'est plus proposée.
+          if (vol?.statut_sync === 'synced') continue;
+          libres.push({
+            id: autre.id,
+            libelle: autre.n_fiche ? `Fiche ${autre.n_fiche}` : 'Autre prospection du jour',
+            aDejaUnVol: !!vol,
+          });
         }
         setCandidates(libres);
       }
     })().catch((error) => signalerChargement(error, { source: 'bloc-vol' }));
   }, [equipeId, ficheId, type, categorie, dateParDefaut, signalerChargement]);
+
+  // L'aéronef de l'équipe dépend de la date du vol : l'affectation doit couvrir ce jour-là (comme le serveur).
+  useEffect(() => {
+    if (!equipeId) return;
+    listAeronefsEquipe(equipeId, date)
+      .then((aeronefs) => setAeronef(aeronefs[0] ?? null))
+      .catch((error) => signalerChargement(error, { source: 'bloc-vol.aeronef' }));
+  }, [equipeId, date, signalerChargement]);
 
   const enregistrer = () => {
     const saisie = {
@@ -212,7 +223,7 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
                 coche={!!aussi[c.id]}
                 onChange={(coche) => !inactif && setAussi({ ...aussi, [c.id]: coche })}
                 libelle={c.libelle}
-                detail="Même vol, même jour"
+                detail={c.aDejaUnVol ? "Reprend le vol déjà saisi pour cette fiche" : "Même vol, même jour"}
               />
             ))}
           </View>

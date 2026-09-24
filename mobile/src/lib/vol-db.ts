@@ -198,6 +198,22 @@ export async function enregistrerVolOperation(demande: VolOperationDemande): Pro
     throw new PreconditionError('Ce vol est déjà envoyé au serveur : il ne peut plus être modifié ici.');
   }
 
+  // Une fiche « couverte aussi » peut avoir déjà son propre vol local : elle rejoint celui-ci. Un vol
+  // déjà envoyé au serveur ne se défait pas.
+  const reprises: { refId: string; volId: string }[] = [];
+  for (const lien of demande.liens.slice(1)) {
+    const autre = await db.getFirstAsync<{ vol_id: string; statut_sync: StatutSyncVol }>(
+      `SELECT vol_lien.vol_id, vol.statut_sync FROM vol_lien JOIN vol ON vol.id = vol_lien.vol_id
+       WHERE vol_lien.ref_id = ?`,
+      [lien.refId]
+    );
+    if (!autre || autre.vol_id === existant?.id) continue;
+    if (autre.statut_sync === 'synced') {
+      throw new PreconditionError('Une des fiches cochées a un vol déjà envoyé au serveur : décochez-la.');
+    }
+    reprises.push({ refId: lien.refId, volId: autre.vol_id });
+  }
+
   const id = existant?.id ?? generateId();
   const origine: OrigineVol = demande.categorie === 'application' ? 'traitement' : 'prospection';
   const champs = [
@@ -229,6 +245,11 @@ export async function enregistrerVolOperation(demande: VolOperationDemande): Pro
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?)`,
         [id, demande.categorie, origine, ...champs, new Date().toISOString()]
       );
+    }
+    for (const { refId, volId } of reprises) {
+      await db.runAsync('DELETE FROM vol_lien WHERE vol_id = ? AND ref_id = ?', [volId, refId]);
+      const restants = await db.getAllAsync('SELECT 1 FROM vol_lien WHERE vol_id = ?', [volId]);
+      if (restants.length === 0) await db.runAsync('DELETE FROM vol WHERE id = ?', [volId]);
     }
     for (const lien of demande.liens) {
       await db.runAsync('INSERT INTO vol_lien (vol_id, type, ref_id) VALUES (?, ?, ?)', [id, lien.type, lien.refId]);

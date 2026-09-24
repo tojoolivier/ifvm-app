@@ -5,6 +5,7 @@ import {
   creerSiteSecondaire,
   creerSitesGroupes,
   deplacerSites,
+  marquerDeplacementEnEchec,
   listPositionsSite,
 } from '../src/lib/site-aerien-db';
 import type { SiteSaisi } from '../src/lib/site-aerien-regles';
@@ -342,5 +343,23 @@ describe('listPositionsSite', () => {
     expect(sql).toContain('FROM site_aerien_position');
     expect(sql).toMatch(/ORDER BY date_debut DESC/);
     expect(params).toEqual(['pr-1']);
+  });
+});
+
+describe('marquerDeplacementEnEchec (#644)', () => {
+  it('marque aussi en échec le vol de mise en place du déplacement, pour « Mes vols »', async () => {
+    getFirstAsync.mockResolvedValueOnce({ vol_json: JSON.stringify({ id: 'vol-1' }) });
+
+    await marquerDeplacementEnEchec('dep-1');
+
+    expect(ecritures("UPDATE vol SET statut_sync = 'echec'")).toEqual([['vol-1']]);
+  });
+
+  it('sans vol de mise en place, ne touche que le déplacement', async () => {
+    getFirstAsync.mockResolvedValueOnce({ vol_json: null });
+
+    await marquerDeplacementEnEchec('dep-1');
+
+    expect(ecritures("UPDATE vol SET statut_sync = 'echec'")).toEqual([]);
   });
 });

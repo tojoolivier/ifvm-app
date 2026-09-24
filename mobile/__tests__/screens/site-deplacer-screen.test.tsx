@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import SiteDeplacerScreen from '@/app/(app)/site-deplacer';
 import { useAuthStore } from '@/lib/auth-store';
 import { listAeronefsEquipe } from '@/lib/equipe-db';
+import { getEquipeLocale } from '@/lib/referentiel-db';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
 import { getCurrentPosition } from '@/lib/location';
 import { deplacerSites, listSitesAeriensEquipe } from '@/lib/site-aerien-db';
@@ -15,6 +16,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 jest.mock('@/lib/equipe-db', () => ({ aujourdhuiIso: () => '2026-09-24', listAeronefsEquipe: jest.fn() }));
+jest.mock('@/lib/referentiel-db', () => ({ getEquipeLocale: jest.fn() }));
 jest.mock('@/lib/site-aerien-db', () => ({ deplacerSites: jest.fn(), listSitesAeriensEquipe: jest.fn() }));
 jest.mock('@/lib/site-aerien-envoi', () => ({ envoyerSitesSiEnLigne: jest.fn() }));
 jest.mock('@/lib/location', () => ({ getCurrentPosition: jest.fn() }));
@@ -49,6 +51,7 @@ beforeEach(() => {
   mockParams = { siteId: 'pr-1' };
   useAuthStore.setState({ token: 'tok', user: { id: 'u-1', role: 'chef_de_base' } } as any);
   useEquipeTravailStore.setState({ equipeId: 'eq-sud' });
+  jest.mocked(getEquipeLocale).mockResolvedValue({ id: 'eq-sud', nom: 'Équipe Sud', type: 'aerien' } as any);
   jest.mocked(listAeronefsEquipe).mockResolvedValue([{ id: 'ae-1', immatriculation: 'EMA-1', societe: 'Cessna' }]);
   jest.mocked(listSitesAeriensEquipe).mockResolvedValue([
     site({}),
@@ -200,6 +203,21 @@ describe('SiteDeplacerScreen — vol de mise en place', () => {
     await fireEvent.press(screen.getByTestId('deplacement-confirmer'));
 
     expect(screen.getByText('• Ce site n’a aucun stand : impossible de saisir un vol de mise en place.')).toBeVisible();
+    expect(deplacerSites).not.toHaveBeenCalled();
+  });
+
+  it('une équipe de travail terrestre refuse le vol de mise en place (#644)', async () => {
+    jest.mocked(getEquipeLocale).mockResolvedValue({ id: 'eq-sud', nom: 'Équipe Nord', type: 'terrestre' } as any);
+    await render(<SiteDeplacerScreen />);
+    await capturer();
+    await saisirHeures('07:30', '08:45');
+    await choisirStand();
+
+    await fireEvent.press(screen.getByTestId('deplacement-confirmer'));
+
+    expect(
+      screen.getByText('• Un vol se mène avec une équipe aérienne : changez d’équipe de travail dans Paramètres.')
+    ).toBeVisible();
     expect(deplacerSites).not.toHaveBeenCalled();
   });
 

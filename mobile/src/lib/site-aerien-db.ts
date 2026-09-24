@@ -171,7 +171,17 @@ export async function marquerDeplacementSynchronise(deplacementId: string): Prom
 
 export async function marquerDeplacementEnEchec(deplacementId: string): Promise<void> {
   const db = await getReferentielDb();
-  await db.runAsync("UPDATE site_aerien_deplacement SET statut_sync = 'echec' WHERE id = ?", [deplacementId]);
+  const ligne = await db.getFirstAsync<{ vol_json: string | null }>(
+    'SELECT vol_json FROM site_aerien_deplacement WHERE id = ?',
+    [deplacementId]
+  );
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("UPDATE site_aerien_deplacement SET statut_sync = 'echec' WHERE id = ?", [deplacementId]);
+    // Le vol de mise en place voyage avec le déplacement : « Mes vols » doit dire qu'il est refusé aussi.
+    if (ligne?.vol_json) {
+      await db.runAsync("UPDATE vol SET statut_sync = 'echec' WHERE id = ?", [JSON.parse(ligne.vol_json).id]);
+    }
+  });
 }
 
 // ==========================================================================

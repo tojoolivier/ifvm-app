@@ -48,13 +48,18 @@ export default function VolNouveauScreen() {
 
   useEffect(() => {
     if (!equipeId) return;
-    Promise.all([getEquipeLocale(equipeId), listAeronefsEquipe(equipeId, aujourdhuiIso())])
-      .then(([e, aeronefs]) => {
-        setEquipe(e ? { nom: e.nom, type: e.type } : null);
-        setAeronef(aeronefs[0] ?? null);
-      })
+    getEquipeLocale(equipeId)
+      .then((e) => setEquipe(e ? { nom: e.nom, type: e.type } : null))
       .catch((error) => signalerChargement(error, { source: 'vol-nouveau' }));
   }, [equipeId, signalerChargement]);
+
+  // L'aéronef dépend de la date du vol : l'affectation doit couvrir ce jour-là (comme le serveur).
+  useEffect(() => {
+    if (!equipeId) return;
+    listAeronefsEquipe(equipeId, date)
+      .then((aeronefs) => setAeronef(aeronefs[0] ?? null))
+      .catch((error) => signalerChargement(error, { source: 'vol-nouveau.aeronef' }));
+  }, [equipeId, date, signalerChargement]);
 
   const enregistrer = () => {
     const saisie = {
