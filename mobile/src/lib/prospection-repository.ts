@@ -762,6 +762,19 @@ const COLONNES_REVALIDATION_NON_CLONEES = new Set([
 ]);
 
 /**
+ * #revalidation-numero-bis : la fiche qui revalide une autre garde le numéro de la fiche
+ * revalidée, suffixé « -bis » — le suffixe signale d'un coup d'œil une fiche de revalidation.
+ * Une revalidation de revalidation ajoute un nouveau « -bis » (« F-1-bis-bis »), ce qui reste
+ * lisible et ne peut jamais entrer en collision avec le numéro de sa fiche d'origine.
+ * Numéro absent (`null`) : laissé tel quel, jamais un « null-bis ».
+ */
+export const SUFFIXE_NUMERO_REVALIDATION = '-bis';
+
+export function numeroDeRevalidation(numeroSource: string | null | undefined): string | null {
+  return numeroSource ? `${numeroSource}${SUFFIXE_NUMERO_REVALIDATION}` : null;
+}
+
+/**
  * « Prospections à revalider » (#revalidation-prospection) : amorce une
  * NOUVELLE fiche (nouvel id, `statut='brouillon'`/`statut_sync='local'`,
  * `revalide_de_id` pointant vers la source), pré-remplie avec TOUTES les
@@ -803,9 +816,12 @@ export async function demarrerRevalidation(sourceProspectionId: string): Promise
   const colonnesClonees = Object.keys(source).filter(
     (cle) => !COLONNES_REVALIDATION_NON_CLONEES.has(cle)
   );
-  const valeursClonees = colonnesClonees.map(
-    (cle) => (source as unknown as Record<string, string | number | null>)[cle]
-  );
+  const valeursClonees = colonnesClonees.map((cle) => {
+    const valeur = (source as unknown as Record<string, string | number | null>)[cle];
+    // #revalidation-numero-bis : « -bis » sur le numéro de la fiche (et son n° de message).
+    if (cle === 'n_fiche' || cle === 'n_message') return numeroDeRevalidation(valeur as string | null);
+    return valeur;
+  });
 
   await db.runAsync(
     `INSERT INTO prospection (
@@ -1515,23 +1531,29 @@ export async function deleteProspectionInfestation(prospectionId: string, typeCi
  * fiches ne doivent jamais partager le même numéro — c'est justement ce
  * numéro qui identifie la fiche pour un administrateur côté web.
  *
- * #revalidation-prospection fait exception à dessein : une fiche qui
- * revalide une fiche périmée reprend délibérément le même numéro
- * (`demarrerRevalidation` clone `n_fiche`/`n_message` tels quels) — ce n'est
- * pas un doublon accidentel, c'est le mécanisme même de la revalidation,
- * déjà toléré côté backend (`CreateProspection.execute` ne rejette jamais un
- * `n_fiche` déjà pris par la fiche que `revalide_de_id` désigne).
+ * #revalidation-prospection : une fiche qui revalide une fiche périmée reprend son
+ * numéro (`demarrerRevalidation`), désormais suffixé « -bis » (#revalidation-numero-bis) —
+ * la fiche revalidée reste tolérée ici comme avant, ainsi qu'un autre brouillon de la même
+ * revalidation (assistant abandonné puis relancé).
  */
 async function assurerNumeroFicheUnique(id: string, current: DraftProspection): Promise<void> {
   const numero = current.type_prospection === 'validation' ? current.n_message : current.n_fiche;
   if (!numero) return;
 
   const db = await getDb();
-  const doublon = await db.getFirstAsync<{ id: string }>(
-    `SELECT id FROM prospection WHERE id != ? AND n_fiche = ? LIMIT 1`,
+  const memeNumero = await db.getAllAsync<{ id: string; statut: string; revalide_de_id: string | null }>(
+    `SELECT id, statut, revalide_de_id FROM prospection WHERE id != ? AND n_fiche = ?`,
     [id, numero]
   );
-  if (doublon && doublon.id !== current.revalide_de_id) {
+  // #revalidation-numero-bis : ne comptent pas comme doublon (a) la fiche revalidée elle-même,
+  // (b) un AUTRE brouillon de la même revalidation — un assistant de revalidation abandonné puis
+  // relancé recrée un clone portant le même « -bis » (`demarrerRevalidation`).
+  const doublons = memeNumero.filter(
+    (autre) =>
+      autre.id !== current.revalide_de_id &&
+      !(current.revalide_de_id && autre.statut === 'brouillon' && autre.revalide_de_id === current.revalide_de_id)
+  );
+  if (doublons.length > 0) {
     throw new PreconditionError(
       `Le numéro « ${numero} » est déjà utilisé par une autre fiche — deux fiches ne peuvent pas partager le même numéro.`
     );

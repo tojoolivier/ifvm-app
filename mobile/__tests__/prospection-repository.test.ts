@@ -492,7 +492,7 @@ describe('demarrerRevalidation', () => {
     expect(sql).toContain("VALUES (?, 'brouillon', 'local'");
     expect(sql).toContain('revalide_de_id');
     expect(params).toEqual(
-      expect.arrayContaining([draftId, 'presp-perimee', 'Atsimo-Andrefana', 'F-001'])
+      expect.arrayContaining([draftId, 'presp-perimee', 'Atsimo-Andrefana', 'F-001-bis'])
     );
   });
 
@@ -537,8 +537,26 @@ describe('demarrerRevalidation', () => {
     expect(params).not.toContain(FICHE_PERIMEE.date_prospection);
     const aujourdHui = new Date().toISOString().slice(0, 10);
     expect(params).toContain(aujourdHui);
-    // Le numéro, lui, est bien conservé à l'identique (comportement inchangé).
-    expect(params).toContain('F-001');
+    // #revalidation-numero-bis : le numéro d'origine, suffixé « -bis » (jamais l'ancien tel quel).
+    expect(params).toContain('F-001-bis');
+    expect(params).not.toContain('F-001');
+  });
+
+  it('#revalidation-numero-bis : suffixe aussi n_message, laisse un numéro absent à null, cumule sur une revalidation de revalidation', async () => {
+    getFirstAsync.mockResolvedValueOnce({ ...FICHE_PERIMEE, n_fiche: 'F-001-bis', n_message: 'MSG-9' });
+    getAllAsync.mockResolvedValue([]);
+
+    await demarrerRevalidation('presp-perimee');
+
+    const [, params] = runAsync.mock.calls.find(([q]) => q.includes('INSERT INTO prospection'))!;
+    expect(params).toContain('F-001-bis-bis');
+    expect(params).toContain('MSG-9-bis');
+
+    runAsync.mockClear();
+    getFirstAsync.mockResolvedValueOnce({ ...FICHE_PERIMEE, n_fiche: null, n_message: null });
+    await demarrerRevalidation('presp-perimee');
+    const [, paramsSansNumero] = runAsync.mock.calls.find(([q]) => q.includes('INSERT INTO prospection'))!;
+    expect(paramsSansNumero.some((v: unknown) => typeof v === 'string' && v.includes('null-bis'))).toBe(false);
   });
 
   it('clone populations, infestations, captures et opérations aériennes vers le nouveau brouillon', async () => {
@@ -1077,8 +1095,8 @@ describe('completeProspection', () => {
     };
     getFirstAsync
       .mockResolvedValueOnce(ligne) // lecture initiale (current)
-      .mockResolvedValueOnce(null) // contrôle anti-doublon : aucun
       .mockResolvedValueOnce(ligne); // lecture finale (updated)
+    getAllAsync.mockResolvedValueOnce([]); // contrôle anti-doublon : aucun
 
     const resultat = await completeProspection(BASE_INPUT.id);
 
@@ -1102,9 +1120,8 @@ describe('completeProspection', () => {
   describe('#numeros-fiche-uniques : refus de clôturer un doublon', () => {
     it('refuse de clôturer si une autre fiche locale porte déjà ce n_fiche (Intensif/Extensif)', async () => {
       const ligne = { ...STORED_ROW, n_fiche: '20260711-ABCD', revalide_de_id: null };
-      getFirstAsync
-        .mockResolvedValueOnce(ligne) // lecture initiale (current)
-        .mockResolvedValueOnce({ id: 'autre-fiche-id' }); // contrôle anti-doublon : trouvé
+      getFirstAsync.mockResolvedValueOnce(ligne); // lecture initiale (current)
+      getAllAsync.mockResolvedValueOnce([{ id: 'autre-fiche-id', statut: 'en_attente', revalide_de_id: null }]); // contrôle anti-doublon : trouvé
 
       await expect(completeProspection(BASE_INPUT.id)).rejects.toThrow(
         'Le numéro « 20260711-ABCD » est déjà utilisé par une autre fiche'
@@ -1114,14 +1131,13 @@ describe('completeProspection', () => {
 
     it('vérifie n_message (pas n_fiche, pas encore posé) pour une fiche de Validation/Signalement', async () => {
       const ligne = { ...STORED_ROW, type_prospection: 'validation', n_fiche: null, n_message: 'MSG-001', revalide_de_id: null };
-      getFirstAsync
-        .mockResolvedValueOnce(ligne)
-        .mockResolvedValueOnce({ id: 'autre-fiche-id' });
+      getFirstAsync.mockResolvedValueOnce(ligne);
+      getAllAsync.mockResolvedValueOnce([{ id: 'autre-fiche-id', statut: 'en_attente', revalide_de_id: null }]);
 
       await expect(completeProspection(BASE_INPUT.id)).rejects.toThrow(
         'Le numéro « MSG-001 » est déjà utilisé par une autre fiche'
       );
-      expect(getFirstAsync).toHaveBeenCalledWith(
+      expect(getAllAsync).toHaveBeenCalledWith(
         expect.stringContaining('WHERE id != ? AND n_fiche = ?'),
         [BASE_INPUT.id, 'MSG-001']
       );
@@ -1136,11 +1152,29 @@ describe('completeProspection', () => {
       };
       getFirstAsync
         .mockResolvedValueOnce(ligne) // lecture initiale (current)
-        .mockResolvedValueOnce({ id: 'fiche-perimee-id' }) // contrôle anti-doublon : la source elle-même
         .mockResolvedValueOnce(ligne); // lecture finale (updated)
+      getAllAsync.mockResolvedValueOnce([{ id: 'fiche-perimee-id', statut: 'validee', revalide_de_id: null }]); // la source elle-même
 
       await expect(completeProspection(BASE_INPUT.id)).resolves.toBeTruthy();
       expect(runAsync).toHaveBeenCalled();
+    });
+
+    // #revalidation-numero-bis : un assistant de revalidation abandonné puis relancé laisse un
+    // autre brouillon clone portant le même « -bis » — pas un doublon.
+    it('#revalidation-numero-bis : tolère un AUTRE brouillon de la même revalidation, refuse un brouillon étranger', async () => {
+      const ligne = { ...STORED_ROW, n_fiche: 'F-001-bis', revalide_de_id: 'fiche-perimee-id' };
+      getFirstAsync.mockResolvedValueOnce(ligne).mockResolvedValueOnce(ligne);
+      getAllAsync.mockResolvedValueOnce([
+        { id: 'ancien-clone', statut: 'brouillon', revalide_de_id: 'fiche-perimee-id' },
+      ]);
+      await expect(completeProspection(BASE_INPUT.id)).resolves.toBeTruthy();
+
+      runAsync.mockClear();
+      getFirstAsync.mockResolvedValueOnce(ligne);
+      getAllAsync.mockResolvedValueOnce([
+        { id: 'autre-revalidation', statut: 'brouillon', revalide_de_id: 'une-autre-origine' },
+      ]);
+      await expect(completeProspection(BASE_INPUT.id)).rejects.toThrow('déjà utilisé par une autre fiche');
     });
 
     it("n'appelle aucun contrôle quand la fiche n'a encore aucun numéro (rien à vérifier)", async () => {
