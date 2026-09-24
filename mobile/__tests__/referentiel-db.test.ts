@@ -8,6 +8,8 @@ import {
   listCultures,
   listCodesStades,
   getStationById,
+  listEquipesDeUtilisateur,
+  getEquipeLocale,
 } from '../src/lib/referentiel-db';
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
@@ -281,5 +283,30 @@ describe('getStationById', () => {
     const result = await getStationById('station-inconnue');
 
     expect(result).toBeNull();
+  });
+});
+
+describe('équipes de travail', () => {
+  it('liste les équipes actives dont l’utilisateur est membre, avec leur effectif', async () => {
+    const lignes = [{ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 }];
+    await getReferentielDb(); // ouvre la base : les PRAGMA de migration consomment leurs propres réponses
+    getAllAsync.mockResolvedValueOnce(lignes);
+
+    const equipes = await listEquipesDeUtilisateur('u-1');
+
+    expect(equipes).toEqual(lignes);
+    const [sql, params] = getAllAsync.mock.calls[getAllAsync.mock.calls.length - 1];
+    expect(sql).toContain('FROM equipe');
+    expect(sql).toContain('actif = 1');
+    expect(sql).toContain('equipe_membre');
+    expect(params).toEqual(['u-1']);
+  });
+
+  it('résout une équipe par id, active ou non, et renvoie null si elle est inconnue', async () => {
+    getFirstAsync.mockResolvedValueOnce({ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+    expect(await getEquipeLocale('eq-1')).toEqual({ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+
+    getFirstAsync.mockResolvedValueOnce(null);
+    expect(await getEquipeLocale('inconnue')).toBeNull();
   });
 });

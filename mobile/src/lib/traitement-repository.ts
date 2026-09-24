@@ -30,6 +30,8 @@ function normalizeBoolean(value: unknown): boolean | null {
 export interface DraftTraitementRow {
   id: string;
   prospection_id: string;
+  /** Équipe d'origine (#641) ; `null` pour un brouillon antérieur — « Non renseignée ». */
+  equipe_id: string | null;
   numero_fiche: string | null;
   type_traitement: TypeTraitement;
   mode_traitement: string | null;
@@ -265,6 +267,8 @@ export interface EvaluationRisquePopulation {
 export interface DraftTraitementAerienInput {
   id: string;
   prospectionId: string;
+  /** Équipe de travail de l'agent à la création (#641) — reprise automatiquement par l'appelant. */
+  equipeId?: string | null;
   dateTraitement?: string | null;
   pilote: string;
   mecanicien: string;
@@ -279,6 +283,8 @@ export interface DraftTraitementAerienInput {
 export interface DraftTraitementTerrestreInput {
   id: string;
   prospectionId: string;
+  /** Équipe de travail de l'agent à la création (#641) — reprise automatiquement par l'appelant. */
+  equipeId?: string | null;
   dateTraitement?: string | null;
   chefEquipeId: string;
   agentEncadreur?: string | null;
@@ -363,10 +369,10 @@ export async function createDraftTraitementAerien(
 
   await db.runAsync(
     `INSERT INTO traitement (
-      id, prospection_id, type_traitement, date_traitement,
+      id, prospection_id, equipe_id, type_traitement, date_traitement,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, 'AERIEN', ?, 'brouillon', 'local', ?, ?)`,
-    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now]
+    ) VALUES (?, ?, ?, 'AERIEN', ?, 'brouillon', 'local', ?, ?)`,
+    [input.id, input.prospectionId, input.equipeId ?? null, input.dateTraitement ?? null, now, now]
   );
 
   await db.runAsync(
@@ -400,10 +406,10 @@ export async function createDraftTraitementTerrestre(
 
   await db.runAsync(
     `INSERT INTO traitement (
-      id, prospection_id, type_traitement, date_traitement,
+      id, prospection_id, equipe_id, type_traitement, date_traitement,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, 'TERRESTRE', ?, 'brouillon', 'local', ?, ?)`,
-    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now]
+    ) VALUES (?, ?, ?, 'TERRESTRE', ?, 'brouillon', 'local', ?, ?)`,
+    [input.id, input.prospectionId, input.equipeId ?? null, input.dateTraitement ?? null, now, now]
   );
 
   await db.runAsync(

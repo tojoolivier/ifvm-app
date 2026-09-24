@@ -1,6 +1,7 @@
 import { apiClient, Campagne, ProspectionRead } from './api-client';
 import { generateId } from './id';
 import { STATUT_VALIDE } from './prospection-fiche-lecture';
+import { equipeDeTravailPour } from './equipe-travail';
 import { listCampagnesLocal, getStationById } from './referentiel-db';
 import {
   createDraftProspection,
@@ -435,8 +436,17 @@ export async function startNewProspection(params: {
   const agentConnecte = useAuthStore.getState().user;
   const prospecteurNom = agentConnecte ? `${agentConnecte.prenom} ${agentConnecte.nom}` : null;
 
+  // #641 : équipe de travail reprise automatiquement. Une intensive ou une validation est
+  // toujours terrestre ; seule une extensive en mode aérien se mène avec une équipe aérienne.
+  const equipeId = await equipeDeTravailPour(
+    (params.typeProspection ?? 'intensive') === 'extensive' && params.modeExtensif === 'aerien'
+      ? 'aerien'
+      : 'terrestre'
+  );
+
   const draft = await createDraftProspection({
     id: generateId(),
+    equipeId,
     typeProspection: params.typeProspection ?? 'intensive',
     campagneId: selectedCampagneId,
     prospecteurId: params.prospecteurId,

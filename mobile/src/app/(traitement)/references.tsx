@@ -1,3 +1,4 @@
+import { equipeDeTravailPour } from '@/lib/equipe-travail';
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -244,10 +245,14 @@ export default function ReferencesScreen() {
 
         let id = traitementId;
         if (!id) {
+          // #641 : équipe de travail reprise automatiquement ; bloque un type d'équipe qui ne
+          // correspond pas au traitement (aérien / terrestre) en renvoyant vers Paramètres.
+          const equipeId = await equipeDeTravailPour(typeTraitement === 'AERIEN' ? 'aerien' : 'terrestre');
           const created =
             typeTraitement === 'AERIEN'
               ? await createDraftTraitementAerien({
                   id: generateId(),
+                  equipeId,
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
                   pilote: '',
@@ -256,6 +261,7 @@ export default function ReferencesScreen() {
                 })
               : await createDraftTraitementTerrestre({
                   id: generateId(),
+                  equipeId,
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
                   chefEquipeId: '',

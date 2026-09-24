@@ -30,6 +30,7 @@ import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { formatDirectionDeplacement } from './prospection-infestation-insights';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
+import { useEquipeTravailStore } from './equipe-travail-store';
 import { assertPresent, ReferentialError } from './errors';
 import { logger } from './logger';
 import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
@@ -525,9 +526,18 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     log.detail('station.ignoree_extensive', { prospectionId: draft.id, stationId });
   }
 
+  // #641 : l'équipe d'origine du brouillon prime ; un brouillon antérieur (« Non
+  // renseignée ») reste synchronisable avec l'équipe de travail courante.
+  const equipeId = draft.equipe_id ?? useEquipeTravailStore.getState().equipeId;
+  assertPresent(
+    equipeId,
+    'Aucune équipe de travail : choisissez-en une dans Paramètres avant de synchroniser cette fiche.'
+  );
+
   return {
     type_prospection: draft.type_prospection as ProspectionCreateInput['type_prospection'],
     campagne_id: draft.campagne_id,
+    equipe_id: equipeId,
     // 🔑 station_id = null pour extensive, la valeur pour intensive
     station_id: draft.type_prospection === 'extensive' ? null : stationId,
     n_fiche: draft.n_fiche || null,

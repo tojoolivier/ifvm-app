@@ -3,6 +3,8 @@ import {
   CampagneSync,
   CodeStadeSync,
   CultureSync,
+  EquipeMembreSync,
+  EquipeSync,
   LieuAerienSync,
   PesticideSync,
   PosteAcridienSync,
@@ -24,6 +26,8 @@ const ENTITY_TYPES: EntityType[] = [
   'codes_stades',
   'campagnes',
   'lieux_aeriens',
+  'equipes',
+  'equipe_membres',
 ];
 
 const TABLE_PAR_ENTITE: Record<EntityType, string> = {
@@ -35,6 +39,8 @@ const TABLE_PAR_ENTITE: Record<EntityType, string> = {
   codes_stades: 'code_stade',
   campagnes: 'campagne',
   lieux_aeriens: 'lieu_aerien',
+  equipes: 'equipe',
+  equipe_membres: 'equipe_membre',
 };
 
 /**
@@ -116,6 +122,37 @@ async function upsertStationsFixes(
         station.actif ? 1 : 0,
         station.updated_at,
       ]
+    );
+  }
+}
+
+async function upsertEquipes(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  upserts: EquipeSync[]
+): Promise<void> {
+  for (const equipe of upserts) {
+    await db.runAsync(
+      `INSERT INTO equipe (id, nom, type, actif, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         nom = excluded.nom, type = excluded.type,
+         actif = excluded.actif, updated_at = excluded.updated_at`,
+      [equipe.id, equipe.nom, equipe.type, equipe.actif ? 1 : 0, equipe.updated_at]
+    );
+  }
+}
+
+async function upsertEquipeMembres(
+  db: Awaited<ReturnType<typeof getReferentielDb>>,
+  upserts: EquipeMembreSync[]
+): Promise<void> {
+  for (const membre of upserts) {
+    await db.runAsync(
+      `INSERT INTO equipe_membre (equipe_id, user_id, fonction, nom, prenom)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(equipe_id, user_id) DO UPDATE SET
+         fonction = excluded.fonction, nom = excluded.nom, prenom = excluded.prenom`,
+      [membre.equipe_id, membre.user_id, membre.fonction, membre.nom ?? null, membre.prenom ?? null]
     );
   }
 }
@@ -298,6 +335,8 @@ export async function pullReferentiel(token: string, onUnauthorized?: () => void
   await upsertCodesStades(db, response.codes_stades.upserts);
   await upsertCampagnes(db, response.campagnes.upserts);
   await upsertLieuxAeriens(db, response.lieux_aeriens.upserts);
+  await upsertEquipes(db, response.equipes.upserts);
+  await upsertEquipeMembres(db, response.equipe_membres.upserts);
 
   for (const entityType of ENTITY_TYPES) {
     await updateSyncCursor(db, entityType, response[entityType].server_time);

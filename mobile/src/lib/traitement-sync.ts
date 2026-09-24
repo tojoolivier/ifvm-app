@@ -9,7 +9,8 @@ import {
   markTraitementSynced,
   ServerTraitement,
 } from './traitement-repository';
-import { PreconditionError } from './errors';
+import { useEquipeTravailStore } from './equipe-travail-store';
+import { assertPresent, PreconditionError } from './errors';
 import { logger } from './logger';
 import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
 
@@ -59,8 +60,17 @@ function especesArrayToDict(value: string | null | undefined): Record<string, bo
  * silencieux d'une version serveur plus récente.
  */
 function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas']['TraitementSyncPush'] {
+  // #641 : l'équipe d'origine de la fiche prime ; une fiche antérieure (« Non renseignée »)
+  // reste synchronisable avec l'équipe de travail courante.
+  const equipeId = draft.equipe_id ?? useEquipeTravailStore.getState().equipeId;
+  assertPresent(
+    equipeId,
+    'Aucune équipe de travail : choisissez-en une dans Paramètres avant de synchroniser cette fiche.'
+  );
+
   const common = {
     id: draft.id,
+    equipe_id: equipeId,
     base_updated_at: draft.server_updated_at ?? draft.created_at,
     prospection_id: draft.prospection_id,
     numero_fiche: draft.numero_fiche,

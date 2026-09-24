@@ -46,6 +46,8 @@ export interface DraftProspectionInput {
   /** Extensif uniquement — 'terrestre' | 'aerien' | null (terrestre implicite). Fixé
    * une fois à la création, jamais réécrit ensuite (cf. écran de choix du mode). */
   modeExtensif?: string | null;
+  /** Équipe de travail de l'agent à la création (#641) — reprise automatiquement par l'appelant. */
+  equipeId?: string | null;
 }
 
 export interface DraftProspection {
@@ -79,6 +81,8 @@ export interface DraftProspection {
   /** Extensif uniquement — 'terrestre' | 'aerien' | null (terrestre implicite,
    * fiche existante comme fiche extensive sans mode choisi). */
   mode_extensif: string | null;
+  /** Équipe d'origine (#641) ; `null` pour un brouillon antérieur — « Non renseignée ». */
+  equipe_id: string | null;
   societe: string | null;
   immatricule_aeronef: string | null;
   pilote: string | null;
@@ -463,9 +467,9 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
       date_prospection, latitude, longitude, altitude,
       surface_station, surface_prospectee, surface_infestee,
       signalement_source, signalement_date, signalement_description,
-      mode_extensif,
+      mode_extensif, equipe_id,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
     [
       input.id, input.typeProspection, input.campagneId, input.prospecteurId, input.prospecteurNom ?? null,
       input.stationId ?? null,
@@ -475,6 +479,7 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
       input.surfaceStation ?? null, input.surfaceProspectee ?? null, input.surfaceInfestee ?? null,
       input.signalementSource ?? null, input.signalementDate ?? null, input.signalementDescription ?? null,
       input.modeExtensif ?? null,
+      input.equipeId ?? null,
       now, now
     ]
   );

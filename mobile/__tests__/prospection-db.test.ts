@@ -62,6 +62,7 @@ const MIGRATED_COLUMNS = [
   // #revalidation-prospection
   { name: 'validated_at' },
   { name: 'revalide_de_id' },
+  { name: 'equipe_id' },
   // #fiches-disponibles-hors-ligne
   { name: 'prospecteur_nom' },
 

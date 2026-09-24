@@ -129,6 +129,18 @@ describe('createDraftTraitementAerien', () => {
     expect(result.type_traitement).toBe('AERIEN');
     expect(result.aerien?.pilote).toBe(AERIEN_INPUT.pilote);
   });
+
+  it('rattache le brouillon à l’équipe de travail reçue en entrée (#641)', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await createDraftTraitementAerien({ ...AERIEN_INPUT, equipeId: 'eq-1' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO traitement \([\s\S]*equipe_id/),
+      expect.arrayContaining(['eq-1'])
+    );
+  });
 });
 
 describe('createDraftTraitementTerrestre', () => {

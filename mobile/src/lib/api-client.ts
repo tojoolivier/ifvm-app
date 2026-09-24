@@ -365,6 +365,13 @@ export interface CampagneSync {
  */
 export type LieuAerienSync = components['schemas']['LieuAerienSyncRead'];
 
+/**
+ * Équipes de travail (référentiel unifié, ADR-018 / #638) : une équipe et ses membres se
+ * pullent chacun avec leur propre curseur. Types tirés du contrat OpenAPI.
+ */
+export type EquipeSync = components['schemas']['EquipeSyncRead'];
+export type EquipeMembreSync = components['schemas']['EquipeMembreSyncRead'];
+
 export interface ReferentielPullResponse {
   postes_acridiens: EntityPull<PosteAcridienSync>;
   stations_fixes: EntityPull<StationFixeSync>;
@@ -374,6 +381,8 @@ export interface ReferentielPullResponse {
   codes_stades: EntityPull<CodeStadeSync>;
   campagnes: EntityPull<CampagneSync>;
   lieux_aeriens: EntityPull<LieuAerienSync>;
+  equipes: EntityPull<EquipeSync>;
+  equipe_membres: EntityPull<EquipeMembreSync>;
 }
 
 /**
@@ -1044,6 +1053,14 @@ export const apiClient = {
         'since_lieux_aeriens',
         cursors.lieux_aeriens
       );
+    }
+
+    if (cursors.equipes) {
+      query.set('since_equipes', cursors.equipes);
+    }
+
+    if (cursors.equipe_membres) {
+      query.set('since_equipe_membres', cursors.equipe_membres);
     }
 
     const qs = query.toString();

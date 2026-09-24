@@ -698,6 +698,9 @@ const COLONNES_PROSPECTION: readonly Colonne[] = [
   //    fiche revalide (mirroir de `traitement.traitement_origine_id`).
   { name: 'validated_at', type: 'TEXT' },
   { name: 'revalide_de_id', type: 'TEXT' },
+  // #641 : équipe qui a mené la fiche (équipe de travail à la création). Nullable : les
+  // brouillons antérieurs restent ouvrables (« Non renseignée »), cf. syncOneProspection.
+  { name: 'equipe_id', type: 'TEXT' },
   // #fiches-disponibles-hors-ligne : nom résolu du prospecteur (colonne calculée
   // côté serveur, cf. `_resoudre_noms`) — sans ce cache, « Créé par … » ne
   // pouvait jamais s'afficher pour une fiche d'un AUTRE agent une fois hors
@@ -778,6 +781,9 @@ const COLONNES_OPERATION_AERIENNE: readonly Colonne[] = [
 /** Colonnes ajoutées à `traitement` après sa création initiale. */
 const COLONNES_TRAITEMENT: readonly Colonne[] = [
   { name: 'server_updated_at', type: 'TEXT' },
+  // #641 : équipe qui a mené le traitement (équipe de travail à la création), nullable pour
+  // les brouillons antérieurs — cf. buildTraitementSyncPayload.
+  { name: 'equipe_id', type: 'TEXT' },
   // Moyens humains et matériels (migration backend 0076, fiche CRT papier
   // §4.1/4.2, #moyens-humains-materiels) — communs à l'Aérien et au Terrestre.
   { name: 'nb_agents_permanents', type: 'INTEGER' },

@@ -38,6 +38,8 @@ function emptyResponse(serverTime: string) {
     codes_stades: { upserts: [], server_time: serverTime },
     campagnes: { upserts: [], server_time: serverTime },
     lieux_aeriens: { upserts: [], server_time: serverTime },
+    equipes: { upserts: [], server_time: serverTime },
+    equipe_membres: { upserts: [], server_time: serverTime },
   };
 }
 
@@ -58,6 +60,8 @@ describe('pullReferentiel', () => {
         codes_stades: null,
         campagnes: null,
         lieux_aeriens: null,
+        equipes: null,
+        equipe_membres: null,
       },
       undefined
     );
@@ -106,9 +110,46 @@ describe('pullReferentiel', () => {
         codes_stades: null,
         campagnes: null,
         lieux_aeriens: null,
+        equipes: null,
+        equipe_membres: null,
       },
       undefined
     );
+  });
+
+  it('upserts each équipe et chaque membre idempotently by clé', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      equipes: {
+        upserts: [
+          { id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', actif: true, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      equipe_membres: {
+        upserts: [
+          {
+            equipe_id: 'eq-1',
+            user_id: 'u-1',
+            fonction: 'chef',
+            nom: 'Rakoto',
+            prenom: 'Jean',
+            created_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    const appels = runAsync.mock.calls.map(([sql, params]) => [String(sql), params]);
+    const equipe = appels.find(([sql]) => sql.includes('INSERT INTO equipe ('));
+    expect(equipe?.[0]).toContain('ON CONFLICT(id) DO UPDATE');
+    expect(equipe?.[1]).toEqual(['eq-1', 'Équipe Sud', 'aerien', 1, '2026-08-01T00:00:00Z']);
+    const membre = appels.find(([sql]) => sql.includes('INSERT INTO equipe_membre'));
+    expect(membre?.[0]).toContain('ON CONFLICT(equipe_id, user_id) DO UPDATE');
+    expect(membre?.[1]).toEqual(['eq-1', 'u-1', 'chef', 'Rakoto', 'Jean']);
   });
 
   it('upserts each poste acridien idempotently by id', async () => {

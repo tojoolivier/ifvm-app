@@ -36,6 +36,7 @@ import {
   listAllProspectionInfestations,
   listOperationsAeriennes,
 } from '../src/lib/prospection-repository';
+import { useEquipeTravailStore } from '../src/lib/equipe-travail-store';
 import { apiClient } from '../src/lib/api-client';
 import { NetworkError } from '../src/lib/errors';
 import * as Network from 'expo-network';
@@ -70,6 +71,9 @@ jest.mock('../src/lib/api-client', () => ({
   versionServeurDe: (error: unknown) =>
     (error as { serverVersion?: unknown } | null)?.serverVersion ?? null,
 }));
+jest.mock('../src/lib/storage', () => ({
+  storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
+}));
 jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn() }));
 
 const mockCompleteProspection = jest.mocked(completeProspection);
@@ -92,6 +96,7 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     prospecteur_nom: null,
     validated_at: null,
     revalide_de_id: null,
+    equipe_id: 'eq-1',
     station_id: null,
     biotope: 'Mesophyle',
     region: null,
@@ -727,5 +732,43 @@ describe('syncAllProspections — le lot résume', () => {
 
     expect(resume.reussies).toEqual(['a', 'c']);
     expect(resume.echouees.map((f) => f.id)).toEqual(['b']);
+  });
+});
+describe('rattachement à l’équipe (#641)', () => {
+  beforeEach(() => {
+    mockListAllCaptures.mockResolvedValue([]);
+    mockListAllPopulations.mockResolvedValue([]);
+    mockListAllInfestations.mockResolvedValue([]);
+    mockListOperationsAeriennes.mockResolvedValue([]);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'brouillon', validated_at: null });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    useEquipeTravailStore.setState({ equipeId: null });
+  });
+
+  it('envoie l’équipe d’origine du brouillon, même si l’équipe de travail a changé depuis', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-actuelle' });
+
+    await syncOneProspection(draft({ equipe_id: 'eq-origine' }), 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ equipe_id: 'eq-origine' })
+    );
+  });
+
+  it('un brouillon sans équipe reste synchronisable avec l’équipe de travail courante', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-actuelle' });
+
+    await syncOneProspection(draft({ equipe_id: null }), 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ equipe_id: 'eq-actuelle' })
+    );
+  });
+
+  it('refuse avec un message qui renvoie vers Paramètres quand aucune équipe n’est connue', async () => {
+    await expect(syncOneProspection(draft({ equipe_id: null }), 'token-1')).rejects.toThrow(/équipe de travail/i);
+    expect(mockCreateProspection).not.toHaveBeenCalled();
   });
 });

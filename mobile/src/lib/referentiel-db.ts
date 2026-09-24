@@ -115,6 +115,8 @@ const TABLES_REFERENTIEL = [
   'code_stade',
   'campagne',
   'lieu_aerien',
+  'equipe',
+  'equipe_membre',
 ];
 
 /**
@@ -229,6 +231,38 @@ export async function listUtilisateursByRole(role: RoleUtilisateurEquipe): Promi
     'SELECT id, nom, prenom FROM utilisateur_equipe WHERE actif = 1 AND role = ? ORDER BY nom',
     [role]
   );
+}
+
+export interface EquipeLocale {
+  id: string;
+  nom: string;
+  type: 'terrestre' | 'aerien';
+  nb_membres: number;
+}
+
+const SELECT_EQUIPE_LOCALE = `SELECT e.id, e.nom, e.type,
+       (SELECT count(*) FROM equipe_membre m WHERE m.equipe_id = e.id) AS nb_membres
+     FROM equipe e`;
+
+/**
+ * Équipes actives dont l'utilisateur est membre (`equipe_membre.user_id`) — alimente le choix de
+ * l'équipe de travail (#641). Une équipe désactivée n'est plus proposée à la saisie.
+ */
+export async function listEquipesDeUtilisateur(userId: string): Promise<EquipeLocale[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<EquipeLocale>(
+    `${SELECT_EQUIPE_LOCALE}
+     WHERE e.actif = 1
+       AND EXISTS (SELECT 1 FROM equipe_membre m WHERE m.equipe_id = e.id AND m.user_id = ?)
+     ORDER BY e.nom`,
+    [userId]
+  );
+}
+
+/** Une équipe par id, active ou non — un brouillon garde l'équipe d'origine même désactivée depuis. */
+export async function getEquipeLocale(id: string): Promise<EquipeLocale | null> {
+  const db = await getReferentielDb();
+  return db.getFirstAsync<EquipeLocale>(`${SELECT_EQUIPE_LOCALE} WHERE e.id = ?`, [id]);
 }
 
 export interface CampagneLocal {
@@ -447,6 +481,25 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       actif INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS equipe (
+      id TEXT PRIMARY KEY NOT NULL,
+      nom TEXT NOT NULL,
+      type TEXT NOT NULL,
+      actif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS equipe_membre (
+      equipe_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      fonction TEXT NOT NULL,
+      nom TEXT,
+      prenom TEXT,
+      PRIMARY KEY (equipe_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_equipe_membre_user_id ON equipe_membre(user_id);
 
     CREATE TABLE IF NOT EXISTS referentiel_sync_meta (
       entity_type TEXT PRIMARY KEY NOT NULL,

@@ -18,7 +18,8 @@ import {
   listAllProspectionCaptures,
   DraftProspection,
 } from '../src/lib/prospection-repository';
-import { listCampagnesLocal, getStationById } from '../src/lib/referentiel-db';
+import { listCampagnesLocal, getStationById, getEquipeLocale } from '../src/lib/referentiel-db';
+import { useEquipeTravailStore } from '../src/lib/equipe-travail-store';
 
 // `auth-store.ts` importe `storage.ts` -> `expo-secure-store`, qui tire
 // `react-native` (non transformé dans ce projet Jest "logic") — jamais un
@@ -26,6 +27,9 @@ import { listCampagnesLocal, getStationById } from '../src/lib/referentiel-db';
 // besoin (#fiches-disponibles-hors-ligne), d'où ce mock minimal plutôt que le
 // vrai module.
 const mockAuthState: { user: { nom: string; prenom: string } | null } = { user: null };
+jest.mock('../src/lib/storage', () => ({
+  storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
+}));
 jest.mock('../src/lib/auth-store', () => ({
   useAuthStore: { getState: () => mockAuthState },
 }));
@@ -76,6 +80,7 @@ jest.mock('../src/lib/prospection-repository', () => ({
 jest.mock('../src/lib/referentiel-db', () => ({
   listCampagnesLocal: jest.fn(),
   getStationById: jest.fn(),
+  getEquipeLocale: jest.fn(),
 }));
 
 const mockApiClient = jest.mocked(apiClient);
@@ -93,6 +98,7 @@ const mockSaveCaptures = jest.mocked(saveProspectionCaptures);
 const mockSaveOperations = jest.mocked(saveOperationsAeriennes);
 const mockGetProspection = jest.mocked(getProspection);
 const mockGetStationById = jest.mocked(getStationById);
+const mockGetEquipeLocale = jest.mocked(getEquipeLocale);
 const mockUpdateStationNom = jest.mocked(updateProspectionStationNom);
 const mockListPopulationsLocales = jest.mocked(listAllProspectionPopulations);
 const mockListInfestationsLocales = jest.mocked(listAllProspectionInfestations);
@@ -106,6 +112,7 @@ const STORED_ROW: DraftProspection = {
   prospecteur_nom: null,
   validated_at: null,
   revalide_de_id: null,
+  equipe_id: null,
   station_id: null,
   biotope: 'Mesophyle',
   region: null,
@@ -345,6 +352,53 @@ describe('startNewProspection', () => {
     await expect(
       startNewProspection({ token: 'tok', prospecteurId: 'p1' })
     ).rejects.toBeInstanceOf(PreconditionError);
+  });
+});
+
+describe('startNewProspection — équipe de travail (#641)', () => {
+  const PARAMS = { token: 'tok', prospecteurId: '33333333-3333-3333-3333-333333333333' };
+
+  beforeEach(() => {
+    mockListCampagnesLocal.mockResolvedValue([
+      { id: 'current', name: 'En cours', start_date: '2020-01-01', end_date: null },
+    ]);
+    mockCreateDraft.mockResolvedValue(STORED_ROW);
+    useEquipeTravailStore.setState({ equipeId: null });
+  });
+
+  it('reprend automatiquement l’équipe de travail dans le nouveau brouillon', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-1' });
+    mockGetEquipeLocale.mockResolvedValue({ id: 'eq-1', nom: 'EMT Toliara', type: 'terrestre', nb_membres: 5 });
+
+    await startNewProspection(PARAMS);
+
+    expect(mockCreateDraft).toHaveBeenCalledWith(expect.objectContaining({ equipeId: 'eq-1' }));
+  });
+
+  it('reste créable hors-ligne sans équipe de travail : le brouillon est « Non renseignée »', async () => {
+    await startNewProspection(PARAMS);
+
+    expect(mockCreateDraft).toHaveBeenCalledWith(expect.objectContaining({ equipeId: null }));
+  });
+
+  it.each(['intensive', 'validation'] as const)(
+    'bloque une prospection %s avec une équipe aérienne, en renvoyant vers Paramètres',
+    async (typeProspection) => {
+      useEquipeTravailStore.setState({ equipeId: 'eq-air' });
+      mockGetEquipeLocale.mockResolvedValue({ id: 'eq-air', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+
+      await expect(startNewProspection({ ...PARAMS, typeProspection })).rejects.toThrow(/Paramètres/);
+      expect(mockCreateDraft).not.toHaveBeenCalled();
+    }
+  );
+
+  it('autorise une extensive aérienne avec une équipe aérienne', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-air' });
+    mockGetEquipeLocale.mockResolvedValue({ id: 'eq-air', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+
+    await startNewProspection({ ...PARAMS, typeProspection: 'extensive', modeExtensif: 'aerien' });
+
+    expect(mockCreateDraft).toHaveBeenCalledWith(expect.objectContaining({ equipeId: 'eq-air' }));
   });
 });
 
