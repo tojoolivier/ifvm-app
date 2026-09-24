@@ -61,6 +61,7 @@ export function validerAjoutMembre(ajout: AjoutMembre, contexte: ContexteAjoutMe
     if (!ajout.userId) erreurs.push('Choisissez un utilisateur dans la liste.');
   } else {
     if (!ajout.nom.trim()) erreurs.push('Le nom est obligatoire.');
+    if (!ajout.prenom.trim()) erreurs.push('Le prénom est obligatoire.');
     if (!(ROLES_A_LA_VOLEE as readonly string[]).includes(ajout.fonction)) {
       erreurs.push(
         `Un compte sans accès ne peut être que pilote, mécanicien, consultant international ou membre. Choisissez un compte existant pour « ${libelleFonction(ajout.fonction)} ».`
@@ -87,4 +88,29 @@ export function jourMois(dateIso: string): string {
 /** « Isoanala · n°03 » — l'intitulé d'un site dans les maquettes. */
 export function libelleSite(site: { localite: string; numero: string }): string {
   return `${site.localite} · ${site.numero}`;
+}
+
+export interface MembrePourPrefill {
+  user_id: string;
+  fonction: string;
+  nom: string | null;
+  prenom: string | null;
+}
+
+/**
+ * Pré-remplissage d'un traitement aérien depuis les membres de l'équipe de travail (#641,
+ * décision : pilote / mécanicien / chef de base / consultant restent saisis — présents ce jour-là —
+ * mais s'auto-complètent quand l'équipe les porte ; sinon l'agent les saisit).
+ */
+export function prefillTraitementAerien(membres: MembrePourPrefill[]) {
+  const nomDe = (fonction: string) => {
+    const membre = membres.find((m) => m.fonction === fonction);
+    return membre ? [membre.prenom, membre.nom].filter(Boolean).join(' ') : '';
+  };
+  return {
+    pilote: nomDe('pilote'),
+    mecanicien: nomDe('mecanicien'),
+    chefDeBaseId: membres.find((m) => m.fonction === 'chef')?.user_id ?? '',
+    consultantInternational: nomDe('consultant_international') || null,
+  };
 }

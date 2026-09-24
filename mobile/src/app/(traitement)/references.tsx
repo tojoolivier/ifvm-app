@@ -1,3 +1,5 @@
+import { listMembresEquipe } from '@/lib/equipe-db';
+import { prefillTraitementAerien } from '@/lib/equipe-regles';
 import { equipeDeTravailPour } from '@/lib/equipe-travail';
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
@@ -248,6 +250,9 @@ export default function ReferencesScreen() {
           // #641 : équipe de travail reprise automatiquement ; bloque un type d'équipe qui ne
           // correspond pas au traitement (aérien / terrestre) en renvoyant vers Paramètres.
           const equipeId = await equipeDeTravailPour(typeTraitement === 'AERIEN' ? 'aerien' : 'terrestre');
+          // Pilote, mécanicien, chef de base, consultant : auto-complétés depuis les membres de
+          // l'équipe de travail quand elle les porte (ils restent modifiables — présents ce jour-là).
+          const equipage = prefillTraitementAerien(equipeId ? await listMembresEquipe(equipeId) : []);
           const created =
             typeTraitement === 'AERIEN'
               ? await createDraftTraitementAerien({
@@ -255,9 +260,7 @@ export default function ReferencesScreen() {
                   equipeId,
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
-                  pilote: '',
-                  mecanicien: '',
-                  chefDeBaseId: '',
+                  ...equipage,
                 })
               : await createDraftTraitementTerrestre({
                   id: generateId(),

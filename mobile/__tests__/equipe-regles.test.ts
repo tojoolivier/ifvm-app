@@ -2,6 +2,7 @@ import {
   jourMois,
   libelleFonction,
   libelleSite,
+  prefillTraitementAerien,
   ROLES_A_LA_VOLEE,
   validerAjoutMembre,
   validerNouvelleEquipe,
@@ -45,6 +46,7 @@ describe('validerAjoutMembre', () => {
   it('compte à la volée : exige un nom et une fonction parmi pilote, mécanicien, consultant, membre', () => {
     expect(validerAjoutMembre({ mode: 'nouveau', nom: '', prenom: '', fonction: 'pilote' }, equipeSansChef)).toEqual([
       'Le nom est obligatoire.',
+      'Le prénom est obligatoire.',
     ]);
     expect(ROLES_A_LA_VOLEE).toEqual(['pilote', 'mecanicien', 'consultant_international', 'membre']);
   });
@@ -96,5 +98,43 @@ describe('formats des maquettes', () => {
 
   it('libelleSite rend « localité · numéro »', () => {
     expect(libelleSite({ localite: 'Isoanala', numero: 'n°03' })).toBe('Isoanala · n°03');
+  });
+});
+
+describe('prefillTraitementAerien', () => {
+  const MEMBRES = [
+    { user_id: 'u-1', fonction: 'chef', nom: 'Rakoto', prenom: 'Jean' },
+    { user_id: 'u-2', fonction: 'pilote', nom: 'Rabe', prenom: 'Michel' },
+    { user_id: 'u-3', fonction: 'mecanicien', nom: 'Andria', prenom: 'Sophie' },
+    { user_id: 'u-4', fonction: 'consultant_international', nom: 'Dupont', prenom: 'M.' },
+  ];
+
+  it('auto-complète pilote, mécanicien, chef de base et consultant depuis les membres de l’équipe', () => {
+    expect(prefillTraitementAerien(MEMBRES)).toEqual({
+      pilote: 'Michel Rabe',
+      mecanicien: 'Sophie Andria',
+      chefDeBaseId: 'u-1',
+      consultantInternational: 'M. Dupont',
+    });
+  });
+
+  it('laisse vides les fonctions que l’équipe ne porte pas : l’agent les saisit', () => {
+    expect(prefillTraitementAerien([])).toEqual({
+      pilote: '',
+      mecanicien: '',
+      chefDeBaseId: '',
+      consultantInternational: null,
+    });
+  });
+});
+
+describe('validerAjoutMembre — compte à la volée', () => {
+  it('exige aussi le prénom', () => {
+    expect(
+      validerAjoutMembre(
+        { mode: 'nouveau', nom: 'Dupont', prenom: ' ', fonction: 'pilote' },
+        { equipeADejaUnChef: false, chefsDAutresEquipes: new Set() }
+      )
+    ).toEqual(['Le prénom est obligatoire.']);
   });
 });

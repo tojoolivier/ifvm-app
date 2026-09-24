@@ -64,6 +64,7 @@ describe('EquipeMembreAjoutScreen', () => {
 
     await fireEvent.press(screen.getByText('Créer et ajouter'));
     expect(await screen.findByText('• Le nom est obligatoire.')).toBeVisible();
+    expect(screen.getByText('• Le prénom est obligatoire.')).toBeVisible();
 
     await fireEvent.changeText(screen.getByLabelText('Nom'), 'Dupont');
     await fireEvent.changeText(screen.getByLabelText('Prénom'), 'M.');
