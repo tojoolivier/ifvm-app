@@ -1,5 +1,5 @@
 import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EQ } from '@/components/equipe/tokens';
@@ -47,11 +47,15 @@ function Entree({ entree }: { entree: MenuEntree }) {
  * et déconnexion. Panneau de 252 px à gauche, le reste de l'écran (voile) le referme.
  */
 export function MenuDrawer({ visible, onFermer, nom, email, role, navigation, compte, onDeconnexion }: Props) {
+  // Les marges sont lues ICI, dans l'arbre de l'app, et non par un `SafeAreaView` dans le `Modal` :
+  // sous iOS le `Modal` est une hiérarchie native à part, dont le premier rendu voyait parfois des
+  // marges nulles — l'identité passait alors sous l'heure et l'encoche.
+  const insets = useSafeAreaInsets();
   return (
     <Modal animationType="fade" transparent visible={visible} onRequestClose={onFermer}>
       <View style={styles.racine} testID="menu-tiroir">
         <View style={styles.panneau}>
-          <SafeAreaView edges={['top', 'bottom']} style={styles.securite}>
+          <View style={[styles.securite, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             <View style={styles.identite}>
               <View style={styles.avatar}>
                 <ThemedText style={styles.avatarLettre}>{nom.trim().charAt(0).toUpperCase() || '?'}</ThemedText>
@@ -101,7 +105,7 @@ export function MenuDrawer({ visible, onFermer, nom, email, role, navigation, co
               </TouchableOpacity>
               <ThemedText style={styles.version}>IFVM Veille · v1.0.0</ThemedText>
             </View>
-          </SafeAreaView>
+          </View>
         </View>
         <TouchableOpacity style={styles.voile} activeOpacity={1} onPress={onFermer} accessibilityLabel="Fermer le menu" />
       </View>
