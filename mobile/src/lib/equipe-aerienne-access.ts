@@ -26,6 +26,15 @@ export function peutSaisirVols(role: UserRole | null | undefined): boolean {
 }
 
 /**
+ * Les mouvements de stock (#645) se saisissent en tant que chef de base ou administrateur :
+ * `POST /mouvements-pesticide` exige `require_chef_de_base_ou_admin`. Pilote et mécanicien consultent
+ * le solde (GET ouvert) sans boutons de saisie, plutôt que d'obtenir un 403 à la synchronisation.
+ */
+export function peutSaisirStock(role: UserRole | null | undefined): boolean {
+  return role === 'chef_de_base' || role === 'admin';
+}
+
+/**
  * Le chef de base crée les lieux aériens (bases, stands) de SON équipe — seul membre
  * de l'équipe à pouvoir se connecter (les comptes pilote/mécanicien sont créés à la
  * volée, sans accès applicatif) — et un admin peut le faire pour n'importe quelle équipe (ex. avant même

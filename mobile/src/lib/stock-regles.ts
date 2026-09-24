@@ -1,3 +1,5 @@
+import type { components } from './api-schema.generated';
+
 /**
  * Règles du stock de pesticides côté terrain (#645, ADR-018). Le solde d'un (site, produit, unité)
  * vient du serveur ; les mouvements saisis hors-ligne et pas encore partis s'y ajoutent pour
@@ -36,12 +38,7 @@ export function validerMouvement(saisie: MouvementSaisi): string[] {
   return erreurs;
 }
 
-export interface SoldeServeur {
-  site_id: string;
-  pesticide_id: string;
-  unite: string;
-  quantite: number;
-}
+export type SoldeServeur = components['schemas']['SoldePesticideRead'];
 
 export interface MouvementEnAttente {
   type: TypeMouvementSaisi;

@@ -8,7 +8,7 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useAuthStore } from '@/lib/auth-store';
 import { type Pesticide, listPesticides } from '@/lib/referentiel-db';
-import { type SiteStock, creerMouvement, listSitesActifs } from '@/lib/stock-db';
+import { type SiteStock, creerMouvement, listSitesPrincipaux } from '@/lib/stock-db';
 import { envoyerStockSiEnLigne } from '@/lib/stock-envoi';
 import { type TypeMouvementSaisi, type UniteStock, validerMouvement } from '@/lib/stock-regles';
 
@@ -40,7 +40,7 @@ export default function StockMouvementScreen() {
   const transfert = type === 'transfert';
 
   useEffect(() => {
-    Promise.all([listSitesActifs(), listPesticides()])
+    Promise.all([listSitesPrincipaux(), listPesticides()])
       .then(([tousSites, produits]) => {
         setSites(tousSites);
         setPesticides(produits);

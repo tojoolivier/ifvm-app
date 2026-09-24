@@ -1,7 +1,7 @@
 import { PreconditionError } from '../src/lib/errors';
 import { generateId } from '../src/lib/id';
 import { getReferentielDb } from '../src/lib/referentiel-db';
-import { creerMouvement, listMouvementsPourSolde, remplacerSoldesServeur } from '../src/lib/stock-db';
+import { creerMouvement, listMouvementsPourSolde, listSitesPrincipaux, remplacerSoldesServeur } from '../src/lib/stock-db';
 import type { MouvementSaisi } from '../src/lib/stock-regles';
 
 jest.mock('../src/lib/referentiel-db', () => ({ getReferentielDb: jest.fn() }));
@@ -52,6 +52,14 @@ describe('listMouvementsPourSolde', () => {
     getAllAsync.mockResolvedValue([]);
     await listMouvementsPourSolde();
     expect(String(getAllAsync.mock.calls[0][0])).toContain("statut_sync = 'local'");
+  });
+});
+
+describe('listSitesPrincipaux', () => {
+  it('exclut les sites secondaires : le serveur les refuse (422)', async () => {
+    getAllAsync.mockResolvedValue([]);
+    await listSitesPrincipaux();
+    expect(String(getAllAsync.mock.calls[0][0])).toContain('parent_site_id IS NULL');
   });
 });
 

@@ -1,4 +1,4 @@
-import { peutCreerEquipe, peutGererParcAeronefs } from '../src/lib/equipe-aerienne-access';
+import { peutCreerEquipe, peutGererParcAeronefs, peutSaisirStock } from '../src/lib/equipe-aerienne-access';
 
 describe('peutCreerEquipe', () => {
   it.each(['chef_de_base', 'chef_equipe', 'admin'] as const)('autorise %s', (role) => {
@@ -26,5 +26,15 @@ describe('peutGererParcAeronefs', () => {
 
   it('refuse un utilisateur sans rôle', () => {
     expect(peutGererParcAeronefs(null)).toBe(false);
+  });
+});
+
+describe('peutSaisirStock (#645)', () => {
+  it.each(['chef_de_base', 'admin'] as const)('autorise %s', (role) => {
+    expect(peutSaisirStock(role)).toBe(true);
+  });
+
+  it.each(['pilote', 'mecanicien', 'chef_equipe', 'prospecteur', null, undefined] as const)('refuse %s', (role) => {
+    expect(peutSaisirStock(role)).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import { EQ } from '@/components/equipe/tokens';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useAuthStore } from '@/lib/auth-store';
+import { peutSaisirStock } from '@/lib/equipe-aerienne-access';
 import { listSitesEquipe } from '@/lib/equipe-db';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
 import { type Pesticide, listPesticides } from '@/lib/referentiel-db';
@@ -14,7 +15,7 @@ import {
   type SiteStock,
   listMouvementsPourSolde,
   listMouvementsSite,
-  listSitesActifs,
+  listSitesPrincipaux,
   listSoldesServeur,
 } from '@/lib/stock-db';
 import { envoyerStockSiEnLigne } from '@/lib/stock-envoi';
@@ -49,6 +50,7 @@ export default function StockScreen() {
   const router = useRouter();
   const signalerChargement = useSignalerChargement('stock');
   const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.user?.role);
   const equipeId = useEquipeTravailStore((s) => s.equipeId);
 
   const [sites, setSites] = useState<SiteStock[]>([]);
@@ -61,7 +63,7 @@ export default function StockScreen() {
   const charger = useCallback(
     async (siteCourant: string | null) => {
       const [tous, principaux, produits] = await Promise.all([
-        listSitesActifs(),
+        listSitesPrincipaux(),
         equipeId ? listSitesEquipe(equipeId) : Promise.resolve([]),
         listPesticides(),
       ]);
@@ -181,26 +183,28 @@ export default function StockScreen() {
             );
           })}
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            testID="stock-approvisionner"
-            style={[styles.bouton, styles.boutonPlein, !siteId && styles.desactive]}
-            disabled={!siteId}
-            onPress={() => ouvrir('approvisionnement')}
-            accessibilityRole="button"
-          >
-            <ThemedText style={styles.boutonPleinTexte}>+ Approvisionner</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            testID="stock-transferer"
-            style={[styles.bouton, styles.boutonContour, !siteId && styles.desactive]}
-            disabled={!siteId}
-            onPress={() => ouvrir('transfert')}
-            accessibilityRole="button"
-          >
-            <ThemedText style={styles.boutonContourTexte}>↔ Transférer</ThemedText>
-          </TouchableOpacity>
-        </View>
+        {peutSaisirStock(role) && (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              testID="stock-approvisionner"
+              style={[styles.bouton, styles.boutonPlein, !siteId && styles.desactive]}
+              disabled={!siteId}
+              onPress={() => ouvrir('approvisionnement')}
+              accessibilityRole="button"
+            >
+              <ThemedText style={styles.boutonPleinTexte}>+ Approvisionner</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="stock-transferer"
+              style={[styles.bouton, styles.boutonContour, !siteId && styles.desactive]}
+              disabled={!siteId}
+              onPress={() => ouvrir('transfert')}
+              accessibilityRole="button"
+            >
+              <ThemedText style={styles.boutonContourTexte}>↔ Transférer</ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

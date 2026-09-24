@@ -1,10 +1,11 @@
 /** Stock de pesticides (#645, Figma 81:588) : solde par (produit, unité), mouvements en attente distingués. */
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import StockScreen from '@/app/(app)/stock';
+import { useAuthStore } from '@/lib/auth-store';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
 import { listSitesEquipe } from '@/lib/equipe-db';
 import { listPesticides } from '@/lib/referentiel-db';
-import { listMouvementsPourSolde, listMouvementsSite, listSitesActifs, listSoldesServeur } from '@/lib/stock-db';
+import { listMouvementsPourSolde, listMouvementsSite, listSitesPrincipaux, listSoldesServeur } from '@/lib/stock-db';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => {
@@ -19,7 +20,7 @@ jest.mock('@/lib/equipe-db', () => ({ listSitesEquipe: jest.fn() }));
 jest.mock('@/lib/referentiel-db', () => ({ listPesticides: jest.fn() }));
 jest.mock('@/lib/stock-envoi', () => ({ envoyerStockSiEnLigne: jest.fn() }));
 jest.mock('@/lib/stock-db', () => ({
-  listSitesActifs: jest.fn(),
+  listSitesPrincipaux: jest.fn(),
   listSoldesServeur: jest.fn(),
   listMouvementsPourSolde: jest.fn(),
   listMouvementsSite: jest.fn(),
@@ -29,8 +30,9 @@ const SITE = { id: 's-1', numero: '03', localite: 'Isoanala' };
 
 beforeEach(() => {
   mockPush.mockReset();
+  useAuthStore.setState({ user: { role: 'chef_de_base' } as any });
   useEquipeTravailStore.setState({ equipeId: 'eq-1', isInitialized: true });
-  jest.mocked(listSitesActifs).mockResolvedValue([SITE]);
+  jest.mocked(listSitesPrincipaux).mockResolvedValue([SITE]);
   jest.mocked(listSitesEquipe).mockResolvedValue([{ ...SITE, parent_site_id: null, date_debut_position: null }]);
   jest.mocked(listPesticides).mockResolvedValue([
     { id: 'p-feni', nom: 'Fenitrothion 96% ULV' },
@@ -75,6 +77,15 @@ describe('StockScreen', () => {
     expect(await screen.findByText('Transfert sortant')).toBeVisible();
     expect(screen.getByText('-30 L')).toBeVisible();
     expect(screen.getByText(/⏳ Local/)).toBeVisible();
+  });
+
+  it('pilote et mécanicien consultent le solde sans boutons de saisie (le serveur refuserait leur POST)', async () => {
+    useAuthStore.setState({ user: { role: 'pilote' } as any });
+    await render(<StockScreen />);
+    await screen.findByText('Fenitrothion 96% ULV');
+
+    expect(screen.queryByTestId('stock-approvisionner')).toBeNull();
+    expect(screen.queryByTestId('stock-transferer')).toBeNull();
   });
 
   it('« Approvisionner » et « Transférer » ouvrent la saisie pour le site affiché', async () => {

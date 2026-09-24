@@ -123,14 +123,20 @@ export async function remplacerSoldesServeur(soldes: SoldeServeur[]): Promise<vo
   });
 }
 
+/** Le stock est rattaché au site aérien **principal** : le serveur refuse un secondaire (422, #606). */
 export interface SiteStock {
   id: string;
   numero: string;
   localite: string;
 }
 
-/** Tous les sites actifs connus de l'appareil : un transfert peut partir vers le site d'une autre équipe. */
-export async function listSitesActifs(): Promise<SiteStock[]> {
+/**
+ * Sites principaux actifs connus de l'appareil : un transfert peut partir vers le site principal
+ * d'une autre équipe, mais jamais vers un stand ou une base secondaire.
+ */
+export async function listSitesPrincipaux(): Promise<SiteStock[]> {
   const db = await getReferentielDb();
-  return db.getAllAsync<SiteStock>('SELECT id, numero, localite FROM site_aerien WHERE actif = 1 ORDER BY numero');
+  return db.getAllAsync<SiteStock>(
+    'SELECT id, numero, localite FROM site_aerien WHERE actif = 1 AND parent_site_id IS NULL ORDER BY numero'
+  );
 }

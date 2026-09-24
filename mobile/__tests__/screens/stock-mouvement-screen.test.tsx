@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import StockMouvementScreen from '@/app/(app)/stock-mouvement';
 import { listPesticides } from '@/lib/referentiel-db';
-import { creerMouvement, listSitesActifs } from '@/lib/stock-db';
+import { creerMouvement, listSitesPrincipaux } from '@/lib/stock-db';
 
 const mockBack = jest.fn();
 let mockParams: Record<string, string> = {};
@@ -13,13 +13,13 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/storage', () => ({ storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() } }));
 jest.mock('@/lib/referentiel-db', () => ({ listPesticides: jest.fn() }));
 jest.mock('@/lib/stock-envoi', () => ({ envoyerStockSiEnLigne: jest.fn() }));
-jest.mock('@/lib/stock-db', () => ({ listSitesActifs: jest.fn(), creerMouvement: jest.fn() }));
+jest.mock('@/lib/stock-db', () => ({ listSitesPrincipaux: jest.fn(), creerMouvement: jest.fn() }));
 
 beforeEach(() => {
   mockBack.mockReset();
   mockParams = { type: 'approvisionnement', siteId: 's-1' };
   jest.mocked(creerMouvement).mockReset().mockResolvedValue('m-1');
-  jest.mocked(listSitesActifs).mockResolvedValue([
+  jest.mocked(listSitesPrincipaux).mockResolvedValue([
     { id: 's-1', numero: '03', localite: 'Isoanala' },
     { id: 's-2', numero: '01', localite: 'Betroka' },
   ]);
