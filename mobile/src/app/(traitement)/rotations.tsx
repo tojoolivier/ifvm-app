@@ -20,6 +20,7 @@ import {
   computeDureesRotation,
   formatDureeRotation,
   validateRotationsHeures,
+  messagesOrdreHeuresRotation,
   validateRotationsMeteo,
   messageVentTropFort,
   messageTemperatureTropElevee,
@@ -449,6 +450,18 @@ export default function RotationsScreen() {
                   />
                 </View>
               </View>
+              {/* #ordre-heures-rotation-aerien : début < ouverture vanne < fermeture vanne < fin,
+                  signalé en direct ; « Continuer » reste refusé tant que l'ordre n'est pas rétabli. */}
+              {messagesOrdreHeuresRotation({
+                heureDebut: rotation.heure_debut ?? null,
+                heureFin: rotation.heure_fin ?? null,
+                heureOuvertureVanne: rotation.heure_ouverture_vanne ?? null,
+                heureFermetureVanne: rotation.heure_fermeture_vanne ?? null,
+              }).map((m) => (
+                <Text key={m} style={formStyles.error}>
+                  ⚠️ {m.charAt(0).toUpperCase() + m.slice(1)}
+                </Text>
+              ))}
 
               <View style={formStyles.row}>
                 <View style={formStyles.flex1}>

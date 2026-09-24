@@ -484,6 +484,12 @@ export default function RecapScreen() {
       produitId: r.produit_id,
       quantite: r.quantite,
     })),
+    aerienRotationsHeures: (draft.aerien?.rotations ?? []).map((r) => ({
+      heureDebut: r.heure_debut ?? null,
+      heureFin: r.heure_fin ?? null,
+      heureOuvertureVanne: r.heure_ouverture_vanne ?? null,
+      heureFermetureVanne: r.heure_fermeture_vanne ?? null,
+    })),
     aerienRotationsMeteo: (draft.aerien?.rotations ?? []).map((r) => ({
       ventDebutMs: r.vent_debut_ms,
       ventFinMs: r.vent_fin_ms,
