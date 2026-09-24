@@ -286,6 +286,10 @@ class TraitementRepositoryImpl(TraitementRepository):
                 surface_restante_ha=traitement.aerien.surface_restante_ha,
                 pesticide_recu_l=traitement.aerien.pesticide_recu_l,
                 pesticide_stock_restant_l=traitement.aerien.pesticide_stock_restant_l,
+                surface_restante_abandonnee=traitement.aerien.surface_restante_abandonnee,
+                motif_surface_restante_abandonnee=(
+                    traitement.aerien.motif_surface_restante_abandonnee
+                ),
                 taux_mortalite_pourcent=traitement.aerien.taux_mortalite_pourcent,
                 evaluation_efficacite_heures_apres=(
                     traitement.aerien.evaluation_efficacite_heures_apres
@@ -714,6 +718,10 @@ class TraitementRepositoryImpl(TraitementRepository):
             model.aerien.surface_restante_ha = traitement.aerien.surface_restante_ha
             model.aerien.pesticide_recu_l = traitement.aerien.pesticide_recu_l
             model.aerien.pesticide_stock_restant_l = traitement.aerien.pesticide_stock_restant_l
+            model.aerien.surface_restante_abandonnee = traitement.aerien.surface_restante_abandonnee
+            model.aerien.motif_surface_restante_abandonnee = (
+                traitement.aerien.motif_surface_restante_abandonnee
+            )
             model.aerien.taux_mortalite_pourcent = traitement.aerien.taux_mortalite_pourcent
             model.aerien.evaluation_efficacite_heures_apres = (
                 traitement.aerien.evaluation_efficacite_heures_apres
@@ -967,6 +975,8 @@ class TraitementRepositoryImpl(TraitementRepository):
                 pesticide_stock_restant_l=float(model.aerien.pesticide_stock_restant_l)
                 if model.aerien.pesticide_stock_restant_l is not None
                 else None,
+                surface_restante_abandonnee=model.aerien.surface_restante_abandonnee,
+                motif_surface_restante_abandonnee=model.aerien.motif_surface_restante_abandonnee,
                 taux_mortalite_pourcent=float(model.aerien.taux_mortalite_pourcent)
                 if model.aerien.taux_mortalite_pourcent is not None
                 else None,

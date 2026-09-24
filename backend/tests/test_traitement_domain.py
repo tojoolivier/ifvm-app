@@ -812,6 +812,17 @@ def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
     assert aerien.pesticide_stock_restant_l == 140.0
 
 
+def test_recalculer_stock_pesticide_aerien_poudre_deduit_la_consommation_en_kg():
+    """« Approvisionnement » est saisi dans l'unité du produit : pour une poudre (rotations
+    en kg), le stock se déduit du cumul kg, pas du cumul litres (nul)."""
+    aerien = TraitementAerien(pesticide_recu_l=100.0)
+    aerien.rotations = [_rotation(numero=1, quantite=30.0, unite="kg")]
+    aerien.recalculer_totaux("TOTAL")
+    assert aerien.total_pesticide_l == 0.0
+    assert aerien.total_pesticide_kg == 30.0
+    assert aerien.pesticide_stock_restant_l == 70.0
+
+
 def test_recalculer_stock_pesticide_aerien_sans_reception_reste_none():
     aerien = TraitementAerien()
     aerien.rotations = [_rotation(numero=1, quantite=60.0)]
@@ -1937,6 +1948,36 @@ def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok():
         motif_surface_restante_abandonnee="Zone inaccessible (crue)",
     )
     traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
+    assert traitement.statut == "validee"
+
+
+def test_valider_aerien_surface_restante_abandonnee_sans_motif_bloque():
+    traitement = _traitement_aerien_valide()
+    traitement.aerien.surface_restante_abandonnee = True
+    traitement.aerien.motif_surface_restante_abandonnee = None
+    with pytest.raises(MotifAbandonManquantError):
+        traitement.valider(
+            date(2026, 8, 12),
+            [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        )
+
+
+def test_valider_aerien_surface_restante_abandonnee_avec_motif_ok():
+    traitement = _traitement_aerien_valide()
+    traitement.aerien.surface_restante_abandonnee = True
+    traitement.aerien.motif_surface_restante_abandonnee = "Zone inaccessible (crue)"
+    traitement.valider(
+        date(2026, 8, 12),
+        [
+            {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+            {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+            {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+        ],
+    )
     assert traitement.statut == "validee"
 
 

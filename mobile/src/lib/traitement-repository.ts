@@ -132,6 +132,9 @@ export interface TraitementAerien {
   surface_restante_ha: number | null;
   pesticide_recu_l: number | null;
   pesticide_stock_restant_l: number | null;
+  // Surface restante abandonnée ? (migration backend 0086) — mirroir du Terrestre.
+  surface_restante_abandonnee: boolean | null;
+  motif_surface_restante_abandonnee: string | null;
   // Efficacité (migration backend 0058) : une seule évaluation par fiche
   // (après l'ensemble des rotations), pas par rotation individuelle — même
   // patron que TraitementTerrestre ci-dessous.
@@ -617,6 +620,27 @@ export async function updateTraitementAerien(
     throw new Error('Échec de la mise à jour de la fiche brouillon locale');
   }
   return updated;
+}
+
+/**
+ * Surface restante abandonnée ? (migration backend 0086) — décision de l'agent
+ * sur l'écran « Pesticides & rotations » (rotations.tsx), mirroir du Terrestre.
+ * Le motif n'a de sens que pour un abandon : remis à NULL sinon (même invariant
+ * que la CHECK `ck_traitement_aerien_motif_abandon` côté serveur).
+ */
+export async function updateTraitementAerienSurfaceRestante(
+  traitementId: string,
+  input: { abandonnee: boolean | null | undefined; motif: string | null | undefined }
+): Promise<void> {
+  const db = await getDb();
+  const abandonnee = input.abandonnee ?? null;
+  await db.runAsync(
+    `UPDATE traitement_aerien SET
+      surface_restante_abandonnee = ?,
+      motif_surface_restante_abandonnee = ?
+     WHERE traitement_id = ?`,
+    [abandonnee === null ? null : abandonnee ? 1 : 0, abandonnee ? input.motif ?? null : null, traitementId]
+  );
 }
 
 /**

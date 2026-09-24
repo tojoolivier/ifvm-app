@@ -3575,6 +3575,10 @@ export interface components {
             immatricule_aeronef: string;
             /** Pesticide Recu L */
             pesticide_recu_l?: number | null;
+            /** Surface Restante Abandonnee */
+            surface_restante_abandonnee?: boolean | null;
+            /** Motif Surface Restante Abandonnee */
+            motif_surface_restante_abandonnee?: string | null;
             /** Taux Mortalite Pourcent */
             taux_mortalite_pourcent?: number | null;
             /** Evaluation Efficacite Heures Apres */
@@ -3635,6 +3639,10 @@ export interface components {
             pesticide_recu_l: number | null;
             /** Pesticide Stock Restant L */
             pesticide_stock_restant_l: number | null;
+            /** Surface Restante Abandonnee */
+            surface_restante_abandonnee: boolean | null;
+            /** Motif Surface Restante Abandonnee */
+            motif_surface_restante_abandonnee: string | null;
             /** Taux Mortalite Pourcent */
             taux_mortalite_pourcent: number | null;
             /** Evaluation Efficacite Heures Apres */

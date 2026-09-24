@@ -6,11 +6,11 @@ import { traitementColors } from './tokens';
 // « Pesticides & rotations » s'insère juste après (rotations.tsx) — aérien
 // seulement, puisque les rotations n'ont pas d'équivalent côté terrestre (produits
 // utilisés restés sur l'écran Équipe). #equipe-slide-aerien. « Cibles » devient
-// « Synthèse » (cibles + végétation, déplacée depuis Moyens) et un dernier segment
-// « Surface traitée » s'insère avant Signatures (#326) — toujours aérien seulement,
-// le terrestre garde son flux actuel. Les deux flux ont donc un nombre d'étapes
-// différent (8 vs 6) : deux listes séparées plutôt qu'une seule masquant/affichant
-// un segment selon le type.
+// « Synthèse » (cibles + végétation, déplacée depuis Moyens) (#326) — aérien seulement,
+// le terrestre garde son flux actuel. (Le segment « Surface traitée » ajouté par #326 a été
+// retiré : la surface traitée se lit déjà sur « Pesticides & rotations ».) Les deux flux
+// ont donc un nombre d'étapes différent (7 vs 6) : deux listes séparées plutôt qu'une seule
+// masquant/affichant un segment selon le type.
 export const PROGRESS_SEGMENTS_AERIEN = [
   'Références',
   'Synthèse',
@@ -18,7 +18,6 @@ export const PROGRESS_SEGMENTS_AERIEN = [
   'Pesticides & rotations',
   'Moyens',
   'Impacts',
-  'Surface traitée',
   'Signatures',
 ] as const;
 
@@ -42,7 +41,7 @@ interface ProgressBarProps {
   segments?: Segments;
 }
 
-/** Barre de progression à 6 ou 8 segments selon le type de traitement — n'apparaît
+/** Barre de progression à 6 ou 7 segments selon le type de traitement — n'apparaît
  * que sur les écrans A à F/G. */
 export function ProgressBar({ currentIndex, segments = PROGRESS_SEGMENTS_AERIEN }: ProgressBarProps) {
   return (

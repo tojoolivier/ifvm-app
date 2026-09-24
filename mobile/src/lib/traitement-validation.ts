@@ -63,6 +63,32 @@ export function computeTotalPesticideAerienParUnite(
 }
 
 /**
+ * Unité (L ou kg) déduite de la « dose de référence » du référentiel pesticide
+ * (ex. « 2 l/ha » → 'L', « 200 g/ha » ou « 1,5 kg/ha » → 'kg') : un produit liquide se
+ * dose au litre, une poudre au poids. `null` si la dose est absente ou illisible — l'appelant
+ * garde alors le choix manuel.
+ */
+export function deriveUniteDepuisDoseReference(doseReference: string | null | undefined): 'L' | 'kg' | null {
+  if (!doseReference) return null;
+  const match = doseReference.toLowerCase().match(/\d\s*(kg|kilos?|mg|g|litres?|ml|cl|l)\b/);
+  if (!match) return null;
+  return ['kg', 'kilo', 'kilos', 'mg', 'g'].includes(match[1]) ? 'kg' : 'L';
+}
+
+/**
+ * Unité de « Approvisionnement » (Aérien) : c'est celle du produit employé. Une fiche
+ * n'utilise en pratique qu'un seul type de produit — kg seulement si tous les produits
+ * choisis sont dosés au poids, litres sinon (liquide, mélange, ou aucun produit encore
+ * choisi).
+ */
+export function computeUniteApprovisionnementAerien(
+  rotations: { produit_id?: string | null; unite?: 'L' | 'kg' | null }[]
+): 'L' | 'kg' {
+  const avecProduit = rotations.filter((r) => !!r.produit_id);
+  return avecProduit.length > 0 && avecProduit.every((r) => r.unite === 'kg') ? 'kg' : 'L';
+}
+
+/**
  * traitement_aerien.surface_traitee_ha n'est plus une saisie directe (migration 0046) :
  * dérivée de la somme des `surface_ha` de chaque rotation, même principe que
  * computeTotalPesticideAerienParUnite ci-dessus.

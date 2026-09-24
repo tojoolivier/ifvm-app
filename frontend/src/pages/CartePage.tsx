@@ -40,6 +40,8 @@ interface Prospection {
   latitude: number | null
   longitude: number | null
   infestations: InfestationRead[]
+  surface_infestee: number | null
+  type_prospection: string
 }
 
 const SEVERITE_STYLE: Record<SeveriteNiveau, { color: string; radius: number }> = {
@@ -78,8 +80,8 @@ export function CartePage() {
   }
 
   const { data: prospections = [], isLoading } = useQuery<Prospection[]>({
-    queryKey: ['prospections', 'intensive'],
-    queryFn: () => api.get('/prospections', { params: { type: 'intensive' } }).then((r) => r.data),
+    queryKey: ['prospections', 'carte'],
+    queryFn: () => api.get('/prospections').then((r) => r.data),
   })
 
   const { data: campagnes = [] } = useQuery<Campagne[]>({
@@ -216,7 +218,27 @@ export function CartePage() {
                     <Popup>
                       <div className="text-sm">
                         <p className="font-semibold">{marker.nFiche ?? 'Fiche sans numéro'}</p>
+                        {marker.typeProspection && (
+                          <p className="text-muted-foreground">
+                            Prospection {marker.typeProspection === 'extensive' ? 'extensive' : 'intensive'}
+                          </p>
+                        )}
                         <p>Sévérité : {SEVERITE_LABELS[marker.severite]}</p>
+                        <p className="mt-2 font-medium">Situation d&apos;infestation acridienne</p>
+                        <p>Surface infestée : {marker.surfaceTotale != null ? `${marker.surfaceTotale} ha` : '—'}</p>
+                        <ul className="mb-2 list-disc pl-4" hidden={marker.infestations.length === 0}>
+                          {marker.infestations.map((infestation, index) => (
+                            <li key={index}>
+                              {infestation.typeLabel}
+                              {' — '}
+                              {infestation.surfaceTotale != null ? `${infestation.surfaceTotale} ha` : 'surface —'}
+                              {' — '}
+                              {infestation.densiteMoy != null ? `densité ${infestation.densiteMoy}` : 'densité —'}
+                              {' — '}
+                              {infestation.comportementLabel}
+                            </li>
+                          ))}
+                        </ul>
                         <button
                           className="text-primary underline"
                           onClick={() => navigate(`/prospections/${marker.prospectionId}`)}

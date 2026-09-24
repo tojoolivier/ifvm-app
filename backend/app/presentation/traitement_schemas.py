@@ -102,6 +102,9 @@ class TraitementAerienCreate(BaseModel):
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
     # des `surface_ha` de rotation, ajoutées après coup via /rotations.
     pesticide_recu_l: float | None = Field(None, ge=0)
+    # Surface restante abandonnée ? (migration 0086) — mirroir de TraitementTerrestreCreate.
+    surface_restante_abandonnee: bool | None = None
+    motif_surface_restante_abandonnee: str | None = None
     # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
     # seule évaluation par fiche, après l'ensemble des rotations — pas de
     # contrainte de cohérence entre les 3 champs, chacun facultatif
@@ -453,6 +456,8 @@ class TraitementAerienRead(BaseModel):
     surface_restante_ha: float | None
     pesticide_recu_l: float | None
     pesticide_stock_restant_l: float | None
+    surface_restante_abandonnee: bool | None
+    motif_surface_restante_abandonnee: str | None
     taux_mortalite_pourcent: float | None
     evaluation_efficacite_heures_apres: float | None
     methode_evaluation_efficacite: MethodeEvaluationEfficacite | None

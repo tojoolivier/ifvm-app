@@ -365,62 +365,69 @@ export default function MoyensScreen() {
           onBlur={() => handleDecimalBlur('nbPersonnelLocal')}
         />
 
-        <Text style={styles.sectionLabel}>Matériels</Text>
-        <Text style={styles.fieldLabel}>Atomiseur</Text>
-        <TextInput
-          testID="moyens-atomiseur-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="number-pad"
-          value={decimalDrafts.moyensAtomiseurNb ?? formatDecimalDisplay(moyensAtomiseurNb)}
-          onChangeText={(v) => handleDecimalChange('moyensAtomiseurNb', v)}
-          onBlur={() => handleDecimalBlur('moyensAtomiseurNb')}
-        />
-        <Text style={styles.fieldLabel}>Essence (litres)</Text>
-        <TextInput
-          testID="moyens-essence-litres-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="decimal-pad"
-          value={decimalDrafts.moyensEssenceLitres ?? formatDecimalDisplay(moyensEssenceLitres)}
-          onChangeText={(v) => handleDecimalChange('moyensEssenceLitres', v)}
-          onBlur={() => handleDecimalBlur('moyensEssenceLitres')}
-        />
-        <Text style={styles.fieldLabel}>Disque rotatif</Text>
-        <TextInput
-          testID="moyens-disque-rotatif-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="number-pad"
-          value={decimalDrafts.moyensDisqueRotatifNb ?? formatDecimalDisplay(moyensDisqueRotatifNb)}
-          onChangeText={(v) => handleDecimalChange('moyensDisqueRotatifNb', v)}
-          onBlur={() => handleDecimalBlur('moyensDisqueRotatifNb')}
-        />
-        <Text style={styles.fieldLabel}>Nombre de piles</Text>
-        <TextInput
-          testID="moyens-piles-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="number-pad"
-          value={decimalDrafts.moyensPilesNb ?? formatDecimalDisplay(moyensPilesNb)}
-          onChangeText={(v) => handleDecimalChange('moyensPilesNb', v)}
-          onBlur={() => handleDecimalBlur('moyensPilesNb')}
-        />
-        <Text style={styles.fieldLabel}>Ulvamast</Text>
-        <TextInput
-          testID="moyens-ulvamast-input"
-          editable={!readOnly}
-          style={styles.input}
-          placeholder="0"
-          keyboardType="number-pad"
-          value={decimalDrafts.moyensUlvamastNb ?? formatDecimalDisplay(moyensUlvamastNb)}
-          onChangeText={(v) => handleDecimalChange('moyensUlvamastNb', v)}
-          onBlur={() => handleDecimalBlur('moyensUlvamastNb')}
-        />
+        {/* Matériels (atomiseur, essence…) : Terrestre uniquement — retirés du flux Aérien
+            (décision produit). Les valeurs déjà enregistrées restent rechargées et
+            réécrites telles quelles par `handleContinuer` (round-trip, rien n'est perdu). */}
+        {typeTraitement !== 'AERIEN' && (
+          <>
+            <Text style={styles.sectionLabel}>Matériels</Text>
+            <Text style={styles.fieldLabel}>Atomiseur</Text>
+            <TextInput
+              testID="moyens-atomiseur-input"
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="0"
+              keyboardType="number-pad"
+              value={decimalDrafts.moyensAtomiseurNb ?? formatDecimalDisplay(moyensAtomiseurNb)}
+              onChangeText={(v) => handleDecimalChange('moyensAtomiseurNb', v)}
+              onBlur={() => handleDecimalBlur('moyensAtomiseurNb')}
+            />
+            <Text style={styles.fieldLabel}>Essence (litres)</Text>
+            <TextInput
+              testID="moyens-essence-litres-input"
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="0"
+              keyboardType="decimal-pad"
+              value={decimalDrafts.moyensEssenceLitres ?? formatDecimalDisplay(moyensEssenceLitres)}
+              onChangeText={(v) => handleDecimalChange('moyensEssenceLitres', v)}
+              onBlur={() => handleDecimalBlur('moyensEssenceLitres')}
+            />
+            <Text style={styles.fieldLabel}>Disque rotatif</Text>
+            <TextInput
+              testID="moyens-disque-rotatif-input"
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="0"
+              keyboardType="number-pad"
+              value={decimalDrafts.moyensDisqueRotatifNb ?? formatDecimalDisplay(moyensDisqueRotatifNb)}
+              onChangeText={(v) => handleDecimalChange('moyensDisqueRotatifNb', v)}
+              onBlur={() => handleDecimalBlur('moyensDisqueRotatifNb')}
+            />
+            <Text style={styles.fieldLabel}>Nombre de piles</Text>
+            <TextInput
+              testID="moyens-piles-input"
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="0"
+              keyboardType="number-pad"
+              value={decimalDrafts.moyensPilesNb ?? formatDecimalDisplay(moyensPilesNb)}
+              onChangeText={(v) => handleDecimalChange('moyensPilesNb', v)}
+              onBlur={() => handleDecimalBlur('moyensPilesNb')}
+            />
+            <Text style={styles.fieldLabel}>Ulvamast</Text>
+            <TextInput
+              testID="moyens-ulvamast-input"
+              editable={!readOnly}
+              style={styles.input}
+              placeholder="0"
+              keyboardType="number-pad"
+              value={decimalDrafts.moyensUlvamastNb ?? formatDecimalDisplay(moyensUlvamastNb)}
+              onChangeText={(v) => handleDecimalChange('moyensUlvamastNb', v)}
+              onBlur={() => handleDecimalBlur('moyensUlvamastNb')}
+            />
+          </>
+        )}
 
         <Text style={styles.sectionLabel}>Kit de protection</Text>
         <Card variant={nbKitFournis === 5 ? 'info' : 'avertissement'}>
