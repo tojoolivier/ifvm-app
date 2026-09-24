@@ -595,7 +595,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     header: {
       backgroundColor: HEADER_BG,
       paddingHorizontal: 16,
-      paddingBottom: 10,
+      paddingBottom: 14,
       borderBottomLeftRadius: 22,
       borderBottomRightRadius: 22,
       shadowColor: '#000',
@@ -667,7 +667,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     badgeRow: {
       flexDirection: 'row',
       gap: 8,
-      marginTop: 14,
+      marginTop: 8,
     },
     badgeAvailable: {
       flexDirection: 'row',
