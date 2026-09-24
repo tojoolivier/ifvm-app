@@ -25,6 +25,16 @@ export interface CarteProspection {
   /** Surface infestée déclarée sur la fiche elle-même (ha), pour toute fiche intensive ou extensive. */
   surface_infestee?: number | null
   type_prospection?: string
+  // Bases aériennes déclarées sur la fiche (prospection extensive en mode aérien).
+  base?: string | null
+  base_numero?: number | null
+  base_date_installation?: string | null
+  base_latitude?: number | null
+  base_longitude?: number | null
+  base_secondaire?: string | null
+  base_secondaire_date_installation?: string | null
+  base_secondaire_latitude?: number | null
+  base_secondaire_longitude?: number | null
 }
 
 export interface CarteFiltres {
@@ -248,4 +258,141 @@ export function buildTraitementMarkers(
   }
 
   return markers
+}
+
+// ---------------------------------------------------------------------------
+// Bases aériennes : les bases (principale et secondaire) déclarées sur les fiches
+// de prospection extensive en mode aérien — un déplacement de base se lit comme
+// l'apparition d'une base secondaire, avec sa date d'installation.
+// ---------------------------------------------------------------------------
+
+export type BaseAerienneType = 'principale' | 'secondaire'
+
+export interface BaseAerienneMarker {
+  /** Clé de déduplication : type + coordonnées arrondies (la même base revient sur plusieurs fiches). */
+  key: string
+  type: BaseAerienneType
+  nom: string | null
+  numero: number | null
+  dateInstallation: string | null
+  latitude: number
+  longitude: number
+  /** Nombre de fiches filtrées qui déclarent cette base. */
+  nbFiches: number
+  /** Première fiche qui la déclare — cible du lien « Voir la fiche ». */
+  prospectionId: string
+}
+
+export function buildBaseAerienneMarkers(prospections: CarteProspection[]): BaseAerienneMarker[] {
+  const bases = new Map<string, BaseAerienneMarker>()
+
+  function ajouter(
+    p: CarteProspection,
+    type: BaseAerienneType,
+    latitude: number | null | undefined,
+    longitude: number | null | undefined,
+    nom: string | null | undefined,
+    numero: number | null | undefined,
+    dateInstallation: string | null | undefined,
+  ) {
+    if (latitude == null || longitude == null) return
+    const key = `${type}|${latitude.toFixed(4)}|${longitude.toFixed(4)}`
+    const existante = bases.get(key)
+    if (existante) {
+      existante.nbFiches += 1
+      existante.nom ??= nom ?? null
+      existante.dateInstallation ??= dateInstallation ?? null
+      return
+    }
+    bases.set(key, {
+      key,
+      type,
+      nom: nom ?? null,
+      numero: numero ?? null,
+      dateInstallation: dateInstallation ?? null,
+      latitude,
+      longitude,
+      nbFiches: 1,
+      prospectionId: p.id,
+    })
+  }
+
+  for (const p of prospections) {
+    ajouter(p, 'principale', p.base_latitude, p.base_longitude, p.base, p.base_numero, p.base_date_installation)
+    ajouter(
+      p,
+      'secondaire',
+      p.base_secondaire_latitude,
+      p.base_secondaire_longitude,
+      p.base_secondaire,
+      null,
+      p.base_secondaire_date_installation,
+    )
+  }
+
+  return [...bases.values()]
+}
+
+// ---------------------------------------------------------------------------
+// Couches : quelles fiches l'utilisateur veut voir sur la carte.
+// ---------------------------------------------------------------------------
+
+export type CoucheCarte =
+  | 'prospection_intensive'
+  | 'prospection_extensive'
+  | 'prospection_validation'
+  | 'traitement_aerien'
+  | 'traitement_terrestre'
+  | 'base_aerienne'
+
+export interface CoucheGroupe {
+  groupe: string
+  couches: { key: CoucheCarte; label: string }[]
+}
+
+export const COUCHES_CARTE: CoucheGroupe[] = [
+  {
+    groupe: 'Prospection',
+    couches: [
+      { key: 'prospection_intensive', label: 'Intensive' },
+      { key: 'prospection_extensive', label: 'Extensive' },
+      { key: 'prospection_validation', label: 'Validation' },
+    ],
+  },
+  {
+    groupe: 'Traitement',
+    couches: [
+      { key: 'traitement_aerien', label: 'Aérien' },
+      { key: 'traitement_terrestre', label: 'Terrestre' },
+    ],
+  },
+  {
+    groupe: 'Base aérienne',
+    couches: [{ key: 'base_aerienne', label: 'Déplacement de base aérienne' }],
+  },
+]
+
+export const TOUTES_LES_COUCHES: CoucheCarte[] = COUCHES_CARTE.flatMap((g) => g.couches.map((c) => c.key))
+
+/**
+ * Couche d'une fiche de prospection selon son type. Un type absent ou inconnu (fiche plus
+ * ancienne que le champ) reste visible tant qu'au moins une couche de prospection est cochée.
+ */
+export function coucheProspection(type: string | null | undefined): CoucheCarte | null {
+  if (type === 'intensive') return 'prospection_intensive'
+  if (type === 'extensive') return 'prospection_extensive'
+  if (type === 'validation') return 'prospection_validation'
+  return null
+}
+
+export function prospectionVisible(type: string | null | undefined, couches: ReadonlySet<CoucheCarte>): boolean {
+  const couche = coucheProspection(type)
+  if (couche) return couches.has(couche)
+  return couches.has('prospection_intensive') || couches.has('prospection_extensive') || couches.has('prospection_validation')
+}
+
+export function traitementVisible(typeTraitement: string, couches: ReadonlySet<CoucheCarte>): boolean {
+  if (typeTraitement === 'AERIEN') return couches.has('traitement_aerien')
+  if (typeTraitement === 'TERRESTRE') return couches.has('traitement_terrestre')
+  return couches.has('traitement_aerien') || couches.has('traitement_terrestre')
 }
