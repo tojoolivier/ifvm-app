@@ -233,6 +233,9 @@ const MIGRATED_COLUMNS = [
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue(MIGRATED_COLUMNS);
 const runAsync = jest.fn().mockResolvedValue(undefined);
+// user_version absent => base jamais migrée (0) : toutes les étapes numérotées sont jouées.
+const getFirstAsync = jest.fn().mockResolvedValue(null);
+const withTransactionAsync = jest.fn(async (tache: () => Promise<void>) => tache());
 
 /**
  * Méthode hors du tableau de typage, qui **rend son propre `this`**.
@@ -249,6 +252,8 @@ const baseNue = {
   execAsync,
   getAllAsync,
   runAsync,
+  getFirstAsync,
+  withTransactionAsync,
   closeAsync: renvoieSonThis,
 };
 
@@ -263,7 +268,8 @@ beforeEach(() => {
   resetLoggerForTests();
   openDatabaseAsync.mockClear();
   execAsync.mockClear();
-  getAllAsync.mockClear();
+  // mockReset : `mockClear` laisse les valeurs `...Once` non consommées fuir d'un test au suivant.
+  getAllAsync.mockReset().mockResolvedValue(MIGRATED_COLUMNS);
   runAsync.mockClear();
 });
 
@@ -277,8 +283,9 @@ describe('prospection-db', () => {
   it('creates the prospection, prospection_capture and prospection_population tables', async () => {
     await getDb();
 
-    expect(execAsync).toHaveBeenCalledTimes(1);
-    const sql = execAsync.mock.calls[0][0] as string;
+    const sql = execAsync.mock.calls
+      .map(([requete]) => requete as string)
+      .find((requete) => requete.includes('CREATE TABLE IF NOT EXISTS prospection ')) as string;
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS prospection ');
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS prospection_capture');
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS prospection_population');

@@ -2,9 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { getDb } from './prospection-db';
 import { ReferentialError } from './errors';
-import { STOCK_DDL } from './stock-schema';
 import { REFERENTIEL_DDL, REFERENTIEL_SCHEMA_VERSION, REFERENTIEL_TABLES } from './referentiel-schema.generated';
-import { VOL_DDL, migrerColonnesVol } from './vol-schema';
 
 /**
  * Migration en cours ou terminée. C'est une **promesse** mémoïsée, pas un booléen :
@@ -402,11 +400,8 @@ export async function findNearestStation(
 }
 
 /**
- * Tables écrites à la main, hors du schéma généré : la reconstruction du référentiel n'y touche
- * jamais. Y figurent les métadonnées du cache (curseurs, version) et les saisies pas encore
- * envoyées. `site_aerien_deplacement` est la file d'envoi des déplacements, `site_aerien_position` l'historique
- * local, `vol`/`vol_lien` et `mouvement_pesticide_local` des saisies pas encore envoyées.
- * (`stock_solde` et `referentiel_sync_meta` sont des caches, mais hors du schéma généré.)
+ * Métadonnées du cache : curseurs `since` et version du schéma généré. Les saisies de vol, de site et
+ * de stock ne sont plus créées ici mais par les migrations numérotées (`migrations-captures.ts`).
  */
 const DDL_LOCAL = `
     CREATE TABLE IF NOT EXISTS referentiel_sync_meta (
@@ -419,48 +414,6 @@ const DDL_LOCAL = `
       id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
       version TEXT NOT NULL
     );
-
-    -- Historique des implantations (#643). Pas un miroir du serveur : le pull n'embarque que la
-    -- position active, l'historique local est celui des déplacements faits sur cet appareil
-    -- (plus ce que l'écran rafraîchit en ligne). 'local' = créée hors-ligne, pas encore envoyée.
-    CREATE TABLE IF NOT EXISTS site_aerien_position (
-      id TEXT PRIMARY KEY NOT NULL,
-      site_id TEXT NOT NULL,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
-      altitude REAL,
-      date_debut TEXT NOT NULL,
-      date_fin TEXT,
-      localite TEXT NOT NULL,
-      statut_sync TEXT NOT NULL DEFAULT 'synced'
-    );
-
-    CREATE INDEX IF NOT EXISTS ix_site_aerien_position_site_id ON site_aerien_position(site_id);
-
-    -- File des déplacements à envoyer (#643) : un déplacement groupé = une ligne, rejouée dans
-    -- l'ordre de saisie une fois les sites concernés synchronisés. Le vol de mise en place
-    -- facultatif voyage avec elle (vol_json) : il n'a de sens qu'après le déplacement.
-    CREATE TABLE IF NOT EXISTS site_aerien_deplacement (
-      id TEXT PRIMARY KEY NOT NULL,
-      site_id TEXT NOT NULL,
-      numero TEXT NOT NULL,
-      localite TEXT NOT NULL,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
-      altitude REAL,
-      -- 1 si numéro/localité ont changé : seul cas où l'envoi passe par PUT /sites-aeriens/{id}
-      -- (réservé au chef côté serveur, alors que le déplacement lui-même ne l'est pas).
-      renomme INTEGER NOT NULL DEFAULT 0,
-      dependants_json TEXT NOT NULL DEFAULT '[]',
-      vol_json TEXT,
-      cree_le TEXT NOT NULL,
-      statut_sync TEXT NOT NULL DEFAULT 'local',
-      erreur TEXT
-    );
-
-    ${VOL_DDL}
-
-    ${STOCK_DDL}
 `;
 
 /**
@@ -471,7 +424,6 @@ const DDL_LOCAL = `
  */
 async function preparerSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(DDL_LOCAL);
-  await migrateColonnesAeriennes(db);
 
   const stockee = await db.getFirstAsync<{ version: string }>(
     'SELECT version FROM referentiel_schema_version WHERE id = 1'
@@ -518,33 +470,4 @@ async function reconstruireReferentiel(db: SQLite.SQLiteDatabase): Promise<void>
       [REFERENTIEL_SCHEMA_VERSION]
     );
   });
-}
-
-/**
- * `CREATE TABLE IF NOT EXISTS` ne complète pas une table déjà créée par une version antérieure du
- * schéma : un appareil de développement qui portait `site_aerien_deplacement` sans `renomme`
- * refusait toute écriture (« no column named renomme »). On ajoute donc les colonnes manquantes.
- */
-async function migrateColonnesAeriennes(db: SQLite.SQLiteDatabase): Promise<void> {
-  await addColumnsIfMissing(db, 'site_aerien_deplacement', [
-    { name: 'renomme', type: 'INTEGER NOT NULL DEFAULT 0' },
-    { name: 'dependants_json', type: "TEXT NOT NULL DEFAULT '[]'" },
-    { name: 'vol_json', type: 'TEXT' },
-    { name: 'erreur', type: 'TEXT' },
-  ]);
-  await migrerColonnesVol(db);
-}
-
-async function addColumnsIfMissing(
-  db: SQLite.SQLiteDatabase,
-  table: string,
-  columns: { name: string; type: string }[]
-): Promise<void> {
-  const tableInfo = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
-  const existing = new Set(tableInfo.map((row) => row.name));
-  for (const col of columns) {
-    if (!existing.has(col.name)) {
-      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${col.name} ${col.type};`);
-    }
-  }
 }

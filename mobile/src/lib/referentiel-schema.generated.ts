@@ -1,4 +1,3 @@
- 
 // Fichier généré par `npm run generate:referentiel-schema` depuis api-schema.generated.ts.
 // Ne pas modifier à la main : la couche locale se déclare dans scripts/referentiel-schema.config.js.
 

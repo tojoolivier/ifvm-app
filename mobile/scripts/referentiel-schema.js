@@ -147,8 +147,7 @@ function genererModule(source) {
   const ddl = config.tables.map((t) => ddlTable(t, source)).join('\n\n');
   const version = crypto.createHash('sha1').update(ddl).digest('hex').slice(0, 12);
   const tables = config.tables.map((t) => `  '${t.table}',`).join('\n');
-  return `/* eslint-disable */
-// Fichier généré par \`npm run generate:referentiel-schema\` depuis api-schema.generated.ts.
+  return `// Fichier généré par \`npm run generate:referentiel-schema\` depuis api-schema.generated.ts.
 // Ne pas modifier à la main : la couche locale se déclare dans scripts/referentiel-schema.config.js.
 
 /** Tables du cache jetable du référentiel (DROP + pull complet quand la version change). */

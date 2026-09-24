@@ -3,7 +3,7 @@
 /**
  * Vérifie que chaque champ du contrat OpenAPI backend (api-schema.generated.ts,
  * régénéré via `npm run generate:api-types`) a une colonne SQLite correspondante
- * dans prospection-db.ts. C'est le garde-fou anti-régression du bug `phase` :
+ * dans db-baseline.ts / migrations-captures.ts. C'est le garde-fou anti-régression du bug `phase` :
  * une colonne ajoutée côté backend et jamais répercutée côté mobile causait un
  * écran blanc silencieux (requête SQL en échec, promesse rejetée sans .catch).
  *
@@ -31,7 +31,9 @@ const path = require('path');
 
 const { verifierFraicheur, OUT_PATH: REFERENTIEL_OUT_PATH } = require('./referentiel-schema');
 
-const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'prospection-db.ts');
+// Schéma de base (figé, migration 1) puis étapes numérotées suivantes (#676).
+const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'db-baseline.ts');
+const MIGRATIONS_PATH = path.join(process.cwd(), 'src', 'lib', 'migrations-captures.ts');
 const SCHEMA_PATH = path.join(process.cwd(), 'src', 'lib', 'api-schema.generated.ts');
 
 // table SQLite -> schéma OpenAPI "*Create" correspondant
@@ -106,6 +108,17 @@ function extraireColonnesDeMigration(source) {
   return parTable;
 }
 
+/** Colonnes ajoutées par les étapes numérotées : `ALTER TABLE t ADD COLUMN c` en SQL direct. */
+function extraireColonnesDesEtapes(source) {
+  const parTable = {};
+  for (const [, table, colonne] of source.matchAll(
+    /ALTER TABLE ([a-z_]+) ADD COLUMN ([a-z_][a-z0-9_]*)/g
+  )) {
+    (parTable[table] ??= new Set()).add(colonne);
+  }
+  return parTable;
+}
+
 function extractOpenApiFields(source, schemaName) {
   const re = new RegExp(`\\b${schemaName}: \\{([\\s\\S]*?)\\n {8}\\};`, 'm');
   const match = source.match(re);
@@ -126,6 +139,7 @@ function main() {
   const schemaSource = fs.readFileSync(SCHEMA_PATH, 'utf8');
 
   const migrations = extraireColonnesDeMigration(dbSource);
+  const etapes = extraireColonnesDesEtapes(fs.readFileSync(MIGRATIONS_PATH, 'utf8'));
 
   let hasDrift = false;
 
@@ -133,6 +147,7 @@ function main() {
     const sqliteColumns = new Set([
       ...extraireColonnesCreate(dbSource, table),
       ...(migrations[table] ?? []),
+      ...(etapes[table] ?? []),
     ]);
     const openapiFields = extractOpenApiFields(schemaSource, schemaName);
 
@@ -163,9 +178,8 @@ function main() {
 
   if (hasDrift) {
     console.error('\nRégénère api-schema.generated.ts (npm run generate:api-types) si le backend a évolué,');
-    console.error('sinon ajoute la colonne manquante dans prospection-db.ts : au CREATE TABLE');
-    console.error('si elle est nouvelle pour tout le monde, et à la liste COLONNES_* correspondante');
-    console.error('pour que les appareils déjà installés la reçoivent aussi.');
+    console.error('sinon ajoute la colonne manquante par une nouvelle étape de migrations-captures.ts (ALTER TABLE ... ADD COLUMN)');
+    console.error('(une base neuve reçoit la même chose : le schéma de base plus les étapes, dans l’ordre).');
     process.exit(1);
   }
 

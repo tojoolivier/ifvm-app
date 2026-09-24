@@ -1,13 +1,10 @@
-import type * as SQLite from 'expo-sqlite';
-
 /**
  * Schéma local des vols (#644), à part de `referentiel-db.ts` : ce cache n'a rien d'un référentiel et
- * change pour d'autres raisons. `referentiel-db` en inclut le DDL à la création et appelle
- * `migrerColonnesVol` à l'ouverture.
+ * change pour d'autres raisons. Le DDL est créé par la migration de base (`db-baseline.ts`).
  */
 
 /** Colonnes propres à une catégorie : nulles pour les autres. Une seule liste sert au DDL et à la migration. */
-const COLONNES_FACULTATIVES = [
+export const COLONNES_VOL_FACULTATIVES = [
   { name: 'site_principal_id', type: 'TEXT' },
   { name: 'stand_id', type: 'TEXT' },
   { name: 'base_secondaire_id', type: 'TEXT' },
@@ -31,7 +28,7 @@ export const VOL_DDL = `
       date_vol TEXT NOT NULL,
       heure_debut TEXT NOT NULL,
       heure_fin TEXT NOT NULL,
-      ${COLONNES_FACULTATIVES.map((c) => `${c.name} ${c.type},`).join('\n      ')}
+      ${COLONNES_VOL_FACULTATIVES.map((c) => `${c.name} ${c.type},`).join('\n      ')}
       statut_sync TEXT NOT NULL DEFAULT 'local',
       cree_le TEXT NOT NULL
     );
@@ -48,15 +45,3 @@ export const VOL_DDL = `
 
     CREATE INDEX IF NOT EXISTS ix_vol_lien_ref_id ON vol_lien(ref_id);
 `;
-
-/** `CREATE TABLE IF NOT EXISTS` ne complète pas une table créée par une version antérieure du schéma. */
-export async function migrerColonnesVol(db: SQLite.SQLiteDatabase): Promise<void> {
-  const existantes = new Set(
-    (await db.getAllAsync<{ name: string }>('PRAGMA table_info(vol)')).map((colonne) => colonne.name)
-  );
-  for (const colonne of COLONNES_FACULTATIVES) {
-    if (!existantes.has(colonne.name)) {
-      await db.execAsync(`ALTER TABLE vol ADD COLUMN ${colonne.name} ${colonne.type};`);
-    }
-  }
-}
