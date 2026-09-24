@@ -37,6 +37,7 @@ type TerrestreDecimalField =
   | 'vitesse_vent_ms'
   | 'temperature_c'
   | 'surface_atomiseur_ha'
+  | 'surface_atomiseur_autoporte_ha'
   | 'surface_disque_rotatif_ha'
   | 'taux_mortalite_pourcent'
   | 'evaluation_efficacite_heures_apres'
@@ -280,6 +281,19 @@ export function TerrestreForm({
         value={getDecimalDraft('surface_atomiseur_ha') ?? formatDecimalDisplay(store.terrestre.surface_atomiseur_ha)}
         onChangeText={(v) => handleDecimalChange('surface_atomiseur_ha', v)}
         onBlur={() => clearDecimalDraft('surface_atomiseur_ha')}
+      />
+      <Text style={styles.label}>Atomiseur autoporté</Text>
+      <TextInput
+        editable={!readOnly}
+        style={styles.input}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        value={
+          getDecimalDraft('surface_atomiseur_autoporte_ha') ??
+          formatDecimalDisplay(store.terrestre.surface_atomiseur_autoporte_ha)
+        }
+        onChangeText={(v) => handleDecimalChange('surface_atomiseur_autoporte_ha', v)}
+        onBlur={() => clearDecimalDraft('surface_atomiseur_autoporte_ha')}
       />
       <Text style={styles.label}>Disque rotatif</Text>
       <TextInput
