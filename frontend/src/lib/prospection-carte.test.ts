@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildCarteMarkers,
+  buildTraitementMarkers,
   computeSeverite,
   filterProspectionsForCarte,
   type CarteProspection,
+  type CarteTraitement,
   type CarteStation,
 } from './prospection-carte'
 import type { InfestationRead } from './prospection-fiche-lecture'
@@ -177,5 +179,94 @@ describe('buildCarteMarkers', () => {
       stations,
     )
     expect(markers).toEqual([])
+  })
+})
+
+function traitement(overrides: Partial<CarteTraitement> = {}): CarteTraitement {
+  return {
+    id: 't-1',
+    prospection_id: 'p-1',
+    numero_fiche: 'T-001',
+    type_traitement: 'AERIEN',
+    mode_traitement: 'TOTAL',
+    date_traitement: '2026-09-10',
+    latitude: -19.5,
+    longitude: 46.5,
+    aerien: { surface_traitee_ha: 40, surface_protegee_ha: 0, surface_restante_ha: 10 },
+    terrestre: null,
+    ...overrides,
+  }
+}
+
+describe('buildTraitementMarkers', () => {
+  const stations: CarteStation[] = [{ id: 's1', latitude: -18.9, longitude: 47.5 }]
+
+  it('crée un marqueur par traitement avec une surface traitée, à sa propre position', () => {
+    expect(buildTraitementMarkers([traitement()], [], [])).toEqual([
+      {
+        traitementId: 't-1',
+        latitude: -19.5,
+        longitude: 46.5,
+        numeroFiche: 'T-001',
+        typeTraitement: 'AERIEN',
+        modeTraitement: 'TOTAL',
+        dateTraitement: '2026-09-10',
+        libelleSurface: 'Traitée',
+        surfaceHa: 40,
+        surfaceRestanteHa: 10,
+      },
+    ])
+  })
+
+  it('lit la surface protégée en mode barrière et la surface du terrestre (valeurs texte comprises)', () => {
+    const [marker] = buildTraitementMarkers(
+      [
+        traitement({
+          type_traitement: 'TERRESTRE',
+          mode_traitement: 'BARRIERE',
+          aerien: null,
+          terrestre: { surface_traitee_ha: 0, surface_protegee_ha: '12.50', surface_restante_ha: null },
+        }),
+      ],
+      [],
+      [],
+    )
+    expect(marker.libelleSurface).toBe('Protégée')
+    expect(marker.surfaceHa).toBe(12.5)
+    expect(marker.surfaceRestanteHa).toBeNull()
+  })
+
+  it('ignore un traitement sans surface traitée (nulle ou 0)', () => {
+    expect(
+      buildTraitementMarkers(
+        [
+          traitement({ id: 'a', aerien: { surface_traitee_ha: 0, surface_protegee_ha: 0 } }),
+          traitement({ id: 'b', aerien: { surface_traitee_ha: null } }),
+        ],
+        [],
+        [],
+      ),
+    ).toEqual([])
+  })
+
+  it('retombe sur la position de la prospection liée, puis sur celle de sa station', () => {
+    const sansPosition = { latitude: null, longitude: null }
+    const ponctuelle = buildTraitementMarkers(
+      [traitement({ ...sansPosition })],
+      [prospection({ latitude: -18, longitude: 45 })],
+      stations,
+    )
+    expect(ponctuelle[0]).toMatchObject({ latitude: -18, longitude: 45 })
+
+    const viaStation = buildTraitementMarkers(
+      [traitement({ ...sansPosition })],
+      [prospection({ station_id: 's1' })],
+      stations,
+    )
+    expect(viaStation[0]).toMatchObject({ latitude: -18.9, longitude: 47.5 })
+  })
+
+  it('ignore un traitement sans aucune position exploitable', () => {
+    expect(buildTraitementMarkers([traitement({ latitude: null, longitude: null })], [], stations)).toEqual([])
   })
 })
