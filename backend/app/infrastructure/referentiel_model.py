@@ -302,8 +302,12 @@ class EquipeAeronefModel(Base):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=datetime.utcnow)
     # Curseur du pull incrémental (#638) : clôturer une affectation ne change que
     # `date_fin`, il faut donc un horodatage rehaussé à chaque écriture.
+    # `onupdate` : la rehausse vit sur le modèle, pas dans chaque chemin d'écriture —
+    # un futur UPDATE oublié ne peut plus casser le pull sans erreur.
     updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     equipe: Mapped["EquipeModel"] = relationship(

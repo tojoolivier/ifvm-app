@@ -380,6 +380,8 @@ class SiteAerienneRepositoryImpl(SiteAerienneRepository):
                 select(SiteAeriennePositionModel).where(
                     SiteAeriennePositionModel.site_id.in_([s.id for s in sites]),
                     SiteAeriennePositionModel.date_fin.is_(None),
+                    # Une implantation planifiée dans le futur n'est pas « active ».
+                    SiteAeriennePositionModel.date_debut <= datetime.now(timezone.utc).date(),
                 )
             )
             par_site = {p.site_id: p for p in actives.scalars().all()}
@@ -840,8 +842,6 @@ class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
         # Seule `date_fin` bouge : rouvrir une période close ou déplacer son début
         # réécrirait l'histoire, ce que cette table existe précisément pour empêcher.
         model.date_fin = affectation.date_fin
-        # Sans rehausse, le pull incrémental sauterait la clôture (#638).
-        model.updated_at = datetime.now(timezone.utc)
         try:
             await self.session.commit()
         except IntegrityError as exc:

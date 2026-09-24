@@ -183,3 +183,52 @@ async def test_affectation_creee_puis_cloturee_remonte_comme_mise_a_jour(
         "upserts"
     ]
     assert [a["date_fin"] for a in upserts if a["id"] == affectation["id"]] == ["2026-07-01"]
+
+
+@pytest.mark.asyncio
+async def test_equipe_creee_avec_aeronef_expose_son_affectation_dans_le_pull(
+    client, auth_headers, admin_headers, chef_de_base
+):
+    """`EquipeRepositoryImpl.create` pose l'affectation sans passer par
+    `EquipeAeronefRepositoryImpl` : elle doit quand même porter un `updated_at`."""
+    curseur = (await _pull(client, auth_headers))["equipe_aeronefs"]["server_time"]
+    creee = await client.post(
+        "/equipes",
+        json={
+            "nom": "Équipe Ihosy",
+            "type": "aerien",
+            "membres": [{"user_id": str(chef_de_base.id), "fonction": "chef"}],
+            "aeronef": AERONEF,
+        },
+        headers=admin_headers,
+    )
+    assert creee.status_code == 201, creee.text
+
+    upserts = (await _pull(client, auth_headers, since_equipe_aeronefs=curseur))["equipe_aeronefs"][
+        "upserts"
+    ]
+    assert [a["equipe_id"] for a in upserts] == [creee.json()["id"]]
+    assert upserts[0]["date_fin"] is None
+
+
+@pytest.mark.asyncio
+async def test_position_planifiee_dans_le_futur_n_est_pas_active(
+    client, auth_headers, db_session, base_aerienne
+):
+    from datetime import date
+
+    from app.infrastructure.referentiel_model import SiteAeriennePositionModel
+
+    db_session.add(
+        SiteAeriennePositionModel(
+            site_id=base_aerienne.id,
+            latitude=-22.0,
+            longitude=46.0,
+            date_debut=date.today() + timedelta(days=30),
+        )
+    )
+    await db_session.commit()
+
+    sites = (await _pull(client, auth_headers))["sites_aeriens"]["upserts"]
+    site = next(s for s in sites if s["id"] == str(base_aerienne.id))
+    assert site["latitude"] is None
