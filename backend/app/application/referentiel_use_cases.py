@@ -44,8 +44,10 @@ from app.domain.referentiel import (
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
     SiteAerienne,
+    SiteAerienneDependantInvalideError,
     SiteAerienneEquipeInvalideError,
     SiteAerienneIntrouvableError,
+    SiteAerienneParentAbsentError,
     SiteAerienneParentInvalideError,
     SiteAeriennePosition,
     SiteDestinationIncoherentError,
@@ -829,12 +831,14 @@ async def _exiger_droit_sur_equipe(
 async def _valider_parent_site(
     repository: SiteAerienneRepository, parent_site_id: uuid.UUID | None
 ) -> None:
-    """La hiérarchie s'arrête à 2 niveaux : le parent référencé doit exister et être
-    lui-même un principal (pas de secondaire d'un secondaire)."""
+    """La hiérarchie s'arrête à 2 niveaux : le parent référencé doit exister (sinon 409
+    rejouable, #655) et être lui-même un principal (pas de secondaire d'un secondaire)."""
     if parent_site_id is None:
         return
     parent = await repository.get_by_id(parent_site_id)
-    if parent is None or parent.parent_site_id is not None:
+    if parent is None:
+        raise SiteAerienneParentAbsentError(str(parent_site_id))
+    if parent.parent_site_id is not None:
         raise SiteAerienneParentInvalideError(str(parent_site_id))
 
 
@@ -862,15 +866,22 @@ class CreateSiteAerienne:
     """Seul le chef de base de l'équipe (ou un admin) crée ses sites (bases,
     stands — le rôle est contextuel, cf. `SiteAerienneModel`). Un site principal est
     rattaché à l'équipe du chef sans qu'il la désigne ; un secondaire hérite de son
-    principal, dont l'équipe doit être la sienne."""
+    principal, dont l'équipe doit être la sienne.
+
+    Création idempotente (#655, patron #639) : `client_id` devient l'`id` du site,
+    un rejeu au même contenu renvoie l'existant. Une position initiale facultative
+    est installée à la création — et au rejeu si l'appel précédent s'est arrêté
+    entre le site et sa position."""
 
     def __init__(
         self,
         repository: SiteAerienneRepository,
         equipe_aerienne_repository: EquipeRepository,
+        position_repository: SiteAeriennePositionRepository | None = None,
     ):
         self.repository = repository
         self.equipe_aerienne_repository = equipe_aerienne_repository
+        self.position_repository = position_repository
 
     async def execute(
         self,
@@ -879,6 +890,8 @@ class CreateSiteAerienne:
         localite: str,
         parent_site_id: uuid.UUID | None = None,
         equipe_id: uuid.UUID | None = None,
+        client_id: uuid.UUID | None = None,
+        position: tuple[float, float, float | None] | None = None,
     ) -> SiteAerienne:
         await _valider_parent_site(self.repository, parent_site_id)
         if parent_site_id is None:
@@ -896,15 +909,54 @@ class CreateSiteAerienne:
         _valider_equipe_coherente(parent_site_id, equipe_id)
 
         maintenant = datetime.now(timezone.utc)
-        return await self.repository.create(
-            SiteAerienne(
-                parent_site_id=parent_site_id,
-                equipe_id=equipe_id,
-                numero=numero,
-                localite=localite,
-                actif=True,
+        candidat = SiteAerienne(
+            id=client_id or uuid.uuid4(),
+            parent_site_id=parent_site_id,
+            equipe_id=equipe_id,
+            numero=numero,
+            localite=localite,
+            actif=True,
+            created_at=maintenant,
+            updated_at=maintenant,
+        )
+        site = await self._creer_ou_rejouer(candidat, rejouable=client_id is not None)
+        if position is not None:
+            await self._installer_position_initiale(site.id, position)
+        return site
+
+    async def _creer_ou_rejouer(self, candidat: SiteAerienne, rejouable: bool) -> SiteAerienne:
+        if rejouable:
+            existant = await self.repository.get_by_id(candidat.id)
+            if existant is not None:
+                return _rejouer(existant, candidat, candidat.id)
+        try:
+            return await self.repository.create(candidat)
+        except IdentifiantDejaUtiliseError:
+            # Rejeu concurrent : l'autre requête a inséré entre le `get_by_id` et le
+            # `create` — on relit et on tranche comme pour un rejeu ordinaire.
+            existant = await self.repository.get_by_id(candidat.id)
+            if existant is None:
+                raise
+            return _rejouer(existant, candidat, candidat.id)
+
+    async def _installer_position_initiale(
+        self, site_id: uuid.UUID, position: tuple[float, float, float | None]
+    ) -> None:
+        if self.position_repository is None:
+            return
+        if await self.position_repository.list_par_site(site_id):
+            return  # déjà installée (rejeu) ou site déjà déplacé depuis : on n'y touche pas
+        latitude, longitude, altitude = position
+        maintenant = datetime.now(timezone.utc)
+        await self.position_repository.installer(
+            SiteAeriennePosition(
+                site_id=site_id,
+                latitude=latitude,
+                longitude=longitude,
+                altitude=altitude,
+                date_debut=maintenant.date(),
+                date_fin=None,
                 created_at=maintenant,
-                updated_at=maintenant,
             )
         )
 
@@ -1008,6 +1060,41 @@ class InstallerPositionSiteAerienne:
                 date_fin=None,
                 created_at=maintenant,
             )
+        )
+
+
+class DeplacerSiteAerienne:
+    """Déplacement groupé (#655, ADR-018 §3) : le site et les `dependants` cochés
+    reçoivent la même nouvelle position, en une seule transaction. Les dépendants
+    doivent avoir le site déplacé pour principal — un secondaire se déplace seul
+    (`dependants` vide). La position active précédente est close à J-1."""
+
+    def __init__(
+        self,
+        repository: SiteAeriennePositionRepository,
+        site_repository: SiteAerienneRepository,
+    ):
+        self.repository = repository
+        self.site_repository = site_repository
+
+    async def execute(
+        self,
+        site_id: uuid.UUID,
+        latitude: float,
+        longitude: float,
+        altitude: float | None = None,
+        dependants: list[uuid.UUID] | None = None,
+    ) -> list[SiteAeriennePosition]:
+        if await self.site_repository.get_by_id(site_id) is None:
+            raise SiteAerienneIntrouvableError(str(site_id))
+        cibles = [site_id]
+        for dependant_id in dict.fromkeys(dependants or []):
+            dependant = await self.site_repository.get_by_id(dependant_id)
+            if dependant is None or dependant.parent_site_id != site_id:
+                raise SiteAerienneDependantInvalideError(str(dependant_id))
+            cibles.append(dependant_id)
+        return await self.repository.deplacer(
+            cibles, latitude, longitude, altitude, datetime.now(timezone.utc).date()
         )
 
 

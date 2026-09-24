@@ -23,6 +23,7 @@ from app.application.referentiel_use_cases import (
     CreateVol,
     CreateZoneAntiAcridien,
     DemonterPositionSiteAerienne,
+    DeplacerSiteAerienne,
     GetAeronef,
     GetCodeStade,
     GetCulture,
@@ -98,8 +99,10 @@ from app.domain.referentiel import (
     PosteAcridienAvecStationsActivesError,
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
+    SiteAerienneDependantInvalideError,
     SiteAerienneEquipeInvalideError,
     SiteAerienneIntrouvableError,
+    SiteAerienneParentAbsentError,
     SiteAerienneParentInvalideError,
     SiteDestinationIncoherentError,
     SiteHorsBaseError,
@@ -173,6 +176,7 @@ from app.presentation.referentiel_schemas import (
     PosteAcridienUpdate,
     ReferentielPullResponse,
     SiteAerienneCreate,
+    SiteAerienneDeplacer,
     SiteAeriennePositionInstaller,
     SiteAeriennePositionRead,
     SiteAerienneRead,
@@ -1161,7 +1165,12 @@ async def create_site_aerienne(
     db: Annotated[AsyncSession, Depends(get_db)],
     acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateSiteAerienne(SiteAerienneRepositoryImpl(db), EquipeRepositoryImpl(db))
+    use_case = CreateSiteAerienne(
+        SiteAerienneRepositoryImpl(db),
+        EquipeRepositoryImpl(db),
+        SiteAeriennePositionRepositoryImpl(db),
+    )
+    position = body.position
     try:
         return await use_case.execute(
             acteur=acteur,
@@ -1169,7 +1178,24 @@ async def create_site_aerienne(
             localite=body.localite,
             parent_site_id=body.parent_site_id,
             equipe_id=body.equipe_id,
+            client_id=body.id,
+            position=(
+                (position.latitude, position.longitude, position.altitude)
+                if position is not None
+                else None
+            ),
         )
+    except IdentifiantDejaUtiliseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"l'identifiant {exc.args[0]} est déjà utilisé par un site différent",
+        ) from exc
+    except SiteAerienneParentAbsentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"parent_site_id inconnu du serveur, à rejouer après son principal : "
+            f"{exc.args[0]}",
+        ) from exc
     except EquipeNonAutoriseeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except SiteAerienneParentInvalideError as exc:
@@ -1233,6 +1259,11 @@ async def update_site_aerienne(
         )
     except EquipeNonAutoriseeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except SiteAerienneParentAbsentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"parent_site_id inconnu du serveur : {exc.args[0]}",
+        ) from exc
     except SiteAerienneParentInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1304,6 +1335,44 @@ async def installer_position_site_aerienne(
             detail=f"le site a déjà une position active, le démonter d'abord : {exc.args[0]}",
         ) from exc
     return _position_read(position)
+
+
+@router.post("/sites-aeriens/{site_id}/deplacer", response_model=list[SiteAeriennePositionRead])
+async def deplacer_site_aerienne(
+    site_id: uuid.UUID,
+    body: SiteAerienneDeplacer,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Déplace le site et ses `dependants` en une transaction (#655) : chaque position
+    active est close à J-1 et remplacée. Atomique : tout est déplacé ou rien."""
+    use_case = DeplacerSiteAerienne(
+        SiteAeriennePositionRepositoryImpl(db), SiteAerienneRepositoryImpl(db)
+    )
+    try:
+        positions = await use_case.execute(
+            site_id=site_id,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+            dependants=body.dependants,
+        )
+    except SiteAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Site aérien non trouvé : {exc.args[0]}"
+        ) from exc
+    except SiteAerienneDependantInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"dependants invalide (inconnu ou rattaché à un autre principal) : "
+            f"{exc.args[0]}",
+        ) from exc
+    except PositionDejaActiveError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"conflit de position active, réessayer : {exc.args[0]}",
+        ) from exc
+    return [_position_read(p) for p in positions]
 
 
 @router.post("/sites-aeriens/{site_id}/positions/demonter", response_model=SiteAeriennePositionRead)

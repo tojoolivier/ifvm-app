@@ -595,7 +595,17 @@ class SiteAerienneRead(BaseModel):
     updated_at: datetime
 
 
+class SiteAeriennePositionInstaller(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    altitude: float | None = None
+
+
 class SiteAerienneCreate(BaseModel):
+    # `id` fourni par le mobile hors-ligne (#655, patron #639) : création idempotente.
+    id: uuid.UUID | None = None
+    # Position initiale facultative : évite un second appel `POST …/positions`.
+    position: SiteAeriennePositionInstaller | None = None
     numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
     localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     parent_site_id: uuid.UUID | None = None
@@ -632,10 +642,11 @@ class SiteAeriennePositionRead(BaseModel):
     created_at: datetime
 
 
-class SiteAeriennePositionInstaller(BaseModel):
-    latitude: float = Field(ge=-90, le=90)
-    longitude: float = Field(ge=-180, le=180)
-    altitude: float | None = None
+class SiteAerienneDeplacer(SiteAeriennePositionInstaller):
+    """Déplacement groupé (#655) : `dependants` = ids des sites rattachés à déplacer
+    avec le principal, à la même position."""
+
+    dependants: list[uuid.UUID] = Field(default_factory=list)
 
 
 class CultureSyncRead(BaseModel):

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import delete, func, or_, select, union_all
 from sqlalchemy.exc import IntegrityError
@@ -438,6 +438,10 @@ class SiteAerienneRepositoryImpl(SiteAerienneRepository):
             return EquipeAerienneDejaAssigneeError(str(site.equipe_id))
         if contrainte == "fk_site_aerienne_equipe_id":
             return EquipeAerienneIntrouvableError(str(site.equipe_id))
+        if contrainte == "site_aerienne_pkey":
+            # Rejeu concurrent d'une création à id client (#655) : c'est le use case
+            # qui relit et tranche entre rejeu identique et conflit.
+            return IdentifiantDejaUtiliseError(str(site.id))
         return NumeroSiteAerienneDejaPrisError(site.numero)
 
     async def update(self, site: SiteAerienne) -> SiteAerienne:
@@ -549,6 +553,59 @@ class SiteAeriennePositionRepositoryImpl(SiteAeriennePositionRepository):
         await self.session.commit()
         await self.session.refresh(model)
         return self._to_domain(model)
+
+    async def deplacer(
+        self,
+        site_ids: list[uuid.UUID],
+        latitude: float,
+        longitude: float,
+        altitude: float | None,
+        aujourdhui: date,
+    ) -> list[SiteAeriennePosition]:
+        modeles: list[SiteAeriennePositionModel] = []
+        for site_id in site_ids:
+            result = await self.session.execute(
+                select(SiteAeriennePositionModel).where(
+                    SiteAeriennePositionModel.site_id == site_id,
+                    SiteAeriennePositionModel.date_fin.is_(None),
+                )
+            )
+            active = result.scalar_one_or_none()
+            if active is not None and active.date_debut >= aujourdhui:
+                # Même jour : `date_fin >= date_debut` interdit de clore à J-1, on
+                # corrige la position ouverte (c'est aussi ce qui rend le rejeu inerte).
+                active.latitude = latitude
+                active.longitude = longitude
+                active.altitude = altitude
+                modeles.append(active)
+            else:
+                if active is not None:
+                    active.date_fin = aujourdhui - timedelta(days=1)
+                    # Vider l'index « une seule ouverte par site » avant l'INSERT.
+                    await self.session.flush()
+                nouvelle = SiteAeriennePositionModel(
+                    id=uuid.uuid4(),
+                    site_id=site_id,
+                    latitude=latitude,
+                    longitude=longitude,
+                    altitude=altitude,
+                    date_debut=aujourdhui,
+                    date_fin=None,
+                    created_at=datetime.now(timezone.utc),
+                )
+                self.session.add(nouvelle)
+                modeles.append(nouvelle)
+            await self._toucher_site(site_id)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if _contrainte_violee(exc) == "uq_site_aerienne_position_ouverte_par_site":
+                raise PositionDejaActiveError(",".join(str(s) for s in site_ids)) from exc
+            raise
+        for modele in modeles:
+            await self.session.refresh(modele)
+        return [self._to_domain(m) for m in modeles]
 
 
 class EquipeRepositoryImpl(EquipeRepository):

@@ -143,6 +143,22 @@ déplacement du siège d'opération ; `latitude` / `longitude` / `altitude` quit
 La règle « une seule position active par site » est vérifiée côté application. `duree_implantation`
 est **dérivée à la volée, jamais stockée**.
 
+**Création et déplacement sur le terrain, hors-ligne (#655).** Le mobile crée un principal avec
+jusqu'à deux dépendants et les déplace ensemble. Décision : **création par appels enchaînés,
+déplacement par endpoint groupé.**
+
+- *Création* : `POST /sites-aeriens` accepte un `id` client (idempotent, patron #639) et une
+  position initiale facultative. Le mobile synchronise le principal, puis chaque dépendant ; un
+  dépendant reçu avant son principal répond **409** (rejouable au sync suivant), un parent qui
+  est lui-même secondaire répond **422**. Enchaîner reste simple : chaque site est autonome et
+  un échec partiel se rejoue sans état à défaire.
+- *Déplacement* : `POST /sites-aeriens/{id}/deplacer` avec `dependants: [site_id]` installe la
+  même position sur le principal et les dépendants cochés **dans une transaction**. Ici
+  l'atomicité compte : sans elle, un principal pourrait avoir bougé sans ses dépendants et
+  l'historique serait incohérent. La position active précédente est close à J-1 ; si elle date
+  d'aujourd'hui elle est corrigée en place (`date_fin >= date_debut` interdit de clore à J-1), ce
+  qui rend le rejeu du même jour inoffensif.
+
 La position d'une équipe aérienne se lit donc par la position courante de son site principal ;
 celle d'une EMT se **déduit de ses dernières interventions rattachées** — pas de table de position
 dédiée pour le terrestre (#607).

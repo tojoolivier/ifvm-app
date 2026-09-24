@@ -93,13 +93,15 @@ async def test_create_site_secondaire_d_une_secondaire_refusee(
 
 
 @pytest.mark.asyncio
-async def test_create_site_parent_inexistant_422(client: AsyncClient, admin_headers: dict):
+async def test_create_site_parent_inexistant_409(client: AsyncClient, admin_headers: dict):
+    """#655 : un parent inconnu du serveur n'est pas une saisie invalide — le mobile
+    hors-ligne peut envoyer le dépendant avant son principal, il est rejoué."""
     response = await client.post(
         "/sites-aeriens",
         json={"numero": "IHO01", "localite": "Ihosy", "parent_site_id": str(uuid.uuid4())},
         headers=admin_headers,
     )
-    assert response.status_code == 422
+    assert response.status_code == 409
 
 
 @pytest.mark.asyncio

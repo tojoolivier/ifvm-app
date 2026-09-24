@@ -240,12 +240,26 @@ class NumeroSiteAerienneDejaPrisError(Exception):
 
 
 class SiteAerienneParentInvalideError(Exception):
-    """`parent_site_id` ne référence pas un site principal existant.
-
-    Couvre deux cas : l'id ne référence aucun site_aerienne, ou il en référence un
-    qui est lui-même secondaire (`parent_site_id` non nul) — la hiérarchie s'arrête à
-    2 niveaux, pas de secondaire d'un secondaire.
+    """`parent_site_id` référence un site qui n'est pas un principal : il est
+    lui-même secondaire (`parent_site_id` non nul) — la hiérarchie s'arrête à
+    2 niveaux, pas de secondaire d'un secondaire. Un parent *inexistant* est une
+    autre erreur (`SiteAerienneParentAbsentError`) : elle se rejoue.
     """
+
+    pass
+
+
+class SiteAerienneParentAbsentError(Exception):
+    """`parent_site_id` ne référence aucun site existant (#655). Le mobile crée le
+    principal puis ses dépendants hors-ligne : un dépendant peut arriver avant son
+    principal, la requête est alors rejouée au sync suivant (409, pas 422)."""
+
+    pass
+
+
+class SiteAerienneDependantInvalideError(Exception):
+    """Déplacement groupé (#655) : un `dependants[]` n'existe pas ou n'a pas le site
+    déplacé pour principal — on ne déplace jamais le site d'une autre équipe."""
 
     pass
 
@@ -531,6 +545,15 @@ class SiteAerienne:
     updated_at: datetime = field(default_factory=datetime.utcnow)
     # Renseignée par `SiteAerienneRepository.list_since` seulement (pull mobile, #638).
     position_active: "SiteAeriennePosition | None" = None
+
+    def a_meme_contenu(self, autre: "SiteAerienne") -> bool:
+        """Rejeu idempotent (#655) : même saisie, hors identité et horodatage."""
+        return (
+            self.numero == autre.numero
+            and self.localite == autre.localite
+            and self.parent_site_id == autre.parent_site_id
+            and self.equipe_id == autre.equipe_id
+        )
 
 
 @dataclass

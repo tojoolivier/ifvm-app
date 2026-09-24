@@ -497,6 +497,20 @@ class SiteAeriennePositionRepository(ABC):
     async def demonter(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
         pass
 
+    @abstractmethod
+    async def deplacer(
+        self,
+        site_ids: list[uuid.UUID],
+        latitude: float,
+        longitude: float,
+        altitude: float | None,
+        aujourdhui: date,
+    ) -> list[SiteAeriennePosition]:
+        """Une nouvelle position active par site, en UNE transaction (#655). La position
+        active précédente est close à J-1 ; si elle date d'aujourd'hui elle est corrigée
+        en place (`date_fin >= date_debut`), ce qui rend un rejeu du même jour inoffensif."""
+        pass
+
 
 class AeronefRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""

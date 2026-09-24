@@ -611,6 +611,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sites-aeriens/{site_id}/deplacer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deplacer Site Aerienne
+         * @description Déplace le site et ses `dependants` en une transaction (#655) : chaque position
+         *     active est close à J-1 et remplacée. Atomique : tout est déplacé ou rien.
+         */
+        post: operations["deplacer_site_aerienne_sites_aeriens__site_id__deplacer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites-aeriens/{site_id}/positions/demonter": {
         parameters: {
             query?: never;
@@ -3615,6 +3636,9 @@ export interface components {
         };
         /** SiteAerienneCreate */
         SiteAerienneCreate: {
+            /** Id */
+            id?: string | null;
+            position?: components["schemas"]["SiteAeriennePositionInstaller"] | null;
             /** Numero */
             numero: string;
             /** Localite */
@@ -3623,6 +3647,21 @@ export interface components {
             parent_site_id?: string | null;
             /** Equipe Id */
             equipe_id?: string | null;
+        };
+        /**
+         * SiteAerienneDeplacer
+         * @description Déplacement groupé (#655) : `dependants` = ids des sites rattachés à déplacer
+         *     avec le principal, à la même position.
+         */
+        SiteAerienneDeplacer: {
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude?: number | null;
+            /** Dependants */
+            dependants?: string[];
         };
         /** SiteAeriennePositionInstaller */
         SiteAeriennePositionInstaller: {
@@ -6729,6 +6768,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SiteAeriennePositionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deplacer_site_aerienne_sites_aeriens__site_id__deplacer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteAerienneDeplacer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAeriennePositionRead"][];
                 };
             };
             /** @description Validation Error */
