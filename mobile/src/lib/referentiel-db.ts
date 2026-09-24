@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { getDb } from './prospection-db';
 import { ReferentialError } from './errors';
+import { VOL_DDL, migrerColonnesVol } from './vol-schema';
 
 /**
  * Migration en cours ou terminée. C'est une **promesse** mémoïsée, pas un booléen :
@@ -564,41 +565,7 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       erreur TEXT
     );
 
-    -- Vols saisis sur l'appareil (#644), toutes origines confondues : c'est ce que lit « Mes vols ».
-    -- Seules les lignes 'saisie_directe' (convoyage, divers) partent d'ici ; celles de la mise en
-    -- place voyagent avec leur déplacement (site_aerien_deplacement.vol_json) et sont seulement
-    -- marquées synchronisées à son envoi.
-    CREATE TABLE IF NOT EXISTS vol (
-      id TEXT PRIMARY KEY NOT NULL,
-      categorie TEXT NOT NULL,
-      origine TEXT NOT NULL,
-      equipe_id TEXT NOT NULL,
-      aeronef_id TEXT NOT NULL,
-      date_vol TEXT NOT NULL,
-      heure_debut TEXT NOT NULL,
-      heure_fin TEXT NOT NULL,
-      site_principal_id TEXT,
-      stand_id TEXT,
-      base_secondaire_id TEXT,
-      motif TEXT,
-      lieu_depart TEXT,
-      lieu_arrivee TEXT,
-      libelle_lieu TEXT,
-      statut_sync TEXT NOT NULL DEFAULT 'local',
-      cree_le TEXT NOT NULL
-    );
-
-    -- Rattachement d'un vol à l'opération qui l'a produit (#644, #610) : un vol d'application couvre
-    -- un traitement, un vol de prospection couvre une ou plusieurs prospections (« Ce vol couvre
-    -- aussi »). type = 'traitement' | 'prospection', ref_id = id de la fiche (autre base SQLite).
-    CREATE TABLE IF NOT EXISTS vol_lien (
-      vol_id TEXT NOT NULL REFERENCES vol(id) ON DELETE CASCADE,
-      type TEXT NOT NULL,
-      ref_id TEXT NOT NULL,
-      PRIMARY KEY (vol_id, ref_id)
-    );
-
-    CREATE INDEX IF NOT EXISTS ix_vol_lien_ref_id ON vol_lien(ref_id);
+    ${VOL_DDL}
 
     CREATE TABLE IF NOT EXISTS aeronef (
       id TEXT PRIMARY KEY NOT NULL,
@@ -668,15 +635,7 @@ async function migrateColonnesAeriennes(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'vol_json', type: 'TEXT' },
     { name: 'erreur', type: 'TEXT' },
   ]);
-  await addColumnsIfMissing(db, 'vol', [
-    { name: 'site_principal_id', type: 'TEXT' },
-    { name: 'stand_id', type: 'TEXT' },
-    { name: 'base_secondaire_id', type: 'TEXT' },
-    { name: 'motif', type: 'TEXT' },
-    { name: 'lieu_depart', type: 'TEXT' },
-    { name: 'lieu_arrivee', type: 'TEXT' },
-    { name: 'libelle_lieu', type: 'TEXT' },
-  ]);
+  await migrerColonnesVol(db);
 }
 
 /**

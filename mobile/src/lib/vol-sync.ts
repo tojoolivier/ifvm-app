@@ -2,7 +2,6 @@ import { apiClient } from './api-client';
 import { NetworkError } from './errors';
 import { getTraitement } from './traitement-repository';
 import {
-  type TypeLienVol,
   type VolEnAttenteLocal,
   type VolLocal,
   getVolDeOperation,
@@ -21,9 +20,7 @@ import { type LotSync, type ResumeSync, syncAll } from './sync-lot';
  *   `prospection.vol_id` référence le vol ;
  * - mise en place : voyagent avec leur déplacement (`site-aerien-sync.ts`).
  */
-type VolEnAttente = VolEnAttenteLocal;
-
-async function creerSurLeServeur(vol: VolEnAttente, token: string): Promise<void> {
+async function creerSurLeServeur(vol: VolEnAttenteLocal, token: string): Promise<void> {
   await apiClient.createVol(token, {
     id: vol.id,
     type: vol.categorie,
@@ -41,21 +38,23 @@ async function creerSurLeServeur(vol: VolEnAttente, token: string): Promise<void
   });
 }
 
-const lotVol: LotSync<VolEnAttente> = {
+async function exigerTraitementSynchronise(traitementId: string | null): Promise<void> {
+  const traitement = traitementId ? await getTraitement(traitementId) : null;
+  if (traitement?.statut_sync !== 'synced') {
+    throw new NetworkError('Le traitement n’est pas encore synchronisé — le vol partira ensuite.');
+  }
+}
+
+const lotVol: LotSync<VolEnAttenteLocal> = {
   nom: 'vol.creation',
   idDe: (vol) => vol.id,
   labelDe: (vol: VolLocal) => `Vol ${vol.categorie} · ${vol.date_vol}`,
   marquerEchec: marquerVolEnEchec,
   syncOne: async (vol, token) => {
-    // Le vol d'application se rattache à un traitement qui doit exister sur le serveur : tant qu'il
-    // ne l'est pas, le vol reste dans la file (`NetworkError`), ce n'est pas un échec de l'agent.
+    // Un vol d'application se rattache à un traitement qui doit exister sur le serveur : tant qu'il ne
+    // l'est pas, le vol reste dans la file (`NetworkError`), ce n'est pas un échec de l'agent.
     const traitementId = vol.origine === 'traitement' ? vol.traitement_id : null;
-    if (vol.origine === 'traitement') {
-      const traitement = traitementId ? await getTraitement(traitementId) : null;
-      if (!traitement || traitement.statut_sync !== 'synced') {
-        throw new NetworkError('Le traitement n’est pas encore synchronisé — le vol partira ensuite.');
-      }
-    }
+    if (vol.origine === 'traitement') await exigerTraitementSynchronise(traitementId);
     await creerSurLeServeur(vol, token);
     if (traitementId) await apiClient.updateVol(token, vol.id, { traitement_id: traitementId });
     await marquerVolSynchronise(vol.id);
@@ -71,12 +70,11 @@ export async function synchroniserVols(token: string): Promise<ResumeSync> {
  * (`null` : la fiche n'a pas de vol). Une erreur remonte : la fiche ne peut pas partir sans son vol.
  */
 export async function assurerVolDeProspection(token: string, prospectionId: string): Promise<string | null> {
-  const type: TypeLienVol = 'prospection';
-  const vol = await getVolDeOperation(type, prospectionId);
+  const vol = await getVolDeOperation('prospection', prospectionId);
   if (!vol) return null;
   if (vol.statut_sync !== 'synced') {
     const [enAttente] = await listVolsEnAttente(vol.id);
-    if (!enAttente) return vol.id;
+    if (!enAttente) throw new Error('Vol de la prospection introuvable dans la file d’envoi.');
     await creerSurLeServeur(enAttente, token);
     await marquerVolSynchronise(vol.id);
   }

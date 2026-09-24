@@ -12,8 +12,8 @@ export type CategorieVol = components['schemas']['VolCreate']['type'];
 
 export interface VolSaisi {
   categorie: CategorieVol;
-  /** Type de l'équipe de travail : un vol ne se mène qu'avec une équipe aérienne. */
-  equipeType: 'terrestre' | 'aerien';
+  /** Type de l'équipe de travail : un vol ne se mène qu'avec une équipe aérienne. `null` : équipe inconnue de l'appareil. */
+  equipeType: 'terrestre' | 'aerien' | null;
   aeronefId: string | null;
   /** `YYYY-MM-DD` */
   date: string;
@@ -40,7 +40,9 @@ const AVEC_MOTIF: CategorieVol[] = ['convoyage', 'divers'];
 export function validerVol(vol: VolSaisi, { dependantIds }: ContexteVol): string[] {
   const erreurs: string[] = [];
 
-  if (vol.equipeType !== 'aerien') {
+  if (vol.equipeType === null) {
+    erreurs.push('Équipe de travail introuvable sur l’appareil : synchronisez les référentiels puis réessayez.');
+  } else if (vol.equipeType !== 'aerien') {
     erreurs.push('Un vol se mène avec une équipe aérienne : changez d’équipe de travail dans Paramètres.');
   }
   if (!vol.aeronefId) erreurs.push('L’équipe n’a aucun aéronef en service : impossible de saisir un vol.');
@@ -58,13 +60,12 @@ export function validerVol(vol: VolSaisi, { dependantIds }: ContexteVol): string
     if (!vol.sitePrincipalId) erreurs.push('Aucun site principal actif : impossible de saisir ce vol.');
     if (!vol.standId) erreurs.push('Choisissez le stand de remplissage.');
   }
-  if (vol.sitePrincipalId) {
-    if (vol.standId && !dependantIds.includes(vol.standId)) {
-      erreurs.push('Le stand choisi ne dépend pas du site principal.');
-    }
-    if (vol.baseSecondaireId && !dependantIds.includes(vol.baseSecondaireId)) {
-      erreurs.push('La base secondaire choisie ne dépend pas du site principal.');
-    }
+  // Sans site principal, aucun dépendant n'est valable : le serveur refuse un stand ou une base orphelins.
+  if (vol.standId && !dependantIds.includes(vol.standId)) {
+    erreurs.push('Le stand choisi ne dépend pas du site principal.');
+  }
+  if (vol.baseSecondaireId && !dependantIds.includes(vol.baseSecondaireId)) {
+    erreurs.push('La base secondaire choisie ne dépend pas du site principal.');
   }
 
   if (AVEC_MOTIF.includes(vol.categorie) && !vol.motif.trim()) erreurs.push('Le motif est obligatoire.');
@@ -83,9 +84,9 @@ export function dureeMinutes(debut: string, fin: string): number {
   return Math.max(0, minutes(fin) - minutes(debut));
 }
 
-/** `165` → « 2h 45min » (format des maquettes Figma). */
-export function formaterDuree(totalMinutes: number): string {
+/** `165` → « 2h 45min » (format des maquettes Figma) ; `court` : « 2h 45 » (lignes de « Mes vols »). */
+export function formaterDuree(totalMinutes: number, court = false): string {
   const heures = Math.floor(totalMinutes / 60);
   const minutes = String(totalMinutes % 60).padStart(2, '0');
-  return `${heures}h ${minutes}min`;
+  return `${heures}h ${minutes}${court ? '' : 'min'}`;
 }

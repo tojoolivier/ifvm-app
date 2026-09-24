@@ -34,7 +34,6 @@ const ORIGINE: Record<OrigineVol, string> = {
 
 const jourMois = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const duree = (v: VolLocal) => dureeMinutes(v.heure_debut, v.heure_fin);
-const minutesCourtes = (m: number) => `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}`;
 
 /**
  * « Mes vols » (#644, Figma 81:524) : tous les vols de l'équipe de travail, quelle que soit leur
@@ -108,7 +107,7 @@ export default function VolsScreen() {
                 </View>
               </View>
               <ThemedText style={styles.horaires}>
-                {v.heure_debut} – {v.heure_fin}  ·  {minutesCourtes(duree(v))}
+                {v.heure_debut} – {v.heure_fin}  ·  {formaterDuree(duree(v), true)}
               </ThemedText>
               <View style={styles.ligne}>
                 <ThemedText style={styles.lieu}>{v.libelle_lieu ?? ''}</ThemedText>

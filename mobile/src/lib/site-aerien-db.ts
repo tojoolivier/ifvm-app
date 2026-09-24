@@ -1,13 +1,15 @@
 import { PreconditionError } from './errors';
 import { generateId } from './id';
 import { getReferentielDb } from './referentiel-db';
-import { tracerVolInstallation } from './vol-db';
+import { marquerVolEnEchec, tracerVolInstallation } from './vol-db';
 import {
   type PositionSaisie,
   type SiteSaisi,
+  type VolMiseEnPlaceCorps,
   type VolMiseEnPlaceSaisi,
   jourPrecedent,
   lireDependants,
+  lireVolJson,
   validerCreationGroupee,
   validerDeplacement,
   validerSiteSecondaire,
@@ -178,9 +180,7 @@ export async function marquerDeplacementEnEchec(deplacementId: string): Promise<
   await db.withTransactionAsync(async () => {
     await db.runAsync("UPDATE site_aerien_deplacement SET statut_sync = 'echec' WHERE id = ?", [deplacementId]);
     // Le vol de mise en place voyage avec le déplacement : « Mes vols » doit dire qu'il est refusé aussi.
-    if (ligne?.vol_json) {
-      await db.runAsync("UPDATE vol SET statut_sync = 'echec' WHERE id = ?", [JSON.parse(ligne.vol_json).id]);
-    }
+    if (ligne?.vol_json) await marquerVolEnEchec(lireVolJson(ligne.vol_json).id);
   });
 }
 
@@ -344,6 +344,28 @@ export interface DeplacementDemande {
   aujourdhui?: string;
 }
 
+/** Corps `POST /vols` du vol de mise en place : sert à `vol_json` (envoi) et à la trace « Mes vols ». */
+function corpsVolMiseEnPlace(
+  id: string,
+  vol: VolMiseEnPlaceDemande,
+  siteId: string,
+  jour: string
+): VolMiseEnPlaceCorps {
+  // `validerVolMiseEnPlace` a déjà refusé l'absence d'aéronef ; ce garde-fou le dit au type.
+  if (!vol.aeronefId) refuser(['L’équipe n’a aucun aéronef en service : impossible de saisir un vol.']);
+  return {
+    id,
+    type: 'mise_en_place',
+    equipe_id: vol.equipeId,
+    aeronef_id: vol.aeronefId,
+    date_vol: jour,
+    heure_debut: vol.debut,
+    heure_fin: vol.fin,
+    site_principal_id: siteId,
+    stand_id: vol.standId,
+  };
+}
+
 /**
  * Déplace le site et les dépendants cochés. Chaque site voit sa position active close à J-1 et une
  * nouvelle ouverte à J — sauf si l'active date d'aujourd'hui : elle est alors corrigée en place,
@@ -377,20 +399,8 @@ export async function deplacerSites(demande: DeplacementDemande): Promise<void> 
   if (erreurs.length > 0) refuser(erreurs);
 
   const deplacementId = generateId();
-  const volId = generateId();
-  const volJson = demande.vol
-    ? JSON.stringify({
-        id: volId,
-        type: 'mise_en_place',
-        equipe_id: demande.vol.equipeId,
-        aeronef_id: demande.vol.aeronefId,
-        date_vol: jour,
-        heure_debut: demande.vol.debut,
-        heure_fin: demande.vol.fin,
-        site_principal_id: demande.siteId,
-        stand_id: demande.vol.standId,
-      })
-    : null;
+  const vol = demande.vol ? corpsVolMiseEnPlace(generateId(), demande.vol, demande.siteId, jour) : null;
+  const volJson = vol ? JSON.stringify(vol) : null;
 
   const { latitude, longitude, altitude } = demande.position;
   const numero = demande.numero.trim();
@@ -440,20 +450,8 @@ export async function deplacerSites(demande: DeplacementDemande): Promise<void> 
         new Date().toISOString(),
       ]
     );
-    if (demande.vol) {
-      // Trace pour « Mes vols » : l'envoi reste porté par le déplacement (vol_json).
-      await tracerVolInstallation(db, {
-        id: volId,
-        equipeId: demande.vol.equipeId,
-        aeronefId: demande.vol.aeronefId,
-        date: jour,
-        debut: demande.vol.debut,
-        fin: demande.vol.fin,
-        sitePrincipalId: demande.siteId,
-        standId: demande.vol.standId,
-        libelleLieu: localite,
-      });
-    }
+    // Trace pour « Mes vols » : l'envoi reste porté par le déplacement (vol_json).
+    if (vol) await tracerVolInstallation(db, vol, localite);
   });
 }
 

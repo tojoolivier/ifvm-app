@@ -6,9 +6,11 @@ import { TimeField } from '@/components/TimeField';
 import { ChoixField } from '@/components/equipe/ChoixField';
 import { EQ } from '@/components/equipe/tokens';
 import { CaseALigne } from '@/components/site/ChampsSite';
+import { BandeauEquipeVol } from '@/components/vol/BandeauEquipeVol';
+import { useAeronefDuJour } from '@/hooks/use-aeronef-du-jour';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
-import { aujourdhuiIso, listAeronefsEquipe } from '@/lib/equipe-db';
+import { aujourdhuiIso } from '@/lib/equipe-db';
 import { libelleSite } from '@/lib/equipe-regles';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
 import { listProspectionsAeriennesDuJour } from '@/lib/prospection-repository';
@@ -40,7 +42,6 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
   const type = categorie === 'application' ? 'traitement' : 'prospection';
 
   const [equipe, setEquipe] = useState<{ nom: string; type: 'terrestre' | 'aerien' } | null>(null);
-  const [aeronef, setAeronef] = useState<{ id: string; immatriculation: string } | null>(null);
   const [principal, setPrincipal] = useState<SiteAerienLocal | null>(null);
   const [dependants, setDependants] = useState<SiteAerienLocal[]>([]);
   const [candidates, setCandidates] = useState<{ id: string; libelle: string; aDejaUnVol: boolean }[]>([]);
@@ -48,6 +49,7 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
   const [envoye, setEnvoye] = useState(false);
 
   const [date, setDate] = useState(dateParDefaut ?? aujourdhuiIso());
+  const { aeronef, aeronefs, choisir: choisirAeronef } = useAeronefDuJour(equipeId, date, 'bloc-vol.aeronef');
   const [debut, setDebut] = useState('');
   const [fin, setFin] = useState('');
   const [standId, setStandId] = useState<string | null>(null);
@@ -94,18 +96,10 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
     })().catch((error) => signalerChargement(error, { source: 'bloc-vol' }));
   }, [equipeId, ficheId, type, categorie, dateParDefaut, signalerChargement]);
 
-  // L'aéronef de l'équipe dépend de la date du vol : l'affectation doit couvrir ce jour-là (comme le serveur).
-  useEffect(() => {
-    if (!equipeId) return;
-    listAeronefsEquipe(equipeId, date)
-      .then((aeronefs) => setAeronef(aeronefs[0] ?? null))
-      .catch((error) => signalerChargement(error, { source: 'bloc-vol.aeronef' }));
-  }, [equipeId, date, signalerChargement]);
-
   const enregistrer = () => {
     const saisie = {
       categorie,
-      equipeType: equipe?.type ?? ('aerien' as const),
+      equipeType: equipe?.type ?? null,
       aeronefId: aeronef?.id ?? null,
       date,
       debut,
@@ -163,12 +157,7 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
         </View>
       )}
 
-      {equipe && (
-        <View style={styles.info}>
-          <ThemedText style={styles.infoTexte}>{equipe.nom}</ThemedText>
-          {aeronef && <ThemedText style={styles.infoMono}>{aeronef.immatriculation}</ThemedText>}
-        </View>
-      )}
+      <BandeauEquipeVol equipe={equipe} aeronef={aeronef} aeronefs={aeronefs} onChoisirAeronef={choisirAeronef} />
 
       <ThemedText style={styles.etiquette}>Date *</ThemedText>
       <DateField value={date} onChange={setDate} editable={!inactif} style={styles.champ} textStyle={styles.champTexte} />
@@ -259,8 +248,6 @@ const styles = StyleSheet.create({
     borderColor: EQ.vertBordure,
     backgroundColor: EQ.vertLeger,
   },
-  infoTexte: { fontSize: 11, lineHeight: 14, fontWeight: '700', color: EQ.vert },
-  infoMono: { fontSize: 10, lineHeight: 14, fontWeight: '600', color: EQ.vert },
   infoSite: { fontSize: 9, lineHeight: 14, fontWeight: '600', color: EQ.vert },
   infoSiteValeur: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: EQ.encre },
   champ: { minHeight: 36, borderRadius: 9, borderWidth: 1, borderColor: EQ.bordure, backgroundColor: EQ.carte, paddingHorizontal: 11 },

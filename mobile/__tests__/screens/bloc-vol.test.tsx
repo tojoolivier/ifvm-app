@@ -107,6 +107,36 @@ describe('BlocVol — application', () => {
     expect(await screen.findByText(/ENREGISTRÉ/)).toBeVisible();
   });
 
+  it('avec plusieurs aéronefs affectés ce jour-là, l’agent choisit celui du vol', async () => {
+    jest.mocked(listAeronefsEquipe).mockResolvedValue([
+      { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna' },
+      { id: 'ae-2', immatriculation: '5R-MHS', societe: 'Cessna' },
+    ]);
+    await render(<BlocVol categorie="application" ficheId="tr-1" />);
+    await screen.findByLabelText('Aéronef');
+
+    await fireEvent.press(screen.getByLabelText('Aéronef'));
+    await fireEvent.press(await screen.findByText('5R-MHS'));
+    await remplirHeures();
+    await fireEvent.press(screen.getByTestId('bloc-vol-enregistrer'));
+
+    await waitFor(() =>
+      expect(enregistrerVolOperation).toHaveBeenCalledWith(expect.objectContaining({ aeronefId: 'ae-2' }))
+    );
+  });
+
+  it('une équipe inconnue de l’appareil n’est pas supposée aérienne', async () => {
+    jest.mocked(getEquipeLocale).mockResolvedValue(null);
+    await render(<BlocVol categorie="application" ficheId="tr-1" />);
+    await screen.findByTestId('bloc-vol');
+
+    await fireEvent.press(screen.getByTestId('bloc-vol-enregistrer'));
+
+    await waitFor(() =>
+      expect(enregistrerVolOperation).toHaveBeenCalledWith(expect.objectContaining({ equipeType: null }))
+    );
+  });
+
   it('un vol déjà envoyé au serveur n’est plus modifiable', async () => {
     jest.mocked(getVolDeOperation).mockResolvedValue({
       id: 'vol-1', categorie: 'application', origine: 'traitement', date_vol: '2026-09-23',

@@ -59,6 +59,23 @@ describe('validerVol', () => {
     );
   });
 
+  it('refuse une équipe de travail inconnue de l’appareil au lieu de la supposer aérienne', () => {
+    expect(valider({ equipeType: null })).toContain(
+      'Équipe de travail introuvable sur l’appareil : synchronisez les référentiels puis réessayez.'
+    );
+  });
+
+  it('refuse un stand ou une base secondaire sans site principal', () => {
+    const erreurs = validerVol(
+      { ...base, categorie: 'prospection', sitePrincipalId: null, standId: 'st-1', baseSecondaireId: 'bs-1' },
+      { dependantIds: [] }
+    );
+    expect(erreurs).toEqual([
+      'Le stand choisi ne dépend pas du site principal.',
+      'La base secondaire choisie ne dépend pas du site principal.',
+    ]);
+  });
+
   it('exige un aéronef', () => {
     expect(valider({ aeronefId: null })).toContain('L’équipe n’a aucun aéronef en service : impossible de saisir un vol.');
   });
@@ -76,5 +93,6 @@ describe('durée', () => {
     expect(formaterDuree(165)).toBe('2h 45min');
     expect(formaterDuree(2910)).toBe('48h 30min');
     expect(formaterDuree(60)).toBe('1h 00min');
+    expect(formaterDuree(165, true)).toBe('2h 45');
   });
 });

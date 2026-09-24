@@ -6,11 +6,12 @@ import { ThemedText } from '@/components/themed-text';
 import { TimeField } from '@/components/TimeField';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import { EQ } from '@/components/equipe/tokens';
-import { Fonts } from '@/constants/theme';
+import { BandeauEquipeVol } from '@/components/vol/BandeauEquipeVol';
+import { useAeronefDuJour } from '@/hooks/use-aeronef-du-jour';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useAuthStore } from '@/lib/auth-store';
-import { aujourdhuiIso, listAeronefsEquipe } from '@/lib/equipe-db';
+import { aujourdhuiIso } from '@/lib/equipe-db';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
 import { getEquipeLocale } from '@/lib/referentiel-db';
 import { envoyerSitesSiEnLigne } from '@/lib/site-aerien-envoi';
@@ -36,9 +37,9 @@ export default function VolNouveauScreen() {
   const { run, isRunning } = useAsyncAction();
 
   const [equipe, setEquipe] = useState<{ nom: string; type: 'terrestre' | 'aerien' } | null>(null);
-  const [aeronef, setAeronef] = useState<{ id: string; immatriculation: string } | null>(null);
   const [categorie, setCategorie] = useState<Categorie>('convoyage');
   const [date, setDate] = useState(aujourdhuiIso());
+  const { aeronef, aeronefs, choisir: choisirAeronef } = useAeronefDuJour(equipeId, date, 'vol-nouveau.aeronef');
   const [debut, setDebut] = useState('');
   const [fin, setFin] = useState('');
   const [lieuDepart, setLieuDepart] = useState('');
@@ -53,18 +54,10 @@ export default function VolNouveauScreen() {
       .catch((error) => signalerChargement(error, { source: 'vol-nouveau' }));
   }, [equipeId, signalerChargement]);
 
-  // L'aéronef dépend de la date du vol : l'affectation doit couvrir ce jour-là (comme le serveur).
-  useEffect(() => {
-    if (!equipeId) return;
-    listAeronefsEquipe(equipeId, date)
-      .then((aeronefs) => setAeronef(aeronefs[0] ?? null))
-      .catch((error) => signalerChargement(error, { source: 'vol-nouveau.aeronef' }));
-  }, [equipeId, date, signalerChargement]);
-
   const enregistrer = () => {
     const saisie = {
       categorie,
-      equipeType: equipe?.type ?? ('aerien' as const),
+      equipeType: equipe?.type ?? null,
       aeronefId: aeronef?.id ?? null,
       date,
       debut,
@@ -125,12 +118,7 @@ export default function VolNouveauScreen() {
           })}
         </View>
 
-        {equipe && (
-          <View style={styles.info}>
-            <ThemedText style={styles.infoTexte}>{equipe.nom}</ThemedText>
-            {aeronef && <ThemedText style={styles.infoMono}>{aeronef.immatriculation}</ThemedText>}
-          </View>
-        )}
+        <BandeauEquipeVol equipe={equipe} aeronef={aeronef} aeronefs={aeronefs} onChoisirAeronef={choisirAeronef} />
 
         <ThemedText style={styles.etiquette}>Date *</ThemedText>
         <DateField value={date} onChange={setDate} style={styles.champ} textStyle={styles.champTexte} />
@@ -208,19 +196,6 @@ const styles = StyleSheet.create({
   categorieActive: { backgroundColor: EQ.vert, borderColor: EQ.vert },
   categorieTexte: { fontSize: 12, lineHeight: 15, fontWeight: '700', color: EQ.attenue },
   categorieTexteActive: { color: EQ.surMarque },
-  info: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    marginBottom: 4,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: EQ.vertBordure,
-    backgroundColor: EQ.vertLeger,
-  },
-  infoTexte: { fontSize: 11, lineHeight: 14, fontWeight: '700', color: EQ.vert },
-  infoMono: { fontSize: 10, lineHeight: 14, fontWeight: '600', fontFamily: Fonts.mono, color: EQ.vert },
   etiquette: { fontSize: 10, lineHeight: 12, fontWeight: '600', color: EQ.attenue, marginTop: 4 },
   champ: {
     minHeight: 34,

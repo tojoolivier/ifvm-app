@@ -1,3 +1,5 @@
+import type { components } from './api-schema.generated';
+
 /**
  * Règles métier des sites aériens sous l'équipe (#643) : création groupée « principal +
  * dépendants », déplacement, vol de mise en place. Vérifiées côté mobile pour donner à l'agent
@@ -133,6 +135,19 @@ export function lireDependants(json: string): string[] {
     throw new Error('dependants_json corrompu : liste d’identifiants attendue.');
   }
   return valeur;
+}
+
+/** Corps `POST /vols` d'un vol de mise en place, tel que stocké dans `vol_json`. */
+export type VolMiseEnPlaceCorps = components['schemas']['VolCreate'] & { id: string };
+
+/** Relit `site_aerien_deplacement.vol_json` : même exigence que `lireDependants`, une colonne corrompue lève. */
+export function lireVolJson(json: string): VolMiseEnPlaceCorps {
+  const valeur: unknown = JSON.parse(json);
+  if (typeof valeur !== 'object' || valeur === null || typeof (valeur as { id?: unknown }).id !== 'string') {
+    throw new Error('vol_json corrompu : corps de vol avec identifiant attendu.');
+  }
+  // Écrit par `deplacerSites` (`corpsVolMiseEnPlace`) : seul l'identifiant est revérifié ici.
+  return valeur as VolMiseEnPlaceCorps;
 }
 
 const JOUR_MS = 24 * 60 * 60 * 1000;

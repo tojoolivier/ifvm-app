@@ -1,6 +1,8 @@
+import type * as SQLite from 'expo-sqlite';
 import { PreconditionError } from './errors';
 import { generateId } from './id';
 import { getReferentielDb } from './referentiel-db';
+import type { VolMiseEnPlaceCorps } from './site-aerien-regles';
 import { type CategorieVol, type VolSaisi, validerVol } from './vol-regles';
 
 /**
@@ -74,22 +76,15 @@ export async function creerVolAutonome(demande: VolAutonomeDemande): Promise<str
   return id;
 }
 
-/** Trace locale du vol de mise en place (envoyé avec son déplacement) pour « Mes vols ». */
+/**
+ * Trace locale du vol de mise en place pour « Mes vols » : la ligne reprend le corps qui partira avec
+ * le déplacement (`vol_json`), une seule construction pour les deux.
+ */
 export async function tracerVolInstallation(
-  db: Awaited<ReturnType<typeof getReferentielDb>>,
-  vol: {
-    id: string;
-    equipeId: string;
-    aeronefId: string | null;
-    date: string;
-    debut: string;
-    fin: string;
-    sitePrincipalId: string;
-    standId: string | null;
-    libelleLieu: string;
-  }
+  db: SQLite.SQLiteDatabase,
+  vol: VolMiseEnPlaceCorps,
+  libelleLieu: string
 ): Promise<void> {
-  if (!vol.aeronefId) throw new PreconditionError('L’équipe n’a aucun aéronef en service : impossible de saisir un vol.');
   await db.runAsync(
     `INSERT INTO vol
        (id, categorie, origine, equipe_id, aeronef_id, date_vol, heure_debut, heure_fin,
@@ -97,14 +92,14 @@ export async function tracerVolInstallation(
      VALUES (?, 'mise_en_place', 'installation_site', ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?)`,
     [
       vol.id,
-      vol.equipeId,
-      vol.aeronefId,
-      vol.date,
-      vol.debut,
-      vol.fin,
-      vol.sitePrincipalId,
-      vol.standId,
-      vol.libelleLieu,
+      vol.equipe_id,
+      vol.aeronef_id,
+      vol.date_vol,
+      vol.heure_debut,
+      vol.heure_fin,
+      vol.site_principal_id ?? null,
+      vol.stand_id ?? null,
+      libelleLieu,
       new Date().toISOString(),
     ]
   );
@@ -128,12 +123,13 @@ const SELECT_EN_ATTENTE = `SELECT ${COLONNES}, equipe_id, aeronef_id, motif, sit
 
 /**
  * Vols à envoyer par le lot : saisie directe et application. Ceux de la mise en place partent avec
- * leur déplacement, ceux de la prospection avec leur fiche. Avec `volId`, ce seul vol (si non envoyé).
+ * leur déplacement, ceux de la prospection avec leur fiche. Avec `volId`, ce seul vol s'il n'est pas envoyé.
  */
 export async function listVolsEnAttente(volId?: string): Promise<VolEnAttenteLocal[]> {
   const db = await getReferentielDb();
   if (volId) {
-    return db.getAllAsync<VolEnAttenteLocal>(`${SELECT_EN_ATTENTE} WHERE id = ? AND statut_sync = 'local'`, [volId]);
+    // Un vol refusé (`echec`) est rejoué avec sa fiche : elle ne peut pas partir sans lui.
+    return db.getAllAsync<VolEnAttenteLocal>(`${SELECT_EN_ATTENTE} WHERE id = ? AND statut_sync != 'synced'`, [volId]);
   }
   return db.getAllAsync<VolEnAttenteLocal>(
     `${SELECT_EN_ATTENTE} WHERE statut_sync = 'local' AND origine IN ('saisie_directe', 'traitement')

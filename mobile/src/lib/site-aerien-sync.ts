@@ -11,7 +11,7 @@ import {
   marquerSiteEnEchec,
   marquerSiteSynchronise,
 } from './site-aerien-db';
-import { lireDependants } from './site-aerien-regles';
+import { lireDependants, lireVolJson } from './site-aerien-regles';
 import { marquerVolSynchronise } from './vol-db';
 import { synchroniserVols } from './vol-sync';
 import { type LotSync, type ResumeSync, syncAll } from './sync-lot';
@@ -106,7 +106,7 @@ const lotDeplacement: LotSync<DeplacementLocal> = {
     });
     // Le vol n'a de sens qu'une fois le site installé ; son id client le rend rejouable (#639).
     if (deplacement.vol_json) {
-      const vol = JSON.parse(deplacement.vol_json);
+      const vol = lireVolJson(deplacement.vol_json);
       await apiClient.createVol(token, vol);
       await marquerVolSynchronise(vol.id);
     }
