@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentPosition, reverseGeocode } from '@/lib/location';
-import { validateGpsPosition } from '@/lib/prospection-validation';
+import { messageSurfaceInfesteeSuperieure, validateGpsPosition } from '@/lib/prospection-validation';
 import { useAuthStore } from '@/lib/auth-store';
 import {
   OperationAerienneRow,
@@ -284,6 +284,13 @@ export default function ExtensiveReferenceScreen() {
   };
   const [surfaceStation, setSurfaceStation] = useState(draft?.surface_station != null ? String(draft.surface_station) : '');
   const [surfaceInfestee, setSurfaceInfestee] = useState(draft?.surface_infestee != null ? String(draft.surface_infestee) : '');
+  // #surface-infestee-inferieure-prospectee : recalculé à chaque frappe, affiché sous le
+  // champ « Surface infestée » et bloquant à « Suivant ». Vide (rien à comparer) tant
+  // que l'une des deux surfaces n'est pas saisie.
+  const messageSurfaceInfestee = messageSurfaceInfesteeSuperieure(
+    surfaceInfestee ? parseFloat(surfaceInfestee) : null,
+    surfaceStation ? parseFloat(surfaceStation) : null
+  );
   const [nMessage, setNMessage] = useState(
     draft?.n_message ??
       (draftId && draft ? generateNumeroMessage(draftId, draft.date_prospection, user?.sigle, suffixeNumeroMode) : '')
@@ -611,6 +618,13 @@ export default function ExtensiveReferenceScreen() {
     // (`SurfaceInfesteeSuperieureError`, backend) sans qu'aucun champ visible ici
     // n'explique pourquoi.
     const surfaceInfesteeNum = surfaceInfestee ? parseFloat(surfaceInfestee) : 0;
+    // #surface-infestee-inferieure-prospectee : le champ VISIBLE « Surface prospectée »
+    // de cet écran est stocké dans `surface_station` (colonne historique) — c'est lui
+    // que l'agent compare à l'infestée, pas seulement la valeur héritée ci-dessous.
+    if (messageSurfaceInfestee) {
+      Alert.alert('Surface infestée invalide', messageSurfaceInfestee);
+      return;
+    }
     if (draft?.surface_prospectee != null && surfaceInfesteeNum > draft.surface_prospectee) {
       Alert.alert(
         'Surface infestée invalide',
@@ -1025,6 +1039,7 @@ export default function ExtensiveReferenceScreen() {
             <View style={[styles.card, { marginTop: 10 }]}>
               <Text style={styles.label}>Surface prospectée (ha)</Text>
               <TextInput
+                testID="extensive-surface-prospectee-input"
                 value={surfaceStation}
                 onChangeText={setSurfaceStation}
                 keyboardType="decimal-pad"
@@ -1035,6 +1050,7 @@ export default function ExtensiveReferenceScreen() {
             <View style={[styles.card, { marginTop: 8 }]}>
               <Text style={styles.label}>Surface infestée (ha)</Text>
               <TextInput
+                testID="extensive-surface-infestee-input"
                 value={surfaceInfestee}
                 onChangeText={setSurfaceInfestee}
                 keyboardType="decimal-pad"
@@ -1042,6 +1058,7 @@ export default function ExtensiveReferenceScreen() {
                 placeholderTextColor={TEXT_SECONDARY}
                 style={styles.input}
               />
+              {messageSurfaceInfestee ? <Text style={styles.gpsErrorText}>{messageSurfaceInfestee}</Text> : null}
             </View>
 
             <Text style={styles.hintText}>Vert = auto-rempli par GPS/session ; blanc = à confirmer ou saisir.</Text>

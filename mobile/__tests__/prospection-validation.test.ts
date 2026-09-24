@@ -10,6 +10,7 @@ import {
   classifyAerialPopulation,
   validateEcartHistorique,
   ECART_HISTORIQUE_SEUIL_RATIO,
+  messageSurfaceInfesteeSuperieure,
 } from '../src/lib/prospection-validation';
 
 describe('validateProspectionDate — antériorité au début de mission (#105)', () => {
@@ -531,5 +532,23 @@ describe('validateEcartHistorique — écart vs dernière observation au même s
       derniereDensiteMoyConnue: 1,
     });
     expect(blocages).toEqual([]);
+  });
+});
+
+describe('messageSurfaceInfesteeSuperieure (#surface-infestee-inferieure-prospectee)', () => {
+  it('signale une infestée strictement supérieure à la prospectée', () => {
+    expect(messageSurfaceInfesteeSuperieure(8, 5)).toContain('inférieure ou égale');
+  });
+
+  it('autorise l’égalité et une infestée plus petite', () => {
+    expect(messageSurfaceInfesteeSuperieure(5, 5)).toBeNull();
+    expect(messageSurfaceInfesteeSuperieure(0, 5)).toBeNull();
+  });
+
+  it('ne dit rien quand l’une des deux valeurs est inconnue', () => {
+    expect(messageSurfaceInfesteeSuperieure(8, null)).toBeNull();
+    expect(messageSurfaceInfesteeSuperieure(null, 5)).toBeNull();
+    expect(messageSurfaceInfesteeSuperieure(undefined, undefined)).toBeNull();
+    expect(messageSurfaceInfesteeSuperieure(NaN, 5)).toBeNull();
   });
 });

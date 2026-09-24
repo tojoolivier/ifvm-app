@@ -370,3 +370,20 @@ export function validateEcartHistorique(input: EcartHistoriqueValidationInput): 
 
   return { blocages, avertissements };
 }
+
+/**
+ * #surface-infestee-inferieure-prospectee (Extensif/Validation) : la surface
+ * infestée ne peut pas dépasser la surface prospectée — même règle que le
+ * backend (`valider_surfaces_prospection`) et que l'Intensif (ADR-006). Aucun
+ * message si l'une des deux valeurs est inconnue (rien à comparer) ; l'égalité
+ * reste autorisée.
+ */
+export function messageSurfaceInfesteeSuperieure(
+  surfaceInfesteeHa: number | null | undefined,
+  surfaceProspecteeHa: number | null | undefined
+): string | null {
+  if (surfaceInfesteeHa == null || surfaceProspecteeHa == null) return null;
+  if (Number.isNaN(surfaceInfesteeHa) || Number.isNaN(surfaceProspecteeHa)) return null;
+  if (surfaceInfesteeHa <= surfaceProspecteeHa) return null;
+  return `La surface infestée (${surfaceInfesteeHa} ha) doit être inférieure ou égale à la surface prospectée (${surfaceProspecteeHa} ha).`;
+}
