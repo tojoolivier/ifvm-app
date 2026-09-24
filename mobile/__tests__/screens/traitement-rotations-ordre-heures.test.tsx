@@ -1,7 +1,7 @@
 /**
- * #alerte-meteo-vent-temperature (Aérien) : même règle que le Terrestre, appliquée
- * à chaque rotation (vent/température début et fin) sur l'écran Pesticides &
- * rotations — avertissement en direct, « Continuer » refusé tant que non corrigé.
+ * #ordre-heures-rotation-aerien : sur l'écran Pesticides & rotations, chaque rotation doit
+ * respecter début < ouverture de vanne < fermeture de vanne < fin — avertissement en direct,
+ * « Continuer » refusé tant que l'ordre n'est pas rétabli.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import RotationsScreen from '@/app/(traitement)/rotations';
@@ -35,9 +35,9 @@ const rotation = (over: Record<string, unknown>) => ({
   unite: 'L',
   surface_ha: 5,
   heure_debut: '06:00',
-  heure_fin: '06:30',
   heure_ouverture_vanne: '06:05',
-  heure_fermeture_vanne: '06:15',
+  heure_fermeture_vanne: '06:20',
+  heure_fin: '06:30',
   temperature_debut_c: 25,
   temperature_fin_c: 26,
   vent_debut_ms: 2,
@@ -78,36 +78,28 @@ beforeEach(() => {
     aerien: { surface_restante_abandonnee: false, pesticide_recu_l: null, rotations: [] },
   } as any);
   jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear();
-  jest.mocked(traitementRepository.addRotation).mockClear();
 });
 
-describe('RotationsScreen (Aérien) — alerte vent / température', () => {
-  it('avertit et refuse de continuer quand le vent d’une rotation dépasse 6 m/s', async () => {
-    await charger({ vent_fin_ms: 7 });
+describe('RotationsScreen (Aérien) — ordre des heures', () => {
+  it.each([
+    [{ heure_ouverture_vanne: '05:50' }, /L'heure d'ouverture de vanne doit être postérieure à l'heure de début/],
+    [{ heure_fermeture_vanne: '06:05' }, /L'heure de fermeture de vanne doit être postérieure à l'heure d'ouverture de vanne/],
+    [{ heure_fin: '06:20' }, /L'heure de fin doit être postérieure à l'heure de fermeture de vanne/],
+  ])('avertit et refuse de continuer quand l’ordre est rompu (%j)', async (over, message) => {
+    await charger(over);
 
-    expect(await screen.findByText(/Vitesse du vent supérieure à 6 m\/s/)).toBeVisible();
+    expect(await screen.findByText(message)).toBeVisible();
     fireEvent.press(screen.getByText(/Continuer/));
 
-    expect(await screen.findByText(/Rotation 1 \(vent fin\)/)).toBeVisible();
+    await waitFor(() => expect(screen.getAllByText(message).length).toBeGreaterThan(0), { timeout: 5000 });
     expect(traitementRepository.deleteAllRotationsForTraitementAerien).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('avertit et refuse de continuer quand la température d’une rotation dépasse 35 °C', async () => {
-    await charger({ temperature_debut_c: 36 });
+  it('accepte l’ordre début < ouverture < fermeture < fin, sans avertissement, et enregistre', async () => {
+    await charger({});
 
-    expect(await screen.findByText(/Température supérieure à 35 °C/)).toBeVisible();
-    fireEvent.press(screen.getByText(/Continuer/));
-
-    expect(await screen.findByText(/Rotation 1 \(température début\)/)).toBeVisible();
-    expect(traitementRepository.deleteAllRotationsForTraitementAerien).not.toHaveBeenCalled();
-  });
-
-  it('autorise 6 m/s et 35 °C pile, sans avertissement, et enregistre', async () => {
-    await charger({ vent_debut_ms: 6, temperature_fin_c: 35 });
-
-    expect(screen.queryByText(/Vitesse du vent supérieure/)).toBeNull();
-    expect(screen.queryByText(/Température supérieure/)).toBeNull();
+    expect(screen.queryByText(/doit être postérieure/)).toBeNull();
     fireEvent.press(screen.getByText(/Continuer/));
     await waitFor(() => expect(traitementRepository.deleteAllRotationsForTraitementAerien).toHaveBeenCalled(), {
       timeout: 5000,

@@ -491,29 +491,40 @@ export interface RotationHeuresInput {
   heureFermetureVanne?: string | null;
 }
 
-/** Même règle que TerrestreConditionsInput.heureDebut/heureFin (backend :
- * ck_traitement_rotation_heures) pour heure_debut/heure_fin, et
- * ck_traitement_rotation_heures_vanne pour heure_ouverture_vanne/heure_fermeture_vanne
- * (migration 0046) — appliquées à chaque rotation aérienne, numérotées à partir de 1
- * dans le message, dans l'ordre de saisie. */
+/**
+ * Ordre chronologique STRICT d'une rotation aérienne (#ordre-heures-rotation-aerien) :
+ * heure de début < ouverture de vanne < fermeture de vanne < heure de fin. Le backend
+ * (ck_traitement_rotation_heures / ..._heures_vanne, migration 0046) tolère l'égalité ;
+ * la fiche est volontairement plus stricte, comme demandé.
+ *
+ * Seules les heures renseignées sont comparées, deux à deux dans cet ordre (une heure
+ * de vanne encore vide ne masque pas une incohérence début/fin). Un message par paire
+ * incohérente, sans préfixe de rotation — cf. `validateRotationsHeures`.
+ */
+export function messagesOrdreHeuresRotation(r: RotationHeuresInput): string[] {
+  const chaine: { heure: string | null | undefined; libelle: string }[] = [
+    { heure: r.heureDebut, libelle: "l'heure de début" },
+    { heure: r.heureOuvertureVanne, libelle: "l'heure d'ouverture de vanne" },
+    { heure: r.heureFermetureVanne, libelle: "l'heure de fermeture de vanne" },
+    { heure: r.heureFin, libelle: "l'heure de fin" },
+  ];
+  const renseignees = chaine.filter((e): e is { heure: string; libelle: string } => !!e.heure);
+  const messages: string[] = [];
+  for (let i = 1; i < renseignees.length; i++) {
+    if (renseignees[i].heure <= renseignees[i - 1].heure) {
+      messages.push(`${renseignees[i].libelle} doit être postérieure à ${renseignees[i - 1].libelle}`);
+    }
+  }
+  return messages;
+}
+
+/** Applique `messagesOrdreHeuresRotation` à chaque rotation aérienne, numérotées à partir
+ * de 1 dans le message, dans l'ordre de saisie. */
 export function validateRotationsHeures(rotations: RotationHeuresInput[]): ValidationError[] {
   const errors: ValidationError[] = [];
   rotations.forEach((r, index) => {
-    if (r.heureDebut && r.heureFin && r.heureFin <= r.heureDebut) {
-      errors.push({
-        field: 'rotations',
-        message: `Rotation ${index + 1} : l'heure de fin doit être postérieure à l'heure de début`,
-      });
-    }
-    if (
-      r.heureOuvertureVanne &&
-      r.heureFermetureVanne &&
-      r.heureFermetureVanne <= r.heureOuvertureVanne
-    ) {
-      errors.push({
-        field: 'rotations',
-        message: `Rotation ${index + 1} : l'heure de fermeture de vanne doit être postérieure à l'heure d'ouverture`,
-      });
+    for (const message of messagesOrdreHeuresRotation(r)) {
+      errors.push({ field: 'rotations', message: `Rotation ${index + 1} : ${message}` });
     }
   });
   return errors;
@@ -758,6 +769,9 @@ export interface RecapAggregateInput {
   /** #alerte-meteo-vent-temperature : vent/température de chaque rotation aérienne
    * (le Terrestre passe par `terrestreConditions`). Optionnel : absent = aucune vérification. */
   aerienRotationsMeteo?: RotationMeteoInput[];
+  /** #ordre-heures-rotation-aerien : heures de chaque rotation aérienne. Optionnel : absent =
+   * aucune vérification. */
+  aerienRotationsHeures?: RotationHeuresInput[];
   signatureMatrix: SignatureRequirementWithState[];
 }
 
@@ -781,6 +795,10 @@ export function aggregateRecapErrors(input: RecapAggregateInput): ValidationErro
       field: 'rotations',
       message: 'Chaque rotation doit avoir un produit et une quantité renseignés',
     });
+  }
+
+  if (input.typeTraitement === 'AERIEN' && input.aerienRotationsHeures) {
+    errors.push(...validateRotationsHeures(input.aerienRotationsHeures));
   }
 
   if (input.typeTraitement === 'AERIEN' && input.aerienRotationsMeteo) {

@@ -13,6 +13,7 @@ import {
   validateReferences,
   validateTerrestreConditions,
   validateRotationsHeures,
+  messagesOrdreHeuresRotation,
   validateRecouvrement,
   validateEmpoisonnement,
   validateAerienEquipe,
@@ -448,6 +449,69 @@ describe('validateRotationsHeures', () => {
     expect(
       validateRotationsHeures([{ heureDebut: '06:00', heureFin: '06:30', heureOuvertureVanne: null, heureFermetureVanne: null }])
     ).toEqual([]);
+  });
+});
+
+// #ordre-heures-rotation-aerien : début < ouverture vanne < fermeture vanne < fin (strict).
+describe('ordre des heures d’une rotation aérienne (#ordre-heures-rotation-aerien)', () => {
+  const base = {
+    heureDebut: '06:00',
+    heureOuvertureVanne: '06:05',
+    heureFermetureVanne: '06:20',
+    heureFin: '06:30',
+  };
+
+  it('accepte l’ordre début < ouverture < fermeture < fin', () => {
+    expect(messagesOrdreHeuresRotation(base)).toEqual([]);
+  });
+
+  it('refuse une ouverture de vanne avant (ou égale à) l’heure de début', () => {
+    expect(messagesOrdreHeuresRotation({ ...base, heureOuvertureVanne: '05:55' })).toEqual([
+      "l'heure d'ouverture de vanne doit être postérieure à l'heure de début",
+    ]);
+    expect(messagesOrdreHeuresRotation({ ...base, heureOuvertureVanne: '06:00' })).toHaveLength(1);
+  });
+
+  it('refuse une fermeture de vanne avant (ou égale à) l’ouverture', () => {
+    expect(messagesOrdreHeuresRotation({ ...base, heureFermetureVanne: '06:05' })).toEqual([
+      "l'heure de fermeture de vanne doit être postérieure à l'heure d'ouverture de vanne",
+    ]);
+  });
+
+  it('refuse une heure de fin avant (ou égale à) la fermeture de vanne', () => {
+    expect(messagesOrdreHeuresRotation({ ...base, heureFin: '06:20' })).toEqual([
+      "l'heure de fin doit être postérieure à l'heure de fermeture de vanne",
+    ]);
+  });
+
+  it('ne compare que les heures renseignées : début/fin restent contrôlés sans heures de vanne', () => {
+    const sansVanne = { ...base, heureOuvertureVanne: null, heureFermetureVanne: null };
+    expect(messagesOrdreHeuresRotation(sansVanne)).toEqual([]);
+    expect(messagesOrdreHeuresRotation({ ...sansVanne, heureFin: '05:00' })).toEqual([
+      "l'heure de fin doit être postérieure à l'heure de début",
+    ]);
+  });
+
+  it('validateRotationsHeures nomme la rotation fautive', () => {
+    const errors = validateRotationsHeures([base, { ...base, heureOuvertureVanne: '05:00' }]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toMatch(/^Rotation 2 : /);
+  });
+
+  it('le récapitulatif remonte aussi une rotation dont l’ordre est incohérent', () => {
+    const errors = aggregateRecapErrors({
+      typeTraitement: 'AERIEN',
+      references: { typeTraitement: 'AERIEN', dateTraitement: '2026-09-17', dateValidation: null, localite: 'X', prospectionId: 'p1' },
+      recouvrementPercent: null,
+      empoisonnement: { empoisonnement: false, empoisonnementType: null, empoisonnementMode: null, empoisonnementAutre: null },
+      terrestreConditions: null,
+      aerienEquipe: null,
+      aerienRotations: [],
+      aerienRotationsHeures: [{ ...base, heureFin: '06:10' }],
+      terrestreProduits: [],
+      signatureMatrix: [],
+    } as any);
+    expect(errors.some((e) => e.message.includes('Rotation 1 : '))).toBe(true);
   });
 });
 
