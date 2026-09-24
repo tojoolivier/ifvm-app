@@ -144,3 +144,35 @@ describe('TerrestreForm — unité Produits utilisés (Litres/Kilos)', () => {
     expect(screen.getByText('Approvisionnement (kg)')).toBeVisible();
   });
 });
+
+describe('TerrestreForm — surface traitée ou protégée selon le mode', () => {
+  const brouillon = {
+    id: 'trait-1',
+    type_traitement: 'TERRESTRE',
+    cible: { surface_infestee_ha: 0 },
+    terrestre: terrestreDraft(),
+  } as any;
+
+  beforeEach(() => {
+    mockRouteParams = { traitementId: 'trait-1' };
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue(brouillon);
+  });
+
+  it('libelle la surface « Protégée (ha) » pour un produit de barrière', async () => {
+    useTraitementCaptureStore.setState({ ...RESET_STATE, ref: { modeTraitement: 'BARRIERE' } } as any);
+    await render(<TraitementScreen />);
+    await screen.findByText('Produits utilisés');
+
+    expect(screen.getByText('Protégée (ha)')).toBeVisible();
+    expect(screen.queryByText('Traitée (ha)')).toBeNull();
+  });
+
+  it('libelle la surface « Traitée (ha) » pour un produit de choc', async () => {
+    useTraitementCaptureStore.setState({ ...RESET_STATE, ref: { modeTraitement: 'TOTAL' } } as any);
+    await render(<TraitementScreen />);
+    await screen.findByText('Produits utilisés');
+
+    expect(screen.getByText('Traitée (ha)')).toBeVisible();
+    expect(screen.queryByText('Protégée (ha)')).toBeNull();
+  });
+});

@@ -248,6 +248,9 @@ export default function RotationsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.aerien.repriseTraitement, store.aerien.traitementOrigineId]);
 
+  // Produit de barrière : la surface couverte est « protégée », pas « traitée »
+  // (même règle que le backend, `repartir_surface`, et que le récapitulatif).
+  const surfaceLabel = store.ref.modeTraitement === 'BARRIERE' ? 'protégée' : 'traitée';
   const nbRotations = computeNbRotations(store.aerien.rotations);
   const totauxPesticide = computeTotalPesticideAerienParUnite(store.aerien.rotations);
   const surfaceTraitee = computeSurfaceTraiteeAerien(store.aerien.rotations);
@@ -441,7 +444,7 @@ export default function RotationsScreen() {
                 onBlur={() => clearRotationDraft(rotation.localId, 'quantite')}
               />
 
-              <Text style={formStyles.label}>Surface traitée (ha) *</Text>
+              <Text style={formStyles.label}>{`Surface ${surfaceLabel} (ha) *`}</Text>
               <TextInput
                 testID={`rotation-surface-ha-input-${index}`}
                 editable={!readOnly}
@@ -625,7 +628,7 @@ export default function RotationsScreen() {
           <Text style={formStyles.derivedValue}>{totauxPesticide.kg}</Text>
         </Card>
         <Card variant="derivee">
-          <Text style={formStyles.label}>Surface traitée (ha)</Text>
+          <Text style={formStyles.label}>{`Surface ${surfaceLabel} (ha)`}</Text>
           <Text style={formStyles.derivedValue}>{surfaceTraitee}</Text>
         </Card>
         {store.aerien.repriseTraitement && (

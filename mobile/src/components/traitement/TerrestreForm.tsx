@@ -307,7 +307,7 @@ export function TerrestreForm({
       />
 
       <Card variant="derivee">
-        <Text style={styles.label}>Traitée (ha)</Text>
+        <Text style={styles.label}>{store.ref.modeTraitement === 'BARRIERE' ? 'Protégée (ha)' : 'Traitée (ha)'}</Text>
         <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
       </Card>
       <Card variant="derivee">

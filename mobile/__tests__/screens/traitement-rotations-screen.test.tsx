@@ -401,3 +401,27 @@ describe('RotationsScreen — surface restante abandonnée ? (comme le Terrestre
     expect(screen.queryByText('Surface restante abandonnée ?')).toBeNull();
   });
 });
+
+describe('RotationsScreen — surface traitée ou protégée selon le mode', () => {
+  const rotationsBase = { rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L' as const, surface_ha: 5 }] };
+
+  it('affiche « Surface protégée (ha) » (saisie par rotation et total) pour un produit de barrière', async () => {
+    useTraitementCaptureStore.setState({ ...RESET_STATE, ref: { modeTraitement: 'BARRIERE' }, aerien: rotationsBase } as any);
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+
+    expect(screen.getByText('Surface protégée (ha) *')).toBeVisible();
+    expect(screen.getByText('Surface protégée (ha)')).toBeVisible();
+    expect(screen.queryByText('Surface traitée (ha)')).toBeNull();
+  });
+
+  it('garde « Surface traitée (ha) » pour un produit de choc', async () => {
+    useTraitementCaptureStore.setState({ ...RESET_STATE, ref: { modeTraitement: 'TOTAL' }, aerien: rotationsBase } as any);
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+
+    expect(screen.getByText('Surface traitée (ha) *')).toBeVisible();
+    expect(screen.getByText('Surface traitée (ha)')).toBeVisible();
+    expect(screen.queryByText('Surface protégée (ha)')).toBeNull();
+  });
+});
