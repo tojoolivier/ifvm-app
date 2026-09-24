@@ -67,6 +67,9 @@ describe('RevalidationListeScreen — affichage', () => {
 
     expect(await screen.findByText(/F-100/)).toBeVisible();
     expect(screen.getByText(/Validée il y a 7 jours/)).toBeVisible();
+    // Renommé « Revalidation » (ex. « Prospections à revalider »).
+    expect(screen.getByText('Revalidation')).toBeVisible();
+    expect(screen.queryByText('Prospections à revalider')).toBeNull();
   });
 
   it('affiche un état vide explicite sans planter', async () => {
@@ -74,7 +77,7 @@ describe('RevalidationListeScreen — affichage', () => {
 
     await render(<RevalidationListeScreen />);
 
-    expect(await screen.findByText(/Aucune prospection à revalider/)).toBeVisible();
+    expect(await screen.findByText(/Aucune revalidation en attente/)).toBeVisible();
   });
 });
 

@@ -23,6 +23,8 @@ import { logger } from '@/lib/logger';
 import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 // ============================================
 // CONSTANTES - PALETTE CLAIRE
@@ -35,6 +37,8 @@ const IFVM_BG_LIGHT = '#F0F2F5';
 const CARD_BG = '#FFFFFF';
 const IFVM_ORANGE = '#E67E22';
 const IFVM_ORANGE_BG = '#FFF3E0';
+const IFVM_BROUILLON = '#6B7280';
+const IFVM_BROUILLON_BG = '#F3F4F6';
 const HEADER_BG = '#1B5E1B';
 const TEXT_BLACK = '#000000';
 const TEXT_DARK = '#1A1A1A';
@@ -65,6 +69,10 @@ interface ActiviteItem {
   titre: string;
   sousTitre: string;
   synced: boolean;
+  /** #brouillon-prospection-hors-a-synchro : une prospection encore en cours de saisie
+   * (`statut = 'brouillon'`) n'est jamais « à synchro » — elle ne devient une fiche
+   * envoyable qu'une fois tout le parcours validé (`completeProspection`). */
+  brouillon: boolean;
   updatedAt: string;
 }
 
@@ -74,6 +82,7 @@ function prospectionVersActivite(fiche: DraftProspection): ActiviteItem {
     titre: stationLabel(fiche),
     sousTitre: `N°${fiche.n_fiche ?? '—'} · ${fiche.date_prospection}`,
     synced: fiche.statut_sync === 'synced',
+    brouillon: fiche.statut === 'brouillon',
     updatedAt: fiche.updated_at,
   };
 }
@@ -84,6 +93,7 @@ function traitementVersActivite(fiche: DraftTraitementRow): ActiviteItem {
     titre: fiche.localite || 'Localité non spécifiée',
     sousTitre: `N°${fiche.numero_fiche ?? '—'} · ${fiche.date_traitement ?? '—'}`,
     synced: fiche.statut_sync === 'synced',
+    brouillon: false,
     updatedAt: fiche.updated_at,
   };
 }
@@ -97,7 +107,8 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const [prospections, setProspections] = useState<DraftProspection[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
@@ -404,13 +415,22 @@ export default function DashboardScreen() {
                 <View
                   style={[
                     styles.statusBadge,
-                    { backgroundColor: item.synced ? IFVM_GREEN_BG : IFVM_ORANGE_BG },
+                    {
+                      backgroundColor: item.brouillon
+                        ? IFVM_BROUILLON_BG
+                        : item.synced
+                          ? IFVM_GREEN_BG
+                          : IFVM_ORANGE_BG,
+                    },
                   ]}
                 >
                   <ThemedText
-                    style={[styles.statusBadgeText, { color: item.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE }]}
+                    style={[
+                      styles.statusBadgeText,
+                      { color: item.brouillon ? IFVM_BROUILLON : item.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE },
+                    ]}
                   >
-                    {item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
+                    {item.brouillon ? 'BROUILLON' : item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
                   </ThemedText>
                 </View>
               </TouchableOpacity>
@@ -437,7 +457,8 @@ function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
   const max = Math.max(1, ...data.map((d) => d.count));
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   return (
     <View style={styles.weekChart}>
@@ -490,7 +511,7 @@ const BASE_TYPE_SIZES = {
   footerText: 12,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: {
       flex: 1,
@@ -795,7 +816,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       paddingVertical: 20,
     },
     footerText: {
-      color: '#BDBDBD',
+      color: theme.faint,
       fontSize: typeSizes.footerText,
     },
   });

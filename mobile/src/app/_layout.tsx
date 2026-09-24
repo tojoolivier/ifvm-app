@@ -5,6 +5,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
 import { useFontScaleStore } from '@/lib/font-scale-store';
+import { useThemeStore } from '@/lib/theme-store';
 import { getDb } from '@/lib/prospection-db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import { useFichesAutoSync } from '@/hooks/use-fiches-auto-sync';
@@ -56,6 +57,7 @@ export default function RootLayout() {
   // `demarrerApp` (qui tourne avant que l'auth ne soit résolue) — recalculé si
   // un autre agent se connecte sur ce même appareil.
   useEffect(() => {
+    void useThemeStore.getState().init();
     if (userId) void useFontScaleStore.getState().init(userId);
   }, [userId]);
 
@@ -108,8 +110,8 @@ export default function RootLayout() {
 
   if (!isInitialized) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#16a34a" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5efe3' }}>
+        <ActivityIndicator size="large" color="#1f5b39" />
       </View>
     );
   }

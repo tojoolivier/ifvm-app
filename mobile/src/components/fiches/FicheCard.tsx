@@ -3,6 +3,8 @@ import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View
 import { BadgeStyle } from './tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -55,7 +57,8 @@ export function FicheCard({
 }: FicheCardProps) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.cardContent}>
@@ -130,10 +133,10 @@ const BASE_TYPE_SIZES = {
   cardExtra: isSmallScreen ? 11 : 12,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     card: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderRadius: 12,
       marginBottom: 10,
       shadowColor: '#000',
@@ -206,16 +209,16 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     cardCode: {
       fontSize: typeSizes.cardCode,
       fontWeight: '700',
-      color: '#111827',
+      color: theme.text,
     },
     cardMeta: {
       fontSize: typeSizes.cardMeta,
-      color: '#6B7280',
+      color: theme.muted,
       marginTop: 2,
     },
     cardExtra: {
       fontSize: typeSizes.cardExtra,
-      color: '#9CA3AF',
+      color: theme.faint,
       marginTop: 2,
     },
   });

@@ -15,15 +15,11 @@ import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAuthStore } from '@/lib/auth-store';
 import { DateField } from '@/components/DateField';
 import { SignaturePad } from '@/components/traitement/SignaturePad';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const ORANGE = '#e89b2b';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
-const INACTIVE_BG = '#efeada';
 const GREEN = '#235a36';
-const AUTO_BG = '#eaf2ec';
 
 // ==========================================
 // OPTIONS INTENSITE PLUIE
@@ -45,7 +41,8 @@ export default function ObservationsScreen() {
   const signalerChargement = useSignalerChargement('observations');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const initialEnnemis = parseEnnemis(draft?.ennemis_naturels ?? null);
   const [showAutre, setShowAutre] = useState(initialEnnemis.autre !== '');
   const scrollRef = useRef<ScrollView>(null);
@@ -474,43 +471,43 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerRow: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  back: { fontSize: typeSizes.back, fontWeight: '700', color: TEXT_SECONDARY },
-  title: { fontSize: typeSizes.title, fontWeight: '700', color: TEXT },
+  back: { fontSize: typeSizes.back, fontWeight: '700', color: theme.muted },
+  title: { fontSize: typeSizes.title, fontWeight: '700', color: theme.text },
   scroll: { flex: 1 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 12, padding: 14, marginBottom: 11 },
+  card: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 12, padding: 14, marginBottom: 11 },
   cardError: { borderColor: '#c0412b', borderWidth: 1.5 },
-  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', color: TEXT, marginBottom: 11 },
-  autoCard: { backgroundColor: AUTO_BG, borderRadius: 12, padding: 14, marginBottom: 11 },
+  cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '700', color: theme.text, marginBottom: 11 },
+  autoCard: { backgroundColor: theme.successBg, borderRadius: 12, padding: 14, marginBottom: 11 },
   autoLabel: { fontSize: typeSizes.autoLabel, fontWeight: '600', color: GREEN, textTransform: 'uppercase', marginBottom: 4 },
-  autoValue: { fontSize: typeSizes.autoValue, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
+  autoValue: { fontSize: typeSizes.autoValue, fontWeight: '700', color: theme.text, fontFamily: 'monospace' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  chip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: INACTIVE_BG },
+  chip: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, backgroundColor: theme.inputBg },
   chipFlex: { flex: 1, alignItems: 'center' },
   chipActive: { backgroundColor: '#235a36' },
-  chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: TEXT_SECONDARY },
+  chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: theme.muted },
   chipTextActive: { fontWeight: '700', color: '#fff' },
-  textInput: { backgroundColor: '#f6f3e9', borderRadius: 7, padding: 8, fontSize: typeSizes.textInput, fontWeight: '500', color: TEXT, marginTop: 4 },
-  dateFieldBox: { minHeight: 0, borderWidth: 0, borderRadius: 7, backgroundColor: '#f6f3e9', paddingHorizontal: 8, paddingVertical: 8, marginTop: 4 },
+  textInput: { backgroundColor: theme.inputBg, borderRadius: 7, padding: 8, fontSize: typeSizes.textInput, fontWeight: '500', color: theme.text, marginTop: 4 },
+  dateFieldBox: { minHeight: 0, borderWidth: 0, borderRadius: 7, backgroundColor: theme.inputBg, paddingHorizontal: 8, paddingVertical: 8, marginTop: 4 },
   textArea: { minHeight: 70, textAlignVertical: 'top' },
   fieldGroup: { marginBottom: 8 },
-  fieldLabel: { fontSize: typeSizes.fieldLabel, fontWeight: '600', color: TEXT_SECONDARY, marginBottom: 4 },
-  errorText: { color: '#c0412b', fontSize: typeSizes.errorText, marginBottom: 4 },
+  fieldLabel: { fontSize: typeSizes.fieldLabel, fontWeight: '600', color: theme.muted, marginBottom: 4 },
+  errorText: { color: theme.danger, fontSize: typeSizes.errorText, marginBottom: 4 },
   footer: { padding: 16 },
   continueButton: { backgroundColor: ORANGE, borderRadius: 13, padding: 15, alignItems: 'center' },
-  continueButtonText: { color: TEXT, fontWeight: '800', fontSize: typeSizes.continueButtonText },
+  continueButtonText: { color: theme.text, fontWeight: '800', fontSize: typeSizes.continueButtonText },
   // ===== Signature =====
-  signatureStamp: { fontSize: typeSizes.signatureStamp, color: TEXT_SECONDARY, fontFamily: 'monospace', marginTop: 6 },
+  signatureStamp: { fontSize: typeSizes.signatureStamp, color: theme.muted, fontFamily: 'monospace', marginTop: 6 },
   signButton: { backgroundColor: GREEN, borderRadius: 9, paddingVertical: 9, alignItems: 'center', marginTop: 8 },
   signButtonDisabled: { backgroundColor: '#9a9484' },
   signButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.signButtonText },
-  modifyButton: { borderWidth: 1, borderColor: BORDER, borderRadius: 9, paddingVertical: 9, alignItems: 'center', marginTop: 8 },
-  modifyButtonText: { color: TEXT, fontWeight: '800', fontSize: typeSizes.modifyButtonText },
+  modifyButton: { borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 9, paddingVertical: 9, alignItems: 'center', marginTop: 8 },
+  modifyButtonText: { color: theme.text, fontWeight: '800', fontSize: typeSizes.modifyButtonText },
 });
 }
 

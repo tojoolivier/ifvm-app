@@ -47,6 +47,8 @@ const freshDraft = () => ({
   // sans lien avec ce que ce fichier teste (géocodage de la Station), mais
   // requise pour que « Suivant » ne soit pas bloqué dans le premier test.
   surface_infestee: 3.5,
+  // Surface prospectée : plafond de la surface infestée, sans lien avec le géocodage testé ici.
+  surface_station: 1000,
 });
 
 describe('ExtensiveReferenceScreen — Station auto-remplie par géocodage inverse (#station-gps-auto)', () => {
