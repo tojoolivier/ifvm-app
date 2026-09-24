@@ -21,6 +21,9 @@ import {
   deriveNomCommercial,
   estAerienPretPourSynchro,
   estTerrestrePretPourSynchro,
+  messageVentTropFort,
+  messageTemperatureTropElevee,
+  validateRotationsMeteo,
 } from '../src/lib/traitement-validation';
 
 /**
@@ -704,5 +707,71 @@ describe('aggregateRecapErrors', () => {
       terrestreProduits: [{ produitId: null, quantiteL: null }],
     });
     expect(errors.some((e) => e.field === 'produits')).toBe(true);
+  });
+});
+
+// #alerte-meteo-vent-temperature : au-delà de 6 m/s de vent ou de 35 °C, le
+// traitement est à annuler — seuils strictement supérieurs (6 et 35 pile restent
+// autorisés), valables Aérien (par rotation) comme Terrestre.
+describe('conditions météo (#alerte-meteo-vent-temperature)', () => {
+  it('signale un vent strictement supérieur à 6 m/s, pas 6 pile ni une valeur absente', () => {
+    expect(messageVentTropFort(6.1)).toContain('6 m/s');
+    expect(messageVentTropFort(6)).toBeNull();
+    expect(messageVentTropFort(0)).toBeNull();
+    expect(messageVentTropFort(null)).toBeNull();
+    expect(messageVentTropFort(undefined)).toBeNull();
+  });
+
+  it('signale une température strictement supérieure à 35 °C, pas 35 pile ni une valeur absente', () => {
+    expect(messageTemperatureTropElevee(35.1)).toContain('35 °C');
+    expect(messageTemperatureTropElevee(35)).toBeNull();
+    expect(messageTemperatureTropElevee(null)).toBeNull();
+  });
+
+  it('Terrestre : validateTerrestreConditions bloque vent et température hors seuil, champ par champ', () => {
+    const base = {
+      heureDebut: '06:00',
+      heureFin: '09:00',
+      vitesseVentMs: 6,
+      temperatureC: 35,
+      surfaceRestanteHa: 0,
+      surfaceRestanteAbandonnee: null,
+      motifSurfaceRestanteAbandonnee: null,
+    };
+    expect(validateTerrestreConditions(base)).toEqual([]);
+    expect(validateTerrestreConditions({ ...base, vitesseVentMs: 7 }).map((e) => e.field)).toEqual(['vitesseVentMs']);
+    expect(validateTerrestreConditions({ ...base, temperatureC: 40 }).map((e) => e.field)).toEqual(['temperatureC']);
+  });
+
+  it('Aérien : une erreur par valeur hors seuil, numérotée par rotation', () => {
+    const errors = validateRotationsMeteo([
+      { ventDebutMs: 6, ventFinMs: 6, temperatureDebutC: 35, temperatureFinC: 35 },
+      { ventDebutMs: 8, ventFinMs: 2, temperatureDebutC: 20, temperatureFinC: 36 },
+    ]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0].message).toContain('Rotation 2 (vent début)');
+    expect(errors[1].message).toContain('Rotation 2 (température fin)');
+  });
+
+  it('récapitulatif : aggregateRecapErrors remonte les rotations aériennes hors seuil', () => {
+    const errors = aggregateRecapErrors({
+      typeTraitement: 'AERIEN',
+      references: {
+        typeTraitement: 'AERIEN',
+        dateTraitement: '2026-09-17',
+        dateValidation: null,
+        localite: 'X',
+        prospectionId: 'p1',
+      },
+      recouvrementPercent: null,
+      empoisonnement: { empoisonnement: false, empoisonnementType: null, empoisonnementMode: null, empoisonnementAutre: null },
+      terrestreConditions: null,
+      aerienEquipe: null,
+      aerienRotations: [],
+      aerienRotationsMeteo: [{ ventDebutMs: 9 }],
+      terrestreProduits: [],
+      signatureMatrix: [],
+    } as any);
+    expect(errors.some((e) => e.message.includes('Rotation 1 (vent début)'))).toBe(true);
   });
 });

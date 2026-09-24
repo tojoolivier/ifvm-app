@@ -494,6 +494,54 @@ export function validateRotationsHeures(rotations: RotationHeuresInput[]): Valid
 }
 
 // ==========================================
+// CONDITIONS MÉTÉO (#alerte-meteo-vent-temperature)
+// ==========================================
+
+/** Au-delà de ces seuils (strictement supérieurs — 6 m/s et 35 °C pile restent
+ * autorisés), le traitement doit être annulé : « Continuer » est refusé tant que
+ * la valeur n'est pas corrigée. Valables pour l'Aérien (par rotation, début/fin)
+ * comme pour le Terrestre — une seule règle, appelée des deux côtés. */
+export const SEUIL_VENT_MAX_MS = 6;
+export const SEUIL_TEMPERATURE_MAX_C = 35;
+
+/** Message d'avertissement si la vitesse du vent dépasse le seuil, sinon `null`. */
+export function messageVentTropFort(ventMs: number | null | undefined): string | null {
+  if (ventMs == null || !(ventMs > SEUIL_VENT_MAX_MS)) return null;
+  return `⚠️ Vitesse du vent supérieure à ${SEUIL_VENT_MAX_MS} m/s : annulez le traitement, ou corrigez la valeur si elle est erronée.`;
+}
+
+/** Message d'avertissement si la température dépasse le seuil, sinon `null`. */
+export function messageTemperatureTropElevee(temperatureC: number | null | undefined): string | null {
+  if (temperatureC == null || !(temperatureC > SEUIL_TEMPERATURE_MAX_C)) return null;
+  return `⚠️ Température supérieure à ${SEUIL_TEMPERATURE_MAX_C} °C : annulez le traitement, ou corrigez la valeur si elle est erronée.`;
+}
+
+export interface RotationMeteoInput {
+  ventDebutMs?: number | null;
+  ventFinMs?: number | null;
+  temperatureDebutC?: number | null;
+  temperatureFinC?: number | null;
+}
+
+/** Une erreur bloquante par valeur hors seuil, préfixée « Rotation N : » (numérotée
+ * à partir de 1, dans l'ordre de saisie) — même convention que `validateRotationsHeures`. */
+export function validateRotationsMeteo(rotations: RotationMeteoInput[]): ValidationError[] {
+  const errors: ValidationError[] = [];
+  rotations.forEach((r, index) => {
+    const champs: [string, string | null][] = [
+      ['vent début', messageVentTropFort(r.ventDebutMs)],
+      ['vent fin', messageVentTropFort(r.ventFinMs)],
+      ['température début', messageTemperatureTropElevee(r.temperatureDebutC)],
+      ['température fin', messageTemperatureTropElevee(r.temperatureFinC)],
+    ];
+    for (const [champ, message] of champs) {
+      if (message) errors.push({ field: 'rotations', message: `Rotation ${index + 1} (${champ}) — ${message}` });
+    }
+  });
+  return errors;
+}
+
+// ==========================================
 // CONDITIONS TERRESTRE (écran C, branche terrestre)
 // ==========================================
 
@@ -533,6 +581,12 @@ export function validateTerrestreConditions(input: TerrestreConditionsInput): Va
   if (input.heureDebut && input.heureFin && input.heureFin <= input.heureDebut) {
     errors.push({ field: 'heureFin', message: "L'heure de fin doit être postérieure à l'heure de début" });
   }
+
+  // #alerte-meteo-vent-temperature : bloquant tant que la valeur n'est pas corrigée.
+  const messageVent = messageVentTropFort(input.vitesseVentMs);
+  if (messageVent) errors.push({ field: 'vitesseVentMs', message: messageVent });
+  const messageTemperature = messageTemperatureTropElevee(input.temperatureC);
+  if (messageTemperature) errors.push({ field: 'temperatureC', message: messageTemperature });
 
   if (input.surfaceRestanteHa > 0) {
     if (input.surfaceRestanteAbandonnee === null || input.surfaceRestanteAbandonnee === undefined) {
@@ -675,6 +729,9 @@ export interface RecapAggregateInput {
   aerienRotations: RotationSyncPreconditionInput[];
   /** Même garde-fou côté Terrestre — cf. `produitsTerrestrePretsPourSynchro`. */
   terrestreProduits: ProduitUtiliseSyncPreconditionInput[];
+  /** #alerte-meteo-vent-temperature : vent/température de chaque rotation aérienne
+   * (le Terrestre passe par `terrestreConditions`). Optionnel : absent = aucune vérification. */
+  aerienRotationsMeteo?: RotationMeteoInput[];
   signatureMatrix: SignatureRequirementWithState[];
 }
 
@@ -698,6 +755,10 @@ export function aggregateRecapErrors(input: RecapAggregateInput): ValidationErro
       field: 'rotations',
       message: 'Chaque rotation doit avoir un produit et une quantité renseignés',
     });
+  }
+
+  if (input.typeTraitement === 'AERIEN' && input.aerienRotationsMeteo) {
+    errors.push(...validateRotationsMeteo(input.aerienRotationsMeteo));
   }
 
   if (input.typeTraitement === 'TERRESTRE' && !produitsTerrestrePretsPourSynchro(input.terrestreProduits)) {

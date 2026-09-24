@@ -483,6 +483,12 @@ export default function RecapScreen() {
       produitId: r.produit_id,
       quantite: r.quantite,
     })),
+    aerienRotationsMeteo: (draft.aerien?.rotations ?? []).map((r) => ({
+      ventDebutMs: r.vent_debut_ms,
+      ventFinMs: r.vent_fin_ms,
+      temperatureDebutC: r.temperature_debut_c,
+      temperatureFinC: r.temperature_fin_c,
+    })),
     terrestreProduits: (draft.terrestre?.produits ?? []).map((p) => ({
       produitId: p.produit_id,
       quantiteL: p.quantite_l,
