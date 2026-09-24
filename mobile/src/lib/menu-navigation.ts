@@ -1,6 +1,6 @@
 import type { MenuEntree } from '@/components/menu/MenuDrawer';
 import type { UserRole } from './api-client';
-import { peutVoirEquipesAeriennes } from './equipe-aerienne-access';
+import { peutSaisirVols, peutVoirEquipesAeriennes } from './equipe-aerienne-access';
 
 /**
  * Section NAVIGATION du tiroir de l'Accueil (Figma « Tiroir menu ») : Équipes, Sites, Mes vols, Référentiels.
@@ -14,10 +14,10 @@ export function entreesNavigation(
   return [
     { cle: 'equipes', libelle: 'Équipes', icone: 'utilisateurs', onPress: () => aller('/(app)/equipes') },
     ...(peutVoirEquipesAeriennes(role)
-      ? [
-          { cle: 'sites', libelle: 'Sites', icone: 'sites' as const, onPress: () => aller('/(app)/sites') },
-          { cle: 'vols', libelle: 'Mes vols', icone: 'aeronef-avion' as const, onPress: () => aller('/(app)/vols') },
-        ]
+      ? [{ cle: 'sites', libelle: 'Sites', icone: 'sites' as const, onPress: () => aller('/(app)/sites') }]
+      : []),
+    ...(peutSaisirVols(role)
+      ? [{ cle: 'vols', libelle: 'Mes vols', icone: 'aeronef-avion' as const, onPress: () => aller('/(app)/vols') }]
       : []),
     { cle: 'referentiels', libelle: 'Référentiels', icone: 'referentiels', onPress: () => aller('/(app)/sync') },
   ];

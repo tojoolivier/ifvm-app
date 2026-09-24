@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
+import { peutSaisirVols } from '@/lib/equipe-aerienne-access';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -28,6 +29,7 @@ export function NewFicheFab() {
   const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
+  const avecVol = peutSaisirVols(user?.role);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const { run: runQuickStart, isRunning: isStartingProspection } = useAsyncAction();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -90,7 +92,7 @@ export function NewFicheFab() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.card, styles.cardLast]}
+              style={[styles.card, !avecVol && styles.cardLast]}
               activeOpacity={0.85}
               onPress={() => {
                 setMenuVisible(false);
@@ -103,6 +105,24 @@ export function NewFicheFab() {
                 <Text style={styles.cardSubtitle}>Évaluation rapide après traitement</Text>
               </View>
             </TouchableOpacity>
+
+            {avecVol && (
+              <TouchableOpacity
+                testID="fab-nouveau-vol"
+                style={[styles.card, styles.cardLast]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  setMenuVisible(false);
+                  router.push('/(app)/vol-nouveau' as any);
+                }}
+              >
+                <Text style={styles.cardIcon}>✈️</Text>
+                <View style={styles.cardTextWrap}>
+                  <Text style={styles.cardTitle}>Nouveau vol</Text>
+                  <Text style={styles.cardSubtitle}>Convoyage ou vol divers</Text>
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>

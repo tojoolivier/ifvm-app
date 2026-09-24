@@ -12,12 +12,16 @@ describe('entreesNavigation — section NAVIGATION du tiroir', () => {
     }
   );
 
-  it.each(['prospecteur', 'chef_equipe', 'agent_encadreur', 'admin', undefined, null] as const)(
-    '%s ne voit pas « Sites » (réservé à l’équipe aérienne)',
+  it.each(['prospecteur', 'chef_equipe', 'agent_encadreur', undefined, null] as const)(
+    '%s ne voit ni « Sites » ni « Mes vols » (réservés à l’équipe aérienne)',
     (role) => {
       expect(entreesNavigation(role, aller).map((e) => e.cle)).toEqual(['equipes', 'referentiels']);
     }
   );
+
+  it('l’admin voit « Mes vols » mais pas « Sites »', () => {
+    expect(entreesNavigation('admin', aller).map((e) => e.cle)).toEqual(['equipes', 'vols', 'referentiels']);
+  });
 
   it('« Sites » ouvre l’écran des sites, pas l’ancienne liste des équipes aériennes', () => {
     const sites = entreesNavigation('chef_de_base', aller).find((e) => e.cle === 'sites');

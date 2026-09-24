@@ -18,6 +18,14 @@ export function peutVoirEquipesAeriennes(role: UserRole | null | undefined): boo
 }
 
 /**
+ * Les vols (#644) se saisissent avec une équipe de travail aérienne : l'équipe aérienne, et l'admin
+ * qui peut choisir n'importe quelle équipe.
+ */
+export function peutSaisirVols(role: UserRole | null | undefined): boolean {
+  return peutVoirEquipesAeriennes(role) || role === 'admin';
+}
+
+/**
  * Le chef de base crée les lieux aériens (bases, stands) de SON équipe — seul membre
  * de l'équipe à pouvoir se connecter (les comptes pilote/mécanicien sont créés à la
  * volée, sans accès applicatif) — et un admin peut le faire pour n'importe quelle équipe (ex. avant même
