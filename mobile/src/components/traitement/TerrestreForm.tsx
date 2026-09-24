@@ -2,7 +2,12 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { UtilisateurEquipe, Pesticide } from '@/lib/referentiel-db';
 import { ProduitDraft, useTraitementCaptureStore } from '@/lib/traitement-capture-store';
-import { computePesticideConsommeSuggere, deriveNomCommercial } from '@/lib/traitement-validation';
+import {
+  computePesticideConsommeSuggere,
+  deriveNomCommercial,
+  messageTemperatureTropElevee,
+  messageVentTropFort,
+} from '@/lib/traitement-validation';
 import { generateId } from '@/lib/id';
 import { Card } from '@/components/traitement/Card';
 import { Chip } from '@/components/traitement/Chip';
@@ -233,6 +238,11 @@ export function TerrestreForm({
         onChangeText={(v) => handleDecimalChange('vitesse_vent_ms', v)}
         onBlur={() => clearDecimalDraft('vitesse_vent_ms')}
       />
+      {/* #alerte-meteo-vent-temperature : avertissement en direct dès que la valeur
+          dépasse le seuil ; « Continuer » reste refusé tant qu'elle n'est pas corrigée. */}
+      {(messageVentTropFort(store.terrestre.vitesse_vent_ms) ?? errors.vitesseVentMs) && (
+        <Text style={styles.error}>{messageVentTropFort(store.terrestre.vitesse_vent_ms) ?? errors.vitesseVentMs}</Text>
+      )}
       <Text style={styles.label}>Température (°C) *</Text>
       <TextInput
         editable={!readOnly}
@@ -243,6 +253,11 @@ export function TerrestreForm({
         onChangeText={(v) => handleDecimalChange('temperature_c', v)}
         onBlur={() => clearDecimalDraft('temperature_c')}
       />
+      {(messageTemperatureTropElevee(store.terrestre.temperature_c) ?? errors.temperatureC) && (
+        <Text style={styles.error}>
+          {messageTemperatureTropElevee(store.terrestre.temperature_c) ?? errors.temperatureC}
+        </Text>
+      )}
       <Text style={styles.label}>Direction du vent</Text>
       <View style={styles.chipRow}>
         {DIRECTIONS_VENT.map((d) => (
