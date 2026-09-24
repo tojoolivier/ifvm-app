@@ -20,6 +20,7 @@ jest.mock('@/lib/traitement-repository', () => ({
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
   updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),
+  updateTraitementAerienSurfaceRestante: jest.fn().mockResolvedValue(undefined),
   updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
 }));
 
@@ -68,7 +69,8 @@ beforeEach(() => {
     id: 'trait-1',
     type_traitement: 'AERIEN',
     cible: { surface_infestee_ha: 100 },
-    aerien: { pesticide_recu_l: null, rotations: [] },
+    // Surface restante déjà tranchée : sinon « Continuer » exige la décision (abandonnée ou non).
+    aerien: { surface_restante_abandonnee: false, pesticide_recu_l: null, rotations: [] },
   } as any);
   jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear();
   jest.mocked(traitementRepository.addRotation).mockClear();
