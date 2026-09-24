@@ -322,6 +322,11 @@ describe('RecapScreen — Terrestre : rien de saisi ne manque à la relecture', 
     expect(screen.getByText('77')).toBeVisible(); // Essence (litres)
     expect(screen.getByText('22')).toBeVisible(); // Disque rotatif
     expect(screen.getByText('99')).toBeVisible(); // Nombre de piles
-    expect(screen.getByText('3')).toBeVisible(); // Ulvamast
+    expect(screen.getByText('3')).toBeVisible(); // Nb Atomiseur autoporté (colonne moyens_ulvamast_nb)
+    // #renomme-materiels-atomiseur : libellés « Nb … », plus « Atomiseur » / « Ulvamast ».
+    expect(screen.getByText('Nb Atomiseur à dos')).toBeVisible();
+    expect(screen.getByText('Nb Atomiseur autoporté')).toBeVisible();
+    expect(screen.queryByText('Atomiseur')).toBeNull();
+    expect(screen.queryByText('Ulvamast')).toBeNull();
   });
 });
