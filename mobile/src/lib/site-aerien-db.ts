@@ -1,6 +1,7 @@
 import { PreconditionError } from './errors';
 import { generateId } from './id';
 import { getReferentielDb } from './referentiel-db';
+import { tracerVolInstallation } from './vol-db';
 import {
   type PositionSaisie,
   type SiteSaisi,
@@ -366,9 +367,10 @@ export async function deplacerSites(demande: DeplacementDemande): Promise<void> 
   if (erreurs.length > 0) refuser(erreurs);
 
   const deplacementId = generateId();
+  const volId = generateId();
   const volJson = demande.vol
     ? JSON.stringify({
-        id: generateId(),
+        id: volId,
         type: 'mise_en_place',
         equipe_id: demande.vol.equipeId,
         aeronef_id: demande.vol.aeronefId,
@@ -428,6 +430,20 @@ export async function deplacerSites(demande: DeplacementDemande): Promise<void> 
         new Date().toISOString(),
       ]
     );
+    if (demande.vol) {
+      // Trace pour « Mes vols » : l'envoi reste porté par le déplacement (vol_json).
+      await tracerVolInstallation(db, {
+        id: volId,
+        equipeId: demande.vol.equipeId,
+        aeronefId: demande.vol.aeronefId,
+        date: jour,
+        debut: demande.vol.debut,
+        fin: demande.vol.fin,
+        sitePrincipalId: demande.siteId,
+        standId: demande.vol.standId,
+        libelleLieu: localite,
+      });
+    }
   });
 }
 

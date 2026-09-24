@@ -564,6 +564,30 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       erreur TEXT
     );
 
+    -- Vols saisis sur l'appareil (#644), toutes origines confondues : c'est ce que lit « Mes vols ».
+    -- Seules les lignes 'saisie_directe' (convoyage, divers) partent d'ici ; celles de la mise en
+    -- place voyagent avec leur déplacement (site_aerien_deplacement.vol_json) et sont seulement
+    -- marquées synchronisées à son envoi.
+    CREATE TABLE IF NOT EXISTS vol (
+      id TEXT PRIMARY KEY NOT NULL,
+      categorie TEXT NOT NULL,
+      origine TEXT NOT NULL,
+      equipe_id TEXT NOT NULL,
+      aeronef_id TEXT NOT NULL,
+      date_vol TEXT NOT NULL,
+      heure_debut TEXT NOT NULL,
+      heure_fin TEXT NOT NULL,
+      site_principal_id TEXT,
+      stand_id TEXT,
+      base_secondaire_id TEXT,
+      motif TEXT,
+      lieu_depart TEXT,
+      lieu_arrivee TEXT,
+      libelle_lieu TEXT,
+      statut_sync TEXT NOT NULL DEFAULT 'local',
+      cree_le TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS aeronef (
       id TEXT PRIMARY KEY NOT NULL,
       immatriculation TEXT NOT NULL,

@@ -12,6 +12,8 @@ import {
   marquerSiteSynchronise,
 } from './site-aerien-db';
 import { lireDependants } from './site-aerien-regles';
+import { marquerVolSynchronise } from './vol-db';
+import { synchroniserVols } from './vol-sync';
 import { type LotSync, type ResumeSync, syncAll } from './sync-lot';
 
 /**
@@ -104,7 +106,9 @@ const lotDeplacement: LotSync<DeplacementLocal> = {
     });
     // Le vol n'a de sens qu'une fois le site installé ; son id client le rend rejouable (#639).
     if (deplacement.vol_json) {
-      await apiClient.createVol(token, JSON.parse(deplacement.vol_json));
+      const vol = JSON.parse(deplacement.vol_json);
+      await apiClient.createVol(token, vol);
+      await marquerVolSynchronise(vol.id);
     }
     await marquerDeplacementSynchronise(deplacement.id);
   },
@@ -114,9 +118,10 @@ const lotDeplacement: LotSync<DeplacementLocal> = {
 export async function synchroniserSitesAeriens(token: string): Promise<ResumeSync> {
   const sites = await syncAll(await listSitesEnAttente(), token, lotCreation);
   const deplacements = await syncAll(await listDeplacementsEnAttente(), token, lotDeplacement);
+  const vols = await synchroniserVols(token);
   return {
-    reussies: [...sites.reussies, ...deplacements.reussies],
-    echouees: [...sites.echouees, ...deplacements.echouees],
-    conflits: [...sites.conflits, ...deplacements.conflits],
+    reussies: [...sites.reussies, ...deplacements.reussies, ...vols.reussies],
+    echouees: [...sites.echouees, ...deplacements.echouees, ...vols.echouees],
+    conflits: [...sites.conflits, ...deplacements.conflits, ...vols.conflits],
   };
 }

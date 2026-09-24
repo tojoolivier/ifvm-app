@@ -3,7 +3,7 @@ import type { UserRole } from './api-client';
 import { peutVoirEquipesAeriennes } from './equipe-aerienne-access';
 
 /**
- * Section NAVIGATION du tiroir de l'Accueil (Figma « Tiroir menu ») : Équipes, Sites, Référentiels.
+ * Section NAVIGATION du tiroir de l'Accueil (Figma « Tiroir menu ») : Équipes, Sites, Mes vols, Référentiels.
  * « Sites » n'apparaît que pour l'équipe aérienne (chef de base, pilote, mécanicien) : les sites
  * sont un sous-domaine de l'équipe aérienne (#643), il n'y a rien à y montrer aux autres rôles.
  */
@@ -14,7 +14,10 @@ export function entreesNavigation(
   return [
     { cle: 'equipes', libelle: 'Équipes', icone: 'utilisateurs', onPress: () => aller('/(app)/equipes') },
     ...(peutVoirEquipesAeriennes(role)
-      ? [{ cle: 'sites', libelle: 'Sites', icone: 'sites' as const, onPress: () => aller('/(app)/sites') }]
+      ? [
+          { cle: 'sites', libelle: 'Sites', icone: 'sites' as const, onPress: () => aller('/(app)/sites') },
+          { cle: 'vols', libelle: 'Mes vols', icone: 'aeronef-avion' as const, onPress: () => aller('/(app)/vols') },
+        ]
       : []),
     { cle: 'referentiels', libelle: 'Référentiels', icone: 'referentiels', onPress: () => aller('/(app)/sync') },
   ];

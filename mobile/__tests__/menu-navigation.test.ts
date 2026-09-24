@@ -5,10 +5,10 @@ describe('entreesNavigation — section NAVIGATION du tiroir', () => {
   beforeEach(() => aller.mockReset());
 
   it.each(['chef_de_base', 'pilote', 'mecanicien'] as const)(
-    '%s voit « Sites » entre « Équipes » et « Référentiels »',
+    '%s voit « Sites » et « Mes vols » entre « Équipes » et « Référentiels »',
     (role) => {
       const entrees = entreesNavigation(role, aller);
-      expect(entrees.map((e) => e.cle)).toEqual(['equipes', 'sites', 'referentiels']);
+      expect(entrees.map((e) => e.cle)).toEqual(['equipes', 'sites', 'vols', 'referentiels']);
     }
   );
 
@@ -25,6 +25,11 @@ describe('entreesNavigation — section NAVIGATION du tiroir', () => {
     sites?.onPress();
 
     expect(aller).toHaveBeenCalledWith('/(app)/sites');
+  });
+
+  it('« Mes vols » ouvre la liste des vols', () => {
+    entreesNavigation('pilote', aller).find((e) => e.cle === 'vols')?.onPress();
+    expect(aller).toHaveBeenCalledWith('/(app)/vols');
   });
 
   it('« Sites » porte l’icône et le libellé de la maquette', () => {
