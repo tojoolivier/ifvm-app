@@ -388,7 +388,9 @@ async function creerTables(db: SQLite.SQLiteDatabase): Promise<void> {
       surface_protegee_ha REAL,
       surface_restante_ha REAL,
       pesticide_recu_l REAL,
-      pesticide_stock_restant_l REAL
+      pesticide_stock_restant_l REAL,
+      surface_restante_abandonnee INTEGER,
+      motif_surface_restante_abandonnee TEXT
     );
 
     CREATE TABLE IF NOT EXISTS rotation (
@@ -821,6 +823,9 @@ const COLONNES_TRAITEMENT_AERIEN: readonly Colonne[] = [
   { name: 'surface_restante_ha', type: 'REAL' },
   { name: 'pesticide_recu_l', type: 'REAL' },
   { name: 'pesticide_stock_restant_l', type: 'REAL' },
+  // Migration backend 0086 : surface restante abandonnée ? (mirroir du Terrestre).
+  { name: 'surface_restante_abandonnee', type: 'INTEGER' },
+  { name: 'motif_surface_restante_abandonnee', type: 'TEXT' },
   // Migration backend 0047 : cumul séparé des rotations dosées au kg (poudre), à côté
   // de total_pesticide_l (rotations dosées au litre).
   { name: 'total_pesticide_kg', type: 'REAL' },

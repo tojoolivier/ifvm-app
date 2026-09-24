@@ -19,6 +19,8 @@ import {
   computeSignatureMatrix,
   aggregateRecapErrors,
   deriveNomCommercial,
+  deriveUniteDepuisDoseReference,
+  computeUniteApprovisionnementAerien,
   estAerienPretPourSynchro,
   estTerrestrePretPourSynchro,
   messageVentTropFort,
@@ -86,6 +88,43 @@ describe('deriveNomCommercial', () => {
 
   it('ne retire que les espaces, pas la ponctuation collée au chiffre', () => {
     expect(deriveNomCommercial('SP-9')).toBe('SP-');
+  });
+});
+
+describe('deriveUniteDepuisDoseReference', () => {
+  it('déduit litres pour un produit liquide', () => {
+    expect(deriveUniteDepuisDoseReference('2 l/ha')).toBe('L');
+    expect(deriveUniteDepuisDoseReference('0,5 L/ha')).toBe('L');
+    expect(deriveUniteDepuisDoseReference('500 ml/ha')).toBe('L');
+  });
+
+  it('déduit kilos pour une poudre', () => {
+    expect(deriveUniteDepuisDoseReference('1,5 kg/ha')).toBe('kg');
+    expect(deriveUniteDepuisDoseReference('200 g/ha')).toBe('kg');
+  });
+
+  it("renvoie null quand la dose est absente ou illisible (choix manuel conservé)", () => {
+    expect(deriveUniteDepuisDoseReference(null)).toBeNull();
+    expect(deriveUniteDepuisDoseReference('')).toBeNull();
+    expect(deriveUniteDepuisDoseReference('selon le stade')).toBeNull();
+  });
+});
+
+describe('computeUniteApprovisionnementAerien', () => {
+  it('vaut kg quand tous les produits choisis sont dosés au poids', () => {
+    expect(computeUniteApprovisionnementAerien([{ produit_id: 'p1', unite: 'kg' }])).toBe('kg');
+  });
+
+  it('vaut L pour un liquide, un mélange ou aucun produit choisi', () => {
+    expect(computeUniteApprovisionnementAerien([{ produit_id: 'p1', unite: 'L' }])).toBe('L');
+    expect(
+      computeUniteApprovisionnementAerien([
+        { produit_id: 'p1', unite: 'kg' },
+        { produit_id: 'p2', unite: 'L' },
+      ])
+    ).toBe('L');
+    expect(computeUniteApprovisionnementAerien([{ produit_id: null, unite: 'kg' }])).toBe('L');
+    expect(computeUniteApprovisionnementAerien([])).toBe('L');
   });
 });
 

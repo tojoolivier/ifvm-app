@@ -222,6 +222,9 @@ const MIGRATED_COLUMNS = [
   { name: 'densite_groupee_nse' },
   // #zone-a-reprendre-surface-reste-a-traiter
   { name: 'surface_restante_origine_ha' },
+  // Surface restante abandonnée ? côté Aérien (migration backend 0086).
+  { name: 'surface_restante_abandonnee' },
+  { name: 'motif_surface_restante_abandonnee' },
 ];
 
 const execAsync = jest.fn().mockResolvedValue(undefined);

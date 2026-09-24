@@ -81,6 +81,8 @@ def _traitement_aerien(**overrides) -> TraitementRead:
             surface_restante_ha=None,
             pesticide_recu_l=50.0,
             pesticide_stock_restant_l=40.0,
+            surface_restante_abandonnee=None,
+            motif_surface_restante_abandonnee=None,
             taux_mortalite_pourcent=None,
             evaluation_efficacite_heures_apres=None,
             methode_evaluation_efficacite=None,
@@ -542,3 +544,14 @@ def test_build_crt_html_dates_au_format_francais():
 
     assert "11/08/2026" in html  # date_traitement
     assert "2026-08-11" not in html.replace("Hery-Aerien-2026-08-11", "")
+
+
+def test_build_crt_html_5_aerien_poudre_affiche_unite_et_consommation_en_kg():
+    """Aérien : « Approvisionnement » suit l'unité du produit — poudre (rotations en kg)
+    → libellés en kg et consommation lue dans le cumul kg, pas dans le cumul litres."""
+    base = _traitement_aerien()
+    aerien = base.aerien.model_copy(update={"total_pesticide_l": 0.0, "total_pesticide_kg": 30.0})
+    html = build_crt_html(base.model_copy(update={"aerien": aerien}))
+    assert "5.4 Approvisionnement (kg)" in html
+    assert "5.5 Produit consommé (kg)" in html
+    assert "5.6 Stock final (kg)" in html

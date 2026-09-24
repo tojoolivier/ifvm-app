@@ -101,6 +101,9 @@ export interface AerienDraft {
   // (traitement-validation.ts) — jamais une saisie stockée dans le draft.
   // Saisi sur l'écran « Traitement » (rotations.tsx), pas « Équipe » — #equipe-slide-aerien.
   pesticideRecuL?: number | null;
+  // Surface restante abandonnée ? (migration backend 0086) — mirroir de TerrestreDraft.
+  surfaceRestanteAbandonnee?: boolean | null;
+  motifSurfaceRestanteAbandonnee?: string | null;
   // Efficacité (migration backend 0058) : gérée directement en local state sur
   // l'écran « Moyens & protection » (moyens.tsx, #efficacite-moyens-protection),
   // pas dans ce store — n'y figure donc plus depuis son déplacement.
