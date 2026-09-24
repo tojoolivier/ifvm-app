@@ -3,6 +3,7 @@ import * as SQLite from 'expo-sqlite';
 import { getDb } from './prospection-db';
 import { ReferentialError } from './errors';
 import { STOCK_DDL } from './stock-schema';
+import { REFERENTIEL_DDL, REFERENTIEL_SCHEMA_VERSION, REFERENTIEL_TABLES } from './referentiel-schema.generated';
 import { VOL_DDL, migrerColonnesVol } from './vol-schema';
 
 /**
@@ -27,7 +28,7 @@ export async function getReferentielDb(): Promise<SQLite.SQLiteDatabase> {
   if (!basePrete) {
     basePrete = (async () => {
       const db = await getDb();
-      await migrateReferentielTables(db);
+      await preparerSchema(db);
       return db;
     })();
     // Un échec ne doit pas rester mémoïsé : le prochain appel réessaie.
@@ -400,133 +401,24 @@ export async function findNearestStation(
   return { station: nearest, distanceKm: bestDistance };
 }
 
-async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void> {
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS poste_acridien (
-      id TEXT PRIMARY KEY NOT NULL,
-      code TEXT NOT NULL,
-      nom TEXT NOT NULL,
-      za_id TEXT,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
+/**
+ * Tables écrites à la main, hors du schéma généré : la reconstruction du référentiel n'y touche
+ * jamais. Y figurent les métadonnées du cache (curseurs, version) et les saisies pas encore
+ * envoyées. `site_aerien_deplacement` est la file d'envoi des déplacements, `site_aerien_position` l'historique
+ * local, `vol`/`vol_lien` et `mouvement_pesticide_local` des saisies pas encore envoyées.
+ * (`stock_solde` et `referentiel_sync_meta` sont des caches, mais hors du schéma généré.)
+ */
+const DDL_LOCAL = `
+    CREATE TABLE IF NOT EXISTS referentiel_sync_meta (
+      entity_type TEXT PRIMARY KEY NOT NULL,
+      last_pull_at TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS station_fixe (
-      id TEXT PRIMARY KEY NOT NULL,
-      code TEXT NOT NULL,
-      nom TEXT NOT NULL,
-      pa_id TEXT NOT NULL,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
-      altitude REAL,
-      commune TEXT,
-      district TEXT,
-      region TEXT,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
+    -- Version du schéma généré du référentiel : quand elle change, le cache est reconstruit.
+    CREATE TABLE IF NOT EXISTS referentiel_schema_version (
+      id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+      version TEXT NOT NULL
     );
-
-    CREATE INDEX IF NOT EXISTS ix_station_fixe_pa_id ON station_fixe(pa_id);
-
-    CREATE TABLE IF NOT EXISTS utilisateur_equipe (
-      id TEXT PRIMARY KEY NOT NULL,
-      nom TEXT NOT NULL,
-      prenom TEXT NOT NULL,
-      role TEXT NOT NULL,
-      pa_id TEXT,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS pesticide (
-      id TEXT PRIMARY KEY NOT NULL,
-      code TEXT NOT NULL,
-      nom TEXT NOT NULL,
-      matiere_active TEXT,
-      dose_reference TEXT,
-      type_produit TEXT,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS culture (
-      id TEXT PRIMARY KEY NOT NULL,
-      code TEXT NOT NULL,
-      nom TEXT NOT NULL,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    -- Place d'un code de stade dans une grille de saisie. Un même code y figure
-    -- plusieurs fois (A1 est un stade femelle et un stade mâle) ; espece/sexe NULL
-    -- valent « toutes espèces » / « non sexé ».
-    CREATE TABLE IF NOT EXISTS code_stade (
-      id TEXT PRIMARY KEY NOT NULL,
-      code TEXT NOT NULL,
-      categorie TEXT,
-      sexe TEXT,
-      espece TEXT,
-      libelle TEXT NOT NULL,
-      ordre INTEGER NOT NULL DEFAULT 0,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS campagne (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      start_date TEXT NOT NULL,
-      end_date TEXT,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS lieu_aerien (
-      id TEXT PRIMARY KEY NOT NULL,
-      type_lieu TEXT NOT NULL,
-      nom TEXT NOT NULL,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
-      altitude REAL,
-      equipe_aerienne_id TEXT,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS equipe (
-      id TEXT PRIMARY KEY NOT NULL,
-      nom TEXT NOT NULL,
-      type TEXT NOT NULL,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS equipe_membre (
-      equipe_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      fonction TEXT NOT NULL,
-      nom TEXT,
-      prenom TEXT,
-      PRIMARY KEY (equipe_id, user_id)
-    );
-
-    CREATE INDEX IF NOT EXISTS ix_equipe_membre_user_id ON equipe_membre(user_id);
-
-    CREATE TABLE IF NOT EXISTS site_aerien (
-      id TEXT PRIMARY KEY NOT NULL,
-      parent_site_id TEXT,
-      equipe_id TEXT,
-      numero TEXT NOT NULL,
-      localite TEXT NOT NULL,
-      actif INTEGER NOT NULL DEFAULT 1,
-      latitude REAL,
-      longitude REAL,
-      altitude REAL,
-      date_debut_position TEXT,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS ix_site_aerien_equipe_id ON site_aerien(equipe_id);
 
     -- Historique des implantations (#643). Pas un miroir du serveur : le pull n'embarque que la
     -- position active, l'historique local est celui des déplacements faits sur cet appareil
@@ -569,61 +461,63 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
     ${VOL_DDL}
 
     ${STOCK_DDL}
+`;
 
-    CREATE TABLE IF NOT EXISTS aeronef (
-      id TEXT PRIMARY KEY NOT NULL,
-      immatriculation TEXT NOT NULL,
-      societe TEXT NOT NULL,
-      volume_cuve_l REAL NOT NULL,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS equipe_aeronef (
-      id TEXT PRIMARY KEY NOT NULL,
-      equipe_id TEXT NOT NULL,
-      aeronef_id TEXT NOT NULL,
-      date_debut TEXT NOT NULL,
-      date_fin TEXT,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS ix_equipe_aeronef_equipe_id ON equipe_aeronef(equipe_id);
-
-    CREATE TABLE IF NOT EXISTS referentiel_sync_meta (
-      entity_type TEXT PRIMARY KEY NOT NULL,
-      last_pull_at TEXT
-    );
-  `);
-
-  // Installs antérieurs à l'introduction de la Zone Anti-Acridienne (ZA) et de
-  // commune/district/region par station : poste_acridien/station_fixe existent déjà sans ces
-  // colonnes (CREATE TABLE IF NOT EXISTS ne les touche pas) — on les ajoute au besoin.
-  await addColumnsIfMissing(db, 'poste_acridien', [{ name: 'za_id', type: 'TEXT' }]);
-  await addColumnsIfMissing(db, 'station_fixe', [
-    { name: 'commune', type: 'TEXT' },
-    { name: 'district', type: 'TEXT' },
-    { name: 'region', type: 'TEXT' },
-  ]);
-  await addColumnsIfMissing(db, 'campagne', [
-    { name: 'actif', type: 'INTEGER NOT NULL DEFAULT 1' },
-  ]);
-  await addColumnsIfMissing(db, 'pesticide', [
-    { name: 'matiere_active', type: 'TEXT' },
-    { name: 'dose_reference', type: 'TEXT' },
-    { name: 'type_produit', type: 'TEXT' },
-  ]);
-  // Rattachement d'un lieu aérien à son équipe (migration backend 0074) : nullable, les
-  // lieux déjà en cache restent NULL comme côté serveur tant qu'un admin ne les rattache pas.
-  await addColumnsIfMissing(db, 'lieu_aerien', [{ name: 'equipe_aerienne_id', type: 'TEXT' }]);
-  // Site créé sur le terrain (#643) : 'local' tant que le serveur ne l'a pas reçu. Les lignes
-  // déjà en cache viennent du pull, donc 'synced'.
-  await addColumnsIfMissing(db, 'site_aerien', [
-    { name: 'statut_sync', type: "TEXT NOT NULL DEFAULT 'synced'" },
-  ]);
-  await migrateCodeStade(db);
-  await migrateUtilisateurEquipe(db);
+/**
+ * Le référentiel est un cache jetable (#675) : son DDL est généré depuis le contrat OpenAPI
+ * (`referentiel-schema.generated.ts`) et il n'a aucune migration. Si la version de schéma stockée
+ * diffère de celle du code, on jette les tables du cache, on les recrée et on remet les curseurs
+ * `since` à zéro — le prochain pull est complet. Les tables de saisie ne sont jamais touchées.
+ */
+async function preparerSchema(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(DDL_LOCAL);
   await migrateColonnesAeriennes(db);
+
+  const stockee = await db.getFirstAsync<{ version: string }>(
+    'SELECT version FROM referentiel_schema_version WHERE id = 1'
+  );
+  if (stockee?.version === REFERENTIEL_SCHEMA_VERSION) {
+    // Rien à reconstruire ; rejouer le DDL (idempotent) répare une création interrompue.
+    await db.execAsync(REFERENTIEL_DDL);
+    return;
+  }
+  await reconstruireReferentiel(db);
+}
+
+type LigneSite = Record<string, unknown>;
+
+async function reconstruireReferentiel(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    // Un site créé hors-ligne (#643) vit dans une table de cache mais n'existe que sur l'appareil :
+    // on le met de côté avant le DROP et on le réinsère.
+    const colonnes = await db.getAllAsync<{ name: string }>('PRAGMA table_info(site_aerien)');
+    const sitesEnAttente: LigneSite[] = colonnes.some((c) => c.name === 'statut_sync')
+      ? await db.getAllAsync<LigneSite>("SELECT * FROM site_aerien WHERE statut_sync <> 'synced'")
+      : [];
+
+    for (const table of REFERENTIEL_TABLES) {
+      await db.execAsync(`DROP TABLE IF EXISTS ${table};`);
+    }
+    await db.execAsync(REFERENTIEL_DDL);
+    await db.runAsync('DELETE FROM referentiel_sync_meta');
+
+    const nouvelles = new Set(
+      (await db.getAllAsync<{ name: string }>('PRAGMA table_info(site_aerien)')).map((c) => c.name)
+    );
+    for (const site of sitesEnAttente) {
+      const cles = Object.keys(site).filter((cle) => nouvelles.has(cle));
+      await db.runAsync(
+        `INSERT INTO site_aerien (${cles.join(', ')}) VALUES (${cles.map(() => '?').join(', ')})`,
+        cles.map((cle) => site[cle] as SQLite.SQLiteBindValue)
+      );
+    }
+
+    await db.runAsync(
+      `INSERT INTO referentiel_schema_version (id, version) VALUES (1, ?)
+       ON CONFLICT(id) DO UPDATE SET version = excluded.version`,
+      [REFERENTIEL_SCHEMA_VERSION]
+    );
+  });
 }
 
 /**
@@ -639,67 +533,6 @@ async function migrateColonnesAeriennes(db: SQLite.SQLiteDatabase): Promise<void
     { name: 'erreur', type: 'TEXT' },
   ]);
   await migrerColonnesVol(db);
-}
-
-/**
- * `utilisateur_equipe` portait `email TEXT NOT NULL` : le backend ne descend plus ce
- * champ sur le terrain (ADR-015, #136 — l'email ne sert qu'à l'authentification et
- * aucun écran ne l'affiche). SQLite ne sait pas relâcher un NOT NULL, et la table
- * n'est qu'un cache du référentiel : on la recrée sans `email` et on remet son
- * curseur à zéro pour que la prochaine synchro la repeuple entièrement — même
- * traitement que `migrateCodeStade` ci-dessus.
- */
-async function migrateUtilisateurEquipe(db: SQLite.SQLiteDatabase): Promise<void> {
-  const colonnes = await db.getAllAsync<{ name: string }>(
-    'PRAGMA table_info(utilisateur_equipe)'
-  );
-  if (!colonnes.some((c) => c.name === 'email')) return;
-
-  await db.execAsync(`
-    DROP TABLE IF EXISTS utilisateur_equipe;
-    CREATE TABLE utilisateur_equipe (
-      id TEXT PRIMARY KEY NOT NULL,
-      nom TEXT NOT NULL,
-      prenom TEXT NOT NULL,
-      role TEXT NOT NULL,
-      pa_id TEXT,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-  `);
-  await db.runAsync("DELETE FROM referentiel_sync_meta WHERE entity_type = 'utilisateurs_equipe'");
-}
-
-/**
- * `code_stade` ne portait que (code, espece NOT NULL) : il ne pouvait pas décrire les
- * grilles, et refuserait désormais les stades valables pour les deux espèces
- * (espece = NULL). SQLite ne sait pas relâcher un NOT NULL — la table étant un simple
- * cache du référentiel, on la recrée et on remet son curseur à zéro pour que la
- * prochaine synchro la repeuple entièrement.
- */
-async function migrateCodeStade(db: SQLite.SQLiteDatabase): Promise<void> {
-  const colonnes = await db.getAllAsync<{ name: string; notnull: number }>(
-    'PRAGMA table_info(code_stade)'
-  );
-  const espece = colonnes.find((c) => c.name === 'espece');
-  const aJour = colonnes.some((c) => c.name === 'categorie') && espece?.notnull === 0;
-  if (aJour) return;
-
-  await db.execAsync(`
-    DROP TABLE IF EXISTS code_stade;
-    CREATE TABLE code_stade (
-      id TEXT PRIMARY KEY NOT NULL,
-      code TEXT NOT NULL,
-      categorie TEXT,
-      sexe TEXT,
-      espece TEXT,
-      libelle TEXT NOT NULL,
-      ordre INTEGER NOT NULL DEFAULT 0,
-      actif INTEGER NOT NULL DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-  `);
-  await db.runAsync("DELETE FROM referentiel_sync_meta WHERE entity_type = 'codes_stades'");
 }
 
 async function addColumnsIfMissing(

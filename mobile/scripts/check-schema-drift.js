@@ -29,6 +29,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { verifierFraicheur, OUT_PATH: REFERENTIEL_OUT_PATH } = require('./referentiel-schema');
+
 const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'prospection-db.ts');
 const SCHEMA_PATH = path.join(process.cwd(), 'src', 'lib', 'api-schema.generated.ts');
 
@@ -145,6 +147,18 @@ function main() {
     } else {
       console.log(`✅ ${table} : à jour avec ${schemaName} (${openapiFields.size} champs)`);
     }
+  }
+
+  // Référentiel local (#675) : son DDL est généré depuis le contrat, il doit être à jour.
+  const problemeReferentiel = verifierFraicheur(
+    schemaSource,
+    fs.readFileSync(path.join(process.cwd(), REFERENTIEL_OUT_PATH), 'utf8')
+  );
+  if (problemeReferentiel) {
+    hasDrift = true;
+    console.error(`\n❌ référentiel local : ${problemeReferentiel}`);
+  } else {
+    console.log('✅ référentiel local : DDL généré à jour avec le contrat');
   }
 
   if (hasDrift) {

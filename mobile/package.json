@@ -78,6 +78,7 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
     "generate:api-types": "openapi-typescript ${API_URL:-http://localhost:8000}/openapi.json -o src/lib/api-schema.generated.ts",
+    "generate:referentiel-schema": "node scripts/referentiel-schema.js",
     "check:schema-drift": "node scripts/check-schema-drift.js"
   },
   "private": true,
