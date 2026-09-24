@@ -230,6 +230,39 @@ describe('CartePage — carte des infestations (#17)', () => {
     expect(screen.queryAllByTestId('marker')).toHaveLength(0)
   })
 
+  it('les boutons Prospections / Traitements affichent uniquement l\'un ou l\'autre', async () => {
+    renderPage('/carte', [{ ...prospections[0], type_prospection: 'intensive' }], [
+      {
+        id: 't1',
+        prospection_id: 'p1',
+        numero_fiche: 'T-001',
+        type_traitement: 'TERRESTRE',
+        mode_traitement: 'TOTAL',
+        date_traitement: '2026-09-10',
+        latitude: -19.5,
+        longitude: 46.5,
+        aerien: null,
+        terrestre: { surface_traitee_ha: 12, surface_protegee_ha: 0, surface_restante_ha: null },
+      },
+    ])
+    await waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(2))
+    expect(screen.getByRole('button', { name: 'Tout' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Traitements' }))
+    expect(screen.getAllByTestId('marker')).toHaveLength(1)
+    expect(screen.getByText('Surface traitée : 12 ha')).toBeInTheDocument()
+    expect(screen.queryByText('Situation d\'infestation acridienne')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Traitements' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prospections' }))
+    expect(screen.getAllByTestId('marker')).toHaveLength(1)
+    expect(screen.getByText('Situation d\'infestation acridienne')).toBeInTheDocument()
+    expect(screen.queryByText('Surface traitée : 12 ha')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tout' }))
+    expect(screen.getAllByTestId('marker')).toHaveLength(2)
+  })
+
   it('navigue vers la fiche au clic sur un marqueur', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText(/1 fiche avec infestation/)).toBeInTheDocument())
