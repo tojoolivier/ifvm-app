@@ -28,6 +28,7 @@ jest.mock('@/lib/prospection-accueil', () => ({
 
 jest.mock('@/lib/prospection-repository', () => ({
   listProspectionsDisponiblesPourTraitementLocal: jest.fn(),
+  listProspectionIdsAvecTraitementLocal: jest.fn(),
 }));
 
 const FICHE_PROPRE_AGENT = {
@@ -82,7 +83,52 @@ beforeEach(() => {
   jest.mocked(prospectionAccueil.assurerProspectionDisponibleLocalement).mockClear().mockResolvedValue(undefined);
   jest.mocked(prospectionAccueil.materialiserFichesDisponibles).mockClear().mockResolvedValue(undefined);
   jest.mocked(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).mockReset();
+  jest.mocked(prospectionRepository.listProspectionIdsAvecTraitementLocal).mockReset().mockResolvedValue(new Set());
   useAuthStore.setState({ user: { id: 'moi' } as any, token: 'token-1' } as any);
+});
+
+/**
+ * #liste-nouveau-traitement-exclut-deja-traitees : le serveur n'exclut une fiche qu'une fois son
+ * traitement synchronisé. Une fiche pour laquelle un traitement existe déjà sur cet appareil
+ * (brouillon, enregistré hors ligne…) doit disparaître de la liste tout de suite, pour ne pas
+ * être confondue avec une fiche encore à traiter.
+ */
+describe('TraitementProspectionPickerScreen — fiches déjà traitées sur cet appareil', () => {
+  it('retire de la liste la fiche pour laquelle un traitement existe déjà, et garde les autres', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([
+      FICHE_PROPRE_AGENT,
+      FICHE_AUTRE_AGENT,
+    ]);
+    jest
+      .mocked(prospectionRepository.listProspectionIdsAvecTraitementLocal)
+      .mockResolvedValue(new Set([FICHE_PROPRE_AGENT.id]));
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/Créée par Alice Autre/)).toBeVisible();
+    expect(screen.queryByText(/Créée par Jean Dupont/)).toBeNull();
+  });
+
+  it('garde toute la liste serveur si aucune fiche n’a encore de traitement local', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([
+      FICHE_PROPRE_AGENT,
+      FICHE_AUTRE_AGENT,
+    ]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/Créée par Jean Dupont/)).toBeVisible();
+    expect(screen.getByText(/Créée par Alice Autre/)).toBeVisible();
+  });
+
+  it('n’empêche jamais l’affichage : si la lecture locale échoue, la liste serveur s’affiche telle quelle', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([FICHE_PROPRE_AGENT]);
+    jest.mocked(prospectionRepository.listProspectionIdsAvecTraitementLocal).mockRejectedValue(new Error('sqlite'));
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/Créée par Jean Dupont/)).toBeVisible();
+  });
 });
 
 describe('TraitementProspectionPickerScreen — visibilité multi-utilisateurs', () => {

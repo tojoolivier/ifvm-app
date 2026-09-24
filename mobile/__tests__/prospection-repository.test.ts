@@ -32,6 +32,7 @@ import {
   deleteProspectionInfestation,
   listAllProspectionInfestations,
   deleteProspection,
+  listProspectionIdsAvecTraitementLocal,
 } from '../src/lib/prospection-repository';
 
 const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
@@ -347,6 +348,26 @@ describe('listValidatedProspections', () => {
     expect(query).toContain('tt.surface_restante_ha IS NOT NULL AND tt.surface_restante_ha <= 0');
     expect(query).toContain('JOIN traitement_aerien ta ON ta.traitement_id = t.id');
     expect(query).toContain('ta.surface_restante_ha IS NOT NULL AND ta.surface_restante_ha <= 0');
+  });
+});
+
+// #liste-nouveau-traitement-exclut-deja-traitees : complément local de la liste serveur.
+describe('listProspectionIdsAvecTraitementLocal', () => {
+  it('renvoie les identifiants des fiches ayant déjà un traitement local (brouillon ou non), sans doublon', async () => {
+    getAllAsync.mockResolvedValueOnce([{ prospection_id: 'p1' }, { prospection_id: 'p2' }]);
+
+    const ids = await listProspectionIdsAvecTraitementLocal();
+
+    expect(ids).toEqual(new Set(['p1', 'p2']));
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).toContain('SELECT DISTINCT prospection_id FROM traitement');
+    // Aucun filtre sur le statut : un brouillon de traitement suffit à retirer la fiche de la liste.
+    expect(query).not.toContain('statut');
+  });
+
+  it('renvoie un ensemble vide quand aucun traitement n’existe', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+    expect((await listProspectionIdsAvecTraitementLocal()).size).toBe(0);
   });
 });
 
