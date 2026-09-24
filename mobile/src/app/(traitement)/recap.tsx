@@ -818,11 +818,11 @@ export default function RecapScreen() {
           {draft.type_traitement !== 'AERIEN' && (
             <>
             <Text style={styles.subsectionTitle}>Matériels</Text>
-            <RecapLigne label="Atomiseur" value={display(draft.moyens_atomiseur_nb)} />
+            <RecapLigne label="Nb Atomiseur à dos" value={display(draft.moyens_atomiseur_nb)} />
             <RecapLigne label="Essence (litres)" value={display(draft.moyens_essence_litres)} />
             <RecapLigne label="Disque rotatif" value={display(draft.moyens_disque_rotatif_nb)} />
             <RecapLigne label="Nombre de piles" value={display(draft.moyens_piles_nb)} />
-            <RecapLigne label="Ulvamast" value={display(draft.moyens_ulvamast_nb)} />
+            <RecapLigne label="Nb Atomiseur autoporté" value={display(draft.moyens_ulvamast_nb)} />
             </>
           )}
           <Text style={styles.subsectionTitle}>Kit de protection</Text>

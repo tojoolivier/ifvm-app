@@ -77,11 +77,15 @@ describe.each([['TERRESTRE']])('MoyensScreen (%s) — Humains/Matériels', (type
     expect(screen.getByText('Nb agents temporaires')).toBeVisible();
     expect(screen.getByText('Nb personnel local')).toBeVisible();
     expect(screen.getByText('Matériels')).toBeVisible();
-    expect(screen.getByText('Atomiseur')).toBeVisible();
+    // Renommés (#renomme-materiels-atomiseur) : « Atomiseur » → « Nb Atomiseur à dos »,
+    // « Ulvamast » → « Nb Atomiseur autoporté » (mêmes colonnes, simple libellé).
+    expect(screen.getByText('Nb Atomiseur à dos')).toBeVisible();
+    expect(screen.queryByText('Atomiseur')).toBeNull();
     expect(screen.getByText('Essence (litres)')).toBeVisible();
     expect(screen.getByText('Disque rotatif')).toBeVisible();
     expect(screen.getByText('Nombre de piles')).toBeVisible();
-    expect(screen.getByText('Ulvamast')).toBeVisible();
+    expect(screen.getByText('Nb Atomiseur autoporté')).toBeVisible();
+    expect(screen.queryByText('Ulvamast')).toBeNull();
     expect(screen.getByText('Kit de protection')).toBeVisible();
 
     const rendered = JSON.stringify(screen.toJSON());
@@ -168,11 +172,11 @@ describe('MoyensScreen (AERIEN) — Matériels retirés, Humains conservés', ()
     expect(screen.getByText('Nb agents permanents')).toBeVisible();
     expect(screen.getByText('Kit de protection')).toBeVisible();
     expect(screen.queryByText('Matériels')).toBeNull();
-    expect(screen.queryByText('Atomiseur')).toBeNull();
+    expect(screen.queryByText('Nb Atomiseur à dos')).toBeNull();
     expect(screen.queryByText('Essence (litres)')).toBeNull();
     expect(screen.queryByText('Disque rotatif')).toBeNull();
     expect(screen.queryByText('Nombre de piles')).toBeNull();
-    expect(screen.queryByText('Ulvamast')).toBeNull();
+    expect(screen.queryByText('Nb Atomiseur autoporté')).toBeNull();
   });
 
   it("réécrit telles quelles les valeurs de matériels déjà enregistrées (rien n'est perdu)", async () => {

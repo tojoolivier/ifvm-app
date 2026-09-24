@@ -371,7 +371,7 @@ export default function MoyensScreen() {
         {typeTraitement !== 'AERIEN' && (
           <>
             <Text style={styles.sectionLabel}>Matériels</Text>
-            <Text style={styles.fieldLabel}>Atomiseur</Text>
+            <Text style={styles.fieldLabel}>Nb Atomiseur à dos</Text>
             <TextInput
               testID="moyens-atomiseur-input"
               editable={!readOnly}
@@ -415,7 +415,7 @@ export default function MoyensScreen() {
               onChangeText={(v) => handleDecimalChange('moyensPilesNb', v)}
               onBlur={() => handleDecimalBlur('moyensPilesNb')}
             />
-            <Text style={styles.fieldLabel}>Ulvamast</Text>
+            <Text style={styles.fieldLabel}>Nb Atomiseur autoporté</Text>
             <TextInput
               testID="moyens-ulvamast-input"
               editable={!readOnly}
