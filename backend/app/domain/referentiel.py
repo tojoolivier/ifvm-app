@@ -616,6 +616,21 @@ class MouvementPesticide:
     # mouvements produits par une fiche donnée.
     traitement_id: uuid.UUID | None = None
 
+    def a_meme_contenu(self, autre: "MouvementPesticide", *, comparer_date: bool = True) -> bool:
+        """Rejeu idempotent (#639) : même saisie, hors identité et horodatage.
+        `comparer_date=False` quand le client n'a pas envoyé `date_mouvement` —
+        son défaut (« aujourd'hui ») change d'un jour à l'autre sans que la saisie
+        ait changé."""
+        return (
+            self.type == autre.type
+            and self.pesticide_id == autre.pesticide_id
+            and self.site_id == autre.site_id
+            and self.site_destination_id == autre.site_destination_id
+            and self.quantite == autre.quantite
+            and self.unite == autre.unite
+            and (not comparer_date or self.date_mouvement == autre.date_mouvement)
+        )
+
 
 @dataclass
 class SoldePesticide:
@@ -737,3 +752,27 @@ class Vol:
     observations: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def a_meme_contenu(self, autre: "Vol") -> bool:
+        """Rejeu idempotent (#639) : même saisie, hors identité et horodatage.
+        Les textes vides valent `None` et les heures se comparent à la seconde,
+        pour qu'un rejeu légitime ne soit pas pris pour un conflit."""
+
+        def texte(valeur: str | None) -> str | None:
+            return valeur or None
+
+        return (
+            self.type == autre.type
+            and self.equipe_id == autre.equipe_id
+            and self.aeronef_id == autre.aeronef_id
+            and self.date_vol == autre.date_vol
+            and self.heure_debut.replace(microsecond=0) == autre.heure_debut.replace(microsecond=0)
+            and self.heure_fin.replace(microsecond=0) == autre.heure_fin.replace(microsecond=0)
+            and self.site_principal_id == autre.site_principal_id
+            and self.stand_id == autre.stand_id
+            and self.base_secondaire_id == autre.base_secondaire_id
+            and texte(self.motif) == texte(autre.motif)
+            and texte(self.lieu_depart) == texte(autre.lieu_depart)
+            and texte(self.lieu_arrivee) == texte(autre.lieu_arrivee)
+            and texte(self.observations) == texte(autre.observations)
+        )

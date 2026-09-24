@@ -460,3 +460,23 @@ async def test_vol_meme_id_contenu_different_409(
         headers=admin_headers,
     )
     assert conflit.status_code == 409, conflit.text
+
+
+@pytest.mark.asyncio
+async def test_rejeu_vol_texte_vide_equivaut_a_absent(
+    client: AsyncClient, admin_headers: dict, equipe_aerienne, aeronef_affecte: dict
+):
+    """`observations=""` et `observations` absent sont la même saisie : pas de faux 409."""
+    identifiant = str(uuid.uuid4())
+    premier = await client.post(
+        "/vols",
+        json=_payload(equipe_aerienne, aeronef_affecte, id=identifiant),
+        headers=admin_headers,
+    )
+    rejeu = await client.post(
+        "/vols",
+        json=_payload(equipe_aerienne, aeronef_affecte, id=identifiant, observations=""),
+        headers=admin_headers,
+    )
+    assert premier.status_code == 201, premier.text
+    assert rejeu.status_code == 201, rejeu.text

@@ -18,6 +18,7 @@ from app.domain.referentiel import (
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
     EquipeDejaEquipeeError,
+    IdentifiantDejaUtiliseError,
     ImmatriculationAeronefDejaPriseError,
     LieuAerien,
     MembreDejaDansEquipeError,
@@ -1123,7 +1124,13 @@ class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
             traitement_id=mouvement.traitement_id,
         )
         self.session.add(model)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if await self.get_by_id(mouvement.id) is None:
+                raise
+            raise IdentifiantDejaUtiliseError(str(mouvement.id)) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
 
@@ -1273,7 +1280,13 @@ class VolRepositoryImpl(VolRepository):
     async def create(self, vol: Vol) -> Vol:
         model = _vol_to_model(vol)
         self.session.add(model)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if await self.get_by_id(vol.id) is None:
+                raise
+            raise IdentifiantDejaUtiliseError(str(vol.id)) from exc
         await self.session.refresh(model)
         return _vol_to_domain(model)
 

@@ -1460,7 +1460,7 @@ async def create_mouvement_pesticide(
             unite=body.unite,
             site_destination_id=body.site_destination_id,
             date_mouvement=body.date_mouvement,
-            id=body.id,
+            client_id=body.id,
         )
     except IdentifiantDejaUtiliseError as exc:
         raise HTTPException(
@@ -1527,7 +1527,7 @@ async def create_vol(
             lieu_depart=body.lieu_depart,
             lieu_arrivee=body.lieu_arrivee,
             observations=body.observations,
-            id=body.id,
+            client_id=body.id,
         )
     except IdentifiantDejaUtiliseError as exc:
         raise HTTPException(

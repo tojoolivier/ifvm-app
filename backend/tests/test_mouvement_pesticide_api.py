@@ -210,3 +210,42 @@ async def test_droits_de_saisie_chef_de_base_et_admin_seulement(
             "/mouvements-pesticide", json=payload_approvisionnement(), headers=headers
         )
         assert reponse.status_code == 201, reponse.text
+
+
+@pytest.mark.asyncio
+async def test_meme_id_date_differente_409(
+    client: AsyncClient, admin_headers: dict, payload_approvisionnement
+):
+    identifiant = str(uuid.uuid4())
+    premier = await client.post(
+        "/mouvements-pesticide",
+        json=payload_approvisionnement(id=identifiant, date_mouvement="2026-01-10"),
+        headers=admin_headers,
+    )
+    assert premier.status_code == 201, premier.text
+    conflit = await client.post(
+        "/mouvements-pesticide",
+        json=payload_approvisionnement(id=identifiant, date_mouvement="2026-01-11"),
+        headers=admin_headers,
+    )
+    assert conflit.status_code == 409, conflit.text
+
+
+@pytest.mark.asyncio
+async def test_rejeu_sans_date_ne_compare_pas_la_date(
+    client: AsyncClient, admin_headers: dict, payload_approvisionnement
+):
+    identifiant = str(uuid.uuid4())
+    premier = await client.post(
+        "/mouvements-pesticide",
+        json=payload_approvisionnement(id=identifiant, date_mouvement="2026-01-10"),
+        headers=admin_headers,
+    )
+    rejeu = await client.post(
+        "/mouvements-pesticide",
+        json=payload_approvisionnement(id=identifiant),
+        headers=admin_headers,
+    )
+    assert premier.status_code == 201, premier.text
+    assert rejeu.status_code == 201, rejeu.text
+    assert rejeu.json()["date_mouvement"] == "2026-01-10"

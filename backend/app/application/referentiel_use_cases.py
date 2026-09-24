@@ -1625,6 +1625,14 @@ async def _exiger_site_principal(
     return site
 
 
+def _rejouer(existant, candidat, client_id: uuid.UUID, **options):
+    """Rejeu d'une création à `id` client (#639) : même contenu → la ressource
+    existante, contenu différent → conflit, jamais un écrasement silencieux."""
+    if not existant.a_meme_contenu(candidat, **options):
+        raise IdentifiantDejaUtiliseError(str(client_id))
+    return existant
+
+
 class CreateMouvementPesticide:
     """Enregistre un approvisionnement, un transfert ou une consommation de
     pesticide — le solde s'en déduit par agrégation (`ConsulterSoldePesticide`),
@@ -1649,28 +1657,29 @@ class CreateMouvementPesticide:
         unite: str,
         site_destination_id: uuid.UUID | None = None,
         date_mouvement: date | None = None,
-        id: uuid.UUID | None = None,
+        client_id: uuid.UUID | None = None,
     ) -> MouvementPesticide:
-        # Création idempotente (#639) : `id` généré côté client pour la saisie
-        # hors-ligne — un envoi rejoué après une coupure ne doit pas doubler le
-        # mouvement (ce qui fausserait le solde). `date_mouvement` n'est comparée
-        # que si le client l'a envoyée : son défaut (« aujourd'hui ») diffère d'un
-        # jour à l'autre sans que le contenu saisi ait changé.
-        if id is not None:
-            existant = await self.repository.get_by_id(id)
+        # Création idempotente (#639) : `client_id` est généré côté client pour la
+        # saisie hors-ligne — un envoi rejoué après une coupure ne doit pas doubler
+        # le mouvement (ce qui fausserait le solde). Le candidat est construit en
+        # premier : la même entité sert à comparer au rejeu et à créer.
+        maintenant = datetime.now(timezone.utc)
+        candidat = MouvementPesticide(
+            id=client_id or uuid.uuid4(),
+            type=type,
+            pesticide_id=pesticide_id,
+            site_id=site_id,
+            site_destination_id=site_destination_id,
+            quantite=quantite,
+            unite=unite,
+            date_mouvement=date_mouvement or maintenant.date(),
+            created_at=maintenant,
+        )
+        comparer_date = date_mouvement is not None
+        if client_id is not None:
+            existant = await self.repository.get_by_id(client_id)
             if existant is not None:
-                identique = (
-                    existant.type == type
-                    and existant.pesticide_id == pesticide_id
-                    and existant.site_id == site_id
-                    and existant.site_destination_id == site_destination_id
-                    and existant.quantite == quantite
-                    and existant.unite == unite
-                    and (date_mouvement is None or existant.date_mouvement == date_mouvement)
-                )
-                if not identique:
-                    raise IdentifiantDejaUtiliseError(str(id))
-                return existant
+                return _rejouer(existant, candidat, client_id, comparer_date=comparer_date)
 
         est_transfert = type == "transfert"
         if est_transfert and site_destination_id is None:
@@ -1687,20 +1696,15 @@ class CreateMouvementPesticide:
         if await self.pesticide_repository.get_by_id(pesticide_id) is None:
             raise PesticideIntrouvableError(str(pesticide_id))
 
-        maintenant = datetime.now(timezone.utc)
-        return await self.repository.create(
-            MouvementPesticide(
-                id=id or uuid.uuid4(),
-                type=type,
-                pesticide_id=pesticide_id,
-                site_id=site_id,
-                site_destination_id=site_destination_id,
-                quantite=quantite,
-                unite=unite,
-                date_mouvement=date_mouvement or maintenant.date(),
-                created_at=maintenant,
-            )
-        )
+        try:
+            return await self.repository.create(candidat)
+        except IdentifiantDejaUtiliseError:
+            # Rejeu concurrent : l'autre requête a inséré entre le `get_by_id` et
+            # le `create` — on relit et on tranche comme pour un rejeu ordinaire.
+            existant = await self.repository.get_by_id(candidat.id)
+            if existant is None:
+                raise
+            return _rejouer(existant, candidat, candidat.id, comparer_date=comparer_date)
 
 
 class ConsulterSoldePesticide:
@@ -1786,30 +1790,32 @@ class CreateVol:
         lieu_depart: str | None = None,
         lieu_arrivee: str | None = None,
         observations: str | None = None,
-        id: uuid.UUID | None = None,
+        client_id: uuid.UUID | None = None,
     ) -> Vol:
         # Création idempotente (#639) : cf. `CreateMouvementPesticide`.
-        if id is not None:
-            existant = await self.repository.get_by_id(id)
+        maintenant = datetime.now(timezone.utc)
+        candidat = Vol(
+            id=client_id or uuid.uuid4(),
+            type=type,
+            equipe_id=equipe_id,
+            aeronef_id=aeronef_id,
+            site_principal_id=site_principal_id,
+            stand_id=stand_id,
+            base_secondaire_id=base_secondaire_id,
+            date_vol=date_vol,
+            heure_debut=heure_debut,
+            heure_fin=heure_fin,
+            motif=motif,
+            lieu_depart=lieu_depart,
+            lieu_arrivee=lieu_arrivee,
+            observations=observations,
+            created_at=maintenant,
+            updated_at=maintenant,
+        )
+        if client_id is not None:
+            existant = await self.repository.get_by_id(client_id)
             if existant is not None:
-                identique = (
-                    existant.type == type
-                    and existant.equipe_id == equipe_id
-                    and existant.aeronef_id == aeronef_id
-                    and existant.date_vol == date_vol
-                    and existant.heure_debut == heure_debut
-                    and existant.heure_fin == heure_fin
-                    and existant.site_principal_id == site_principal_id
-                    and existant.stand_id == stand_id
-                    and existant.base_secondaire_id == base_secondaire_id
-                    and existant.motif == motif
-                    and existant.lieu_depart == lieu_depart
-                    and existant.lieu_arrivee == lieu_arrivee
-                    and existant.observations == observations
-                )
-                if not identique:
-                    raise IdentifiantDejaUtiliseError(str(id))
-                return existant
+                return _rejouer(existant, candidat, client_id)
 
         equipe = await self.equipe_repository.get_by_id(equipe_id)
         if equipe is None:
@@ -1845,27 +1851,13 @@ class CreateVol:
         if not affecte:
             raise AeronefNonAffecteError(str(aeronef_id))
 
-        maintenant = datetime.now(timezone.utc)
-        return await self.repository.create(
-            Vol(
-                id=id or uuid.uuid4(),
-                type=type,
-                equipe_id=equipe_id,
-                aeronef_id=aeronef_id,
-                site_principal_id=site_principal_id,
-                stand_id=stand_id,
-                base_secondaire_id=base_secondaire_id,
-                date_vol=date_vol,
-                heure_debut=heure_debut,
-                heure_fin=heure_fin,
-                motif=motif,
-                lieu_depart=lieu_depart,
-                lieu_arrivee=lieu_arrivee,
-                observations=observations,
-                created_at=maintenant,
-                updated_at=maintenant,
-            )
-        )
+        try:
+            return await self.repository.create(candidat)
+        except IdentifiantDejaUtiliseError:
+            existant = await self.repository.get_by_id(candidat.id)
+            if existant is None:
+                raise
+            return _rejouer(existant, candidat, candidat.id)
 
 
 class UpdateVol:
