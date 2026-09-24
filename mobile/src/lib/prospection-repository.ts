@@ -1,4 +1,5 @@
 import { getDb } from './prospection-db';
+import { creerOutbox } from './outbox';
 import { generateId } from './id';
 import { logger } from './logger';
 import { PreconditionError } from './errors';
@@ -1692,12 +1693,11 @@ export async function synchroniserStatutServeur(
  * montrer ; `statut_sync` est un `TEXT` libre, une valeur de plus n'en coûte
  * aucune.
  */
-export async function markProspectionEchec(id: string): Promise<void> {
-  const db = await getDb();
-  const now = new Date().toISOString();
-
-  await db.runAsync(`UPDATE prospection SET statut_sync = 'echec', updated_at = ? WHERE id = ?`, [now, id]);
-}
+export const markProspectionEchec = creerOutbox({
+  table: 'prospection',
+  base: () => getDb(),
+  horodate: true,
+}).marquerEnEchec;
 
 export async function deleteDraftProspection(draft: DraftProspection): Promise<void> {
   const db = await getDb();
