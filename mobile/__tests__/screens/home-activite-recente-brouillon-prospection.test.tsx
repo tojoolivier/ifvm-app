@@ -97,4 +97,28 @@ describe('DashboardScreen — Activité récente : brouillon de prospection ≠ 
     expect(screen.getByText('À SYNCHRO')).toBeTruthy();
     expect(screen.queryByText('BROUILLON')).toBeNull();
   });
+
+  // #traitement-brouillon-distinct-fiche-creee : même règle pour un traitement.
+  it('affiche « BROUILLON » pour un traitement jamais enregistré, « À SYNCHRO » une fois enregistré', async () => {
+    const traitement = (id: string, statutSync: string) =>
+      ({
+        id,
+        numero_fiche: `T-${id}`,
+        type_traitement: 'TERRESTRE',
+        localite: `Loc-${id}`,
+        date_traitement: '2026-09-16',
+        statut: 'brouillon',
+        statut_sync: statutSync,
+        updated_at: '2026-09-16T08:00:00Z',
+      }) as any;
+    jest
+      .mocked(traitementRepository.listToutesTraitementsLocal)
+      .mockResolvedValue([traitement('a', 'brouillon'), traitement('b', 'local')]);
+
+    await ouvrir();
+
+    await waitFor(() => expect(screen.getByText('Loc-a')).toBeTruthy());
+    expect(screen.getAllByText('BROUILLON')).toHaveLength(1);
+    expect(screen.getAllByText('À SYNCHRO')).toHaveLength(1);
+  });
 });
