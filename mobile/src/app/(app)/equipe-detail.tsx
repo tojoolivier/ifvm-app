@@ -163,7 +163,7 @@ export default function EquipeDetailScreen() {
           <>
             <View style={styles.enTete}>
               <ThemedText style={styles.section}>SITES AÉRIENS</ThemedText>
-              <TouchableOpacity onPress={() => router.push('/(app)/equipes-aeriennes' as any)} accessibilityRole="button">
+              <TouchableOpacity onPress={() => router.push(`/(app)/sites?id=${id}` as any)} accessibilityRole="button">
                 <ThemedText style={styles.gerer}>Gérer ›</ThemedText>
               </TouchableOpacity>
             </View>

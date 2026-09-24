@@ -36,6 +36,11 @@ jest.mock('@/lib/traitement-sync', () => ({
   syncAllTraitements: (...args: unknown[]) => syncAllTraitements(...args),
 }));
 
+const synchroniserSitesAeriens = jest.fn();
+jest.mock('@/lib/site-aerien-sync', () => ({
+  synchroniserSitesAeriens: (...args: unknown[]) => synchroniserSitesAeriens(...args),
+}));
+
 function enLigne() {
   getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
 }
@@ -49,7 +54,39 @@ beforeEach(() => {
   syncAllProspections.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   listUnsyncedTraitements.mockReset().mockResolvedValue([]);
   syncAllTraitements.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
+  synchroniserSitesAeriens.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   resetLoggerForTests();
+});
+
+describe('checkAndSyncFiches — sites aériens (#643)', () => {
+  it('envoie les sites saisis sur le terrain quand la connectivité revient', async () => {
+    enLigne();
+
+    await checkAndSyncFiches('tok', false);
+
+    expect(synchroniserSitesAeriens).toHaveBeenCalledWith('tok');
+  });
+
+  it('n’envoie rien quand la connectivité était déjà là', async () => {
+    enLigne();
+
+    await checkAndSyncFiches('tok', true);
+
+    expect(synchroniserSitesAeriens).not.toHaveBeenCalled();
+  });
+
+  it('une panne côté sites n’empêche pas les prospections ni les traitements', async () => {
+    enLigne();
+    listUnsyncedProspections.mockResolvedValue([UNE_PROSPECTION]);
+    listUnsyncedTraitements.mockResolvedValue([UN_TRAITEMENT]);
+    synchroniserSitesAeriens.mockRejectedValue(new Error('SQLite indisponible'));
+
+    const apres = await checkAndSyncFiches('tok', false);
+
+    expect(syncAllProspections).toHaveBeenCalled();
+    expect(syncAllTraitements).toHaveBeenCalled();
+    expect(apres).toBe(true);
+  });
 });
 
 describe('checkAndSyncFiches — #synchronisation-automatique', () => {

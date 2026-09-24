@@ -4,6 +4,8 @@ export const EQ = {
   vertDoux: '#EAF2EC',
   vertLeger: '#F6FAF7',
   vertBordure: '#CFE0D4',
+  /** Point de statut « signal GPS obtenu » (Figma GDot). */
+  vertPoint: '#7BD68C',
   ambre: '#8A6D2F',
   ambreFond: '#FDF6E7',
   ambreBordure: '#F0E2BF',

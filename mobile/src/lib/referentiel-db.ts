@@ -526,6 +526,44 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
 
     CREATE INDEX IF NOT EXISTS ix_site_aerien_equipe_id ON site_aerien(equipe_id);
 
+    -- Historique des implantations (#643). Pas un miroir du serveur : le pull n'embarque que la
+    -- position active, l'historique local est celui des déplacements faits sur cet appareil
+    -- (plus ce que l'écran rafraîchit en ligne). 'local' = créée hors-ligne, pas encore envoyée.
+    CREATE TABLE IF NOT EXISTS site_aerien_position (
+      id TEXT PRIMARY KEY NOT NULL,
+      site_id TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      altitude REAL,
+      date_debut TEXT NOT NULL,
+      date_fin TEXT,
+      localite TEXT NOT NULL,
+      statut_sync TEXT NOT NULL DEFAULT 'synced'
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_site_aerien_position_site_id ON site_aerien_position(site_id);
+
+    -- File des déplacements à envoyer (#643) : un déplacement groupé = une ligne, rejouée dans
+    -- l'ordre de saisie une fois les sites concernés synchronisés. Le vol de mise en place
+    -- facultatif voyage avec elle (vol_json) : il n'a de sens qu'après le déplacement.
+    CREATE TABLE IF NOT EXISTS site_aerien_deplacement (
+      id TEXT PRIMARY KEY NOT NULL,
+      site_id TEXT NOT NULL,
+      numero TEXT NOT NULL,
+      localite TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      altitude REAL,
+      -- 1 si numéro/localité ont changé : seul cas où l'envoi passe par PUT /sites-aeriens/{id}
+      -- (réservé au chef côté serveur, alors que le déplacement lui-même ne l'est pas).
+      renomme INTEGER NOT NULL DEFAULT 0,
+      dependants_json TEXT NOT NULL DEFAULT '[]',
+      vol_json TEXT,
+      cree_le TEXT NOT NULL,
+      statut_sync TEXT NOT NULL DEFAULT 'local',
+      erreur TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS aeronef (
       id TEXT PRIMARY KEY NOT NULL,
       immatriculation TEXT NOT NULL,
@@ -572,6 +610,11 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
   // Rattachement d'un lieu aérien à son équipe (migration backend 0074) : nullable, les
   // lieux déjà en cache restent NULL comme côté serveur tant qu'un admin ne les rattache pas.
   await addColumnsIfMissing(db, 'lieu_aerien', [{ name: 'equipe_aerienne_id', type: 'TEXT' }]);
+  // Site créé sur le terrain (#643) : 'local' tant que le serveur ne l'a pas reçu. Les lignes
+  // déjà en cache viennent du pull, donc 'synced'.
+  await addColumnsIfMissing(db, 'site_aerien', [
+    { name: 'statut_sync', type: "TEXT NOT NULL DEFAULT 'synced'" },
+  ]);
   await migrateCodeStade(db);
   await migrateUtilisateurEquipe(db);
 }

@@ -7,6 +7,7 @@ import { syncAllProspections } from '@/lib/prospection-review';
 import { listUnsyncedTraitements } from '@/lib/traitement-repository';
 import { syncAllTraitements } from '@/lib/traitement-sync';
 import { runTask } from '@/lib/run-task';
+import { synchroniserSitesAeriens } from '@/lib/site-aerien-sync';
 
 interface ConnectivityTransition {
   /** `null` = pas encore observé (démarrage de l'app). */
@@ -89,6 +90,12 @@ export async function checkAndSyncFiches(
         },
         { name: 'sync.auto.traitements', criticality: 'best-effort' }
       );
+
+      // Sites aériens saisis sur le terrain (#643) : autre domaine, autre file — même retour du réseau.
+      await runTask(() => synchroniserSitesAeriens(token).then(() => undefined), {
+        name: 'sync.auto.sites-aeriens',
+        criticality: 'best-effort',
+      });
     },
     { name: 'sync.auto.fiches', criticality: 'best-effort' }
   );

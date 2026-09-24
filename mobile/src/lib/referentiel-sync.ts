@@ -180,7 +180,14 @@ async function upsertSitesAeriens(
          parent_site_id = excluded.parent_site_id, equipe_id = excluded.equipe_id,
          numero = excluded.numero, localite = excluded.localite, actif = excluded.actif,
          latitude = excluded.latitude, longitude = excluded.longitude, altitude = excluded.altitude,
-         date_debut_position = excluded.date_debut_position, updated_at = excluded.updated_at`,
+         date_debut_position = excluded.date_debut_position, updated_at = excluded.updated_at,
+         statut_sync = 'synced'
+       -- Un déplacement saisi hors-ligne et pas encore envoyé (#643) : le serveur ne connaît
+       -- que l'ancienne position, la reprendre annulerait à l'écran le geste de l'agent.
+       WHERE NOT EXISTS (
+         SELECT 1 FROM site_aerien_deplacement d
+         WHERE d.site_id = excluded.id AND d.statut_sync = 'local'
+       )`,
       [
         site.id,
         site.parent_site_id,

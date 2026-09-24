@@ -1189,6 +1189,55 @@ export const apiClient = {
   },
 
   /**
+   * Renomme un site (numéro/localité) — seul cas où un déplacement passe par ce PUT (#643).
+   */
+  updateSiteAerien: async (
+    token: string,
+    siteId: string,
+    body: components['schemas']['SiteAerienneUpdate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['SiteAerienneRead']> => {
+    return makeRequest<components['schemas']['SiteAerienneRead']>(
+      `/sites-aeriens/${siteId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Déplacement groupé (#655) : la même position sur le site et ses `dependants`, en une
+   * transaction côté serveur. Un rejeu du même jour est inoffensif (position corrigée en place).
+   */
+  deplacerSiteAerien: async (
+    token: string,
+    siteId: string,
+    body: components['schemas']['SiteAerienneDeplacer'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['SiteAeriennePositionRead'][]> => {
+    return makeRequest<components['schemas']['SiteAeriennePositionRead'][]>(
+      `/sites-aeriens/${siteId}/deplacer`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Vol (ADR-018, #608) — idempotent par `id` client (#639). Ici : le vol de mise en place. */
+  createVol: async (
+    token: string,
+    body: components['schemas']['VolCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['VolRead']> => {
+    return makeRequest<components['schemas']['VolRead']>(
+      cheminDuContrat('/vols'),
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
    * Équipes (référentiel unifié, ADR-018 / migration 0082) : une seule table
    * `equipe` typée `terrestre` | `aerien`, et des membres génériques porteurs de
    * leur `fonction` — le chef de base est devenu un membre `fonction: 'chef'`.

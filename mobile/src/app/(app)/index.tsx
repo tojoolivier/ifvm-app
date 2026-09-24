@@ -25,6 +25,7 @@ import { peutCreerEquipe, peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne
 import { EquipeChip } from '@/components/equipe/EquipeChip';
 import { EquipeSheet } from '@/components/equipe/EquipeSheet';
 import { MenuDrawer } from '@/components/menu/MenuDrawer';
+import { entreesNavigation } from '@/lib/menu-navigation';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { EQ } from '@/components/equipe/tokens';
 import { libelleRole } from '@/lib/role-libelle';
@@ -481,13 +482,7 @@ export default function DashboardScreen() {
         nom={`${user?.prenom ?? ''} ${user?.nom ?? ''}`.trim()}
         email={user?.email}
         role={user?.role ? libelleRole(user.role) : null}
-        navigation={[
-          { cle: 'equipes', libelle: 'Équipes', icone: 'utilisateurs', onPress: () => allerDepuisMenu('/(app)/equipes') },
-          ...(peutVoirEquipesAeriennes(user?.role)
-            ? [{ cle: 'sites', libelle: 'Sites', icone: 'sites' as const, onPress: () => allerDepuisMenu('/(app)/equipes-aeriennes') }]
-            : []),
-          { cle: 'referentiels', libelle: 'Référentiels', icone: 'referentiels', onPress: () => allerDepuisMenu('/(app)/sync') },
-        ]}
+        navigation={entreesNavigation(user?.role, allerDepuisMenu)}
         compte={[
           { cle: 'profil', libelle: 'Profil', icone: 'profil', active: true, onPress: () => allerDepuisMenu('/(app)/profile') },
           { cle: 'parametres', libelle: 'Paramètres', icone: 'parametres', onPress: () => allerDepuisMenu('/(app)/profile') },
