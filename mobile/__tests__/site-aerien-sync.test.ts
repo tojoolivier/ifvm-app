@@ -2,6 +2,7 @@ import { apiClient } from '../src/lib/api-client';
 import { NetworkError } from '../src/lib/errors';
 import * as db from '../src/lib/site-aerien-db';
 import * as volDb from '../src/lib/vol-db';
+import { synchroniserVols } from '../src/lib/vol-sync';
 import { synchroniserSitesAeriens } from '../src/lib/site-aerien-sync';
 
 jest.mock('../src/lib/storage', () => ({
@@ -33,6 +34,9 @@ jest.mock('../src/lib/site-aerien-db', () => ({
   marquerDeplacementEnEchec: jest.fn(),
 }));
 // Le lot des vols de saisie directe (#644) est vide ici ; on vérifie seulement la trace du vol de mise en place.
+jest.mock('../src/lib/vol-sync', () => ({
+  synchroniserVols: jest.fn().mockResolvedValue({ reussies: [], echouees: [], conflits: [] }),
+}));
 jest.mock('../src/lib/vol-db', () => ({
   listVolsEnAttente: jest.fn().mockResolvedValue([]),
   marquerVolSynchronise: jest.fn(),
@@ -77,6 +81,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   statuts.clear();
   jest.mocked(volDb.listVolsEnAttente).mockResolvedValue([]);
+  jest.mocked(synchroniserVols).mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   jest.mocked(db.listSitesEnAttente).mockResolvedValue([]);
   jest.mocked(db.listDeplacementsEnAttente).mockResolvedValue([]);
   jest.mocked(db.getStatutSite).mockImplementation(async (id) => (statuts.get(id) ?? 'synced') as 'synced');

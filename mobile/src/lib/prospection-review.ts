@@ -1,3 +1,4 @@
+import { assurerVolDeProspection } from './vol-sync';
 import * as Network from 'expo-network';
 import {
   apiClient,
@@ -863,8 +864,12 @@ export async function syncOneProspection(
   // `densite_diffuse` obligatoire, cf. `populationRowHasData`.
   const populationsAvecDonnees = populations.filter((row) => populationRowHasData(row, captures));
 
+  // #644 : `prospection.vol_id` référence le vol — il doit exister sur le serveur avant la fiche.
+  const volId = await assurerVolDeProspection(token, draft.id);
+
   const payload = {
     ...(await buildProspectionPayload(draft, token)),
+    ...(volId ? { vol_id: volId } : {}),
     captures: buildCapturesPayload(captures),
     populations: buildPopulationsPayload(populationsAvecDonnees),
     infestations: buildInfestationsPayload(infestations),

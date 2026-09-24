@@ -99,7 +99,13 @@ export interface VolMiseEnPlaceSaisi {
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Le serveur refuse `heure_fin <= heure_debut` (`VolCreate`) : même règle, en local. */
-export function validerVolMiseEnPlace(vol: VolMiseEnPlaceSaisi, contexte: { nbStands: number }): string[] {
+export function validerVolMiseEnPlace(
+  vol: VolMiseEnPlaceSaisi,
+  contexte: { nbStands: number; equipeType?: 'terrestre' | 'aerien' }
+): string[] {
+  if (contexte.equipeType === 'terrestre') {
+    return ['Un vol se mène avec une équipe aérienne : changez d’équipe de travail dans Paramètres.'];
+  }
   if (contexte.nbStands === 0) {
     return ['Ce site n’a aucun stand : impossible de saisir un vol de mise en place.'];
   }

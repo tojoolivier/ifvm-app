@@ -26,6 +26,8 @@ jest.mock('../src/lib/traitement-repository', () => ({
   markTraitementConflict: jest.fn(),
   markTraitementEchec: jest.fn(),
 }));
+// Le lot des vols (#644) est testé à part : ici on vérifie seulement qu'il est lancé après l'envoi.
+jest.mock('../src/lib/vol-sync', () => ({ synchroniserVols: jest.fn().mockResolvedValue({ reussies: [], echouees: [], conflits: [] }) }));
 jest.mock('../src/lib/storage', () => ({
   storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
 }));

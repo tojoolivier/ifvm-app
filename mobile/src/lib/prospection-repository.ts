@@ -1928,6 +1928,24 @@ export async function derniereInterventionEquipe(equipeId: string): Promise<stri
   return row?.derniere ?? null;
 }
 
+/**
+ * Autres prospections aériennes de l'équipe le même jour : candidates à « Ce vol couvre aussi »
+ * (#644). Le filtre « n'a pas déjà un vol » est appliqué par l'appelant (autre base SQLite).
+ */
+export async function listProspectionsAeriennesDuJour(
+  equipeId: string,
+  date: string,
+  sauf: string
+): Promise<{ id: string; n_fiche: string | null }[]> {
+  const db = await getDb();
+  return db.getAllAsync<{ id: string; n_fiche: string | null }>(
+    `SELECT id, n_fiche FROM prospection
+     WHERE equipe_id = ? AND date_prospection = ? AND mode_extensif = 'aerien' AND id != ?
+     ORDER BY created_at`,
+    [equipeId, date, sauf]
+  );
+}
+
 export async function deleteProspection(id: string): Promise<boolean> {
   const db = await getDb();
   const result = await db.runAsync(`DELETE FROM prospection WHERE id = ?`, [id]);

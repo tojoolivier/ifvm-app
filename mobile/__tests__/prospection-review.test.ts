@@ -23,6 +23,7 @@ jest.mock('../src/lib/referentiel-sync', () => ({
 }));
 
 
+import { assurerVolDeProspection } from '../src/lib/vol-sync';
 import {
   CaptureRow,
   DraftProspection,
@@ -71,6 +72,7 @@ jest.mock('../src/lib/api-client', () => ({
   versionServeurDe: (error: unknown) =>
     (error as { serverVersion?: unknown } | null)?.serverVersion ?? null,
 }));
+jest.mock('../src/lib/vol-sync', () => ({ assurerVolDeProspection: jest.fn() }));
 jest.mock('../src/lib/storage', () => ({
   storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
 }));
@@ -81,6 +83,7 @@ const mockMarkSynced = jest.mocked(markProspectionSynced);
 const mockMarkEchec = jest.mocked(markProspectionEchec);
 const mockSynchroniserStatutServeur = jest.mocked(synchroniserStatutServeur);
 const mockCreateProspection = jest.mocked(apiClient.createProspection);
+const mockVolDeProspection = jest.mocked(assurerVolDeProspection);
 const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
 const mockListAllCaptures = jest.mocked(listAllProspectionCaptures);
 const mockListAllPopulations = jest.mocked(listAllProspectionPopulations);
@@ -181,6 +184,7 @@ beforeEach(() => {
   mockListAllPopulations.mockReset().mockResolvedValue([]);
   mockListAllInfestations.mockReset().mockResolvedValue([]);
   mockListOperationsAeriennes.mockReset().mockResolvedValue([]);
+  mockVolDeProspection.mockReset().mockResolvedValue(null);
 });
 
 describe('formatChrono / chronoSeconds', () => {
@@ -577,6 +581,18 @@ describe('enregistrerEtSynchroniser', () => {
       'token-1',
       expect.objectContaining({ revalide_de_id: null })
     );
+  });
+
+  it('envoie le vol de la fiche avant elle et transmet son vol_id (#644)', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'en_attente', validated_at: null });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockVolDeProspection.mockResolvedValue('vol-1');
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith('token-1', expect.objectContaining({ vol_id: 'vol-1' }));
   });
 
   it('normalise type_cible et type_essaim pour la synchro (0031 : "essaim" a disparu du contrat TypeCible ; anciennes valeurs à 5 niveaux de type_essaim toujours reconnues)', async () => {

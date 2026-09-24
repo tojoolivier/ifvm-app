@@ -1237,6 +1237,21 @@ export const apiClient = {
     );
   },
 
+  /** Rattache un vol d'application à son traitement (#610) — seul champ modifiable d'un vol. */
+  updateVol: async (
+    token: string,
+    volId: string,
+    body: components['schemas']['VolUpdate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['VolRead']> => {
+    return makeRequest<components['schemas']['VolRead']>(
+      `/vols/${volId}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
   /**
    * Équipes (référentiel unifié, ADR-018 / migration 0082) : une seule table
    * `equipe` typée `terrestre` | `aerien`, et des membres génériques porteurs de

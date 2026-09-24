@@ -15,6 +15,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { aujourdhuiIso, listAeronefsEquipe } from '@/lib/equipe-db';
 import { libelleSite } from '@/lib/equipe-regles';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
+import { getEquipeLocale } from '@/lib/referentiel-db';
 import { type SiteAerienLocal, deplacerSites, listSitesAeriensEquipe } from '@/lib/site-aerien-db';
 import { envoyerSitesSiEnLigne } from '@/lib/site-aerien-envoi';
 import { type PositionSaisie, validerDeplacement, validerVolMiseEnPlace } from '@/lib/site-aerien-regles';
@@ -41,6 +42,7 @@ export default function SiteDeplacerScreen() {
 
   const [site, setSite] = useState<SiteAerienLocal | null>(null);
   const [dependants, setDependants] = useState<SiteAerienLocal[]>([]);
+  const [equipeType, setEquipeType] = useState<'terrestre' | 'aerien' | undefined>(undefined);
   const [aeronefId, setAeronefId] = useState<string | null>(null);
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
@@ -53,8 +55,13 @@ export default function SiteDeplacerScreen() {
 
   useEffect(() => {
     if (!equipeId || !siteId) return;
-    Promise.all([listSitesAeriensEquipe(equipeId), listAeronefsEquipe(equipeId, aujourdhuiIso())])
-      .then(([sites, aeronefs]) => {
+    Promise.all([
+      listSitesAeriensEquipe(equipeId),
+      listAeronefsEquipe(equipeId, aujourdhuiIso()),
+      getEquipeLocale(equipeId),
+    ])
+      .then(([sites, aeronefs, equipe]) => {
+        setEquipeType(equipe?.type);
         const courant = sites.find((s) => s.id === siteId) ?? null;
         const deps = sites.filter((s) => s.parent_site_id === siteId);
         setSite(courant);
@@ -75,7 +82,7 @@ export default function SiteDeplacerScreen() {
     const trouvees = validerDeplacement({ numero, localite, position });
     if (volRenseigne) {
       trouvees.push(
-        ...validerVolMiseEnPlace({ debut, fin, standId, aeronefId }, { nbStands: dependants.length })
+        ...validerVolMiseEnPlace({ debut, fin, standId, aeronefId }, { nbStands: dependants.length, equipeType })
       );
     }
     setErreurs(trouvees);

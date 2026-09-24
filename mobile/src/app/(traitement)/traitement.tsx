@@ -25,6 +25,7 @@ import {
   produitsTerrestrePretsPourSynchro,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
+import { BlocVol } from '@/components/vol/BlocVol';
 import { AerienForm } from '@/components/traitement/AerienForm';
 import { TerrestreForm } from '@/components/traitement/TerrestreForm';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
@@ -349,6 +350,9 @@ export default function TraitementScreen() {
             aeronefsEquipe={aeronefsEquipe}
             errors={errors}
           />
+        )}
+        {typeTraitement === 'AERIEN' && traitementId && (
+          <BlocVol categorie="application" ficheId={traitementId} readOnly={readOnly} />
         )}
 
         {typeTraitement === 'TERRESTRE' && (

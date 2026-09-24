@@ -588,6 +588,18 @@ async function migrateReferentielTables(db: SQLite.SQLiteDatabase): Promise<void
       cree_le TEXT NOT NULL
     );
 
+    -- Rattachement d'un vol à l'opération qui l'a produit (#644, #610) : un vol d'application couvre
+    -- un traitement, un vol de prospection couvre une ou plusieurs prospections (« Ce vol couvre
+    -- aussi »). type = 'traitement' | 'prospection', ref_id = id de la fiche (autre base SQLite).
+    CREATE TABLE IF NOT EXISTS vol_lien (
+      vol_id TEXT NOT NULL REFERENCES vol(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      ref_id TEXT NOT NULL,
+      PRIMARY KEY (vol_id, ref_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_vol_lien_ref_id ON vol_lien(ref_id);
+
     CREATE TABLE IF NOT EXISTS aeronef (
       id TEXT PRIMARY KEY NOT NULL,
       immatriculation TEXT NOT NULL,

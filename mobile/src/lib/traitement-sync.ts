@@ -1,3 +1,4 @@
+import { synchroniserVols } from './vol-sync';
 import * as Network from 'expo-network';
 import type { components } from './api-schema.generated';
 import { apiClient, conflitSync } from './api-client';
@@ -311,6 +312,9 @@ export async function syncOneTraitement(draft: DraftTraitement, token: string): 
 
   await pushRotationsEtProduits(draft, token, body as ServerTraitement);
   await markTraitementSynced(draft.id, (body as ServerTraitement)?.updated_at);
+  // #644 : le vol d'application attendait ce traitement pour s'y rattacher (#610). `syncAll` du lot
+  // vol résume ses échecs sans lever : ceux du vol ne font pas échouer une fiche déjà envoyée.
+  await synchroniserVols(token);
 }
 
 /** Ce que le domaine « traitement » fournit pour être synchronisé en lot. */

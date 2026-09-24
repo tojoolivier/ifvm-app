@@ -235,3 +235,12 @@ describe('dureeImplantationJours', () => {
     expect(dureeImplantationJours('2026-09-24', null, '2026-09-24')).toBe(0);
   });
 });
+
+describe('validerVolMiseEnPlace — équipe terrestre (#644)', () => {
+  it('refuse un vol de mise en place avec une équipe de travail terrestre', () => {
+    const vol = { debut: '07:00', fin: '08:00', standId: 's1', aeronefId: 'a1' };
+    expect(validerVolMiseEnPlace(vol, { nbStands: 1, equipeType: 'terrestre' })).toEqual([
+      'Un vol se mène avec une équipe aérienne : changez d’équipe de travail dans Paramètres.',
+    ]);
+  });
+});
