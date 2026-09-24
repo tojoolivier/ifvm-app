@@ -12,6 +12,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { listAnnuaire, listChefsDAutresEquipes, listMembresEquipe, UtilisateurAnnuaire } from '@/lib/equipe-db';
 import { libelleFonction, ROLES_A_LA_VOLEE, validerAjoutMembre } from '@/lib/equipe-regles';
 import { getEquipeLocale } from '@/lib/referentiel-db';
+import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
 type Mode = 'existant' | 'nouveau';
@@ -74,15 +75,20 @@ export default function EquipeMembreAjoutScreen() {
         setErreurs(trouvees);
         if (trouvees.length > 0) return;
 
-        await apiClient.ajouterMembreEquipe(
-          token as string,
-          id,
-          mode === 'existant'
-            ? { user_id: userId, fonction: fonction as never }
-            : { nom: nom.trim(), prenom: prenom.trim() || null, fonction: fonction as never }
+        await surRefusAfficher(
+          async () => {
+            await apiClient.ajouterMembreEquipe(
+              token as string,
+              id,
+              mode === 'existant'
+                ? { user_id: userId, fonction: fonction as never }
+                : { nom: nom.trim(), prenom: prenom.trim() || null, fonction: fonction as never }
+            );
+            await pullReferentiel(token as string);
+            router.back();
+          },
+          (message) => setErreurs([message])
         );
-        await pullReferentiel(token as string);
-        router.back();
       },
       { screen: 'equipe-membre-ajout', precondition: !!token && !!id, preconditionMessage: 'Session expirée — reconnectez-vous.' }
     );

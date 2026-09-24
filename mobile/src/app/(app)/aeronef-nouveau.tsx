@@ -9,6 +9,7 @@ import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/auth-store';
 import { peutGererParcAeronefs } from '@/lib/equipe-aerienne-access';
 import { lireVolumeCuve, validerNouvelAeronef } from '@/lib/equipe-regles';
+import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
 /**
@@ -31,16 +32,20 @@ export default function AeronefNouveauScreen() {
     setErreurs(trouvees);
     if (trouvees.length > 0) return;
     void run(
-      async () => {
-        await apiClient.createAeronef(token as string, {
-          immatriculation: immatriculation.trim().toUpperCase(),
-          societe: societe.trim(),
-          volume_cuve_l: lireVolumeCuve(volumeCuveL),
-        });
-        // L'appareil n'existe localement qu'après le prochain pull : on le fait tout de suite.
-        await pullReferentiel(token as string);
-        router.back();
-      },
+      () =>
+        surRefusAfficher(
+          async () => {
+            await apiClient.createAeronef(token as string, {
+              immatriculation: immatriculation.trim().toUpperCase(),
+              societe: societe.trim(),
+              volume_cuve_l: lireVolumeCuve(volumeCuveL),
+            });
+            // L'appareil n'existe localement qu'après le prochain pull : on le fait tout de suite.
+            await pullReferentiel(token as string);
+            router.back();
+          },
+          (message) => setErreurs([message])
+        ),
       { screen: 'aeronef-nouveau', precondition: !!token, preconditionMessage: 'Session expirée — reconnectez-vous.' }
     );
   };

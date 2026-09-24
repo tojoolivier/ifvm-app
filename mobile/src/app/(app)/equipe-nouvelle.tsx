@@ -11,6 +11,7 @@ import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/auth-store';
 import { listAeronefsActifs, listAnnuaire } from '@/lib/equipe-db';
 import { TypeEquipe, validerNouvelleEquipe } from '@/lib/equipe-regles';
+import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
 /** Rôles de l'annuaire qui peuvent être chef d'une équipe de ce type (même règle que le portail web). */
@@ -58,17 +59,21 @@ export default function EquipeNouvelleScreen() {
     setErreurs(trouvees);
     if (trouvees.length > 0) return;
     void run(
-      async () => {
-        await apiClient.createEquipe(token as string, {
-          nom: nom.trim(),
-          type,
-          aeronef_id: type === 'aerien' ? aeronefId : null,
-          membres: [{ user_id: chefId as string, fonction: 'chef' }],
-        });
-        // L'équipe n'existe localement qu'après le prochain pull : on le fait tout de suite.
-        await pullReferentiel(token as string);
-        router.back();
-      },
+      () =>
+        surRefusAfficher(
+          async () => {
+            await apiClient.createEquipe(token as string, {
+              nom: nom.trim(),
+              type,
+              aeronef_id: type === 'aerien' ? aeronefId : null,
+              membres: [{ user_id: chefId as string, fonction: 'chef' }],
+            });
+            // L'équipe n'existe localement qu'après le prochain pull : on le fait tout de suite.
+            await pullReferentiel(token as string);
+            router.back();
+          },
+          (message) => setErreurs([message])
+        ),
       { screen: 'equipe-nouvelle', precondition: !!token, preconditionMessage: 'Session expirée — reconnectez-vous.' }
     );
   };

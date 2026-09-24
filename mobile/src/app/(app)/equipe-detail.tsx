@@ -24,6 +24,7 @@ import {
 } from '@/lib/equipe-db';
 import { affectationActive, jourMois, jourMoisAnnee, joursDepuis, libelleFonction, libelleSite } from '@/lib/equipe-regles';
 import { EquipeLocale, getEquipeLocale } from '@/lib/referentiel-db';
+import { surRefusAfficher } from '@/lib/erreur-serveur';
 import { pullReferentiel } from '@/lib/referentiel-sync';
 
 function initiales(m: MembreEquipeLocal): string {
@@ -54,6 +55,7 @@ export default function EquipeDetailScreen() {
   const [affectations, setAffectations] = useState<AffectationLocale[]>([]);
   const [aeronefsLibres, setAeronefsLibres] = useState<OptionChoix[]>([]);
   const [aeronefChoisi, setAeronefChoisi] = useState<string | null>(null);
+  const [refus, setRefus] = useState<string | null>(null);
 
   const charger = useCallback(() => {
     if (!id) return Promise.resolve();
@@ -97,22 +99,26 @@ export default function EquipeDetailScreen() {
   };
   const affecter = () =>
     void run(
-      async () => {
-        await apiClient.affecterAeronef(token as string, id as string, {
-          aeronef_id: aeronefChoisi as string,
-          date_debut: aujourdhui,
-        });
-        setAeronefChoisi(null);
-        await apresEcriture();
-      },
+      () =>
+        surRefusAfficher(async () => {
+          setRefus(null);
+          await apiClient.affecterAeronef(token as string, id as string, {
+            aeronef_id: aeronefChoisi as string,
+            date_debut: aujourdhui,
+          });
+          setAeronefChoisi(null);
+          await apresEcriture();
+        }, setRefus),
       { screen: 'equipe-detail', precondition: !!token && !!aeronefChoisi, preconditionMessage: 'Choisissez un aéronef.' }
     );
   const terminer = (affectationId: string) =>
     void run(
-      async () => {
-        await apiClient.cloturerAffectationAeronef(token as string, id as string, affectationId, { date_fin: aujourdhui });
-        await apresEcriture();
-      },
+      () =>
+        surRefusAfficher(async () => {
+          setRefus(null);
+          await apiClient.cloturerAffectationAeronef(token as string, id as string, affectationId, { date_fin: aujourdhui });
+          await apresEcriture();
+        }, setRefus),
       { screen: 'equipe-detail', precondition: !!token, preconditionMessage: 'Session expirée — reconnectez-vous.' }
     );
 
@@ -217,6 +223,11 @@ export default function EquipeDetailScreen() {
                 )}
               </>
             )}
+            {refus && (
+              <View style={styles.refus} accessibilityRole="alert">
+                <ThemedText style={styles.refusTexte}>{refus}</ThemedText>
+              </View>
+            )}
             {gestionParc && (
               <View style={styles.carte}>
                 <View style={styles.lignePad}>
@@ -280,6 +291,8 @@ const styles = StyleSheet.create({
   aeronef: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 },
   aeronefTexte: { gap: 2 },
   immat: { fontSize: 13, fontWeight: '700', color: EQ.encre },
+  refus: { padding: 10, borderRadius: 11, borderWidth: 1, borderColor: EQ.ambreBordure, backgroundColor: EQ.ambreFond },
+  refusTexte: { fontSize: 11, fontWeight: '500', color: EQ.ambre },
   terminer: { alignSelf: 'flex-end', paddingVertical: 6 },
   terminerTexte: { fontSize: 11, fontWeight: '700', color: EQ.danger },
   affecter: { height: 38, borderRadius: 10, backgroundColor: EQ.vert, alignItems: 'center', justifyContent: 'center' },
