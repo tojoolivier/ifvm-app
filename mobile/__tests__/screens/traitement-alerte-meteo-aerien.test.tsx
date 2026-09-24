@@ -45,6 +45,10 @@ const rotation = (over: Record<string, unknown>) => ({
   ...over,
 });
 
+/** Un vrai tick avant un geste : sur un runner CI chargé, un `press` juste après le montage
+ * s'exécutait sur une fermeture React pas encore réconciliée (cf. traitement-rotations-screen). */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
 const charger = async (over: Record<string, unknown>) => {
   useTraitementCaptureStore.setState({
     screen: 'reference',
@@ -61,6 +65,7 @@ const charger = async (over: Record<string, unknown>) => {
   } as any);
   await render(<RotationsScreen />);
   await screen.findByTestId('rotation-numero-cuve-0');
+  await settle();
 };
 
 beforeEach(() => {
@@ -104,6 +109,8 @@ describe('RotationsScreen (Aérien) — alerte vent / température', () => {
     expect(screen.queryByText(/Vitesse du vent supérieure/)).toBeNull();
     expect(screen.queryByText(/Température supérieure/)).toBeNull();
     fireEvent.press(screen.getByText(/Continuer/));
-    await waitFor(() => expect(traitementRepository.deleteAllRotationsForTraitementAerien).toHaveBeenCalled());
+    await waitFor(() => expect(traitementRepository.deleteAllRotationsForTraitementAerien).toHaveBeenCalled(), {
+      timeout: 5000,
+    });
   });
 });
