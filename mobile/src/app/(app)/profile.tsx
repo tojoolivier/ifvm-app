@@ -1,5 +1,7 @@
 import { View, TouchableOpacity, ScrollView, StyleSheet, Image, Switch, SafeAreaView, Alert, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { EquipeRadioList } from '@/components/equipe/EquipeRadioList';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useEffect, useMemo } from 'react';
@@ -43,6 +45,8 @@ export default function ProfileScreen() {
   const fontScaleLevel = useFontScaleStore((s) => s.level);
   const setFontScaleLevel = useFontScaleStore((s) => s.setLevel);
   const themeMode = useThemeStore((s) => s.mode);
+  // #641 : équipe de travail — section visible seulement si l'agent est membre de plusieurs équipes.
+  const { equipes, courante, choisir } = useEquipesDeTravail();
   const setThemeMode = useThemeStore((s) => s.setMode);
 
   const [locationEnabled, setLocationEnabled] = useState(true);
@@ -478,6 +482,15 @@ export default function ProfileScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Équipe de travail (#641) : reprise par toute nouvelle saisie. Une équipe unique se
+            choisit toute seule, il n'y a alors rien à régler ici. */}
+        {equipes.length > 1 && (
+          <View style={styles.preferencesSection}>
+            <ThemedText style={styles.sectionTitle}>👥 Équipe de travail</ThemedText>
+            <EquipeRadioList equipes={equipes} equipeId={courante?.id ?? null} onChoisir={(id) => void choisir(id)} />
+          </View>
+        )}
 
         {/* Préférences */}
         <View style={styles.preferencesSection}>

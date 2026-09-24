@@ -21,6 +21,9 @@ import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
+import { EquipeTravailCard } from '@/components/equipe/EquipeTravailCard';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
+import { useResumeEquipe } from '@/hooks/use-resume-equipe';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 
@@ -109,6 +112,16 @@ export default function DashboardScreen() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  // #641 : équipe de travail — carte de l'Accueil, relue au retour sur l'écran (après un changement
+  // dans Paramètres ou une synchro du référentiel).
+  const { courante, recharger } = useEquipesDeTravail();
+  const { resume: resumeEquipe, recharger: rechargerResume } = useResumeEquipe(courante);
+  useFocusEffect(
+    useCallback(() => {
+      recharger();
+      rechargerResume();
+    }, [recharger, rechargerResume])
+  );
 
   // Animations
   const fadeAnim = useMemo(() => new Animated.Value(0), []);
@@ -234,12 +247,6 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <SafeAreaView style={styles.safeArea}>
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-            {isOffline && (
-              <View style={styles.headerTopRow}>
-                <ThemedText style={styles.networkStatus}>⚠ Hors-ligne</ThemedText>
-              </View>
-            )}
-
             <View style={styles.headerContent}>
               <Image
                 source={require('../../../assets/images/logo-ifvm.png')}
@@ -263,6 +270,11 @@ export default function DashboardScreen() {
                 <View style={styles.badgeDot} />
                 <ThemedText style={styles.badgeAvailableText}>Disponible</ThemedText>
               </View>
+              {isOffline && (
+                <View style={styles.badgeOffline}>
+                  <ThemedText style={styles.badgeOfflineText}>⚠ Hors-ligne</ThemedText>
+                </View>
+              )}
             </View>
           </Animated.View>
         </SafeAreaView>
@@ -281,6 +293,17 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Équipe de travail (#641) */}
+        <EquipeTravailCard
+          equipe={courante}
+          resume={resumeEquipe}
+          onChanger={() => navigateTo('/(app)/profile')}
+          onVoir={() => navigateTo('/(app)/equipes')}
+        />
+        <ThemedText style={styles.equipeNote}>
+          Cette équipe, son site et son aéronef sont repris dans toutes vos nouvelles saisies.
+        </ThemedText>
+
         {/* Fiches par jour */}
         <Animated.View style={[styles.chartCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <ThemedText style={styles.chartTitle}>Fiches par jour</ThemedText>
@@ -515,15 +538,25 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       shadowRadius: 12,
       elevation: 8,
     },
-    headerTopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingTop: 8,
+    // Maquette « Hors-ligne » : pastille ambre à côté de « Disponible » (Figma 131:124).
+    equipeNote: {
+      marginHorizontal: 8,
+      marginBottom: 12,
+      fontSize: 10.5,
+      lineHeight: 15,
+      color: '#6F6A59',
     },
-    networkStatus: {
-      color: 'rgba(255,255,255,0.85)',
+    badgeOffline: {
+      backgroundColor: '#FDF6E7',
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      borderRadius: 14,
+      justifyContent: 'center',
+    },
+    badgeOfflineText: {
+      color: '#8A6D2F',
       fontSize: typeSizes.networkStatus,
-      fontWeight: '600',
+      fontWeight: '700',
     },
     gearIcon: {
       fontSize: typeSizes.gearIcon,

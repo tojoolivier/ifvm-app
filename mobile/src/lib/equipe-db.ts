@@ -1,3 +1,4 @@
+import { derniereInterventionEquipe } from './prospection-repository';
 import { getReferentielDb } from './referentiel-db';
 
 /**
@@ -93,4 +94,102 @@ export async function listAeronefsEquipe(equipeId: string, aujourdhui: string): 
      ORDER BY a.immatriculation`,
     [equipeId, aujourdhui, aujourdhui]
   );
+}
+
+export interface ResumeEquipe {
+  sitePrincipal: SiteEquipe | null;
+  sitesSecondaires: SiteEquipe[];
+  /** Aéronef en service ; le premier si plusieurs sont affectés. */
+  aeronef: AeronefEquipe | null;
+  /** Équipe terrestre : date de sa dernière intervention rattachée. */
+  derniereIntervention: string | null;
+}
+
+/**
+ * Ce que la carte « Équipe de travail » de l'Accueil montre : pour une équipe aérienne son site
+ * principal actif, ses sites secondaires et son aéronef en service ; pour une équipe mobile
+ * terrestre sa dernière intervention (position courante déduite, #607).
+ */
+export async function chargerResumeEquipe(
+  equipe: { id: string; type: 'terrestre' | 'aerien' },
+  aujourdhui: string
+): Promise<ResumeEquipe> {
+  if (equipe.type === 'terrestre') {
+    return {
+      sitePrincipal: null,
+      sitesSecondaires: [],
+      aeronef: null,
+      derniereIntervention: await derniereInterventionEquipe(equipe.id),
+    };
+  }
+  const [sites, aeronefs] = await Promise.all([
+    listSitesEquipe(equipe.id),
+    listAeronefsEquipe(equipe.id, aujourdhui),
+  ]);
+  return {
+    sitePrincipal: sites.find((s) => s.parent_site_id === null) ?? null,
+    sitesSecondaires: sites.filter((s) => s.parent_site_id !== null),
+    aeronef: aeronefs[0] ?? null,
+    derniereIntervention: null,
+  };
+}
+
+export interface EquipeDeListe {
+  equipe: EquipeAvecChef;
+  resume: ResumeEquipe;
+}
+
+/** Toutes les équipes actives avec leur résumé — l'écran Équipes (#641). */
+export async function chargerListeEquipes(aujourdhui: string): Promise<EquipeDeListe[]> {
+  const equipes = await listEquipesAvecChef();
+  return Promise.all(
+    equipes.map(async (equipe) => ({ equipe, resume: await chargerResumeEquipe(equipe, aujourdhui) }))
+  );
+}
+
+export interface AeronefLocal {
+  id: string;
+  immatriculation: string;
+  societe: string;
+}
+
+/** Aéronefs actifs, pour choisir celui d'une nouvelle équipe aérienne. */
+export async function listAeronefsActifs(): Promise<AeronefLocal[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<AeronefLocal>(
+    'SELECT id, immatriculation, societe FROM aeronef WHERE actif = 1 ORDER BY immatriculation'
+  );
+}
+
+export interface UtilisateurAnnuaire {
+  id: string;
+  nom: string;
+  prenom: string;
+  role: string;
+}
+
+/**
+ * Annuaire local : utilisateurs actifs dont le nom ou le prénom contient `recherche`, éventuellement
+ * restreints à des rôles. Fonctionne hors-ligne, comme le reste du référentiel.
+ */
+export async function listAnnuaire(recherche: string, roles?: string[]): Promise<UtilisateurAnnuaire[]> {
+  const db = await getReferentielDb();
+  const motif = `%${recherche.trim()}%`;
+  const filtreRoles = roles && roles.length > 0 ? ` AND role IN (${roles.map(() => '?').join(', ')})` : '';
+  return db.getAllAsync<UtilisateurAnnuaire>(
+    `SELECT id, nom, prenom, role FROM utilisateur_equipe
+     WHERE actif = 1 AND (nom LIKE ? OR prenom LIKE ?)${filtreRoles}
+     ORDER BY nom, prenom`,
+    [motif, motif, ...(roles ?? [])]
+  );
+}
+
+/** Utilisateurs déjà chefs d'une autre équipe — un utilisateur ne dirige qu'une équipe. */
+export async function listChefsDAutresEquipes(equipeId: string): Promise<Set<string>> {
+  const db = await getReferentielDb();
+  const rows = await db.getAllAsync<{ user_id: string }>(
+    "SELECT user_id FROM equipe_membre WHERE fonction = 'chef' AND equipe_id <> ?",
+    [equipeId]
+  );
+  return new Set(rows.map((r) => r.user_id));
 }

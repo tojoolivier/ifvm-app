@@ -1,13 +1,20 @@
 import {
   aujourdhuiIso,
+  chargerListeEquipes,
+  chargerResumeEquipe,
+  listAeronefsActifs,
+  listAnnuaire,
+  listChefsDAutresEquipes,
   listAeronefsEquipe,
   listEquipesAvecChef,
   listMembresEquipe,
   listSitesEquipe,
 } from '../src/lib/equipe-db';
+import { derniereInterventionEquipe } from '../src/lib/prospection-repository';
 import { getReferentielDb } from '../src/lib/referentiel-db';
 
 jest.mock('../src/lib/referentiel-db', () => ({ getReferentielDb: jest.fn() }));
+jest.mock('../src/lib/prospection-repository', () => ({ derniereInterventionEquipe: jest.fn() }));
 
 const getAllAsync = jest.fn();
 const db = { getAllAsync } as unknown as Awaited<ReturnType<typeof getReferentielDb>>;
@@ -71,5 +78,98 @@ describe('listAeronefsEquipe', () => {
 describe('aujourdhui', () => {
   it('formate la date du jour au format ISO (AAAA-MM-JJ)', () => {
     expect(aujourdhuiIso(new Date('2026-09-24T10:00:00Z'))).toBe('2026-09-24');
+  });
+});
+
+describe('chargerResumeEquipe', () => {
+  const SITES = [
+    { id: 's1', parent_site_id: null, numero: 'n°03', localite: 'Isoanala', date_debut_position: '2026-09-12' },
+    { id: 's2', parent_site_id: 's1', numero: 'n°01', localite: 'Isoanala', date_debut_position: null },
+  ];
+
+  it('équipe aérienne : site principal, sites secondaires et aéronef en service', async () => {
+    getAllAsync
+      .mockResolvedValueOnce(SITES)
+      .mockResolvedValueOnce([{ id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188' }]);
+
+    const resume = await chargerResumeEquipe({ id: 'eq-1', type: 'aerien' }, '2026-09-24');
+
+    expect(resume).toEqual({
+      sitePrincipal: SITES[0],
+      sitesSecondaires: [SITES[1]],
+      aeronef: { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188' },
+      derniereIntervention: null,
+    });
+    expect(derniereInterventionEquipe).not.toHaveBeenCalled();
+  });
+
+  it('équipe terrestre : dernière intervention rattachée, sans site ni aéronef', async () => {
+    jest.mocked(derniereInterventionEquipe).mockResolvedValue('2026-09-20');
+
+    const resume = await chargerResumeEquipe({ id: 'eq-3', type: 'terrestre' }, '2026-09-24');
+
+    expect(resume).toEqual({
+      sitePrincipal: null,
+      sitesSecondaires: [],
+      aeronef: null,
+      derniereIntervention: '2026-09-20',
+    });
+    expect(getAllAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('chargerListeEquipes', () => {
+  it('joint à chaque équipe son résumé (position) pour l’écran Équipes', async () => {
+    getAllAsync
+      .mockResolvedValueOnce([
+        { id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4, chef_nom: 'Rakoto', chef_prenom: 'Jean' },
+        { id: 'eq-3', nom: 'EMT Toliara', type: 'terrestre', nb_membres: 5, chef_nom: 'Rabe', chef_prenom: 'Sophie' },
+      ])
+      .mockResolvedValueOnce([]) // sites eq-1
+      .mockResolvedValueOnce([]); // aéronefs eq-1
+    jest.mocked(derniereInterventionEquipe).mockResolvedValue('2026-09-20');
+
+    const liste = await chargerListeEquipes('2026-09-24');
+
+    expect(liste.map((e) => e.equipe.nom)).toEqual(['Équipe Sud', 'EMT Toliara']);
+    expect(liste[1].resume.derniereIntervention).toBe('2026-09-20');
+  });
+});
+
+describe('listAeronefsActifs', () => {
+  it('liste les aéronefs actifs par immatriculation', async () => {
+    await listAeronefsActifs();
+    const [sql] = getAllAsync.mock.calls[0];
+    expect(sql).toContain('FROM aeronef');
+    expect(sql).toContain('actif = 1');
+  });
+});
+
+describe('listAnnuaire', () => {
+  it('cherche par nom ou prénom parmi les utilisateurs actifs', async () => {
+    await listAnnuaire('rak');
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).toContain('FROM utilisateur_equipe');
+    expect(sql).toContain('LIKE');
+    expect(params).toEqual(['%rak%', '%rak%']);
+  });
+
+  it('filtre en plus par rôles quand on en donne', async () => {
+    await listAnnuaire('', ['chef_de_base']);
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).toContain('role IN (?)');
+    expect(params).toEqual(['%%', '%%', 'chef_de_base']);
+  });
+});
+
+describe('listChefsDAutresEquipes', () => {
+  it('rend les utilisateurs déjà chefs d’une autre équipe', async () => {
+    getAllAsync.mockResolvedValueOnce([{ user_id: 'u-2' }, { user_id: 'u-5' }]);
+
+    expect(await listChefsDAutresEquipes('eq-1')).toEqual(new Set(['u-2', 'u-5']));
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).toContain("fonction = 'chef'");
+    expect(sql).toContain('equipe_id <> ?');
+    expect(params).toEqual(['eq-1']);
   });
 });

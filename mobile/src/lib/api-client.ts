@@ -1206,6 +1206,47 @@ export const apiClient = {
     );
   },
 
+  /** Équipes terrestres et aériennes, avec leurs membres (écran Équipes, #641). */
+  listEquipes: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['EquipeRead'][]> => {
+    return makeRequest<components['schemas']['EquipeRead'][]>(
+      '/equipes',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  createEquipe: async (
+    token: string,
+    body: components['schemas']['EquipeCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['EquipeRead']> => {
+    return makeRequest<components['schemas']['EquipeRead']>(
+      '/equipes',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Ajoute un membre : compte existant (`user_id`) ou compte « à la volée » (`nom`/`prenom`). */
+  ajouterMembreEquipe: async (
+    token: string,
+    equipeId: string,
+    body: components['schemas']['MembreEquipeCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['MembreEquipeRead']> => {
+    return makeRequest<components['schemas']['MembreEquipeRead']>(
+      `/equipes/${equipeId}/membres`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
   createEquipeAerienne: async (
     token: string,
     body: components['schemas']['EquipeCreate'],

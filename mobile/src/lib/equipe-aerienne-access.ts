@@ -28,3 +28,13 @@ export function peutVoirEquipesAeriennes(role: UserRole | null | undefined): boo
 export function peutCreerLieuAerien(role: UserRole | null | undefined): boolean {
   return role === 'chef_de_base' || role === 'admin';
 }
+
+/**
+ * Rôles qui voient « Créer une équipe » dans le sélecteur d'équipe de travail (#641, maquette
+ * « Définir l'équipe ») : chef de base, chef d'équipe et administrateur. Les autres agents
+ * choisissent parmi les équipes dont ils sont membres. Contrôle d'affichage seulement — le
+ * serveur reste juge de la création.
+ */
+export function peutCreerEquipe(role: UserRole | null | undefined): boolean {
+  return role === 'chef_de_base' || role === 'chef_equipe' || role === 'admin';
+}
