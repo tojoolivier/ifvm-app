@@ -84,7 +84,18 @@ describe('buildCarteMarkers', () => {
       stations,
     )
     expect(markers).toEqual([
-      { prospectionId: 'p-1', latitude: -19.1, longitude: 47.2, severite: 'faible', nFiche: 'F-1' },
+      {
+        prospectionId: 'p-1',
+        latitude: -19.1,
+        longitude: 47.2,
+        severite: 'faible',
+        nFiche: 'F-1',
+        typeProspection: null,
+        infestations: [
+          { typeLabel: 'Tache larvaire', surfaceTotale: 5, densiteMoy: null, comportementLabel: '—' },
+        ],
+        surfaceTotale: 5,
+      },
     ])
   })
 
@@ -94,8 +105,70 @@ describe('buildCarteMarkers', () => {
       stations,
     )
     expect(markers).toEqual([
-      { prospectionId: 'p-1', latitude: -18.9, longitude: 47.5, severite: 'forte', nFiche: 'F-1' },
+      {
+        prospectionId: 'p-1',
+        latitude: -18.9,
+        longitude: 47.5,
+        severite: 'forte',
+        nFiche: 'F-1',
+        typeProspection: null,
+        infestations: [
+          { typeLabel: 'Tache larvaire', surfaceTotale: 60, densiteMoy: null, comportementLabel: '—' },
+        ],
+        surfaceTotale: 60,
+      },
     ])
+  })
+
+  it("détaille chaque infestation et cumule les surfaces pour la situation d'infestation", () => {
+    const markers = buildCarteMarkers(
+      [
+        prospection({
+          latitude: -19,
+          longitude: 47,
+          infestations: [
+            infestation({ id: 'a', type_cible: 'bande_larvaire', surface_totale: 12, densite_moy: 8, comportement: 'deplacement' }),
+            infestation({ id: 'b', type_cible: 'vol_clair', surface_totale: null, comportement: 'repos' }),
+          ],
+        }),
+      ],
+      stations,
+    )
+    expect(markers[0].surfaceTotale).toBe(12)
+    expect(markers[0].infestations).toEqual([
+      { typeLabel: 'Bande larvaire', surfaceTotale: 12, densiteMoy: 8, comportementLabel: 'Déplacement' },
+      { typeLabel: 'Vol clair', surfaceTotale: null, densiteMoy: null, comportementLabel: 'Repos' },
+    ])
+  })
+
+  it('cartographie une fiche extensive qui a une surface infestée mais aucune infestation détaillée', () => {
+    const markers = buildCarteMarkers(
+      [prospection({ type_prospection: 'extensive', latitude: -20, longitude: 46, surface_infestee: 75, infestations: [] })],
+      stations,
+    )
+    expect(markers).toEqual([
+      {
+        prospectionId: 'p-1',
+        latitude: -20,
+        longitude: 46,
+        severite: 'forte',
+        nFiche: 'F-1',
+        typeProspection: 'extensive',
+        infestations: [],
+        surfaceTotale: 75,
+      },
+    ])
+  })
+
+  it("n'affiche pas une fiche sans infestation ni surface infestée (surface nulle ou 0)", () => {
+    const markers = buildCarteMarkers(
+      [
+        prospection({ id: 'a', latitude: -20, longitude: 46, surface_infestee: 0, infestations: [] }),
+        prospection({ id: 'b', latitude: -20, longitude: 46, surface_infestee: null, infestations: [] }),
+      ],
+      stations,
+    )
+    expect(markers).toEqual([])
   })
 
   it('ignore les fiches sans aucune position exploitable', () => {

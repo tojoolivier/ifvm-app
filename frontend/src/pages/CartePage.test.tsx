@@ -62,9 +62,9 @@ const prospections = [
   },
 ]
 
-function renderPage(initialPath = '/carte') {
+function renderPage(initialPath = '/carte', data: unknown[] = prospections) {
   mockedGet.mockImplementation((url: string) => {
-    if (url === '/prospections') return Promise.resolve({ data: prospections })
+    if (url === '/prospections') return Promise.resolve({ data })
     if (url === '/campagnes') return Promise.resolve({ data: campagnes })
     if (url === '/stations') return Promise.resolve({ data: stations })
     return Promise.resolve({ data: [] })
@@ -102,6 +102,38 @@ describe('CartePage — carte des infestations (#17)', () => {
   it('applique le filtre station (persisté dans l’URL)', async () => {
     renderPage('/carte?station=s2')
     await waitFor(() => expect(screen.getByText(/0 fiche avec infestation/)).toBeInTheDocument())
+  })
+
+  it("affiche la situation d'infestation acridienne dans le popup du marqueur", async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText(/1 fiche avec infestation/)).toBeInTheDocument())
+
+    expect(screen.getByText("Situation d'infestation acridienne")).toBeInTheDocument()
+    expect(screen.getByText('Surface infestée : 60 ha')).toBeInTheDocument()
+    expect(screen.getByText(/essaim — 60 ha — densité — — —/)).toBeInTheDocument()
+  })
+
+  it('affiche aussi une fiche extensive qui a une surface infestée et des coordonnées', async () => {
+    renderPage('/carte', [
+      ...prospections,
+      {
+        id: 'p3',
+        campagne_id: 'c1',
+        station_id: null,
+        statut: 'validee',
+        n_fiche: 'F-003',
+        type_prospection: 'extensive',
+        latitude: -21.2,
+        longitude: 45.9,
+        surface_infestee: 30,
+        infestations: [],
+      },
+    ])
+    await waitFor(() => expect(screen.getByText(/2 fiches avec infestation/)).toBeInTheDocument())
+
+    expect(screen.getAllByTestId('marker')).toHaveLength(2)
+    expect(screen.getByText('Surface infestée : 30 ha')).toBeInTheDocument()
+    expect(screen.getByText('Prospection extensive')).toBeInTheDocument()
   })
 
   it('navigue vers la fiche au clic sur un marqueur', async () => {
