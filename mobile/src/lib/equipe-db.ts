@@ -83,14 +83,17 @@ export async function listSitesEquipe(equipeId: string): Promise<SiteEquipe[]> {
   );
 }
 
-/** Aéronefs actuellement affectés à l'équipe : l'affectation couvre la date donnée. */
+/**
+ * Aéronefs actuellement affectés à l'équipe : l'affectation couvre la date donnée. L'intervalle est
+ * semi-ouvert `[date_debut, date_fin)` comme côté serveur : le jour de `date_fin`, l'appareil est déjà libre.
+ */
 export async function listAeronefsEquipe(equipeId: string, aujourdhui: string): Promise<AeronefEquipe[]> {
   const db = await getReferentielDb();
   return db.getAllAsync<AeronefEquipe>(
     `SELECT a.id, a.immatriculation, a.societe
      FROM equipe_aeronef ea JOIN aeronef a ON a.id = ea.aeronef_id
      WHERE ea.equipe_id = ? AND a.actif = 1
-       AND ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin >= ?)
+       AND ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin > ?)
      ORDER BY a.immatriculation`,
     [equipeId, aujourdhui, aujourdhui]
   );
@@ -113,7 +116,7 @@ export async function listParcAeronefs(aujourdhui: string): Promise<AeronefParc[
     `SELECT a.id, a.immatriculation, a.societe, a.volume_cuve_l, e.id AS equipe_id, e.nom AS equipe_nom
      FROM aeronef a
      LEFT JOIN equipe_aeronef ea ON ea.aeronef_id = a.id
-       AND ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin >= ?)
+       AND ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin > ?)
      LEFT JOIN equipe e ON e.id = ea.equipe_id
      WHERE a.actif = 1
      ORDER BY a.immatriculation`,

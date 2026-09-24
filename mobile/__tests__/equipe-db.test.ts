@@ -185,6 +185,7 @@ describe('listParcAeronefs', () => {
     expect(sql).toContain('LEFT JOIN equipe_aeronef');
     expect(sql).toContain('actif = 1');
     expect(sql).toContain('date_fin IS NULL OR');
+    expect(sql).toContain('date_fin > ?');
     expect(params).toEqual(['2026-09-24', '2026-09-24']);
   });
 });

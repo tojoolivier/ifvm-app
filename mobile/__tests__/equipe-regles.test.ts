@@ -199,11 +199,13 @@ describe('affectationActive', () => {
 
   it('rend l’affectation en cours ou dont la fin n’est pas passée', () => {
     expect(affectationActive([affectation('2026-09-01', null)], '2026-09-24')).toEqual(affectation('2026-09-01', null));
-    expect(affectationActive([affectation('2026-09-01', '2026-09-24')], '2026-09-24')).not.toBeNull();
+    expect(affectationActive([affectation('2026-09-01', '2026-09-25')], '2026-09-24')).not.toBeNull();
   });
 
   it('ignore une affectation future ou déjà terminée', () => {
     expect(affectationActive([affectation('2026-10-01', null)], '2026-09-24')).toBeNull();
     expect(affectationActive([affectation('2026-05-01', '2026-08-31')], '2026-09-24')).toBeNull();
+    // Terminée aujourd'hui : intervalle semi-ouvert, l'appareil est déjà libre.
+    expect(affectationActive([affectation('2026-09-01', '2026-09-24')], '2026-09-24')).toBeNull();
   });
 });
