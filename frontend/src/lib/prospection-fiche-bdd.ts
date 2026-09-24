@@ -155,6 +155,8 @@ export const CATALOGUE_PROSPECTION: { [K in keyof P]-?: Colonne<P> } = {
   prospecteur_id: sc<P>(G_ID, 'Prospecteur', (v, ctx, p) =>
     typeof v === 'string' ? (p.prospecteur_nom ?? ctx.nomAgent(v)) : TIRET,
   ),
+  equipe_id: txt(G_ID, 'Équipe (identifiant)'),
+  vol_id: txt(G_ID, 'Vol (identifiant)'),
   prospecteur_nom: ailleurs('ligne « Prospecteur » (jointure utilisateur)'),
   date_prospection: txt(G_ID, 'Date de prospection'),
   statut: sc<P>(G_ID, 'Statut', (v) => fStatut(v)),
