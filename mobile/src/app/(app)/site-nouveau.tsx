@@ -290,7 +290,8 @@ function Dependant(props: {
 const styles = StyleSheet.create({
   racine: { flex: 1, backgroundColor: EQ.fond },
   contenu: { padding: 16, gap: 10 },
-  section: { marginTop: 6, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, color: EQ.attenue },
+  // Figma : 10 px entre blocs, libellé → champ 6 px (le `gap` de 10 s'y ajoute, d'où −4).
+  section: { marginBottom: -4, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, color: EQ.attenue },
   types: { flexDirection: 'row', gap: 6 },
   type: {
     flex: 1,

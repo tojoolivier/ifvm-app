@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   carte: { padding: 8.5, gap: 8, borderRadius: 13, borderWidth: 1.5, borderColor: EQ.vert, backgroundColor: EQ.carte },
   bouton: { height: 36, borderRadius: 11, backgroundColor: EQ.vertDoux, alignItems: 'center', justifyContent: 'center' },
   boutonTexte: { fontSize: 12, fontWeight: '700', color: EQ.vert },
-  ligne: { flexDirection: 'row', justifyContent: 'space-between' },
+  ligne: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
   etiquette: { marginBottom: 3, fontSize: 9, fontWeight: '600', color: EQ.attenue },
   saisie: {
     height: 32,

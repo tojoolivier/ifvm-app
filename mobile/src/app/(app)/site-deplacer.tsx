@@ -142,16 +142,18 @@ export default function SiteDeplacerScreen() {
         {estPrincipal && dependants.length > 0 && (
           <>
             <ThemedText style={styles.section}>DÉPLACER AUSSI</ThemedText>
-            {dependants.map((d) => (
-              <CaseALigne
-                key={d.id}
-                testID={`deplacer-${d.id}`}
-                coche={!!coches[d.id]}
-                onChange={(coche) => setCoches({ ...coches, [d.id]: coche })}
-                libelle={libelleSite(d)}
-                detail="Même position que le principal"
-              />
-            ))}
+            <View style={styles.coches}>
+              {dependants.map((d) => (
+                <CaseALigne
+                  key={d.id}
+                  testID={`deplacer-${d.id}`}
+                  coche={!!coches[d.id]}
+                  onChange={(coche) => setCoches({ ...coches, [d.id]: coche })}
+                  libelle={libelleSite(d)}
+                  detail="Même position que le principal"
+                />
+              ))}
+            </View>
           </>
         )}
 
@@ -200,7 +202,10 @@ const libelleSiteAffiche = (site: SiteAerienLocal) => libelleSite(site).replace(
 const styles = StyleSheet.create({
   racine: { flex: 1, backgroundColor: EQ.fond },
   contenu: { padding: 16, gap: 10 },
-  section: { marginTop: 6, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, color: EQ.attenue },
+  // Figma : 10 px entre blocs, libellé → champ 6 px (le `gap` de 10 s'y ajoute, d'où −4).
+  section: { marginBottom: -4, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, color: EQ.attenue },
+  // Lignes « Déplacer aussi » : 6 px entre elles et avant le bloc vol (Figma), pas les 10 du contenu.
+  coches: { gap: 6, marginBottom: -4 },
   actuel: { gap: 3, padding: 9, borderRadius: 13, borderWidth: 1, borderColor: EQ.bordure, backgroundColor: EQ.carte },
   actuelEtiquette: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5, color: EQ.attenue },
   actuelNom: { fontSize: 13, fontWeight: '700', color: EQ.encre },
