@@ -1776,6 +1776,22 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
 }
 
 /**
+ * #liste-nouveau-traitement-exclut-deja-traitees : identifiants des fiches de prospection
+ * pour lesquelles une fiche de traitement existe DÉJÀ sur cet appareil — brouillon,
+ * enregistrée hors ligne ou synchronisée, peu importe. Le serveur (`disponible_pour_traitement`)
+ * n'exclut une fiche qu'une fois son traitement synchronisé : sans ce complément local, une fiche
+ * qu'on vient de traiter restait proposée dans « Nouvelle fiche de traitement » jusqu'à la
+ * synchronisation, et pouvait être confondue avec une fiche encore à traiter.
+ */
+export async function listProspectionIdsAvecTraitementLocal(): Promise<Set<string>> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ prospection_id: string }>(
+    'SELECT DISTINCT prospection_id FROM traitement WHERE prospection_id IS NOT NULL'
+  );
+  return new Set(rows.map((r) => r.prospection_id));
+}
+
+/**
  * Repli hors-ligne de « Prospections à revalider »
  * (revalidation-liste.tsx) — même raisonnement que
  * `listProspectionsDisponiblesPourTraitementLocal` ci-dessus, dont c'est
