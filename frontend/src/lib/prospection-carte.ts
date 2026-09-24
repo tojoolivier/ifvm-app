@@ -374,6 +374,37 @@ export const COUCHES_CARTE: CoucheGroupe[] = [
 
 export const TOUTES_LES_COUCHES: CoucheCarte[] = COUCHES_CARTE.flatMap((g) => g.couches.map((c) => c.key))
 
+export interface RaccourciCarte {
+  key: string
+  label: string
+  couches: CoucheCarte[]
+}
+
+/**
+ * Raccourcis toujours visibles au-dessus de la carte : un clic pour ne voir que les
+ * prospections, que les traitements ou que les bases aériennes (le panneau « Fiches
+ * affichées » reste là pour un choix plus fin, par type).
+ */
+export const RACCOURCIS_CARTE: RaccourciCarte[] = [
+  { key: 'tout', label: 'Tout', couches: TOUTES_LES_COUCHES },
+  {
+    key: 'prospections',
+    label: 'Prospections',
+    couches: ['prospection_intensive', 'prospection_extensive', 'prospection_validation'],
+  },
+  { key: 'traitements', label: 'Traitements', couches: ['traitement_aerien', 'traitement_terrestre'] },
+  { key: 'bases', label: 'Bases aériennes', couches: ['base_aerienne'] },
+]
+
+/** Le raccourci dont l'ensemble de couches est exactement celui affiché, sinon `null`. */
+export function raccourciActif(couches: ReadonlySet<CoucheCarte>): string | null {
+  return (
+    RACCOURCIS_CARTE.find(
+      (r) => r.couches.length === couches.size && r.couches.every((c) => couches.has(c)),
+    )?.key ?? null
+  )
+}
+
 /**
  * Couche d'une fiche de prospection selon son type. Un type absent ou inconnu (fiche plus
  * ancienne que le champ) reste visible tant qu'au moins une couche de prospection est cochée.
