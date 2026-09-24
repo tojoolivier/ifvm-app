@@ -45,8 +45,9 @@ const styles = StyleSheet.create({
   ligne: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
   fleche: { fontSize: 20, fontWeight: '700' },
   titres: { flex: 1, gap: 1 },
-  titreListe: { fontSize: 14, fontWeight: '700' },
-  titreFormulaire: { fontSize: 15, fontWeight: '700' },
-  sousTitre: { fontSize: 10.5, opacity: 0.85 },
-  action: { fontSize: 12, fontWeight: '700' },
+  // Interlignes explicites : sans elles `ThemedText` impose 24 px et le bandeau dépasse les 56 px du Figma.
+  titreListe: { fontSize: 14, lineHeight: 18, fontWeight: '700' },
+  titreFormulaire: { fontSize: 15, lineHeight: 19, fontWeight: '700' },
+  sousTitre: { fontSize: 10.5, lineHeight: 13, opacity: 0.85 },
+  action: { fontSize: 12, lineHeight: 15, fontWeight: '700' },
 });

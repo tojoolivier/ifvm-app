@@ -37,5 +37,6 @@ export function BadgeTypeEquipe({ type, plein = false }: { type: 'terrestre' | '
 
 const styles = StyleSheet.create({
   badge: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20 },
-  texte: { fontSize: 9, fontWeight: '700' },
+  // Sans interligne, `ThemedText` impose 24 px : la pastille faisait 30 px au lieu des 16 du Figma.
+  texte: { fontSize: 9, lineHeight: 10, fontWeight: '700' },
 });
