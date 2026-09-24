@@ -24,9 +24,9 @@ function nomComplet(membre: MembreEquipe | undefined): string {
   return membre ? [membre.prenom, membre.nom].filter(Boolean).join(' ') : '—'
 }
 
+type SiteAerien = components['schemas']['SiteAerienneRead']
+
 const FONCTIONS_NOMMEES = ['chef', 'pilote', 'mecanicien', 'consultant_international']
-type BaseAerienne = components['schemas']['BaseAerienneRead']
-type StandRemplissage = components['schemas']['StandRemplissageRead']
 
 const inputClass =
   'w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500'
@@ -35,14 +35,14 @@ const labelClass = 'mb-1 block text-sm font-medium text-gray-700'
 /**
  * Assigner un chef de base à une base aérienne, depuis le portail web — même
  * flux que mobile (`mobile/src/app/(app)/equipes-aeriennes.tsx`) : Équipes /
- * Bases principales / Bases secondaires / Stands, cardinalité confirmée
+ * Sites principaux / Sites secondaires (une base secondaire ou un stand est un site secondaire, ADR-018 / #604), cardinalité confirmée
  * (migration 0066) : 1 équipe = 1 chef de base = 1 base principale
- * (`parent_base_id IS NULL`) ; une base secondaire hérite de l'équipe de sa
- * principale via `parent_base_id`.
+ * (`parent_site_id IS NULL`) ; une base secondaire hérite de l'équipe de sa
+ * principale via `parent_site_id`.
  *
  * Le modèle ne porte pas de FK directe base_aerienne -> chef_de_base : le
  * chef vient de l'équipe qui porte la base. « Assigner un chef » revient
- * donc à choisir quelle équipe porte la base (`PUT /bases-aeriennes/{id}`,
+ * donc à choisir quelle équipe porte la base (`PUT /sites-aeriens/{id}`,
  * `equipe_id`) — il n'existe pas de PUT sur /equipes-aeriennes pour changer
  * le chef d'une équipe déjà créée, seulement d'en créer une nouvelle.
  *
@@ -82,13 +82,6 @@ export function EquipesAeriennesSection() {
   const [parentBaseId, setParentBaseId] = useState('')
   const [createBaseSecondaireError, setCreateBaseSecondaireError] = useState('')
 
-  // --- Stand de remplissage ------------------------------------------------
-  const [showCreateStand, setShowCreateStand] = useState(false)
-  const [numeroStand, setNumeroStand] = useState('')
-  const [localiteStand, setLocaliteStand] = useState('')
-  const [equipeIdStand, setEquipeIdStand] = useState('')
-  const [createStandError, setCreateStandError] = useState('')
-
   const {
     data: chefs = [],
     isError: chefsIsError,
@@ -113,24 +106,14 @@ export function EquipesAeriennesSection() {
     isLoading: basesLoading,
     isError: basesIsError,
     error: basesError,
-  } = useQuery<BaseAerienne[]>({
-    queryKey: ['bases-aeriennes'],
-    queryFn: () => api.get('/bases-aeriennes').then((r) => r.data),
-  })
-
-  const {
-    data: stands = [],
-    isLoading: standsLoading,
-    isError: standsIsError,
-    error: standsError,
-  } = useQuery<StandRemplissage[]>({
-    queryKey: ['stands-remplissage'],
-    queryFn: () => api.get('/stands-remplissage').then((r) => r.data),
+  } = useQuery<SiteAerien[]>({
+    queryKey: ['sites-aeriens'],
+    queryFn: () => api.get('/sites-aeriens').then((r) => r.data),
   })
 
   const chefsById = new Map(chefs.map((c) => [c.id, c]))
-  const basesPrincipales = bases.filter((b) => b.parent_base_id === null)
-  const basesSecondaires = bases.filter((b) => b.parent_base_id !== null)
+  const basesPrincipales = bases.filter((b) => b.parent_site_id === null)
+  const basesSecondaires = bases.filter((b) => b.parent_site_id !== null)
   const basesPrincipalesById = new Map(basesPrincipales.map((b) => [b.id, b]))
 
   // Équipe -> base principale qui la porte déjà (au plus une, UNIQUE(equipe_id)).
@@ -182,9 +165,9 @@ export function EquipesAeriennesSection() {
   })
 
   const createBaseMutation = useMutation({
-    mutationFn: (data: components['schemas']['BaseAerienneCreate']) => api.post('/bases-aeriennes', data),
+    mutationFn: (data: components['schemas']['SiteAerienneCreate']) => api.post('/sites-aeriens', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bases-aeriennes'] })
+      queryClient.invalidateQueries({ queryKey: ['sites-aeriens'] })
       setShowCreateBase(false)
       setNumeroBase('')
       setLocaliteBase('')
@@ -197,9 +180,9 @@ export function EquipesAeriennesSection() {
   })
 
   const createBaseSecondaireMutation = useMutation({
-    mutationFn: (data: components['schemas']['BaseAerienneCreate']) => api.post('/bases-aeriennes', data),
+    mutationFn: (data: components['schemas']['SiteAerienneCreate']) => api.post('/sites-aeriens', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bases-aeriennes'] })
+      queryClient.invalidateQueries({ queryKey: ['sites-aeriens'] })
       setShowCreateBaseSecondaire(false)
       setNumeroBaseSecondaire('')
       setLocaliteBaseSecondaire('')
@@ -211,43 +194,14 @@ export function EquipesAeriennesSection() {
     },
   })
 
-  const createStandMutation = useMutation({
-    mutationFn: (data: components['schemas']['StandRemplissageCreate']) =>
-      api.post('/stands-remplissage', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stands-remplissage'] })
-      setShowCreateStand(false)
-      setNumeroStand('')
-      setLocaliteStand('')
-      setEquipeIdStand('')
-      setCreateStandError('')
-    },
-    onError: (err: AxiosError<{ detail?: string }>) => {
-      setCreateStandError(err.response?.data?.detail || 'Erreur lors de la création')
-    },
-  })
-
   const reassignMutation = useMutation({
     mutationFn: ({ id, equipe_id }: { id: string; equipe_id: string }) =>
-      api.put(`/bases-aeriennes/${id}`, { equipe_id }),
+      api.put(`/sites-aeriens/${id}`, { equipe_id }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bases-aeriennes'] })
+      queryClient.invalidateQueries({ queryKey: ['sites-aeriens'] })
     },
     onError: (err: AxiosError<{ detail?: string }>) => {
       alert(err.response?.data?.detail || 'Erreur lors de la réaffectation')
-    },
-  })
-
-  // Rattache un stand antérieur à la migration 0078 (« sans équipe ») à son équipe :
-  // réservé aux admins côté serveur, un stand sans équipe n'étant proposé à personne.
-  const rattacherStandMutation = useMutation({
-    mutationFn: ({ id, equipe_aerienne_id }: { id: string; equipe_aerienne_id: string }) =>
-      api.put(`/stands-remplissage/${id}`, { equipe_aerienne_id }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stands-remplissage'] })
-    },
-    onError: (err: AxiosError<{ detail?: string }>) => {
-      alert(err.response?.data?.detail || 'Erreur lors du rattachement')
     },
   })
 
@@ -320,7 +274,7 @@ export function EquipesAeriennesSection() {
     },
   ]
 
-  const baseColumns: DataTableColumn<BaseAerienne>[] = [
+  const baseColumns: DataTableColumn<SiteAerien>[] = [
     { key: 'numero', header: 'N°', mono: true, render: (b) => b.numero },
     { key: 'localite', header: 'Localité', render: (b) => b.localite },
     {
@@ -348,53 +302,20 @@ export function EquipesAeriennesSection() {
     },
   ]
 
-  const baseSecondaireColumns: DataTableColumn<BaseAerienne>[] = [
+  const baseSecondaireColumns: DataTableColumn<SiteAerien>[] = [
     { key: 'numero', header: 'N°', mono: true, render: (b) => b.numero },
     { key: 'localite', header: 'Localité', render: (b) => b.localite },
     {
       key: 'principale',
       header: 'Base principale',
       render: (b) => {
-        const principale = b.parent_base_id ? basesPrincipalesById.get(b.parent_base_id) : undefined
+        const principale = b.parent_site_id ? basesPrincipalesById.get(b.parent_site_id) : undefined
         return principale ? (
           <span className="font-mono text-[11.5px]">{principale.numero}</span>
         ) : (
           '—'
         )
       },
-    },
-  ]
-
-  const equipesActives = equipes.filter((e) => e.actif)
-
-  const standColumns: DataTableColumn<StandRemplissage>[] = [
-    { key: 'numero', header: 'N°', mono: true, render: (s) => s.numero },
-    { key: 'localite', header: 'Localité', render: (s) => s.localite },
-    {
-      key: 'equipe',
-      header: 'Équipe',
-      render: (s) =>
-        s.equipe_aerienne_id ? (
-          (equipes.find((e) => e.id === s.equipe_aerienne_id)?.nom ?? '—')
-        ) : (
-          <select
-            value=""
-            disabled={rattacherStandMutation.isPending}
-            aria-label={`Rattacher le stand ${s.numero} à une équipe`}
-            onChange={(e) => {
-              if (!e.target.value) return
-              rattacherStandMutation.mutate({ id: s.id, equipe_aerienne_id: e.target.value })
-            }}
-            className="w-full rounded border border-[#e0d9c4] bg-white px-2 py-1 font-sans text-[12px] disabled:opacity-50"
-          >
-            <option value="">— sans équipe : rattacher —</option>
-            {equipesActives.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nom}
-              </option>
-            ))}
-          </select>
-        ),
     },
   ]
 
@@ -507,38 +428,6 @@ export function EquipesAeriennesSection() {
             emptyMessage={basesLoading ? 'Chargement…' : 'Aucune base aérienne secondaire.'}
           />
         </div>
-      </section>
-
-      {/* Stands de remplissage */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-sans text-[14px] font-bold">Stands de remplissage</h2>
-          <button
-            onClick={() => setShowCreateStand(true)}
-            className="rounded-[9px] bg-ifvm-green-text px-4 py-[8px] font-sans text-[12px] font-bold text-white transition hover:bg-[#1a4429]"
-          >
-            + Nouveau stand
-          </button>
-        </div>
-
-        {standsIsError ? (
-          <ErrorBanner
-            label="Erreur"
-            message={
-              (standsError as AxiosError<{ detail?: string }>)?.response?.data?.detail ??
-              'Impossible de charger les stands de remplissage.'
-            }
-          />
-        ) : (
-          <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-card">
-            <DataTable
-              columns={standColumns}
-              rows={stands}
-              getRowKey={(s) => s.id}
-              emptyMessage={standsLoading ? 'Chargement…' : 'Aucun stand de remplissage.'}
-            />
-          </div>
-        )}
       </section>
 
       {/* Modale : nouvelle équipe */}
@@ -897,7 +786,7 @@ export function EquipesAeriennesSection() {
                 createBaseSecondaireMutation.mutate({
                   numero: numeroBaseSecondaire.trim(),
                   localite: localiteBaseSecondaire.trim(),
-                  parent_base_id: parentBaseId,
+                  parent_site_id: parentBaseId,
                 })
               }}
               className="space-y-4 px-6 py-4"
@@ -971,103 +860,6 @@ export function EquipesAeriennesSection() {
                     setLocaliteBaseSecondaire('')
                     setParentBaseId('')
                     setCreateBaseSecondaireError('')
-                  }}
-                  className="rounded border border-gray-300 px-4 py-2 transition hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modale : nouveau stand */}
-      {showCreateStand && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
-            <div className="border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">Nouveau stand de remplissage</h2>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                setCreateStandError('')
-                createStandMutation.mutate({
-                  numero: numeroStand.trim(),
-                  localite: localiteStand.trim(),
-                  equipe_aerienne_id: equipeIdStand,
-                })
-              }}
-              className="space-y-4 px-6 py-4"
-            >
-              {createStandError && (
-                <div className="rounded bg-red-50 p-3 text-sm text-red-700">{createStandError}</div>
-              )}
-              <div>
-                <label htmlFor="stand-numero" className={labelClass}>
-                  Numéro *
-                </label>
-                <input
-                  id="stand-numero"
-                  type="text"
-                  value={numeroStand}
-                  onChange={(e) => setNumeroStand(e.target.value)}
-                  placeholder="Ex. STD01"
-                  required
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label htmlFor="stand-localite" className={labelClass}>
-                  Localité *
-                </label>
-                <input
-                  id="stand-localite"
-                  type="text"
-                  value={localiteStand}
-                  onChange={(e) => setLocaliteStand(e.target.value)}
-                  required
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label htmlFor="stand-equipe" className={labelClass}>
-                  Équipe *
-                </label>
-                <select
-                  id="stand-equipe"
-                  value={equipeIdStand}
-                  onChange={(e) => setEquipeIdStand(e.target.value)}
-                  required
-                  className={inputClass}
-                >
-                  <option value="" disabled>
-                    — choisir —
-                  </option>
-                  {equipesActives.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nom}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={createStandMutation.isPending}
-                  className="rounded bg-green-700 px-4 py-2 text-white transition hover:bg-green-800 disabled:opacity-50"
-                >
-                  {createStandMutation.isPending ? 'Création…' : 'Créer'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateStand(false)
-                    setNumeroStand('')
-                    setLocaliteStand('')
-                    setEquipeIdStand('')
-                    setCreateStandError('')
                   }}
                   className="rounded border border-gray-300 px-4 py-2 transition hover:bg-gray-50"
                 >
