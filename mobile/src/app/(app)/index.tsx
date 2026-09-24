@@ -20,10 +20,12 @@ import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
-import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
-import { EquipeTravailCard } from '@/components/equipe/EquipeTravailCard';
+import { peutCreerEquipe, peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
+import { EquipeChip } from '@/components/equipe/EquipeChip';
+import { EquipeSheet } from '@/components/equipe/EquipeSheet';
+import { MenuDrawer } from '@/components/menu/MenuDrawer';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
-import { useResumeEquipe } from '@/hooks/use-resume-equipe';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { useTheme } from '@/hooks/use-theme';
@@ -33,20 +35,32 @@ import type { ThemePalette } from '@/constants/theme';
 // CONSTANTES - PALETTE CLAIRE
 // ============================================
 
-const IFVM_GREEN = '#1B5E1B';
-const IFVM_GREEN_LIGHT = '#4CAF50';
-const IFVM_GREEN_BG = '#E8F5E9';
-const IFVM_BG_LIGHT = '#F0F2F5';
+const IFVM_GREEN = '#235A36';
+const IFVM_GREEN_LIGHT = '#235A36';
+const IFVM_GREEN_BG = '#EAF2EC';
+const IFVM_BG_LIGHT = '#FAF7EF';
 const CARD_BG = '#FFFFFF';
-const IFVM_ORANGE = '#E67E22';
-const IFVM_ORANGE_BG = '#FFF3E0';
-const HEADER_BG = '#1B5E1B';
-const TEXT_BLACK = '#000000';
-const TEXT_DARK = '#1A1A1A';
-const TEXT_SECONDARY = '#757575';
+const IFVM_ORANGE = '#8A6D2F';
+const IFVM_ORANGE_BG = '#FDF6E7';
+const HEADER_BG = '#235A36';
+const TEXT_BLACK = '#16201A';
+const TEXT_DARK = '#16201A';
+const TEXT_SECONDARY = '#6F6A59';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
+
+const LIBELLES_ROLE: Record<string, string> = {
+  prospecteur: 'Prospecteur',
+  chef_de_base: 'Chef de base',
+  chef_equipe: "Chef d'équipe",
+  pilote: 'Pilote',
+  mecanicien: 'Mécanicien',
+  admin: 'Administrateur',
+};
+function libelleRole(role: string): string {
+  return LIBELLES_ROLE[role] ?? role;
+}
 
 const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -117,13 +131,14 @@ export default function DashboardScreen() {
   const [isOffline, setIsOffline] = useState(false);
   // #641 : équipe de travail — carte de l'Accueil, relue au retour sur l'écran (après un changement
   // dans Paramètres ou une synchro du référentiel).
-  const { courante, recharger } = useEquipesDeTravail();
-  const { resume: resumeEquipe, recharger: rechargerResume } = useResumeEquipe(courante);
+  const { equipes, courante, choisir, recharger } = useEquipesDeTravail();
+  const logout = useAuthStore((s) => s.logout);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [equipeSheetVisible, setEquipeSheetVisible] = useState(false);
   useFocusEffect(
     useCallback(() => {
       recharger();
-      rechargerResume();
-    }, [recharger, rechargerResume])
+    }, [recharger])
   );
 
   // Animations
@@ -217,6 +232,10 @@ export default function DashboardScreen() {
   const navigateTo = (path: string) => {
     router.push(path as any);
   };
+  const allerDepuisMenu = (path: string) => {
+    setMenuVisible(false);
+    navigateTo(path);
+  };
 
   // Activité récente — prospections ET traitements confondus, triés par
   // dernière modification (#activite-recente-traitements : les fiches de
@@ -251,11 +270,13 @@ export default function DashboardScreen() {
         <SafeAreaView style={styles.safeArea}>
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
             <View style={styles.headerContent}>
-              <Image
-                source={require('../../../assets/images/logo-ifvm.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              <View style={styles.logoWrap}>
+                <Image
+                  source={require('../../../assets/images/logo-ifvm.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
               <View style={styles.headerTextContainer} testID="dashboard-header">
                 <ThemedText style={styles.headerGreeting}>Bonjour</ThemedText>
                 <ThemedText style={styles.headerName}>
@@ -263,8 +284,15 @@ export default function DashboardScreen() {
                 </ThemedText>
                 <ThemedText style={styles.headerRole}>Agent de terrain</ThemedText>
               </View>
-              <TouchableOpacity onPress={() => navigateTo('/(app)/profile')} activeOpacity={0.7}>
-                <ThemedText style={styles.gearIcon}>⚙️</ThemedText>
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={() => setMenuVisible(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Ouvrir le menu"
+                testID="dashboard-menu-button"
+              >
+                <AppIcon name="menu" size={24} color={TEXT_DARK} />
               </TouchableOpacity>
             </View>
 
@@ -279,6 +307,9 @@ export default function DashboardScreen() {
                 </View>
               )}
             </View>
+
+            {/* Équipe active (#641) — Figma « EquipeChip » */}
+            <EquipeChip equipe={courante} onChanger={() => setEquipeSheetVisible(true)} />
           </Animated.View>
         </SafeAreaView>
       </View>
@@ -296,17 +327,6 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Équipe de travail (#641) */}
-        <EquipeTravailCard
-          equipe={courante}
-          resume={resumeEquipe}
-          onChanger={() => navigateTo('/(app)/profile')}
-          onVoir={() => navigateTo('/(app)/equipes')}
-        />
-        <ThemedText style={styles.equipeNote}>
-          Cette équipe, son site et son aéronef sont repris dans toutes vos nouvelles saisies.
-        </ThemedText>
-
         {/* Fiches par jour */}
         <Animated.View style={[styles.chartCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <ThemedText style={styles.chartTitle}>Fiches par jour</ThemedText>
@@ -346,7 +366,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(app)/prospection')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>✚</ThemedText>
+              <AppIcon name="ajouter" size={24} color={'#FFFFFF'} />
               <ThemedText style={styles.quickTileTextPrimary}>Nouvelle prospection</ThemedText>
             </TouchableOpacity>
 
@@ -355,7 +375,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(app)/fiches')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>📄</ThemedText>
+              <AppIcon name="rapport-fiche" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Mes fiches</ThemedText>
             </TouchableOpacity>
 
@@ -369,7 +389,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(app)/brouillons')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>📝</ThemedText>
+              <AppIcon name="modifier" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>
                 Brouillons{draftsCount > 0 ? ` (${draftsCount})` : ''}
               </ThemedText>
@@ -380,7 +400,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(traitement)/select')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>🚁</ThemedText>
+              <AppIcon name="aeronef-avion" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
             </TouchableOpacity>
 
@@ -394,13 +414,13 @@ export default function DashboardScreen() {
                 onPress={() => navigateTo('/(app)/equipes-aeriennes')}
                 activeOpacity={0.85}
               >
-                <ThemedText style={styles.quickTileIcon}>🛫</ThemedText>
+                <AppIcon name="utilisateurs" size={24} color={IFVM_GREEN} />
                 <ThemedText style={styles.quickTileText}>Équipes aériennes</ThemedText>
               </TouchableOpacity>
             )}
 
             <View style={[styles.quickTile, styles.quickTileDisabled]}>
-              <ThemedText style={styles.quickTileIcon}>🔔</ThemedText>
+              <AppIcon name="notifications" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Alertes</ThemedText>
               <ThemedText style={styles.quickTileSoon}>Bientôt disponible</ThemedText>
             </View>
@@ -451,6 +471,45 @@ export default function DashboardScreen() {
       </ScrollView>
 
       <NewFicheFab />
+
+      <MenuDrawer
+        visible={menuVisible}
+        onFermer={() => setMenuVisible(false)}
+        nom={`${user?.prenom ?? ''} ${user?.nom ?? ''}`.trim()}
+        email={user?.email}
+        role={user?.role ? libelleRole(user.role) : null}
+        navigation={[
+          { cle: 'equipes', libelle: 'Équipes', icone: 'utilisateurs', onPress: () => allerDepuisMenu('/(app)/equipes') },
+          ...(peutVoirEquipesAeriennes(user?.role)
+            ? [{ cle: 'sites', libelle: 'Sites', icone: 'sites' as const, onPress: () => allerDepuisMenu('/(app)/equipes-aeriennes') }]
+            : []),
+          { cle: 'referentiels', libelle: 'Référentiels', icone: 'referentiels', onPress: () => allerDepuisMenu('/(app)/sync') },
+        ]}
+        compte={[
+          { cle: 'profil', libelle: 'Profil', icone: 'profil', active: true, onPress: () => allerDepuisMenu('/(app)/profile') },
+          { cle: 'parametres', libelle: 'Paramètres', icone: 'parametres', onPress: () => allerDepuisMenu('/(app)/profile') },
+        ]}
+        onDeconnexion={() => {
+          setMenuVisible(false);
+          void logout();
+        }}
+      />
+
+      <EquipeSheet
+        visible={equipeSheetVisible}
+        equipes={equipes}
+        equipeId={courante?.id ?? null}
+        peutCreer={peutCreerEquipe(user?.role)}
+        onFermer={() => setEquipeSheetVisible(false)}
+        onConfirmer={(id) => {
+          void choisir(id);
+          setEquipeSheetVisible(false);
+        }}
+        onCreer={() => {
+          setEquipeSheetVisible(false);
+          navigateTo('/(app)/equipe-nouvelle');
+        }}
+      />
     </View>
   );
 }
@@ -534,8 +593,8 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       backgroundColor: HEADER_BG,
       paddingHorizontal: 16,
       paddingBottom: 20,
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
+      borderBottomLeftRadius: 22,
+      borderBottomRightRadius: 22,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.15,
@@ -543,13 +602,6 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       elevation: 8,
     },
     // Maquette « Hors-ligne » : pastille ambre à côté de « Disponible » (Figma 131:124).
-    equipeNote: {
-      marginHorizontal: 8,
-      marginBottom: 12,
-      fontSize: 10.5,
-      lineHeight: 15,
-      color: '#6F6A59',
-    },
     badgeOffline: {
       backgroundColor: '#FDF6E7',
       paddingHorizontal: 16,
@@ -570,12 +622,26 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       alignItems: 'center',
       marginTop: 12,
     },
+    logoWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
     logo: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      padding: 6,
+      width: 34,
+      height: 34,
+    },
+    menuButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 11,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     headerTextContainer: {
       flex: 1,
@@ -789,11 +855,15 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     quickTile: {
       width: '48%',
+      minHeight: 64,
       backgroundColor: CARD_BG,
-      borderRadius: 16,
-      paddingVertical: 22,
-      alignItems: 'center',
-      justifyContent: 'center',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#E7E0CD',
+      padding: 12,
+      gap: 8,
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
@@ -801,7 +871,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       elevation: 3,
     },
     quickTilePrimary: {
-      backgroundColor: IFVM_ORANGE,
+      backgroundColor: IFVM_GREEN,
     },
     quickTileDisabled: {
       opacity: 0.55,
@@ -814,13 +884,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontSize: typeSizes.quickTileText,
       fontWeight: '600',
       color: TEXT_DARK,
-      textAlign: 'center',
     },
     quickTileTextPrimary: {
       fontSize: typeSizes.quickTileTextPrimary,
       fontWeight: '700',
       color: '#FFFFFF',
-      textAlign: 'center',
     },
     quickTileSoon: {
       fontSize: typeSizes.quickTileSoon,
