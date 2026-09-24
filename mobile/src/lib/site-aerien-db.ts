@@ -1,5 +1,6 @@
 import { PreconditionError } from './errors';
 import { generateId } from './id';
+import { creerOutbox } from './outbox';
 import { getReferentielDb } from './referentiel-db';
 import { marquerVolEnEchec, tracerVolInstallation } from './vol-db';
 import {
@@ -140,10 +141,8 @@ export async function marquerSiteSynchronise(siteId: string): Promise<void> {
   });
 }
 
-export async function marquerSiteEnEchec(siteId: string): Promise<void> {
-  const db = await getReferentielDb();
-  await db.runAsync("UPDATE site_aerien SET statut_sync = 'echec' WHERE id = ?", [siteId]);
-}
+export const marquerSiteEnEchec = creerOutbox({ table: 'site_aerien', base: () => getReferentielDb() })
+  .marquerEnEchec;
 
 /** Déplacements à envoyer, dans l'ordre de saisie : chacun part de la position laissée par le précédent. */
 export async function listDeplacementsEnAttente(): Promise<DeplacementLocal[]> {
@@ -171,6 +170,8 @@ export async function marquerDeplacementSynchronise(deplacementId: string): Prom
   });
 }
 
+const outboxDeplacement = creerOutbox({ table: 'site_aerien_deplacement', base: () => getReferentielDb() });
+
 export async function marquerDeplacementEnEchec(deplacementId: string): Promise<void> {
   const db = await getReferentielDb();
   const ligne = await db.getFirstAsync<{ vol_json: string | null }>(
@@ -178,7 +179,7 @@ export async function marquerDeplacementEnEchec(deplacementId: string): Promise<
     [deplacementId]
   );
   await db.withTransactionAsync(async () => {
-    await db.runAsync("UPDATE site_aerien_deplacement SET statut_sync = 'echec' WHERE id = ?", [deplacementId]);
+    await outboxDeplacement.marquerEnEchec(deplacementId);
     // Le vol de mise en place voyage avec le déplacement : « Mes vols » doit dire qu'il est refusé aussi.
     if (ligne?.vol_json) await marquerVolEnEchec(lireVolJson(ligne.vol_json).id);
   });
