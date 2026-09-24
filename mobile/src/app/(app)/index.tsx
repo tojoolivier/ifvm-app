@@ -337,9 +337,6 @@ export default function DashboardScreen() {
         {showSyncBanner && (
           <Animated.View style={[styles.syncBanner, { opacity: fadeAnim }]}>
             <View style={styles.syncBannerContent}>
-              <View style={styles.syncBannerIcon}>
-                <ThemedText style={styles.syncBannerIconText}>📡</ThemedText>
-              </View>
               <View style={styles.syncBannerText}>
                 <ThemedText style={styles.syncBannerTitle}>
                   {pendingSyncCount} fiche(s) en attente
@@ -534,7 +531,7 @@ function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
             <View
               style={[
                 styles.weekChartBar,
-                { height, backgroundColor: d.isToday ? IFVM_GREEN : '#D9D3C7' },
+                { height, backgroundColor: d.isToday ? IFVM_GREEN : IFVM_GREEN_BG },
               ]}
             />
             <ThemedText style={[styles.weekChartLabel, d.isToday && styles.weekChartLabelToday]}>
@@ -560,7 +557,6 @@ const BASE_TYPE_SIZES = {
   badgeAvailableText: 12,
   chartTitle: 16,
   weekChartLabel: 12,
-  syncBannerIconText: 20,
   syncBannerTitle: 14,
   syncBannerSub: 11,
   syncBannerButtonText: 12,
@@ -592,7 +588,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     header: {
       backgroundColor: HEADER_BG,
       paddingHorizontal: 16,
-      paddingBottom: 20,
+      paddingBottom: 10,
       borderBottomLeftRadius: 22,
       borderBottomRightRadius: 22,
       shadowColor: '#000',
@@ -750,18 +746,6 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       flexDirection: 'row',
       alignItems: 'center',
     },
-    syncBannerIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: IFVM_ORANGE + '20',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
-    },
-    syncBannerIconText: {
-      fontSize: typeSizes.syncBannerIconText,
-    },
     syncBannerText: {
       flex: 1,
     },
@@ -851,10 +835,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     quickAccessGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 10,
+      justifyContent: 'space-between',
+      rowGap: 8,
     },
     quickTile: {
-      width: '48%',
+      width: '48.5%',
       minHeight: 64,
       backgroundColor: CARD_BG,
       borderRadius: 12,
