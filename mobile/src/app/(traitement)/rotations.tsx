@@ -641,6 +641,11 @@ export default function RotationsScreen() {
           <Text style={formStyles.label}>Surface traitée (ha)</Text>
           <Text style={formStyles.derivedValue}>{surfaceTraitee}</Text>
         </Card>
+        {/* #surface-traitee-et-protegee : toujours égale à « Surface traitée (ha) », en lecture seule. */}
+        <Card variant="derivee">
+          <Text style={formStyles.label}>Surface traitée et protégée (ha)</Text>
+          <Text style={formStyles.derivedValue}>{surfaceTraitee}</Text>
+        </Card>
         {store.aerien.repriseTraitement && (
           <Card variant="derivee">
             <Text style={formStyles.label}>Surface cumulée (ha)</Text>

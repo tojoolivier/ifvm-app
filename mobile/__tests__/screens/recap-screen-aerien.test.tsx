@@ -165,18 +165,58 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
   it('affiche la carte Impacts & risque (empoisonnement, évaluation, comportement, observations)', async () => {
     await render(<RecapScreen />);
 
-    await screen.findByText('Empoisonnement');
+    // #recap-impacts-risque-ordonne : sous-sections, une ligne par information.
+    await screen.findByText("Cas d'empoisonnement");
+    expect(screen.getByText('Empoisonnement')).toBeVisible(); // titre de sous-section
     expect(screen.getByText('Agent')).toBeVisible();
     expect(screen.getByText('Inhalation')).toBeVisible();
-    expect(screen.getByText('Ressources en eau : Oui · Sol : Non')).toBeVisible();
+    expect(screen.getByText('Évaluation du risque')).toBeVisible();
+    expect(screen.getByText('Ressources en eau')).toBeVisible();
+    expect(screen.getByText('Sol')).toBeVisible();
+    // Axes non évalués : « non renseigné », jamais masqués.
+    expect(screen.getByText('Faune non cible')).toBeVisible();
+    expect(screen.getByText('Abeilles/pollinisateurs')).toBeVisible();
+    expect(screen.getByText('Comportement et mortalité')).toBeVisible();
     expect(screen.getByText('Oiseaux, Poissons')).toBeVisible();
+    expect(screen.getByText('Observations')).toBeVisible();
     expect(screen.getByText('RAS')).toBeVisible();
+    // Ordre identique à l'écran de saisie (impacts.tsx).
+    const rendu = JSON.stringify(screen.toJSON());
+    const ordre = ["Cas d'empoisonnement", 'Évaluation du risque', 'Comportement et mortalité', 'Observations'].map((t) =>
+      rendu.indexOf(t)
+    );
+    expect(ordre).toEqual([...ordre].sort((a, b) => a - b));
+  });
+
+  // #surface-traitee-et-protegee : ligne sous « Surface traitée (ha) », toujours égale à elle.
+  it('affiche « Surface traitée et protégée (ha) » sous « Surface traitée (ha) », avec la même valeur', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({ ...DRAFT_AERIEN, mode_traitement: 'TOTAL' });
+
+    await render(<RecapScreen />);
+
+    await screen.findByText('Surface traitée et protégée (ha)');
+    expect(screen.getAllByText('100')).toHaveLength(2); // traitée + traitée et protégée
+    const rendu = JSON.stringify(screen.toJSON());
+    expect(rendu.indexOf('Surface traitée (ha)')).toBeLessThan(rendu.indexOf('Surface traitée et protégée (ha)'));
+  });
+
+  it('en mode barrière, « Surface traitée et protégée (ha) » reprend toujours la valeur de « Surface traitée »', async () => {
+    await render(<RecapScreen />); // fixture par défaut : mode BARRIERE
+
+    await screen.findByText('Surface traitée et protégée (ha)');
+    expect(screen.getAllByText('100').length).toBeGreaterThanOrEqual(1);
   });
 
   it('affiche la carte Évaluation du risque pour la population', async () => {
     await render(<RecapScreen />);
 
-    expect(await screen.findByText('Rizière · 1.5 km · sensibilisée')).toBeVisible();
+    expect(await screen.findByText('Évaluation du risque pour la population')).toBeVisible();
+    expect(screen.getByText('Évaluation 1')).toBeVisible();
+    expect(screen.getByText('Habitat le plus proche')).toBeVisible();
+    expect(screen.getByText('Rizière')).toBeVisible();
+    expect(screen.getByText('Distance (km)')).toBeVisible();
+    expect(screen.getByText('1.5')).toBeVisible();
+    expect(screen.getByText('Sensibilisation')).toBeVisible();
   });
 
   it('affiche les dates d’installation du Stand et de la Base secondaire, et les surfaces cumulée/restante', async () => {
