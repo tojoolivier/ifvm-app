@@ -1,6 +1,6 @@
 import type React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { api } from '../api/client'
@@ -62,9 +62,10 @@ const prospections = [
   },
 ]
 
-function renderPage(initialPath = '/carte', data: unknown[] = prospections) {
+function renderPage(initialPath = '/carte', data: unknown[] = prospections, traitementsData: unknown[] = []) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections') return Promise.resolve({ data })
+    if (url === '/traitements') return Promise.resolve({ data: traitementsData })
     if (url === '/campagnes') return Promise.resolve({ data: campagnes })
     if (url === '/stations') return Promise.resolve({ data: stations })
     return Promise.resolve({ data: [] })
@@ -134,6 +135,32 @@ describe('CartePage — carte des infestations (#17)', () => {
     expect(screen.getAllByTestId('marker')).toHaveLength(2)
     expect(screen.getByText('Surface infestée : 30 ha')).toBeInTheDocument()
     expect(screen.getByText('Prospection extensive')).toBeInTheDocument()
+  })
+
+  it('affiche les surfaces traitées sur la carte et permet de masquer cette couche', async () => {
+    renderPage('/carte', prospections, [
+      {
+        id: 't1',
+        prospection_id: 'p1',
+        numero_fiche: 'T-001',
+        type_traitement: 'AERIEN',
+        mode_traitement: 'TOTAL',
+        date_traitement: '2026-09-10',
+        latitude: -19.5,
+        longitude: 46.5,
+        aerien: { surface_traitee_ha: 40, surface_protegee_ha: 0, surface_restante_ha: 10 },
+        terrestre: null,
+      },
+    ])
+    await waitFor(() => expect(screen.getByText(/1 surface traitée/)).toBeInTheDocument())
+
+    // 1 marqueur d'infestation (p1) + 1 marqueur de surface traitée.
+    expect(screen.getAllByTestId('marker')).toHaveLength(2)
+    expect(screen.getByText('Surface traitée : 40 ha')).toBeInTheDocument()
+    expect(screen.getByText('Surface restante : 10 ha')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Surfaces traitées'))
+    expect(screen.getAllByTestId('marker')).toHaveLength(1)
   })
 
   it('navigue vers la fiche au clic sur un marqueur', async () => {

@@ -5,6 +5,7 @@
 // cartographiée dès qu'elle a une position.
 
 import { comportementInfestationLabel, typeCibleLabel, type InfestationRead } from './prospection-fiche-lecture'
+import { libelleSurfaceTraitee, surfaceTraiteeOuProtegee } from './traitement-fiche'
 
 export interface CarteStation {
   id: string
@@ -153,6 +154,96 @@ export function buildCarteMarkers<T extends CarteProspection>(
       typeProspection: p.type_prospection ?? null,
       infestations: buildInfestationLignes(p.infestations),
       surfaceTotale: surfaceFiche ?? sommeSurfaces(p.infestations),
+    })
+  }
+
+  return markers
+}
+
+// ---------------------------------------------------------------------------
+// Surfaces traitées : un marqueur par fiche de traitement (aérien ou terrestre)
+// qui a traité ou protégé une surface (> 0).
+// ---------------------------------------------------------------------------
+
+type Surface = number | string | null
+
+export interface CarteTraitement {
+  id: string
+  prospection_id: string
+  numero_fiche: string
+  type_traitement: string
+  mode_traitement: string | null
+  date_traitement: string
+  latitude: number | null
+  longitude: number | null
+  aerien: { surface_traitee_ha?: Surface; surface_protegee_ha?: Surface; surface_restante_ha?: Surface } | null
+  terrestre: { surface_traitee_ha?: Surface; surface_protegee_ha?: Surface; surface_restante_ha?: Surface } | null
+}
+
+export interface TraitementMarker {
+  traitementId: string
+  latitude: number
+  longitude: number
+  numeroFiche: string
+  typeTraitement: string
+  modeTraitement: string | null
+  dateTraitement: string
+  /** « Traitée » (produit de choc) ou « Protégée » (produit de barrière). */
+  libelleSurface: 'Traitée' | 'Protégée'
+  surfaceHa: number
+  surfaceRestanteHa: number | null
+}
+
+function enNombre(valeur: Surface | undefined): number | null {
+  if (valeur == null || valeur === '') return null
+  const nombre = typeof valeur === 'number' ? valeur : Number(valeur)
+  return Number.isFinite(nombre) ? nombre : null
+}
+
+/**
+ * Un marqueur par traitement dont la surface traitée (ou protégée, en mode barrière) est
+ * > 0. Position : coordonnées propres au traitement, sinon celles de la fiche de
+ * prospection liée (ponctuelles, puis station). Sans position exploitable, il est ignoré.
+ */
+export function buildTraitementMarkers(
+  traitements: CarteTraitement[],
+  prospections: CarteProspection[],
+  stations: CarteStation[],
+): TraitementMarker[] {
+  const prospectionMap = new Map(prospections.map((p) => [p.id, p]))
+  const stationMap = new Map(stations.map((s) => [s.id, s]))
+  const markers: TraitementMarker[] = []
+
+  for (const t of traitements) {
+    const surfaceHa = enNombre(surfaceTraiteeOuProtegee(t))
+    if (surfaceHa == null || surfaceHa <= 0) continue
+
+    let latitude = t.latitude
+    let longitude = t.longitude
+    if (latitude == null || longitude == null) {
+      const prospection = prospectionMap.get(t.prospection_id)
+      latitude = prospection?.latitude ?? null
+      longitude = prospection?.longitude ?? null
+      if ((latitude == null || longitude == null) && prospection?.station_id) {
+        const station = stationMap.get(prospection.station_id)
+        latitude = station?.latitude ?? null
+        longitude = station?.longitude ?? null
+      }
+    }
+    if (latitude == null || longitude == null) continue
+
+    const specialisation = t.terrestre ?? t.aerien
+    markers.push({
+      traitementId: t.id,
+      latitude,
+      longitude,
+      numeroFiche: t.numero_fiche,
+      typeTraitement: t.type_traitement,
+      modeTraitement: t.mode_traitement,
+      dateTraitement: t.date_traitement,
+      libelleSurface: libelleSurfaceTraitee(t),
+      surfaceHa,
+      surfaceRestanteHa: enNombre(specialisation?.surface_restante_ha),
     })
   }
 

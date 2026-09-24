@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
@@ -15,7 +15,15 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import type { InfestationRead } from '@/lib/prospection-fiche-lecture'
-import { buildCarteMarkers, filterProspectionsForCarte, type SeveriteNiveau } from '@/lib/prospection-carte'
+import {
+  buildCarteMarkers,
+  buildTraitementMarkers,
+  filterProspectionsForCarte,
+  type CarteTraitement,
+  type SeveriteNiveau,
+} from '@/lib/prospection-carte'
+import { MODE_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
+import { formatSurface } from '@/lib/traitement-fiche'
 import { STATUTS, STATUT_LABELS } from '@/components/ui/status-badge'
 
 interface Campagne {
@@ -55,6 +63,10 @@ const SEVERITE_LABELS: Record<SeveriteNiveau, string> = {
   moyenne: 'Moyenne',
   forte: 'Forte',
 }
+
+// Surfaces traitées : bleu, trait épais et centre translucide — distinct des points
+// d'infestation (jaune→rouge, pleins) pour que les deux couches restent lisibles ensemble.
+const TRAITEMENT_STYLE = { color: '#2563eb', radius: 10 }
 
 const MADAGASCAR_CENTER: [number, number] = [-19, 47]
 
@@ -105,6 +117,30 @@ export function CartePage() {
   )
 
   const markers = useMemo(() => buildCarteMarkers(filtered, stations), [filtered, stations])
+
+  const { data: traitements = [] } = useQuery<CarteTraitement[]>({
+    queryKey: ['traitements', 'carte'],
+    queryFn: () => api.get('/traitements').then((r) => r.data),
+  })
+
+  // Les filtres campagne/station portent sur la fiche de prospection d'origine : un
+  // traitement suit sa prospection. Le statut est celui de la prospection — pas de
+  // filtre équivalent côté traitement.
+  const traitementMarkers = useMemo(() => {
+    const prospectionsVisibles = filterProspectionsForCarte(prospections, {
+      campagneId: filtreCampagne || undefined,
+      stationId: filtreStationId || undefined,
+    })
+    const idsVisibles = new Set(prospectionsVisibles.map((p) => p.id))
+    const traitementsVisibles =
+      filtreCampagne || filtreStationId
+        ? traitements.filter((t) => idsVisibles.has(t.prospection_id))
+        : traitements
+    return buildTraitementMarkers(traitementsVisibles, prospections, stations)
+  }, [traitements, prospections, stations, filtreCampagne, filtreStationId])
+
+  const [afficherInfestations, setAfficherInfestations] = useState(true)
+  const [afficherTraitements, setAfficherTraitements] = useState(true)
 
   const hasFiltres = filtreStatut || filtreCampagne || filtreStationId
 
@@ -169,6 +205,26 @@ export function CartePage() {
             </Button>
           )}
 
+          <fieldset className="flex items-center gap-4 text-sm">
+            <legend className="sr-only">Couches affichées</legend>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={afficherInfestations}
+                onChange={(e) => setAfficherInfestations(e.target.checked)}
+              />
+              Infestations
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={afficherTraitements}
+                onChange={(e) => setAfficherTraitements(e.target.checked)}
+              />
+              Surfaces traitées
+            </label>
+          </fieldset>
+
           <div className="flex items-center gap-4 ml-auto text-xs text-muted-foreground">
             {(Object.keys(SEVERITE_LABELS) as SeveriteNiveau[]).map((s) => (
               <span key={s} className="flex items-center gap-1.5">
@@ -183,6 +239,13 @@ export function CartePage() {
                 {SEVERITE_LABELS[s]}
               </span>
             ))}
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block rounded-full border-2"
+                style={{ borderColor: TRAITEMENT_STYLE.color, width: 12, height: 12 }}
+              />
+              Surface traitée
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -193,6 +256,9 @@ export function CartePage() {
         <>
           <p className="text-sm text-muted-foreground mb-3">
             {markers.length} fiche{markers.length > 1 ? 's' : ''} avec infestation
+            {' · '}
+            {traitementMarkers.length} surface{traitementMarkers.length > 1 ? 's' : ''} traitée
+            {traitementMarkers.length > 1 ? 's' : ''}
           </p>
           <Card className="flex-1 overflow-hidden">
             <CardContent className="p-0 h-full min-h-[480px]">
@@ -201,7 +267,47 @@ export function CartePage() {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {markers.map((marker) => (
+                {afficherTraitements &&
+                  traitementMarkers.map((marker) => (
+                    <CircleMarker
+                      key={`traitement-${marker.traitementId}`}
+                      center={[marker.latitude, marker.longitude]}
+                      radius={TRAITEMENT_STYLE.radius}
+                      pathOptions={{
+                        color: TRAITEMENT_STYLE.color,
+                        fillColor: TRAITEMENT_STYLE.color,
+                        fillOpacity: 0.25,
+                        weight: 3,
+                      }}
+                      eventHandlers={{
+                        click: () => navigate(`/traitements/${marker.traitementId}`),
+                      }}
+                    >
+                      <Popup>
+                        <div className="text-sm">
+                          <p className="font-semibold">{marker.numeroFiche}</p>
+                          <p>
+                            Traitement {(TYPE_LABELS[marker.typeTraitement] ?? marker.typeTraitement).toLowerCase()}
+                            {marker.modeTraitement ? ` — ${MODE_LABELS[marker.modeTraitement] ?? marker.modeTraitement}` : ''}
+                          </p>
+                          <p>Date : {marker.dateTraitement}</p>
+                          <p>
+                            Surface {marker.libelleSurface.toLowerCase()} : {formatSurface(marker.surfaceHa)} ha
+                          </p>
+                          {marker.surfaceRestanteHa != null && (
+                            <p>Surface restante : {formatSurface(marker.surfaceRestanteHa)} ha</p>
+                          )}
+                          <button
+                            className="text-primary underline"
+                            onClick={() => navigate(`/traitements/${marker.traitementId}`)}
+                          >
+                            Voir le traitement
+                          </button>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  ))}
+                {afficherInfestations && markers.map((marker) => (
                   <CircleMarker
                     key={marker.prospectionId}
                     center={[marker.latitude, marker.longitude]}
