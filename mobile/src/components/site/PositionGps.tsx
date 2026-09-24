@@ -118,9 +118,9 @@ export function PositionGps({ position, onChange, libelleCapture = 'Capturer ma 
 const styles = StyleSheet.create({
   carte: { padding: 8.5, gap: 8, borderRadius: 13, borderWidth: 1.5, borderColor: EQ.vert, backgroundColor: EQ.carte },
   bouton: { height: 36, borderRadius: 11, backgroundColor: EQ.vertDoux, alignItems: 'center', justifyContent: 'center' },
-  boutonTexte: { fontSize: 12, fontWeight: '700', color: EQ.vert },
+  boutonTexte: { fontSize: 13, fontWeight: '700', color: EQ.vert },
   ligne: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  etiquette: { marginBottom: 3, fontSize: 9, fontWeight: '600', color: EQ.attenue },
+  etiquette: { marginBottom: 3, fontSize: 10.5, fontWeight: '600', color: EQ.attenue },
   saisie: {
     height: 32,
     paddingHorizontal: 7,
@@ -128,12 +128,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: EQ.bordure,
     backgroundColor: EQ.fond,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: Fonts.mono,
     color: EQ.encre,
   },
   precision: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   point: { width: 6, height: 6, borderRadius: 3, backgroundColor: EQ.vertPoint },
-  precisionTexte: { fontSize: 9, fontWeight: '500', color: EQ.vert },
+  precisionTexte: { fontSize: 10.5, fontWeight: '500', color: EQ.vert },
 });

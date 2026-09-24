@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   ligne: { flexDirection: 'row', gap: 8 },
   numero: { width: 76 },
   localite: { flex: 1 },
-  etiquette: { marginBottom: 4, fontSize: 10, fontWeight: '600', color: EQ.attenue },
+  etiquette: { marginBottom: 4, fontSize: 10.5, fontWeight: '600', color: EQ.attenue },
   saisie: {
     height: 36,
     paddingHorizontal: 11,
@@ -115,6 +115,6 @@ const styles = StyleSheet.create({
   caseCochee: { backgroundColor: EQ.vert, borderColor: EQ.vert },
   coche: { fontSize: 12, fontWeight: '700', color: EQ.surMarque, lineHeight: 14 },
   caseTexte: { flex: 1, gap: 1 },
-  caseLibelle: { fontSize: 11, fontWeight: '600', color: EQ.encre },
-  caseDetail: { fontSize: 9, fontWeight: '500', color: EQ.etiquette },
+  caseLibelle: { fontSize: 12.5, fontWeight: '600', color: EQ.encre },
+  caseDetail: { fontSize: 10.5, fontWeight: '500', color: EQ.etiquette },
 });
