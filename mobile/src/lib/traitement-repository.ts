@@ -1,4 +1,5 @@
 import { getDb } from './prospection-db';
+import { creerOutbox } from './outbox';
 import { generateId } from './id';
 import { composerNumeroFiche } from './traitement-numero-fiche';
 import { PreconditionError } from './errors';
@@ -1511,15 +1512,11 @@ export async function markTraitementConflict(
  * Pendant de {@link markProspectionEchec} côté traitement : même règle, même
  * motif journalisé plutôt que stocké en colonne.
  */
-export async function markTraitementEchec(id: string): Promise<void> {
-  const db = await getDb();
-  const now = new Date().toISOString();
-
-  await db.runAsync(
-    `UPDATE traitement SET statut_sync = 'echec', updated_at = ? WHERE id = ?`,
-    [now, id]
-  );
-}
+export const markTraitementEchec = creerOutbox({
+  table: 'traitement',
+  base: () => getDb(),
+  horodate: true,
+}).marquerEnEchec;
 
 export async function countUnsyncedTraitements(): Promise<number> {
   const db = await getDb();
