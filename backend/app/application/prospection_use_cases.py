@@ -150,7 +150,7 @@ class CreateProspection:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
 
         await _verifier_stades(self.repository, captures)
-        valider_surfaces_prospection(surface_prospectee, surface_infestee)
+        valider_surfaces_prospection(surface_prospectee, surface_infestee, surface_station)
 
         now = datetime.utcnow()
         # Une fiche de validation / signalisation NEUVE (jamais une
@@ -608,7 +608,11 @@ class UpdateProspection:
         if signature_chef_base_image is not None:
             prospection.signature_chef_base_image = signature_chef_base_image
 
-        valider_surfaces_prospection(prospection.surface_prospectee, prospection.surface_infestee)
+        valider_surfaces_prospection(
+            prospection.surface_prospectee,
+            prospection.surface_infestee,
+            prospection.surface_station,
+        )
         prospection.updated_at = datetime.utcnow()
 
         return await self.repository.update(prospection)
