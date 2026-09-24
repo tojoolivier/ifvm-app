@@ -262,6 +262,12 @@ export async function listEquipesDeUtilisateur(userId: string): Promise<EquipeLo
   );
 }
 
+/** Toutes les équipes actives : l'administrateur choisit son équipe de travail sans en être membre. */
+export async function listToutesEquipes(): Promise<EquipeLocale[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<EquipeLocale>(`${SELECT_EQUIPE_LOCALE} WHERE e.actif = 1 ORDER BY e.nom`);
+}
+
 /** Une équipe par id, active ou non — un brouillon garde l'équipe d'origine même désactivée depuis. */
 export async function getEquipeLocale(id: string): Promise<EquipeLocale | null> {
   const db = await getReferentielDb();

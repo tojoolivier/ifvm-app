@@ -9,6 +9,7 @@ import {
   listCodesStades,
   getStationById,
   listEquipesDeUtilisateur,
+  listToutesEquipes,
   getEquipeLocale,
 } from '../src/lib/referentiel-db';
 
@@ -300,6 +301,17 @@ describe('équipes de travail', () => {
     expect(sql).toContain('actif = 1');
     expect(sql).toContain('equipe_membre');
     expect(params).toEqual(['u-1']);
+  });
+
+  it('liste toutes les équipes actives, sans filtre d’appartenance (administrateur)', async () => {
+    const lignes = [{ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 }];
+    await getReferentielDb();
+    getAllAsync.mockResolvedValueOnce(lignes);
+
+    expect(await listToutesEquipes()).toEqual(lignes);
+    const [sql] = getAllAsync.mock.calls[getAllAsync.mock.calls.length - 1];
+    expect(sql).toContain('actif = 1');
+    expect(sql).not.toContain('EXISTS');
   });
 
   it('résout une équipe par id, active ou non, et renvoie null si elle est inconnue', async () => {

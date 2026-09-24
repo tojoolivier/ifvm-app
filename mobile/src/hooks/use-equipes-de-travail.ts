@@ -2,16 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/auth-store';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
-import { EquipeLocale, listEquipesDeUtilisateur } from '@/lib/referentiel-db';
+import { EquipeLocale, listEquipesDeUtilisateur, listToutesEquipes } from '@/lib/referentiel-db';
 
 /**
  * Équipes de l'agent connecté et équipe de travail courante (#641), lues dans le référentiel local
  * — utilisable hors-ligne. Choisit toute seule l'unique équipe d'un agent qui n'en a qu'une, et
- * oublie une équipe dont l'agent n'est plus membre : sans quoi les nouvelles saisies resteraient
+ * oublie une équipe dont l'agent n'est plus membre (un administrateur, lui, voit toutes les équipes) : sans quoi les nouvelles saisies resteraient
  * rattachées à une équipe que l'écran ne montre plus.
  */
 export function useEquipesDeTravail() {
   const userId = useAuthStore((s) => s.user?.id);
+  const estAdmin = useAuthStore((s) => s.user?.role) === 'admin';
   const equipeId = useEquipeTravailStore((s) => s.equipeId);
   const isInitialized = useEquipeTravailStore((s) => s.isInitialized);
   const setEquipe = useEquipeTravailStore((s) => s.setEquipe);
@@ -26,18 +27,23 @@ export function useEquipesDeTravail() {
     setIsLoaded(true);
   }, []);
 
+  const lireEquipes = useCallback(
+    () => (estAdmin ? listToutesEquipes() : listEquipesDeUtilisateur(userId as string)),
+    [estAdmin, userId]
+  );
+
   /** Relit le référentiel local — ex. au retour sur l'écran, après une synchro. */
   const recharger = useCallback(() => {
     if (!userId) return;
-    listEquipesDeUtilisateur(userId)
+    lireEquipes()
       .then(appliquer)
       .catch((error) => signalerChargement(error, { source: 'listEquipesDeUtilisateur' }));
-  }, [userId, appliquer, signalerChargement]);
+  }, [userId, lireEquipes, appliquer, signalerChargement]);
 
   useEffect(() => {
     if (!userId) return;
     let annule = false;
-    listEquipesDeUtilisateur(userId)
+    lireEquipes()
       .then((lignes) => {
         if (!annule) appliquer(lignes);
       })
@@ -45,7 +51,7 @@ export function useEquipesDeTravail() {
     return () => {
       annule = true;
     };
-  }, [userId, appliquer, signalerChargement]);
+  }, [userId, lireEquipes, appliquer, signalerChargement]);
 
   useEffect(() => {
     if (!userId || !isLoaded || !isInitialized) return;
