@@ -21,9 +21,9 @@ import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
-import { peutCreerEquipe, peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
+import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
 import { EquipeChip } from '@/components/equipe/EquipeChip';
-import { EquipeSheet } from '@/components/equipe/EquipeSheet';
+import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
 import { MenuDrawer } from '@/components/menu/MenuDrawer';
 import { entreesNavigation } from '@/lib/menu-navigation';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -130,10 +130,10 @@ export default function DashboardScreen() {
   const [isOffline, setIsOffline] = useState(false);
   // #641 : équipe de travail — carte de l'Accueil, relue au retour sur l'écran (après un changement
   // dans Paramètres ou une synchro du référentiel).
-  const { equipes, courante, choisir, recharger } = useEquipesDeTravail();
+  const { courante, recharger } = useEquipesDeTravail();
+  const ouvrirChoixEquipe = useEquipeSheetStore((s) => s.ouvrir);
   const logout = useAuthStore((s) => s.logout);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [equipeSheetVisible, setEquipeSheetVisible] = useState(false);
   useFocusEffect(
     useCallback(() => {
       recharger();
@@ -308,7 +308,7 @@ export default function DashboardScreen() {
             </View>
 
             {/* Équipe active (#641) — Figma « EquipeChip » */}
-            <EquipeChip equipe={courante} onChanger={() => setEquipeSheetVisible(true)} />
+            <EquipeChip equipe={courante} onChanger={ouvrirChoixEquipe} />
           </Animated.View>
         </SafeAreaView>
       </View>
@@ -493,22 +493,6 @@ export default function DashboardScreen() {
             { text: 'Annuler', style: 'cancel' },
             { text: 'Se déconnecter', style: 'destructive', onPress: () => void logout() },
           ]);
-        }}
-      />
-
-      <EquipeSheet
-        visible={equipeSheetVisible}
-        equipes={equipes}
-        equipeId={courante?.id ?? null}
-        peutCreer={peutCreerEquipe(user?.role)}
-        onFermer={() => setEquipeSheetVisible(false)}
-        onConfirmer={(id) => {
-          void choisir(id);
-          setEquipeSheetVisible(false);
-        }}
-        onCreer={() => {
-          setEquipeSheetVisible(false);
-          navigateTo('/(app)/equipe-nouvelle');
         }}
       />
     </View>

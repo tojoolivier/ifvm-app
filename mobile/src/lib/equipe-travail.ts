@@ -28,3 +28,19 @@ export async function equipeDeTravailPour(typeAttendu: TypeEquipe): Promise<stri
   }
   return equipeId;
 }
+
+/**
+ * Pourquoi une saisie exigeant une équipe `requis` n'est pas possible avec l'équipe de travail
+ * courante, ou `null` si elle l'est. Sans équipe choisie rien n'est bloqué (saisie hors-ligne, #641).
+ * Sert aux écrans qui grisent l'action au lieu de laisser `equipeDeTravailPour` lever une erreur :
+ * la phrase invite à changer d'équipe (`useEquipeSheetStore.ouvrir`).
+ */
+export function motifEquipeIncompatible(
+  requis: TypeEquipe,
+  courante: { nom: string; type: TypeEquipe } | null
+): string | null {
+  if (!courante || courante.type === requis) return null;
+  const attendue = requis === 'terrestre' ? 'terrestre' : 'aérienne';
+  const actuelle = courante.type === 'terrestre' ? 'terrestre' : 'aérienne';
+  return `Demande une équipe ${attendue} — « ${courante.nom} » est ${actuelle}. Touchez pour changer d'équipe.`;
+}

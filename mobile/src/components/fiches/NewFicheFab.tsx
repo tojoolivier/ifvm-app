@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
-import { peutCreerEquipe, peutSaisirVols } from '@/lib/equipe-aerienne-access';
-import type { TypeEquipe } from '@/lib/equipe-travail';
+import { peutSaisirVols } from '@/lib/equipe-aerienne-access';
+import { motifEquipeIncompatible } from '@/lib/equipe-travail';
+import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
-import { EquipeSheet } from '@/components/equipe/EquipeSheet';
 import { AppIcon, type AppIconName } from '@/components/ui/AppIcon';
 import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
@@ -18,18 +18,6 @@ const PROSPECTION_DESTINATIONS = {
   intensive: '/(prospection)/reference',
   extensive: '/(prospection)/extensive-reference',
 } as const;
-
-/**
- * Motif d'indisponibilité d'une action selon l'équipe de travail courante, ou `null` si elle est
- * permise. Sans équipe choisie rien n'est bloqué (saisie hors-ligne, #641) ; un CRT se mène avec
- * les deux types d'équipe.
- */
-function motifIndisponible(requis: TypeEquipe, courante: { nom: string; type: TypeEquipe } | null): string | null {
-  if (!courante || courante.type === requis) return null;
-  const attendu = requis === 'terrestre' ? 'terrestres' : 'aériennes';
-  const actuel = courante.type === 'aerien' ? 'aérienne' : 'terrestre';
-  return `Réservé aux équipes ${attendu} — « ${courante.nom} » est ${actuel}. Touchez pour changer d'équipe.`;
-}
 
 /**
  * Bouton flottant "+ Nouvelle fiche" mutualisé — extrait de l'accueil ((app)/index.tsx)
@@ -48,13 +36,13 @@ export function NewFicheFab() {
   const { run: runQuickStart, isRunning: isStartingProspection } = useAsyncAction();
   const [menuVisible, setMenuVisible] = useState(false);
   const [etape, setEtape] = useState<'choix' | 'prospection'>('choix');
-  const [equipeSheetVisible, setEquipeSheetVisible] = useState(false);
-  const { equipes, courante, choisir } = useEquipesDeTravail();
+  const ouvrirChoixEquipe = useEquipeSheetStore((s) => s.ouvrir);
+  const { courante } = useEquipesDeTravail();
   // Seule l'intensive est toujours terrestre. L'extensive et la validation se mènent aussi en mode
   // aérien : c'est leur écran de choix du mode qui vérifie l'équipe (#641) — la prospection dans son
   // ensemble n'est donc jamais bloquée.
-  const motifTerrestre = motifIndisponible('terrestre', courante);
-  const motifVol = motifIndisponible('aerien', courante);
+  const motifTerrestre = motifEquipeIncompatible('terrestre', courante);
+  const motifVol = motifEquipeIncompatible('aerien', courante);
 
   // Deux Modal ne se superposent pas proprement sur iOS : on ferme le menu avant d'ouvrir la feuille.
   const fermerMenu = () => {
@@ -67,7 +55,7 @@ export function NewFicheFab() {
   };
   const changerEquipe = () => {
     fermerMenu();
-    setEquipeSheetVisible(true);
+    ouvrirChoixEquipe();
   };
 
   const startQuickProspection = (typeProspection: 'intensive') => {
@@ -201,22 +189,6 @@ export function NewFicheFab() {
           </View>
         </TouchableOpacity>
       </Modal>
-
-      <EquipeSheet
-        visible={equipeSheetVisible}
-        equipes={equipes}
-        equipeId={courante?.id ?? null}
-        peutCreer={peutCreerEquipe(user?.role)}
-        onFermer={() => setEquipeSheetVisible(false)}
-        onConfirmer={(id) => {
-          void choisir(id);
-          setEquipeSheetVisible(false);
-        }}
-        onCreer={() => {
-          setEquipeSheetVisible(false);
-          router.push('/(app)/equipe-nouvelle' as any);
-        }}
-      />
     </>
   );
 }

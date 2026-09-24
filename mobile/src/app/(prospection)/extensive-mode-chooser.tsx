@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
-import { peutCreerEquipe } from '@/lib/equipe-aerienne-access';
-import { EquipeSheet } from '@/components/equipe/EquipeSheet';
+import { motifEquipeIncompatible } from '@/lib/equipe-travail';
+import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { setProspectionModeExtensif } from '@/lib/prospection-repository';
@@ -42,20 +42,19 @@ export default function ExtensiveModeChooserScreen() {
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const { run, isRunning: isCreating } = useAsyncAction();
-  const [mode, setMode] = useState<ModeExtensif | null>(null);
-  const [equipeSheetVisible, setEquipeSheetVisible] = useState(false);
-  const { equipes, courante, choisir } = useEquipesDeTravail();
+  const [modeChoisi, setMode] = useState<ModeExtensif | null>(null);
+  const ouvrirChoixEquipe = useEquipeSheetStore((s) => s.ouvrir);
+  const { courante } = useEquipesDeTravail();
 
   // Même principe que le menu « Nouvelle fiche » : un mode incompatible avec l'équipe de travail
   // n'est pas une erreur, c'est une invitation à changer d'équipe. Valable aussi pour une validation,
   // dont le brouillon reprend l'équipe courante au moment où son mode est fixé.
-  const motifPour = (voulu: ModeExtensif): string | null => {
-    if (!courante || courante.type === voulu) return null;
-    const attendue = voulu === 'aerien' ? 'aérienne' : 'terrestre';
-    return `Demande une équipe ${attendue} — « ${courante.nom} » est ${courante.type === 'aerien' ? 'aérienne' : 'terrestre'}. Touchez pour changer d'équipe.`;
-  };
+  const motifPour = (voulu: ModeExtensif) => motifEquipeIncompatible(voulu, courante);
+  // Un changement d'équipe (feuille globale) peut rendre le mode déjà choisi incompatible : il est
+  // alors ignoré plutôt que reporté sur une équipe qui ne lui convient pas.
+  const mode = modeChoisi && !motifPour(modeChoisi) ? modeChoisi : null;
   const choisirMode = (voulu: ModeExtensif) => {
-    if (motifPour(voulu)) setEquipeSheetVisible(true);
+    if (motifPour(voulu)) ouvrirChoixEquipe();
     else setMode(voulu);
   };
 
@@ -131,23 +130,6 @@ export default function ExtensiveModeChooserScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-
-      <EquipeSheet
-        visible={equipeSheetVisible}
-        equipes={equipes}
-        equipeId={courante?.id ?? null}
-        peutCreer={peutCreerEquipe(user?.role)}
-        onFermer={() => setEquipeSheetVisible(false)}
-        onConfirmer={(id) => {
-          void choisir(id);
-          setEquipeSheetVisible(false);
-          setMode(null);
-        }}
-        onCreer={() => {
-          setEquipeSheetVisible(false);
-          router.push('/(app)/equipe-nouvelle' as any);
-        }}
-      />
     </View>
   );
 }
