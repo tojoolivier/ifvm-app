@@ -38,3 +38,12 @@ export function peutCreerLieuAerien(role: UserRole | null | undefined): boolean 
 export function peutCreerEquipe(role: UserRole | null | undefined): boolean {
   return role === 'chef_de_base' || role === 'chef_equipe' || role === 'admin';
 }
+
+/**
+ * Le parc aéronefs (créer un appareil, affecter, terminer une affectation) est réservé à
+ * l'administrateur (#642) : les autres rôles le consultent seulement. Les boutons sont masqués,
+ * pas seulement refusés par l'API (`POST /aeronefs` exige `require_admin`).
+ */
+export function peutGererParcAeronefs(role: UserRole | null | undefined): boolean {
+  return role === 'admin';
+}

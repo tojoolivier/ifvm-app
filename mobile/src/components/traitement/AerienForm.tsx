@@ -9,6 +9,8 @@ import { useFormStyles } from '@/components/traitement/TraitementFormStyles';
 export interface AerienFormProps {
   readOnly: boolean;
   chefsDeBase: UtilisateurEquipe[];
+  /** Aéronefs affectés à l'équipe à la date de saisie (#642) : proposés en choix rapide si plusieurs. */
+  aeronefsEquipe?: { immatriculation: string }[];
   errors: Record<string, string>;
 }
 
@@ -37,6 +39,7 @@ export interface AerienFormProps {
 export function AerienForm({
   readOnly,
   chefsDeBase,
+  aeronefsEquipe = [],
   errors,
 }: AerienFormProps) {
   const store = useTraitementCaptureStore();
@@ -82,6 +85,18 @@ export function AerienForm({
       {errors.aerien && <Text style={styles.error}>{errors.aerien}</Text>}
 
       <Text style={styles.label}>Immatriculation aéronef *</Text>
+      {aeronefsEquipe.length > 1 && (
+        <View style={styles.chipRow}>
+          {aeronefsEquipe.map((a) => (
+            <Chip
+              key={a.immatriculation}
+              label={a.immatriculation}
+              selected={store.aerien.immatriculationAeronef === a.immatriculation}
+              onPress={() => !readOnly && store.updateAerien({ immatriculationAeronef: a.immatriculation })}
+            />
+          ))}
+        </View>
+      )}
       <TextInput
         editable={!readOnly}
         style={styles.input}

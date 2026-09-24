@@ -274,6 +274,8 @@ export interface DraftTraitementAerienInput {
   mecanicien: string;
   chefDeBaseId: string;
   consultantInternational?: string | null;
+  /** Aéronef de l'affectation active de l'équipe à la date de saisie (#642), modifiable ensuite. */
+  immatriculeAeronef?: string | null;
   // Chaînage de reprise (migration backend 0050) — mirroir de
   // DraftTraitementTerrestreInput, généralisé à l'Aérien.
   repriseTraitement?: boolean;
@@ -378,14 +380,15 @@ export async function createDraftTraitementAerien(
   await db.runAsync(
     `INSERT INTO traitement_aerien (
       traitement_id, pilote, mecanicien, chef_de_base_id, consultant_international,
-      reprise_traitement, traitement_origine_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      immatricule_aeronef, reprise_traitement, traitement_origine_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.id,
       input.pilote,
       input.mecanicien,
       input.chefDeBaseId,
       input.consultantInternational ?? null,
+      input.immatriculeAeronef || null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,
     ]

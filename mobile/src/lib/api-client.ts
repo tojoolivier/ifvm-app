@@ -1247,6 +1247,54 @@ export const apiClient = {
     );
   },
 
+  /**
+   * Parc aéronefs (#621, #603) — administrateur pour la création. En ligne uniquement : ni
+   * création d'appareil ni affectation ne passent par la file d'envoi hors-ligne, l'écran
+   * dit « nécessite le réseau » (décision #642 : la consultation reste locale, l'écriture
+   * exige le serveur, seul juge des chevauchements de dates et de l'unicité d'immatriculation).
+   */
+  createAeronef: async (
+    token: string,
+    body: components['schemas']['AeronefCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['AeronefRead']> => {
+    return makeRequest<components['schemas']['AeronefRead']>(
+      cheminDuContrat('/aeronefs'),
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  affecterAeronef: async (
+    token: string,
+    equipeId: string,
+    body: components['schemas']['AffectationAeronefCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['AffectationAeronefRead']> => {
+    return makeRequest<components['schemas']['AffectationAeronefRead']>(
+      `/equipes/${equipeId}/aeronefs`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  cloturerAffectationAeronef: async (
+    token: string,
+    equipeId: string,
+    affectationId: string,
+    body: components['schemas']['AffectationAeronefCloture'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['AffectationAeronefRead']> => {
+    return makeRequest<components['schemas']['AffectationAeronefRead']>(
+      `/equipes/${equipeId}/aeronefs/${affectationId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
   createEquipeAerienne: async (
     token: string,
     body: components['schemas']['EquipeCreate'],

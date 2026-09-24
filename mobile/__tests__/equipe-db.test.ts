@@ -6,6 +6,8 @@ import {
   listAnnuaire,
   listChefsDAutresEquipes,
   listAeronefsEquipe,
+  listAffectationsEquipe,
+  listParcAeronefs,
   listEquipesAvecChef,
   listMembresEquipe,
   listSitesEquipe,
@@ -170,6 +172,31 @@ describe('listChefsDAutresEquipes', () => {
     const [sql, params] = getAllAsync.mock.calls[0];
     expect(sql).toContain("fonction = 'chef'");
     expect(sql).toContain('equipe_id <> ?');
+    expect(params).toEqual(['eq-1']);
+  });
+});
+
+describe('listParcAeronefs', () => {
+  it('rend chaque aéronef actif avec l’équipe à laquelle il est affecté à la date donnée', async () => {
+    await listParcAeronefs('2026-09-24');
+
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).toContain('FROM aeronef');
+    expect(sql).toContain('LEFT JOIN equipe_aeronef');
+    expect(sql).toContain('actif = 1');
+    expect(sql).toContain('date_fin IS NULL OR');
+    expect(params).toEqual(['2026-09-24', '2026-09-24']);
+  });
+});
+
+describe('listAffectationsEquipe', () => {
+  it('rend l’historique des affectations de l’équipe, la plus récente d’abord', async () => {
+    await listAffectationsEquipe('eq-1');
+
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).toContain('FROM equipe_aeronef');
+    expect(sql).toContain('JOIN aeronef');
+    expect(sql).toMatch(/ORDER BY ea\.date_debut DESC/);
     expect(params).toEqual(['eq-1']);
   });
 });

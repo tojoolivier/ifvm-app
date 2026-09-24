@@ -130,6 +130,18 @@ describe('createDraftTraitementAerien', () => {
     expect(result.aerien?.pilote).toBe(AERIEN_INPUT.pilote);
   });
 
+  it('pré-remplit l’immatriculation depuis l’affectation active de l’équipe (#642)', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await createDraftTraitementAerien({ ...AERIEN_INPUT, immatriculeAeronef: '5R-MHR' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO traitement_aerien \([\s\S]*immatricule_aeronef/),
+      expect.arrayContaining(['5R-MHR'])
+    );
+  });
+
   it('rattache le brouillon à l’équipe de travail reçue en entrée (#641)', async () => {
     getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
     getAllAsync.mockResolvedValueOnce([]);

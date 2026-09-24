@@ -96,6 +96,53 @@ export async function listAeronefsEquipe(equipeId: string, aujourdhui: string): 
   );
 }
 
+export interface AeronefParc {
+  id: string;
+  immatriculation: string;
+  societe: string;
+  volume_cuve_l: number;
+  /** Équipe à laquelle l'appareil est affecté à la date donnée ; `null` s'il est libre. */
+  equipe_id: string | null;
+  equipe_nom: string | null;
+}
+
+/** Parc complet : chaque aéronef actif avec son équipe du jour (`null` = libre). */
+export async function listParcAeronefs(aujourdhui: string): Promise<AeronefParc[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<AeronefParc>(
+    `SELECT a.id, a.immatriculation, a.societe, a.volume_cuve_l, e.id AS equipe_id, e.nom AS equipe_nom
+     FROM aeronef a
+     LEFT JOIN equipe_aeronef ea ON ea.aeronef_id = a.id
+       AND ea.date_debut <= ? AND (ea.date_fin IS NULL OR ea.date_fin >= ?)
+     LEFT JOIN equipe e ON e.id = ea.equipe_id
+     WHERE a.actif = 1
+     ORDER BY a.immatriculation`,
+    [aujourdhui, aujourdhui]
+  );
+}
+
+export interface AffectationLocale {
+  id: string;
+  aeronef_id: string;
+  immatriculation: string;
+  societe: string;
+  date_debut: string;
+  /** `null` : affectation en cours. */
+  date_fin: string | null;
+}
+
+/** Historique des affectations d'une équipe, la plus récente d'abord. */
+export async function listAffectationsEquipe(equipeId: string): Promise<AffectationLocale[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<AffectationLocale>(
+    `SELECT ea.id, ea.aeronef_id, a.immatriculation, a.societe, ea.date_debut, ea.date_fin
+     FROM equipe_aeronef ea JOIN aeronef a ON a.id = ea.aeronef_id
+     WHERE ea.equipe_id = ?
+     ORDER BY ea.date_debut DESC`,
+    [equipeId]
+  );
+}
+
 export interface ResumeEquipe {
   sitePrincipal: SiteEquipe | null;
   sitesSecondaires: SiteEquipe[];

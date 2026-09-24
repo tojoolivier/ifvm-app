@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import EquipeDetailScreen from '@/app/(app)/equipe-detail';
 import { useAuthStore } from '@/lib/auth-store';
-import { listAeronefsEquipe, listMembresEquipe, listSitesEquipe } from '@/lib/equipe-db';
+import { listAeronefsActifs, listAffectationsEquipe, listMembresEquipe, listSitesEquipe } from '@/lib/equipe-db';
 import { getEquipeLocale } from '@/lib/referentiel-db';
 
 const mockPush = jest.fn();
@@ -15,8 +15,10 @@ jest.mock('@/lib/equipe-db', () => ({
   ...jest.requireActual('@/lib/equipe-db'),
   listMembresEquipe: jest.fn(),
   listSitesEquipe: jest.fn(),
-  listAeronefsEquipe: jest.fn(),
+  listAffectationsEquipe: jest.fn(),
+  listAeronefsActifs: jest.fn(),
 }));
+jest.mock('@/lib/referentiel-sync', () => ({ pullReferentiel: jest.fn() }));
 jest.mock('@/lib/referentiel-db', () => ({ getEquipeLocale: jest.fn() }));
 jest.mock('@/lib/storage', () => ({ storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() } }));
 
@@ -33,7 +35,14 @@ beforeEach(() => {
     { id: 's1', parent_site_id: null, numero: 'n°03', localite: 'Isoanala', date_debut_position: '2026-09-12' },
     { id: 's2', parent_site_id: 's1', numero: 'n°01', localite: 'Isoanala', date_debut_position: null },
   ]);
-  jest.mocked(listAeronefsEquipe).mockResolvedValue([{ id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188' }]);
+  jest.mocked(listAffectationsEquipe).mockResolvedValue([
+    { id: 'af-2', aeronef_id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', date_debut: '2026-09-01', date_fin: null },
+    { id: 'af-1', aeronef_id: 'ae-2', immatriculation: '5R-MJK', societe: 'Cessna 188', date_debut: '2026-05-01', date_fin: '2026-08-31' },
+  ]);
+  jest.mocked(listAeronefsActifs).mockResolvedValue([
+    { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188' },
+    { id: 'ae-2', immatriculation: '5R-MJK', societe: 'Cessna 188' },
+  ]);
 });
 
 describe('EquipeDetailScreen', () => {
@@ -48,6 +57,7 @@ describe('EquipeDetailScreen', () => {
     expect(screen.getByText('Isoanala · n°03')).toBeVisible();
     expect(screen.getByText('Stand n°01')).toBeVisible();
     expect(screen.getByText('5R-MHR')).toBeVisible();
+    expect(screen.getByText('AFFECTATION ACTIVE')).toBeVisible();
     expect(screen.getByText('Type fixé à la création, non modifiable.')).toBeVisible();
   });
 
@@ -74,5 +84,31 @@ describe('EquipeDetailScreen', () => {
 
     expect(screen.queryByText('SITES AÉRIENS')).toBeNull();
     expect(screen.queryByText('AÉRONEFS AFFECTÉS')).toBeNull();
+  });
+
+  it('met l’affectation active en avant et liste l’historique en dessous', async () => {
+    await render(<EquipeDetailScreen />);
+    await screen.findByText('Jean Rakoto');
+
+    expect(screen.getByText('Depuis le 01/09/2026')).toBeVisible();
+    expect(screen.getByText('HISTORIQUE DES AFFECTATIONS')).toBeVisible();
+    expect(screen.getByText('5R-MJK')).toBeVisible();
+    expect(screen.getByText('01/05/2026 → 31/08/2026')).toBeVisible();
+  });
+
+  it('réserve « Terminer l’affectation » et l’ajout d’un appareil à l’administrateur', async () => {
+    useAuthStore.setState({ user: { id: 'u-1', role: 'admin' } } as any);
+    await render(<EquipeDetailScreen />);
+    await screen.findByText('Jean Rakoto');
+    expect(screen.getByText('Terminer l’affectation')).toBeVisible();
+    expect(screen.getByText('Affecter à partir d’aujourd’hui')).toBeVisible();
+  });
+
+  it('masque ces actions aux autres rôles, sans se contenter d’un refus de l’API', async () => {
+    await render(<EquipeDetailScreen />);
+    await screen.findByText('Jean Rakoto');
+
+    expect(screen.queryByText('Terminer l’affectation')).toBeNull();
+    expect(screen.queryByText('Affecter à partir d’aujourd’hui')).toBeNull();
   });
 });

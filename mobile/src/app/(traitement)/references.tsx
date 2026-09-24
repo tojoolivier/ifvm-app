@@ -1,5 +1,5 @@
-import { listMembresEquipe } from '@/lib/equipe-db';
-import { prefillTraitementAerien } from '@/lib/equipe-regles';
+import { listAeronefsEquipe, listMembresEquipe } from '@/lib/equipe-db';
+import { aeronefPreselectionne, prefillTraitementAerien } from '@/lib/equipe-regles';
 import { equipeDeTravailPour } from '@/lib/equipe-travail';
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
@@ -264,6 +264,12 @@ export default function ReferencesScreen() {
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
                   ...equipage,
+                  // Aéronef : affectation active de l'équipe à la date de saisie (#642).
+                  immatriculeAeronef: aeronefPreselectionne(
+                    equipeId && store.ref.dateTraitement
+                      ? await listAeronefsEquipe(equipeId, store.ref.dateTraitement)
+                      : []
+                  ),
                 })
               : await createDraftTraitementTerrestre({
                   id: generateId(),

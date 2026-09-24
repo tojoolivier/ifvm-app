@@ -4,6 +4,10 @@ import {
   libelleSite,
   prefillTraitementAerien,
   ROLES_A_LA_VOLEE,
+  aeronefPreselectionne,
+  jourMoisAnnee,
+  joursDepuis,
+  validerNouvelAeronef,
   validerAjoutMembre,
   validerNouvelleEquipe,
 } from '../src/lib/equipe-regles';
@@ -136,5 +140,55 @@ describe('validerAjoutMembre — compte à la volée', () => {
         { equipeADejaUnChef: false, chefsDAutresEquipes: new Set() }
       )
     ).toEqual(['Le prénom est obligatoire.']);
+  });
+});
+
+describe('joursDepuis', () => {
+  it('compte les jours entre le début de l’affectation et aujourd’hui', () => {
+    expect(joursDepuis('2026-09-01', '2026-09-24')).toBe(23);
+  });
+
+  it('vaut 0 le jour même et ne devient jamais négatif', () => {
+    expect(joursDepuis('2026-09-24', '2026-09-24')).toBe(0);
+    expect(joursDepuis('2026-10-01', '2026-09-24')).toBe(0);
+  });
+});
+
+describe('jourMoisAnnee', () => {
+  it('formate une date ISO en JJ/MM/AAAA', () => {
+    expect(jourMoisAnnee('2026-09-01')).toBe('01/09/2026');
+  });
+});
+
+describe('validerNouvelAeronef', () => {
+  const valide = { immatriculation: '5R-MJK', societe: 'Air Mada', volumeCuveL: '1200' };
+
+  it('accepte un appareil complet', () => {
+    expect(validerNouvelAeronef(valide)).toEqual([]);
+  });
+
+  it('exige immatriculation, société et un volume de cuve positif', () => {
+    expect(validerNouvelAeronef({ immatriculation: ' ', societe: '', volumeCuveL: '' })).toEqual([
+      'L’immatriculation est obligatoire.',
+      'La société est obligatoire.',
+      'Le volume de cuve doit être un nombre positif.',
+    ]);
+    expect(validerNouvelAeronef({ ...valide, volumeCuveL: '0' })).toHaveLength(1);
+    expect(validerNouvelAeronef({ ...valide, volumeCuveL: 'abc' })).toHaveLength(1);
+  });
+
+  it('accepte la virgule décimale saisie au clavier', () => {
+    expect(validerNouvelAeronef({ ...valide, volumeCuveL: '1200,5' })).toEqual([]);
+  });
+});
+
+describe('aeronefPreselectionne', () => {
+  it('reprend l’aéronef de l’affectation active', () => {
+    expect(aeronefPreselectionne([{ immatriculation: '5R-MHR' }])).toBe('5R-MHR');
+  });
+
+  it('ne présélectionne rien sans affectation ou si plusieurs appareils sont affectés', () => {
+    expect(aeronefPreselectionne([])).toBe('');
+    expect(aeronefPreselectionne([{ immatriculation: '5R-MHR' }, { immatriculation: '5R-MJK' }])).toBe('');
   });
 });

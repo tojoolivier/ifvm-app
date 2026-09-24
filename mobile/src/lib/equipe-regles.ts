@@ -114,3 +114,46 @@ export function prefillTraitementAerien(membres: MembrePourPrefill[]) {
     consultantInternational: nomDe('consultant_international') || null,
   };
 }
+
+/** Jours écoulés depuis `dateDebut` (AAAA-MM-JJ) jusqu'à `aujourdhui` ; jamais négatif. */
+export function joursDepuis(dateDebut: string, aujourdhui: string): number {
+  const ms = Date.parse(`${aujourdhui}T00:00:00Z`) - Date.parse(`${dateDebut}T00:00:00Z`);
+  return Math.max(0, Math.round(ms / 86_400_000));
+}
+
+/** « 2026-09-01 » → « 01/09/2026 ». */
+export function jourMoisAnnee(dateIso: string): string {
+  const [annee, mois, jour] = dateIso.slice(0, 10).split('-');
+  return `${jour}/${mois}/${annee}`;
+}
+
+export interface NouvelAeronef {
+  immatriculation: string;
+  societe: string;
+  /** Saisie brute du clavier : la virgule décimale est acceptée. */
+  volumeCuveL: string;
+}
+
+/** Nombre saisi (virgule ou point) ; `NaN` si illisible. */
+export function lireVolumeCuve(saisie: string): number {
+  return saisie.trim() === '' ? NaN : Number(saisie.replace(',', '.'));
+}
+
+/** Erreurs de saisie d'un appareil du parc ; vide si le formulaire est valide. */
+export function validerNouvelAeronef(aeronef: NouvelAeronef): string[] {
+  const erreurs: string[] = [];
+  if (!aeronef.immatriculation.trim()) erreurs.push('L’immatriculation est obligatoire.');
+  if (!aeronef.societe.trim()) erreurs.push('La société est obligatoire.');
+  const volume = lireVolumeCuve(aeronef.volumeCuveL);
+  if (!Number.isFinite(volume) || volume <= 0) erreurs.push('Le volume de cuve doit être un nombre positif.');
+  return erreurs;
+}
+
+/**
+ * Immatriculation à présélectionner dans un traitement aérien (#642) : celle de l'unique aéronef
+ * affecté à l'équipe à la date de saisie. Avec plusieurs appareils l'agent choisit (rien n'est
+ * deviné) ; sans affectation la saisie reste libre.
+ */
+export function aeronefPreselectionne(aeronefsAffectes: { immatriculation: string }[]): string {
+  return aeronefsAffectes.length === 1 ? aeronefsAffectes[0].immatriculation : '';
+}
