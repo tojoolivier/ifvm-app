@@ -22,6 +22,8 @@ import {
   COUCHES_CARTE,
   filterProspectionsForCarte,
   prospectionVisible,
+  RACCOURCIS_CARTE,
+  raccourciActif,
   TOUTES_LES_COUCHES,
   traitementVisible,
   type CarteTraitement,
@@ -192,6 +194,22 @@ export function CartePage() {
     <div className="px-8 py-6 flex flex-col h-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Carte des infestations</h1>
+      </div>
+
+      <div role="group" aria-label="Afficher sur la carte" className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Afficher :</span>
+        {RACCOURCIS_CARTE.map((raccourci) => (
+          <Button
+            key={raccourci.key}
+            type="button"
+            size="sm"
+            variant={raccourciActif(couches) === raccourci.key ? 'default' : 'outline'}
+            aria-pressed={raccourciActif(couches) === raccourci.key}
+            onClick={() => setCouches(new Set(raccourci.couches))}
+          >
+            {raccourci.label}
+          </Button>
+        ))}
       </div>
 
       <Card className="mb-4">

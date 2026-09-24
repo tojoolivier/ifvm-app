@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildBaseAerienneMarkers,
+  RACCOURCIS_CARTE,
+  raccourciActif,
   buildCarteMarkers,
   buildTraitementMarkers,
   coucheProspection,
@@ -359,5 +361,22 @@ describe('couches de la carte', () => {
 
   it('expose toutes les couches par défaut', () => {
     expect(TOUTES_LES_COUCHES).toHaveLength(6)
+  })
+})
+
+describe('raccourcis de la carte', () => {
+  it('propose Tout, Prospections, Traitements et Bases aériennes', () => {
+    expect(RACCOURCIS_CARTE.map((r) => r.label)).toEqual(['Tout', 'Prospections', 'Traitements', 'Bases aériennes'])
+  })
+
+  it('reconnaît le raccourci correspondant exactement aux couches affichées', () => {
+    expect(raccourciActif(new Set(TOUTES_LES_COUCHES))).toBe('tout')
+    expect(raccourciActif(new Set(['traitement_aerien', 'traitement_terrestre'] as const))).toBe('traitements')
+    expect(raccourciActif(new Set(['base_aerienne'] as const))).toBe('bases')
+  })
+
+  it("ne reconnaît aucun raccourci pour un choix personnalisé", () => {
+    expect(raccourciActif(new Set(['prospection_extensive'] as const))).toBeNull()
+    expect(raccourciActif(new Set())).toBeNull()
   })
 })
