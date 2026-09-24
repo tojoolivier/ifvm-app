@@ -1,5 +1,6 @@
 import { PreconditionError } from './errors';
 import { generateId } from './id';
+import { creerOutbox } from './outbox';
 import { getReferentielDb } from './referentiel-db';
 import {
   type MouvementEnAttente,
@@ -79,15 +80,13 @@ export async function listMouvementsSite(siteId: string, limite = 10): Promise<M
   );
 }
 
-export async function marquerMouvementSynchronise(id: string): Promise<void> {
-  const db = await getReferentielDb();
-  await db.runAsync("UPDATE mouvement_pesticide_local SET statut_sync = 'synced' WHERE id = ?", [id]);
-}
+const outboxMouvement = creerOutbox({
+  table: 'mouvement_pesticide_local',
+  base: () => getReferentielDb(),
+});
 
-export async function marquerMouvementEnEchec(id: string): Promise<void> {
-  const db = await getReferentielDb();
-  await db.runAsync("UPDATE mouvement_pesticide_local SET statut_sync = 'echec' WHERE id = ?", [id]);
-}
+export const marquerMouvementSynchronise = outboxMouvement.marquerSynchronise;
+export const marquerMouvementEnEchec = outboxMouvement.marquerEnEchec;
 
 export async function listSoldesServeur(): Promise<SoldeServeur[]> {
   const db = await getReferentielDb();
