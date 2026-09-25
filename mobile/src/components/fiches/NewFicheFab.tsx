@@ -80,7 +80,7 @@ export function NewFicheFab() {
   return (
     <>
       <TouchableOpacity testID="fab-nouvelle-fiche" style={styles.fab} onPress={() => setMenuVisible(true)} activeOpacity={0.85}>
-        <AppIcon name="ajouter" size={24} color={EQ.surMarque} />
+        <AppIcon name="ajouter" size={26} color={EQ.surMarque} />
       </TouchableOpacity>
 
       <Modal animationType="slide" transparent visible={menuVisible} onRequestClose={fermerMenu}>
@@ -246,10 +246,10 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     fab: {
       position: 'absolute',
       right: 20,
-      bottom: 28,
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      bottom: 20,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
       backgroundColor: EQ.vert,
       alignItems: 'center',
       justifyContent: 'center',

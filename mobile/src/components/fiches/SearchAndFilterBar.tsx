@@ -1,7 +1,5 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import {
-  Dimensions,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -9,19 +7,21 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { FICHES_GREEN, FICHES_GREEN_DARK, FICHES_GREEN_LIGHT } from './tokens';
+import { AppIcon, type AppIconName } from '@/components/ui/AppIcon';
+import { EQ } from '@/components/equipe/tokens';
+import { FICHES_GREEN, FICHES_GREEN_LIGHT } from './tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { useTheme } from '@/hooks/use-theme';
 import type { ThemePalette } from '@/constants/theme';
 
-const { width: SCREEN_WIDTH_DEFAULT } = Dimensions.get('window');
-const isSmallScreen = SCREEN_WIDTH_DEFAULT < 380;
 
 export interface FilterOption<T extends string> {
   value: T;
   label: string;
   icon?: string;
+  /** Icône vectorielle de la maquette ; prime sur `icon` (emoji). */
+  iconName?: AppIconName;
   disabled?: boolean;
 }
 
@@ -43,7 +43,6 @@ export function SearchAndFilterBar<T extends string>({
   activeFilter,
   onFilterChange,
 }: SearchAndFilterBarProps<T>) {
-  const scrollViewRef = useRef<ScrollView>(null);
   const { width: windowWidth } = useWindowDimensions();
   const showIcons = windowWidth >= 400;
   const { scale } = useFontScale();
@@ -55,11 +54,13 @@ export function SearchAndFilterBar<T extends string>({
     <>
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <View style={styles.searchIcon}>
+            <AppIcon name="rechercher" boite={18} color={EQ.etiquette} />
+          </View>
           <TextInput
             style={styles.searchInput}
             placeholder={searchPlaceholder}
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={EQ.etiquette}
             value={searchQuery}
             onChangeText={onSearchChange}
             clearButtonMode="while-editing"
@@ -74,16 +75,10 @@ export function SearchAndFilterBar<T extends string>({
       </View>
 
       <View style={styles.filtersWrapper}>
-        <ScrollView
-          ref={scrollViewRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filtersContainer}
-          contentContainerStyle={styles.filtersContent}
-          decelerationRate="fast"
-        >
+        <View style={styles.filtersContent}>
           {filters.map((filter) => {
             const isActive = activeFilter === filter.value;
+            const couleur = isActive ? FICHES_GREEN : EQ.attenue;
             return (
               <TouchableOpacity
                 key={filter.value}
@@ -95,20 +90,15 @@ export function SearchAndFilterBar<T extends string>({
                 onPress={() => !filter.disabled && onFilterChange(filter.value)}
                 disabled={filter.disabled}
               >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    isActive && styles.filterChipTextActive,
-                    filter.disabled && styles.filterChipTextDisabled,
-                  ]}
-                >
-                  {showIcons && filter.icon ? `${filter.icon} ` : ''}
+                {filter.iconName ? <AppIcon name={filter.iconName} boite={15} color={couleur} /> : null}
+                <Text style={[styles.filterChipText, { color: couleur }]}>
+                  {!filter.iconName && showIcons && filter.icon ? `${filter.icon} ` : ''}
                   {filter.label}
                 </Text>
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
     </>
   );
@@ -116,9 +106,9 @@ export function SearchAndFilterBar<T extends string>({
 
 const BASE_TYPE_SIZES = {
   searchIcon: 16,
-  searchInput: isSmallScreen ? 14 : 15,
+  searchInput: 13,
   clearIcon: 16,
-  filterChipText: isSmallScreen ? 12 : 13,
+  filterChipText: 12,
 } as const;
 
 function createTypeSizes(scale: number) {
@@ -129,26 +119,25 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: Them
   return StyleSheet.create({
     searchContainer: {
       paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingTop: 14,
       backgroundColor: theme.card,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
     },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme.inputBg,
+      gap: 8,
+      backgroundColor: '#F8F6F0',
       borderRadius: 10,
-      paddingHorizontal: 12,
-      height: isSmallScreen ? 40 : 44,
+      paddingHorizontal: 14,
+      height: 44,
     },
     searchIcon: {
-      fontSize: typeSizes.searchIcon,
-      marginRight: 8,
+      width: 18,
+      height: 18,
     },
     searchInput: {
       flex: 1,
-      fontSize: typeSizes.searchInput,
+      fontSize: 13,
       color: theme.text,
       paddingVertical: 8,
     },
@@ -163,40 +152,36 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: Them
       backgroundColor: theme.card,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
-    },
-    filtersContainer: {
-      paddingVertical: 8,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 12,
     },
     filtersContent: {
-      paddingHorizontal: 16,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 8,
     },
     filterChip: {
-      paddingHorizontal: isSmallScreen ? 12 : 14,
-      paddingVertical: isSmallScreen ? 5 : 6,
-      borderRadius: 20,
-      backgroundColor: theme.inputBg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 16,
+      backgroundColor: '#F8F6F0',
       borderWidth: 1,
-      borderColor: theme.inputBorder,
+      borderColor: EQ.bordure,
     },
     filterChipActive: {
       backgroundColor: FICHES_GREEN_LIGHT,
       borderColor: FICHES_GREEN,
     },
     filterChipDisabled: {
-      opacity: 0.5,
+      opacity: 0.45,
     },
     filterChipText: {
       fontSize: typeSizes.filterChipText,
-      color: theme.muted,
-      fontWeight: '500',
-    },
-    filterChipTextActive: {
-      color: FICHES_GREEN_DARK,
       fontWeight: '600',
-    },
-    filterChipTextDisabled: {
-      color: theme.faint,
     },
   });
 }

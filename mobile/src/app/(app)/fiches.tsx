@@ -35,6 +35,7 @@ import { statutFicheAffiche } from '@/lib/prospection-statut';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { BandeauEquipe } from '@/components/equipe/BandeauEquipe';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
@@ -44,10 +45,10 @@ import type { ThemePalette } from '@/constants/theme';
 type FilterKey = 'TOUS' | 'PROSPECTION' | 'CRT' | 'METEO';
 
 const FILTERS: FilterOption<FilterKey>[] = [
-  { value: 'TOUS', label: 'Toutes', icon: '📋' },
-  { value: 'PROSPECTION', label: 'Prospection', icon: '🔍' },
-  { value: 'CRT', label: 'CRT', icon: '💊' },
-  { value: 'METEO', label: 'Météo', icon: '🌤️', disabled: true },
+  { value: 'TOUS', label: 'Toutes', iconName: 'rapport-fiche' },
+  { value: 'PROSPECTION', label: 'Prospection', iconName: 'prospections' },
+  { value: 'CRT', label: 'CRT', iconName: 'crt' },
+  { value: 'METEO', label: 'Météo', iconName: 'meteo', disabled: true },
 ];
 
 /**
@@ -372,7 +373,7 @@ export default function FichesScreen() {
         <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-              <Text style={styles.backIcon}>‹</Text>
+              <AppIcon name="retour" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>Mes fiches</Text>
@@ -461,10 +462,9 @@ export default function FichesScreen() {
 }
 
 const BASE_TYPE_SIZES = {
-  backIcon: 22,
-  headerTitle: 18,
-  headerSub: 12,
-  resultCount: 13,
+  headerTitle: 17,
+  headerSub: 11.5,
+  resultCount: 12,
   equipeLabel: 12,
   emptyIcon: 48,
   emptyTitle: 18,
@@ -506,31 +506,23 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     header: {
       backgroundColor: FICHES_GREEN_DARK,
       paddingHorizontal: 16,
-      paddingBottom: 14,
+      paddingBottom: 18,
     },
     headerContent: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingTop: 8,
+      gap: 12,
+      paddingTop: 14,
     },
     backBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 8,
-      backgroundColor: '#FFFFFF22',
+      width: 28,
+      height: 28,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    backIcon: {
-      color: '#FFFFFF',
-      fontSize: typeSizes.backIcon,
-      fontWeight: '300',
-      lineHeight: 26,
-      marginTop: -2,
-    },
     headerTextContainer: {
       flex: 1,
-      marginLeft: 12,
+      gap: 2,
     },
     headerTitle: {
       color: '#FFFFFF',
@@ -538,25 +530,24 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontWeight: '700',
     },
     headerSub: {
-      color: '#FFFFFFAA',
+      color: 'rgba(255,255,255,0.28)',
       fontSize: typeSizes.headerSub,
-      marginTop: 1,
     },
     headerRight: {
       width: 32,
     },
     resultCountContainer: {
       paddingHorizontal: 16,
-      paddingVertical: 8,
-      backgroundColor: theme.inputBg,
+      paddingTop: 14,
+      paddingBottom: 8,
     },
     resultCount: {
       fontSize: typeSizes.resultCount,
       color: theme.muted,
-      fontWeight: '500',
+      fontWeight: '600',
     },
     listContent: {
-      padding: 16,
+      paddingHorizontal: 16,
       paddingBottom: 100,
     },
     emptyContainer: {

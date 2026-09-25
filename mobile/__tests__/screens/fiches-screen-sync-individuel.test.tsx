@@ -95,13 +95,13 @@ describe('FichesScreen — synchro fiche par fiche (#synchro-fiche-par-fiche)', 
   it('affiche un bouton « À SYNCHRO ↻ » sur une fiche de prospection et une fiche de traitement non envoyées', async () => {
     await render(<FichesScreen />);
 
-    const boutons = await screen.findAllByText('À SYNCHRO ↻');
+    const boutons = await screen.findAllByText('À SYNCHRO');
     expect(boutons).toHaveLength(2);
   });
 
   it('synchronise uniquement la fiche de prospection tapée, sans passer par l’écran Synchronisation', async () => {
     await render(<FichesScreen />);
-    const [boutonProspection] = await screen.findAllByText('À SYNCHRO ↻');
+    const [boutonProspection] = await screen.findAllByText('À SYNCHRO');
     // La liste se rafraîchit après l'envoi, pas seulement au montage.
     const appelsAuMontage = jest.mocked(prospectionAccueil.loadAccueilData).mock.calls.length;
 
@@ -118,7 +118,7 @@ describe('FichesScreen — synchro fiche par fiche (#synchro-fiche-par-fiche)', 
 
   it('synchronise la fiche de traitement complète (pas la ligne à plat) quand son bouton est tapé', async () => {
     await render(<FichesScreen />);
-    const [, boutonTraitement] = await screen.findAllByText('À SYNCHRO ↻');
+    const [, boutonTraitement] = await screen.findAllByText('À SYNCHRO');
 
     fireEvent.press(boutonTraitement);
 
@@ -148,7 +148,7 @@ describe('FichesScreen — synchro fiche par fiche (#synchro-fiche-par-fiche)', 
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     await render(<FichesScreen />);
-    const [boutonProspection] = await screen.findAllByText('À SYNCHRO ↻');
+    const [boutonProspection] = await screen.findAllByText('À SYNCHRO');
     fireEvent.press(boutonProspection);
 
     await waitFor(() =>

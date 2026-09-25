@@ -18,6 +18,12 @@ export type AppIconName =
   | 'prospections'
   | 'crt'
   | 'suivant'
+  | 'retour'
+  | 'rechercher'
+  | 'meteo'
+  | 'intensif'
+  | 'extensif'
+  | 'synchroniser'
   | 'utilisateurs'
   | 'notifications'
   | 'fermer'
@@ -63,6 +69,32 @@ const RECADREES: Partial<Record<AppIconName, Recadre>> = {
     hauteur: 16,
     d: 'M6 12L10 8L6 4',
   },
+  retour: { largeur: 24, hauteur: 24, d: 'M15 18L9 12L15 6' },
+  rechercher: {
+    largeur: 18,
+    hauteur: 18,
+    d: 'M15.7501 15.7501L12.4951 12.4951M14.25 8.25C14.25 11.5637 11.5637 14.25 8.25 14.25C4.93629 14.25 2.25 11.5637 2.25 8.25C2.25 4.93629 4.93629 2.25 8.25 2.25C11.5637 2.25 14.25 4.93629 14.25 8.25Z',
+  },
+  meteo: {
+    largeur: 15,
+    hauteur: 15,
+    d: 'M7.5 1.875V3.125M7.5 11.875V13.125M1.875 7.5H3.125M11.875 7.5H13.125M3.4375 3.4375L4.375 4.375M11.5625 3.4375L10.625 4.375M3.4375 11.5625L4.375 10.625M11.5625 11.5625L10.625 10.625M7.5 5.3125C8.7675 5.3125 9.6875 6.2325 9.6875 7.5C9.6875 8.7675 8.7675 9.6875 7.5 9.6875C6.2325 9.6875 5.3125 8.7675 5.3125 7.5C5.3125 6.2325 6.2325 5.3125 7.5 5.3125Z',
+  },
+  intensif: {
+    largeur: 13,
+    hauteur: 13,
+    d: 'M3.25 9.75C5.41667 7.58333 7.58333 5.41667 9.75 3.25M2.16667 10.8333C2.16667 5.95833 4.875 2.16667 10.8333 2.16667C10.8333 7.04167 8.125 10.8333 2.16667 10.8333Z',
+  },
+  extensif: {
+    largeur: 13,
+    hauteur: 13,
+    d: 'M4.33333 5.41667H8.66667M4.33333 7.3125H8.66667M4.33333 9.20833H7.04167M5.41667 1.08333H7.58333V2.70833H5.41667V1.08333ZM2.70833 2.16667H10.2917V11.9167H2.70833V2.16667Z',
+  },
+  synchroniser: {
+    largeur: 12,
+    hauteur: 12.0008,
+    d: 'M7.5 7.00048H5.5V5.00032M5.5 7.00048L6.2675 6.19792C6.55452 5.92205 6.90326 5.71872 7.28472 5.60483C7.66617 5.49095 8.0693 5.46981 8.46057 5.54318C8.85183 5.61655 9.21993 5.7823 9.53422 6.02665C9.84851 6.27099 10.0999 6.58687 10.2675 6.94798M8 1V3.00016M10.4999 9.00064L9.73242 9.8032C9.4454 10.0791 9.09666 10.2824 8.71521 10.3963C8.33375 10.5102 7.93062 10.5313 7.53936 10.4579C7.14809 10.3846 6.78 10.2188 6.46571 9.97448C6.15142 9.73013 5.90002 9.41426 5.73242 9.05314M8.5 9.00064H10.4999L10.5 11.0008M10.5 4.25026V3.00016C10.5 2.73492 10.3946 2.48055 10.2071 2.293C10.0196 2.10545 9.76522 2.00008 9.5 2.00008H2.5C2.23478 2.00008 1.98043 2.10545 1.79289 2.293C1.60536 2.48055 1.5 2.73492 1.5 3.00016V10.0007C1.5 10.266 1.60536 10.5203 1.79289 10.7079C1.98043 10.8954 2.23478 11.0008 2.5 11.0008H4.65M1.5 5.00032H3.5M4 1V3.00016',
+  },
   notifications: {
     largeur: 22.0016,
     hauteur: 22.0017,
@@ -89,11 +121,25 @@ interface Props {
   name: AppIconName;
   size?: number;
   color?: string;
+  /**
+   * Taille native, en pixels, de la boîte d'origine de l'icône (Figma) — 13 pour une pastille, 15
+   * pour une puce de filtre. Sans elle, l'icône est centrée dans un carré de `size`. Ne concerne que
+   * les icônes exportées de Figma (`RECADREES`).
+   */
+  boite?: number;
 }
 
-export function AppIcon({ name, size = 24, color = EQ.vert }: Props) {
+export function AppIcon({ name, size = 24, color = EQ.vert, boite }: Props) {
   const trait = { stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
   const recadre = RECADREES[name];
+
+  if (boite && recadre) {
+    return (
+      <Svg width={boite} height={boite} viewBox={`0 0 ${recadre.largeur} ${recadre.hauteur}`} fill="none" testID={`icone-${name}`}>
+        <Path d={recadre.d} {...trait} />
+      </Svg>
+    );
+  }
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" testID={`icone-${name}`}>
