@@ -54,7 +54,7 @@ describe('ReferentielReinitScreen', () => {
 
     await fireEvent.press(screen.getByTestId('reinit-action'));
 
-    expect(options.estAnnule?.()).toBe(true);
+    expect(options.signal?.aborted).toBe(true);
     expect(mockBack).toHaveBeenCalled();
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { EquipeBadge } from '@/components/equipe/EquipeBadge';
@@ -16,7 +16,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Fonts } from '@/constants/theme';
-import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useListeFiltrable } from '@/hooks/use-liste-filtrable';
 import {
   type CategorieFiltre,
   type CodeStadeLigne,
@@ -50,22 +50,14 @@ const CATEGORIES: { valeur: CategorieFiltre; libelle: string }[] = [
 /** Grille des codes stades du cache local (Figma « Codes stades · Liste »), rangée par catégorie et sexe. */
 export default function ReferentielCodesStadesScreen() {
   const router = useRouter();
-  const signalerChargement = useSignalerChargement('referentiel-codes-stades');
-  const [filtre, setFiltre] = useState<FiltreCodesStades>(FILTRE_DEFAUT);
-  const [lignes, setLignes] = useState<CodeStadeLigne[]>([]);
+  const { filtre, lignes, modifier, effacer, signalerChargement } = useListeFiltrable<FiltreCodesStades, CodeStadeLigne>({
+    defaut: FILTRE_DEFAUT,
+    lister: listerCodesStades,
+    source: 'referentiel-codes-stades',
+  });
   const [total, setTotal] = useState<{ n: number; majLe: string | null }>({ n: 0, majLe: null });
   const [especes, setEspeces] = useState<string[]>([]);
   const [feuille, setFeuille] = useState(false);
-  const derniereRequete = useRef(0);
-
-  useEffect(() => {
-    const numero = ++derniereRequete.current;
-    listerCodesStades(filtre)
-      .then((resultat) => {
-        if (numero === derniereRequete.current) setLignes(resultat);
-      })
-      .catch((error) => signalerChargement(error, { source: 'referentiel-codes-stades' }));
-  }, [filtre, signalerChargement]);
 
   useEffect(() => {
     // Le total du sous-titre ignore les filtres : on relit la table entière une seule fois.
@@ -77,7 +69,6 @@ export default function ReferentielCodesStadesScreen() {
       .catch((error) => signalerChargement(error, { source: 'referentiel-codes-stades' }));
   }, [signalerChargement]);
 
-  const modifier = (partie: Partial<FiltreCodesStades>) => setFiltre((f) => ({ ...f, ...partie }));
   const groupes = useMemo(() => grouperCodesStades(lignes), [lignes]);
   const nbFiltres = (filtre.sexe !== 'tous' ? 1 : 0) + (filtre.espece ? 1 : 0) + (filtre.categorie !== 'toutes' ? 1 : 0);
 
@@ -149,7 +140,7 @@ export default function ReferentielCodesStadesScreen() {
       <FeuilleFiltres
         visible={feuille}
         onFermer={() => setFeuille(false)}
-        onEffacer={() => setFiltre((f) => ({ ...FILTRE_DEFAUT, recherche: f.recherche }))}
+        onEffacer={effacer}
         libelleAction={libelleVoirResultats(lignes.length)}
       >
         <SectionFiltre titre="Catégorie">

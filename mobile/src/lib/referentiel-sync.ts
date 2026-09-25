@@ -533,8 +533,8 @@ export function pullReferentiel(token: string, onUnauthorized?: () => void): Pro
 
 export interface OptionsReinitialisation {
   surProgression?: (progression: ProgressionTable) => void;
-  /** Consulté une fois le téléchargement fini : après le vidage, il n'y a plus de retour possible. */
-  estAnnule?: () => boolean;
+  /** « Annuler » : coupe le téléchargement en cours. Une fois l'écriture commencée, il n'y a plus de retour. */
+  signal?: AbortSignal;
   onUnauthorized?: () => void;
 }
 
@@ -554,9 +554,16 @@ export function reinitialiserReferentiel(
 
 async function reinitialiser(token: string, options: OptionsReinitialisation): Promise<'termine' | 'annule'> {
   const curseursNuls = Object.fromEntries(ENTITY_TYPES.map((entite) => [entite, null])) as ReferentielSinceCursors;
-  const response = await apiClient.pullReferentiel(token, curseursNuls, options.onUnauthorized);
+  let response: ReferentielPullResponse;
+  try {
+    response = await apiClient.pullReferentiel(token, curseursNuls, options.onUnauthorized, options.signal);
+  } catch (erreur) {
+    // Une requête coupée par « Annuler » n'est pas un échec : l'agent l'a voulu.
+    if (options.signal?.aborted) return 'annule';
+    throw erreur;
+  }
 
-  if (options.estAnnule?.()) return 'annule';
+  if (options.signal?.aborted) return 'annule';
 
   await remplacerReferentiel((db) => appliquerReponse(db, response, options.surProgression));
   return 'termine';

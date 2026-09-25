@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { EquipeBadge } from '@/components/equipe/EquipeBadge';
@@ -19,7 +19,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Fonts } from '@/constants/theme';
-import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useListeFiltrable } from '@/hooks/use-liste-filtrable';
 import {
   type CompteStatuts,
   type FiltrePesticides,
@@ -68,25 +68,16 @@ function compterFiltres(f: FiltrePesticides): number {
 /** Liste des pesticides du cache local (Figma « Pesticides · Liste » et « Pesticides · Filtres »). */
 export default function ReferentielPesticidesScreen() {
   const router = useRouter();
-  const signalerChargement = useSignalerChargement('referentiel-pesticides');
-  const [filtre, setFiltre] = useState<FiltrePesticides>(FILTRE_DEFAUT);
-  const [lignes, setLignes] = useState<PesticideLigne[]>([]);
+  const { filtre, lignes, modifier, effacer, signalerChargement } = useListeFiltrable<FiltrePesticides, PesticideLigne>({
+    defaut: FILTRE_DEFAUT,
+    lister: listerPesticides,
+    source: 'referentiel-pesticides',
+  });
   const [total, setTotal] = useState<CompteStatuts>({ tous: 0, actifs: 0, inactifs: 0, majLe: null });
   const [types, setTypes] = useState<string[]>([]);
   const [matieres, setMatieres] = useState<string[]>([]);
   const [feuille, setFeuille] = useState(false);
   const [matiereOuverte, setMatiereOuverte] = useState(false);
-  const derniereRequete = useRef(0);
-
-  useEffect(() => {
-    const numero = ++derniereRequete.current;
-    listerPesticides(filtre)
-      .then((resultat) => {
-        // Une frappe plus récente a déjà lancé sa requête : la réponse tardive ne doit pas l'écraser.
-        if (numero === derniereRequete.current) setLignes(resultat);
-      })
-      .catch((error) => signalerChargement(error, { source: 'referentiel-pesticides' }));
-  }, [filtre, signalerChargement]);
 
   useEffect(() => {
     Promise.all([compterPesticides(), listerTypesPesticide(), listerMatieresActives()])
@@ -98,7 +89,6 @@ export default function ReferentielPesticidesScreen() {
       .catch((error) => signalerChargement(error, { source: 'referentiel-pesticides' }));
   }, [signalerChargement]);
 
-  const modifier = (partie: Partial<FiltrePesticides>) => setFiltre((f) => ({ ...f, ...partie }));
   const nbFiltres = compterFiltres(filtre);
 
   return (
@@ -175,7 +165,7 @@ export default function ReferentielPesticidesScreen() {
       <FeuilleFiltres
         visible={feuille}
         onFermer={() => setFeuille(false)}
-        onEffacer={() => setFiltre((f) => ({ ...FILTRE_DEFAUT, recherche: f.recherche }))}
+        onEffacer={effacer}
         libelleAction={libelleVoirResultats(lignes.length)}
       >
         <SectionFiltre titre="Statut">

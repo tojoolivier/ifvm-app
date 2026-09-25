@@ -37,16 +37,17 @@ export default function ReferentielReinitScreen() {
   const [finies, setFinies] = useState<ProgressionTable[]>([]);
   const [enCours, setEnCours] = useState<ProgressionTable | null>(null);
   const [essai, setEssai] = useState(0);
-  const annule = useRef(false);
+  const controleur = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    annule.current = false;
+    const abandon = new AbortController();
+    controleur.current = abandon;
 
     let abouti = false;
     void run(
       async () => {
         const resultat = await reinitialiserReferentiel(token!, {
-          estAnnule: () => annule.current,
+          signal: abandon.signal,
           surProgression: (p) => {
             setPhase('ecriture');
             if (p.etat === 'en_cours') setEnCours(p);
@@ -87,7 +88,7 @@ export default function ReferentielReinitScreen() {
   };
 
   const retour = () => {
-    if (phase === 'telechargement') annule.current = true;
+    if (phase === 'telechargement') controleur.current?.abort();
     if (phase === 'telechargement' || fini) router.back();
   };
 

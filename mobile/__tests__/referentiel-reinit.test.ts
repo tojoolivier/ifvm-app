@@ -72,14 +72,31 @@ describe('reinitialiserReferentiel', () => {
     expect(remplacerReferentiel).not.toHaveBeenCalled();
   });
 
-  it('annulé pendant le téléchargement : rien n’est vidé', async () => {
-    let annule = false;
+  it('la requête coupée par « Annuler » n’est pas un échec', async () => {
+    const controleur = new AbortController();
     jest.mocked(apiClient.pullReferentiel).mockImplementation(async () => {
-      annule = true;
+      controleur.abort();
+      throw new Error('AbortError');
+    });
+
+    await expect(reinitialiserReferentiel('token-1', { signal: controleur.signal })).resolves.toBe('annule');
+    expect(remplacerReferentiel).not.toHaveBeenCalled();
+  });
+
+  it('transmet le signal à la requête réseau', async () => {
+    const controleur = new AbortController();
+    await reinitialiserReferentiel('token-1', { signal: controleur.signal });
+    expect(jest.mocked(apiClient.pullReferentiel).mock.calls[0][3]).toBe(controleur.signal);
+  });
+
+  it('annulé pendant le téléchargement : rien n’est vidé', async () => {
+    const controleur = new AbortController();
+    jest.mocked(apiClient.pullReferentiel).mockImplementation(async () => {
+      controleur.abort();
       return reponseVide() as never;
     });
 
-    const resultat = await reinitialiserReferentiel('token-1', { estAnnule: () => annule });
+    const resultat = await reinitialiserReferentiel('token-1', { signal: controleur.signal });
 
     expect(resultat).toBe('annule');
     expect(remplacerReferentiel).not.toHaveBeenCalled();

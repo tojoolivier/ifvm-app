@@ -1009,7 +1009,9 @@ export const apiClient = {
   pullReferentiel: async (
     token: string,
     cursors: ReferentielSinceCursors,
-    onUnauthorized?: OnUnauthorized
+    onUnauthorized?: OnUnauthorized,
+    /** Coupe la requête en cours (« Annuler » pendant la réinitialisation du référentiel). */
+    signal?: AbortSignal
   ): Promise<ReferentielPullResponse> => {
     const query =
       new URLSearchParams();
@@ -1096,6 +1098,7 @@ export const apiClient = {
       `/referentiel/pull${qs ? `?${qs}` : ''}`,
       {
         method: 'GET',
+        ...(signal ? { signal } : {}),
       },
       token,
       onUnauthorized

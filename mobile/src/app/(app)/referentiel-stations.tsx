@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { EquipeBadge } from '@/components/equipe/EquipeBadge';
@@ -18,7 +18,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Fonts } from '@/constants/theme';
-import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { useListeFiltrable } from '@/hooks/use-liste-filtrable';
 import {
   type CompteStatuts,
   type FiltreStations,
@@ -48,23 +48,15 @@ const TRIS: TriStation[] = ['nom', 'code', 'maj'];
 /** Liste des stations fixes du cache local (Figma « Stations fixes · Liste »). */
 export default function ReferentielStationsScreen() {
   const router = useRouter();
-  const signalerChargement = useSignalerChargement('referentiel-stations');
-  const [filtre, setFiltre] = useState<FiltreStations>(FILTRE_DEFAUT);
-  const [lignes, setLignes] = useState<StationLigne[]>([]);
+  const { filtre, lignes, modifier, effacer, signalerChargement } = useListeFiltrable<FiltreStations, StationLigne>({
+    defaut: FILTRE_DEFAUT,
+    lister: listerStations,
+    source: 'referentiel-stations',
+  });
   const [total, setTotal] = useState<CompteStatuts>({ tous: 0, actifs: 0, inactifs: 0, majLe: null });
   const [regions, setRegions] = useState<string[]>([]);
   const [feuille, setFeuille] = useState(false);
   const [regionOuverte, setRegionOuverte] = useState(false);
-  const derniereRequete = useRef(0);
-
-  useEffect(() => {
-    const numero = ++derniereRequete.current;
-    listerStations(filtre)
-      .then((resultat) => {
-        if (numero === derniereRequete.current) setLignes(resultat);
-      })
-      .catch((error) => signalerChargement(error, { source: 'referentiel-stations' }));
-  }, [filtre, signalerChargement]);
 
   useEffect(() => {
     Promise.all([compterStations(), listerRegionsStations()])
@@ -75,7 +67,6 @@ export default function ReferentielStationsScreen() {
       .catch((error) => signalerChargement(error, { source: 'referentiel-stations' }));
   }, [signalerChargement]);
 
-  const modifier = (partie: Partial<FiltreStations>) => setFiltre((f) => ({ ...f, ...partie }));
   const nbFiltres = (filtre.statut !== 'tous' ? 1 : 0) + (filtre.region ? 1 : 0);
 
   return (
@@ -156,7 +147,7 @@ export default function ReferentielStationsScreen() {
       <FeuilleFiltres
         visible={feuille}
         onFermer={() => setFeuille(false)}
-        onEffacer={() => setFiltre((f) => ({ ...FILTRE_DEFAUT, recherche: f.recherche }))}
+        onEffacer={effacer}
         libelleAction={libelleVoirResultats(lignes.length)}
       >
         <SectionFiltre titre="Statut">
