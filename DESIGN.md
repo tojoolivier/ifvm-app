@@ -33,6 +33,7 @@ colors:
   violet-bg: "#f1edfb"
   blue-border: "#cdddef"
   green-bg: "#eaf2ec"
+  green-light: "#f6faf7"
   green-border: "#cfe0d4"
   brouillon-text: "#6f6a59"
   brouillon-bg: "#f4efe2"
@@ -173,6 +174,10 @@ components:
     backgroundColor: "{colors.blue-bg}"
     textColor: "{colors.blue-text}"
     rounded: "{rounded.full}"
+  bandeau-equipe:
+    backgroundColor: "{colors.green-light}"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.lg}"
   nouvelle-fiche-icone-prospection:
     backgroundColor: "{colors.green-bg}"
     textColor: "{colors.primary}"
@@ -340,6 +345,19 @@ Les badges de catégorie de vol du mobile (« Mes vols », maquette M/Badge) son
 vert `#235a36` (application), ambre `#8a6d2f` (convoyage), bleu `badge-blue-solid` `#4777a2`
 (prospection) et gris `badge-gray-solid` `#737373` (mise en place, divers). Comme `amber` et `danger`
 pleins, ils ne servent qu'aux pastilles, jamais à un fond de bloc.
+
+### Contexte d'équipe (mobile)
+
+L'équipe de travail est le contexte des écrans de saisie. Le **bandeau d'équipe** (`bandeau-equipe`)
+rappelle son nom, son type (badge AÉRIENNE en vert doux, TERRESTRE en ambre) et « Changer › » ; il se
+pose sous la recherche de « Mes fiches » (avec la puce « Toutes les équipes ») et sous le titre de la
+feuille « Nouvelle fiche ». Sans équipe, il devient une invitation en pointillés ambre : « Définir
+l'équipe ».
+
+Une action que le type de l'équipe ne permet pas (vol avec une équipe terrestre, prospection
+intensive avec une équipe aérienne) n'est jamais masquée : sa carte passe à 55 % d'opacité et son
+sous-titre donne le motif (« Demande une équipe aérienne — « … » est terrestre. Touchez pour changer
+d'équipe. »). Un appui ouvre le choix d'équipe. Maquettes : page « Parcours — Mes fiches ».
 
 ### Graphiques
 
