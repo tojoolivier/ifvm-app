@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { EquipeBadge } from '@/components/equipe/EquipeBadge';
@@ -10,7 +10,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useAuthStore } from '@/lib/auth-store';
-import { filtrerCatalogue } from '@/lib/referentiel-catalogue';
+import { filtrerCatalogue, routeFiche } from '@/lib/referentiel-catalogue';
 import {
   type EtatFraicheur,
   type ResumeReferentiel,
@@ -21,6 +21,7 @@ import {
   libelleEntrees,
   resumerReferentielLocal,
 } from '@/lib/referentiel-consultation';
+import { type GroupeRecherche, rechercherPartout } from '@/lib/referentiel-generique';
 import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 
 const BADGE_FRAICHEUR: Record<EtatFraicheur, { texte: string; ton: 'vertDoux' | 'ambre' | 'neutre' }> = {
@@ -43,12 +44,36 @@ export default function ReferentielsScreen() {
   const [resume, setResume] = useState<ResumeReferentiel | null>(null);
   const [recherche, setRecherche] = useState('');
   const [confirmation, setConfirmation] = useState(false);
+  const [lectureEchouee, setLectureEchouee] = useState(false);
+  const [resultats, setResultats] = useState<GroupeRecherche[]>([]);
+  const derniereRecherche = useRef(0);
 
   const charger = useCallback(() => {
     resumerReferentielLocal()
-      .then(setResume)
-      .catch((error) => signalerChargement(error, { source: 'referentiels' }));
+      .then((lu) => {
+        setResume(lu);
+        setLectureEchouee(false);
+      })
+      .catch((error) => {
+        // Sans état d'erreur, un cache illisible s'affichait « 0 tables · 0 entrées », comme un cache vide.
+        setLectureEchouee(true);
+        signalerChargement(error, { source: 'referentiels' });
+      });
   }, [signalerChargement]);
+
+  // Recherche dans les entrées, un peu après la dernière frappe ; le rendu masque les résultats d'un
+  // terme trop court, l'effet n'a donc rien à remettre à zéro.
+  useEffect(() => {
+    const numero = ++derniereRecherche.current;
+    const minuteur = setTimeout(() => {
+      rechercherPartout(recherche)
+        .then((groupes) => {
+          if (numero === derniereRecherche.current) setResultats(groupes);
+        })
+        .catch((error) => signalerChargement(error, { source: 'referentiels-recherche' }));
+    }, 200);
+    return () => clearTimeout(minuteur);
+  }, [recherche, signalerChargement]);
 
   useFocusEffect(charger);
 
@@ -73,6 +98,7 @@ export default function ReferentielsScreen() {
   const sections = filtrerCatalogue(recherche);
   const fraicheur = BADGE_FRAICHEUR[etatFraicheur(resume?.derniereSynchro)];
   const nbTables = resume?.tables.length ?? 0;
+  const entreesTrouvees = recherche.trim().length >= 2 ? resultats : [];
   const totalLignes = resume?.totalLignes ?? 0;
 
   return (
@@ -99,7 +125,7 @@ export default function ReferentielsScreen() {
               <EquipeBadge texte={fraicheur.texte} ton={fraicheur.ton} />
             </View>
             <ThemedText style={styles.synchroTotal}>
-              {nbTables} tables · {formaterNombre(totalLignes)} entrées
+              {resume ? `${nbTables} tables · ${formaterNombre(totalLignes)} entrées` : '—'}
             </ThemedText>
             <View style={styles.actions}>
               <TouchableOpacity
@@ -129,7 +155,10 @@ export default function ReferentielsScreen() {
           </View>
         </Carte>
 
-        {sections.length === 0 ? <EtatVide texte="Aucun référentiel ne correspond à cette recherche." /> : null}
+        {lectureEchouee && !resume ? <EtatVide texte="Impossible de lire le référentiel de ce téléphone." /> : null}
+        {sections.length === 0 && entreesTrouvees.length === 0 ? (
+          <EtatVide texte="Aucun référentiel ne correspond à cette recherche." />
+        ) : null}
 
         {sections.map((section) => (
           <View key={section.titre} style={styles.section}>
@@ -161,6 +190,33 @@ export default function ReferentielsScreen() {
                   </View>
                 );
               })}
+            </Carte>
+          </View>
+        ))}
+
+        {entreesTrouvees.map((groupe) => (
+          <View key={groupe.table} style={styles.section}>
+            <TitreSection titre={groupe.libelle.toUpperCase()} compteur={groupe.lignes.length} />
+            <Carte>
+              {groupe.lignes.map((ligne, i) => (
+                <View key={ligne.cle}>
+                  {i > 0 ? <View style={styles.filetPlein} /> : null}
+                  <TouchableOpacity
+                    testID={`resultat-${groupe.table}-${ligne.cle}`}
+                    style={styles.resultat}
+                    onPress={() => router.push(routeFiche(groupe.table, ligne.cle) as never)}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.ligneTextes}>
+                      <ThemedText style={styles.ligneTitre}>{ligne.titre}</ThemedText>
+                      <ThemedText style={styles.ligneSous} numberOfLines={1}>
+                        {[ligne.code, ligne.sousTitre].filter(Boolean).join(' · ')}
+                      </ThemedText>
+                    </View>
+                    <AppIcon name="suivant" boite={21.6} color={RF.attenue} />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </Carte>
           </View>
         ))}
@@ -226,6 +282,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 9,
   },
+  filetPlein: { height: 1, backgroundColor: RF.bordure, marginHorizontal: 11 },
+  resultat: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 11, paddingVertical: 9 },
   filet: {
     height: 1,
     backgroundColor: RF.bordure,

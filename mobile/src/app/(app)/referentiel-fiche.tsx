@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
-import { Carte, Champ, EnteteDetail, EtatVide, LigneInfo, NoteInfo, RF, TitreSection } from '@/components/referentiel/composants';
-import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { Carte, Champ, EnteteDetail, EtatVide, LigneInfo, NoteInfo, RF, TitreSection, BadgeActif } from '@/components/referentiel/composants';
+import { useFicheChargee } from '@/hooks/use-fiche-chargee';
 import { abregerIdentifiant, formaterDateHeure } from '@/lib/referentiel-consultation';
 import { type FicheGenerique, configGenerique, estGenerique, getLigneGenerique } from '@/lib/referentiel-generique';
 
@@ -14,15 +13,11 @@ export default function ReferentielFicheScreen() {
   const { table, cle } = useLocalSearchParams<{ table: string; cle: string }>();
   // Un paramètre absent ou inconnu (lien périmé) ne doit pas faire planter l'écran.
   const config = estGenerique(table) ? configGenerique(table) : null;
-  const signalerChargement = useSignalerChargement('referentiel-fiche');
-  const [fiche, setFiche] = useState<FicheGenerique | null | undefined>(undefined);
-
-  useEffect(() => {
-    if (!estGenerique(table)) return;
-    getLigneGenerique(table, cle)
-      .then(setFiche)
-      .catch((error) => signalerChargement(error, { source: 'referentiel-fiche', table, cle }));
-  }, [table, cle, signalerChargement]);
+  const charger = useCallback(
+    (identifiant: string) => (estGenerique(table) ? getLigneGenerique(table, identifiant) : Promise.resolve(null)),
+    [table]
+  );
+  const fiche = useFicheChargee<FicheGenerique>(`referentiel-fiche-${table}`, cle, charger);
 
   if (!config) {
     return (
@@ -48,7 +43,7 @@ export default function ReferentielFicheScreen() {
           <>
             <EnteteDetail
               actif={fiche.actif !== false}
-              badge={fiche.actif === null ? <View /> : <EquipeBadge texte={fiche.actif ? 'ACTIF' : 'INACTIF'} ton={fiche.actif ? 'vertDoux' : 'neutre'} />}
+              badge={fiche.actif === null ? <View /> : <BadgeActif actif={fiche.actif} />}
             />
             {fiche.champs.map((champ) => (
               <Champ key={champ.libelle} libelle={champ.libelle} valeur={champ.valeur} />

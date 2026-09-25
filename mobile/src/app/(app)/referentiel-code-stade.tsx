@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
-import { Carte, Champ, EnteteDetail, EtatVide, LigneInfo, NoteInfo, RF, TitreSection } from '@/components/referentiel/composants';
-import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { Carte, Champ, EnteteDetail, EtatVide, LigneInfo, NoteInfo, RF, TitreSection, BadgeActif } from '@/components/referentiel/composants';
+import { useFicheChargee } from '@/hooks/use-fiche-chargee';
 import {
   type CodeStadeLigne,
   getCodeStade,
@@ -16,14 +14,7 @@ import {
 export default function ReferentielCodeStadeScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const signalerChargement = useSignalerChargement('referentiel-code-stade');
-  const [stade, setStade] = useState<CodeStadeLigne | null | undefined>(undefined);
-
-  useEffect(() => {
-    getCodeStade(id)
-      .then(setStade)
-      .catch((error) => signalerChargement(error, { source: 'referentiel-code-stade', id }));
-  }, [id, signalerChargement]);
+  const stade = useFicheChargee<CodeStadeLigne>('referentiel-code-stade', id, getCodeStade);
 
   const categorieSexe = stade ? [libelleCategorie(stade.categorie), stade.sexe === 'F' ? 'femelle' : stade.sexe === 'M' ? 'mâle' : null].filter(Boolean).join(' ') : '';
 
@@ -38,7 +29,7 @@ export default function ReferentielCodeStadeScreen() {
         {stade === null ? <EtatVide texte="Ce code stade n’est plus dans le référentiel de ce téléphone." /> : null}
         {stade ? (
           <>
-            <EnteteDetail actif={stade.actif} badge={<EquipeBadge texte={stade.actif ? 'ACTIF' : 'INACTIF'} ton={stade.actif ? 'vertDoux' : 'neutre'} />} />
+            <EnteteDetail actif={stade.actif} badge={<BadgeActif actif={stade.actif} />} />
             <Champ libelle="Code" valeur={stade.code} />
             <Champ libelle="Libellé" valeur={stade.libelle} />
             <Champ libelle="Catégorie" valeur={libelleCategorie(stade.categorie)} />

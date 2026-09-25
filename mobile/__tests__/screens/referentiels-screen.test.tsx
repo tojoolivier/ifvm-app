@@ -4,6 +4,7 @@ import ReferentielsScreen from '@/app/(app)/referentiels';
 import { useAuthStore } from '@/lib/auth-store';
 import { REFERENTIEL_TABLES } from '@/lib/referentiel-schema.generated';
 import { resumerReferentielLocal } from '@/lib/referentiel-consultation';
+import { rechercherPartout } from '@/lib/referentiel-generique';
 import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 
 const mockPush = jest.fn();
@@ -13,6 +14,10 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@/lib/storage', () => ({ storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() } }));
 jest.mock('@/lib/referentiel-sync', () => ({ pullReferentiel: jest.fn(), resetReferentielSyncCursors: jest.fn() }));
+jest.mock('@/lib/referentiel-generique', () => ({
+  ...jest.requireActual('@/lib/referentiel-generique'),
+  rechercherPartout: jest.fn(),
+}));
 jest.mock('@/lib/referentiel-consultation', () => ({
   ...jest.requireActual('@/lib/referentiel-consultation'),
   resumerReferentielLocal: jest.fn(),
@@ -36,6 +41,7 @@ beforeEach(() => {
   jest.mocked(pullReferentiel).mockReset().mockResolvedValue(undefined);
   jest.mocked(resetReferentielSyncCursors).mockReset().mockResolvedValue(undefined);
   jest.mocked(resumerReferentielLocal).mockResolvedValue(resume(IL_Y_A_UNE_HEURE));
+  jest.mocked(rechercherPartout).mockReset().mockResolvedValue([]);
   useAuthStore.setState({ token: 'jeton-1' } as never);
 });
 
@@ -89,6 +95,71 @@ describe('ReferentielsScreen', () => {
     expect(screen.queryByText('Pesticides')).toBeNull();
     await fireEvent.changeText(screen.getByTestId('referentiel-recherche'), 'zzz');
     expect(screen.getByText('Aucun référentiel ne correspond à cette recherche.')).toBeTruthy();
+  });
+
+  it('un cache illisible le dit au lieu d’afficher « 0 tables »', async () => {
+    jest.mocked(resumerReferentielLocal).mockRejectedValue(new Error('base fermée'));
+    await render(<ReferentielsScreen />);
+
+    expect(await screen.findByText('Impossible de lire le référentiel de ce téléphone.')).toBeTruthy();
+    expect(screen.queryByText(/0 tables/)).toBeNull();
+  });
+
+  describe('recherche dans les entrées', () => {
+    const trouves = [
+      { table: 'station_fixe', libelle: 'Stations fixes', lignes: [{ cle: 's1', titre: 'Ihosy centre', code: 'STF-014', sousTitre: 'Ihosy', actif: true, majLe: null }] },
+      { table: 'culture', libelle: 'Cultures', lignes: [{ cle: 'c1', titre: 'Maïs Ihosy', code: 'CUL-01', sousTitre: null, actif: true, majLe: null }] },
+    ];
+
+    it('montre les entrées trouvées, groupées par table', async () => {
+      jest.mocked(rechercherPartout).mockResolvedValue(trouves);
+      await render(<ReferentielsScreen />);
+      await screen.findByText('TERRAIN');
+
+      await fireEvent.changeText(screen.getByTestId('referentiel-recherche'), 'ihosy');
+
+      expect(await screen.findByText('Ihosy centre')).toBeTruthy();
+      expect(screen.getByText('STF-014 · Ihosy')).toBeTruthy();
+      expect(screen.getByText('Maïs Ihosy')).toBeTruthy();
+      expect(rechercherPartout).toHaveBeenLastCalledWith('ihosy');
+    });
+
+    it('un résultat ouvre sa fiche : écran dédié pour une station, fiche générique pour une culture', async () => {
+      jest.mocked(rechercherPartout).mockResolvedValue(trouves);
+      await render(<ReferentielsScreen />);
+      await screen.findByText('TERRAIN');
+      await fireEvent.changeText(screen.getByTestId('referentiel-recherche'), 'ihosy');
+
+      await fireEvent.press(await screen.findByTestId('resultat-station_fixe-s1'));
+      await fireEvent.press(screen.getByTestId('resultat-culture-c1'));
+
+      expect(mockPush.mock.calls.map((c) => c[0])).toEqual([
+        { pathname: '/(app)/referentiel-station', params: { id: 's1' } },
+        { pathname: '/(app)/referentiel-fiche', params: { table: 'culture', cle: 'c1' } },
+      ]);
+    });
+
+    it('un terme d’une lettre ne montre aucun résultat, même si une réponse tardive arrive', async () => {
+      jest.mocked(rechercherPartout).mockResolvedValue(trouves);
+      await render(<ReferentielsScreen />);
+      await screen.findByText('TERRAIN');
+
+      await fireEvent.changeText(screen.getByTestId('referentiel-recherche'), 'i');
+      await new Promise((r) => setTimeout(r, 300));
+
+      expect(screen.queryByText('Ihosy centre')).toBeNull();
+    });
+
+    it('les résultats d’entrées évitent le message « aucun référentiel »', async () => {
+      jest.mocked(rechercherPartout).mockResolvedValue(trouves);
+      await render(<ReferentielsScreen />);
+      await screen.findByText('TERRAIN');
+
+      await fireEvent.changeText(screen.getByTestId('referentiel-recherche'), 'zzzz');
+
+      await screen.findByText('Ihosy centre');
+      expect(screen.queryByText('Aucun référentiel ne correspond à cette recherche.')).toBeNull();
+    });
   });
 
   it('« Synchroniser » remet les curseurs à zéro puis tire le référentiel', async () => {

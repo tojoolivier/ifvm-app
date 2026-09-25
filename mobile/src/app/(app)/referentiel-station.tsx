@@ -1,24 +1,15 @@
-import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
-import { Carte, Champ, EnteteDetail, EtatVide, LigneInfo, NoteInfo, RF, TitreSection } from '@/components/referentiel/composants';
-import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
+import { Carte, Champ, EnteteDetail, EtatVide, LigneInfo, NoteInfo, RF, TitreSection, BadgeActif } from '@/components/referentiel/composants';
+import { useFicheChargee } from '@/hooks/use-fiche-chargee';
 import { type StationLigne, getStation } from '@/lib/referentiel-consultation';
 
 /** Fiche d'une station fixe, en lecture seule (Figma « Station · Détail »). */
 export default function ReferentielStationScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const signalerChargement = useSignalerChargement('referentiel-station');
-  const [station, setStation] = useState<StationLigne | null | undefined>(undefined);
-
-  useEffect(() => {
-    getStation(id)
-      .then(setStation)
-      .catch((error) => signalerChargement(error, { source: 'referentiel-station', id }));
-  }, [id, signalerChargement]);
+  const station = useFicheChargee<StationLigne>('referentiel-station', id, getStation);
 
   const poste = station?.poste_nom ? [station.poste_nom, station.poste_code].filter(Boolean).join(' · ') : '—';
 
@@ -33,7 +24,7 @@ export default function ReferentielStationScreen() {
         {station === null ? <EtatVide texte="Cette station n’est plus dans le référentiel de ce téléphone." /> : null}
         {station ? (
           <>
-            <EnteteDetail actif={station.actif} badge={<EquipeBadge texte={station.actif ? 'ACTIVE' : 'INACTIVE'} ton={station.actif ? 'vertDoux' : 'neutre'} />} />
+            <EnteteDetail actif={station.actif} badge={<BadgeActif actif={station.actif} feminin />} />
             <Champ libelle="Code" valeur={station.code} />
             <Champ libelle="Nom" valeur={station.nom} />
             <Champ libelle="Poste acridien" valeur={poste} />

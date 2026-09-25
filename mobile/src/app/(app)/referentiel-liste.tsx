@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
-import { BarreRecherche, Carte, Chip, EtatVide, RangeeChips, RF, TitreSection } from '@/components/referentiel/composants';
+import { BarreRecherche, Carte, Chip, EtatVide, RangeeChips, RF, TitreSection, BadgeActif } from '@/components/referentiel/composants';
 import { ThemedText } from '@/components/themed-text';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Fonts } from '@/constants/theme';
@@ -116,7 +115,7 @@ export default function ReferentielListeScreen() {
                 <ThemedText style={styles.nom} numberOfLines={1}>
                   {item.titre}
                 </ThemedText>
-                {item.actif !== null ? <EquipeBadge texte={item.actif ? 'ACTIF' : 'INACTIF'} ton={item.actif ? 'vertDoux' : 'neutre'} /> : null}
+                {item.actif !== null ? <BadgeActif actif={item.actif} /> : null}
               </View>
               <View style={styles.ligneBasse}>
                 {item.code ? <ThemedText style={styles.code}>{item.code}</ThemedText> : null}

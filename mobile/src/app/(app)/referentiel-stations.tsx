@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import {
   BarreRecherche,
@@ -14,6 +13,7 @@ import {
   RF,
   SectionFiltre,
   TitreSection,
+  BadgeActif
 } from '@/components/referentiel/composants';
 import { ThemedText } from '@/components/themed-text';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -127,7 +127,7 @@ export default function ReferentielStationsScreen() {
                   <ThemedText style={styles.nom} numberOfLines={1}>
                     {item.nom}
                   </ThemedText>
-                  <EquipeBadge texte={item.actif ? 'ACTIVE' : 'INACTIVE'} ton={item.actif ? 'vertDoux' : 'neutre'} />
+                  <BadgeActif actif={item.actif} feminin />
                 </View>
                 <View style={styles.ligneCode}>
                   <ThemedText style={styles.code}>{item.code}</ThemedText>

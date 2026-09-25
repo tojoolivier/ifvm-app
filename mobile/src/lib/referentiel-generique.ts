@@ -1,4 +1,5 @@
 import { getReferentielDb } from './referentiel-db';
+import { entreesCatalogue } from './referentiel-catalogue';
 import { formaterJourMois, type StatutFiltre } from './referentiel-consultation';
 
 /**
@@ -264,6 +265,61 @@ export const CONFIGS_GENERIQUES: Record<string, ConfigTable> = {
   },
 };
 
+/**
+ * Les trois tables qui ont leur propre écran ne servent ici qu'à la recherche de l'accueil : de quoi
+ * afficher une ligne de résultat (titre, code, sous-titre), la fiche complète restant celle de l'écran dédié.
+ */
+const CONFIGS_DEDIEES: Record<string, ConfigTable> = {
+  pesticide: {
+    titre: 'Pesticides',
+    libelleFiche: 'Pesticide',
+    from: 'pesticide t',
+    cle: 't.id',
+    titreSql: 't.nom',
+    codeSql: 't.code',
+    sousTitreSql: 't.matiere_active',
+    actifSql: 't.actif',
+    majSql: 't.updated_at',
+    recherche: ['t.nom', 't.code', 't.matiere_active'],
+    tri: 't.nom COLLATE NOCASE',
+    champs: [],
+    avecIdentifiant: true,
+    placeholderRecherche: '',
+  },
+  station_fixe: {
+    titre: 'Stations fixes',
+    libelleFiche: 'Station fixe',
+    from: 'station_fixe t',
+    cle: 't.id',
+    titreSql: 't.nom',
+    codeSql: 't.code',
+    sousTitreSql: 't.commune',
+    actifSql: 't.actif',
+    majSql: 't.updated_at',
+    recherche: ['t.nom', 't.code', 't.commune'],
+    tri: 't.nom COLLATE NOCASE',
+    champs: [],
+    avecIdentifiant: true,
+    placeholderRecherche: '',
+  },
+  code_stade: {
+    titre: 'Codes stades',
+    libelleFiche: 'Code stade',
+    from: 'code_stade t',
+    cle: 't.id',
+    titreSql: 't.libelle',
+    codeSql: 't.code',
+    sousTitreSql: 't.espece',
+    actifSql: 't.actif',
+    majSql: 't.updated_at',
+    recherche: ['t.code', 't.libelle'],
+    tri: 't.ordre',
+    champs: [],
+    avecIdentifiant: true,
+    placeholderRecherche: '',
+  },
+};
+
 function configDe(table: string): ConfigTable {
   const config = CONFIGS_GENERIQUES[table];
   if (!config) throw new Error(`Table de référentiel inconnue : ${table}`);
@@ -371,7 +427,10 @@ function versLigne(brut: Brut, config: ConfigTable): LigneGenerique {
 }
 
 export async function listerGenerique(table: string, filtre: FiltreGenerique): Promise<LigneGenerique[]> {
-  const config = configDe(table);
+  return listerAvecConfig(configDe(table), filtre);
+}
+
+async function listerAvecConfig(config: ConfigTable, filtre: FiltreGenerique, limite?: number): Promise<LigneGenerique[]> {
   const db = await getReferentielDb();
   const conditions: string[] = [];
   const params: string[] = [];
@@ -389,10 +448,35 @@ export async function listerGenerique(table: string, filtre: FiltreGenerique): P
 
   const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
   const lignes = await db.getAllAsync<Brut>(
-    `SELECT ${colonnesDe(config)} FROM ${config.from}${where} ORDER BY ${config.tri}`,
+    `SELECT ${colonnesDe(config)} FROM ${config.from}${where} ORDER BY ${config.tri}${limite ? ` LIMIT ${limite}` : ''}`,
     params
   );
   return lignes.map((l) => versLigne(l, config));
+}
+
+export interface GroupeRecherche {
+  table: string;
+  libelle: string;
+  lignes: LigneGenerique[];
+}
+
+const LONGUEUR_MINIMALE_RECHERCHE = 2;
+const LIMITE_PAR_TABLE = 5;
+
+/**
+ * « Rechercher dans tous les référentiels » : cherche le terme dans les entrées des 13 tables (cinq
+ * résultats au plus par table) et ne rend que les tables qui répondent, rangées comme l'accueil. Sous
+ * deux caractères, rien n'est cherché : un « a » remonterait la moitié du cache.
+ */
+export async function rechercherPartout(terme: string): Promise<GroupeRecherche[]> {
+  if (terme.trim().length < LONGUEUR_MINIMALE_RECHERCHE) return [];
+  const groupes: GroupeRecherche[] = [];
+  for (const entree of entreesCatalogue()) {
+    const config = CONFIGS_GENERIQUES[entree.table] ?? CONFIGS_DEDIEES[entree.table];
+    const lignes = await listerAvecConfig(config, { recherche: terme, statut: 'tous' }, LIMITE_PAR_TABLE);
+    if (lignes.length > 0) groupes.push({ table: entree.table, libelle: entree.libelle, lignes });
+  }
+  return groupes;
 }
 
 export async function getLigneGenerique(table: string, cle: string): Promise<FicheGenerique | null> {

@@ -64,6 +64,18 @@ export const CATALOGUE: SectionCatalogue[] = [
   },
 ];
 
+/** L'écran de fiche d'une entrée : les trois tables à écran dédié gardent le leur, les autres ont la fiche générique. */
+export function routeFiche(table: string, cle: string): { pathname: string; params: Record<string, string> } {
+  const dedie = FICHES_DEDIEES[table];
+  return dedie ? { pathname: dedie, params: { id: cle } } : { pathname: '/(app)/referentiel-fiche', params: { table, cle } };
+}
+
+const FICHES_DEDIEES: Record<string, string> = {
+  pesticide: '/(app)/referentiel-pesticide',
+  station_fixe: '/(app)/referentiel-station',
+  code_stade: '/(app)/referentiel-code-stade',
+};
+
 export function entreesCatalogue(): EntreeCatalogue[] {
   return CATALOGUE.flatMap((section) => section.entrees);
 }

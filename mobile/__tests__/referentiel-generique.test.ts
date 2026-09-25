@@ -5,6 +5,7 @@ import {
   formaterValeur,
   getLigneGenerique,
   listerGenerique,
+  rechercherPartout,
 } from '../src/lib/referentiel-generique';
 
 const getAllAsync = jest.fn();
@@ -161,5 +162,44 @@ describe('compterGenerique', () => {
   it('une table sans actif compte ses lignes en bloc', async () => {
     getFirstAsync.mockResolvedValue({ n: 61 });
     expect(await compterGenerique('equipe_membre')).toEqual({ tous: 61, actifs: 61, inactifs: 0, majLe: null });
+  });
+});
+
+describe('rechercherPartout', () => {
+  it('ne cherche pas en dessous de deux caractères', async () => {
+    expect(await rechercherPartout('a')).toEqual([]);
+    expect(await rechercherPartout('  ')).toEqual([]);
+    expect(getAllAsync).not.toHaveBeenCalled();
+  });
+
+  it('interroge les 13 tables, avec une limite, et échappe les jokers', async () => {
+    await rechercherPartout('50%');
+
+    expect(getAllAsync).toHaveBeenCalledTimes(13);
+    const [sql, params] = getAllAsync.mock.calls[0];
+    expect(sql).toContain('LIMIT');
+    expect(sql).toContain("ESCAPE '\\'");
+    expect(params[0]).toBe('%50\\%%');
+  });
+
+  it('ne rend que les tables qui ont des résultats, rangées comme l’accueil', async () => {
+    getAllAsync.mockImplementation(async (sql: string) =>
+      sql.includes('FROM culture t') || sql.includes('FROM pesticide t')
+        ? [{ cle: 'x1', titre: 'Maïs', code: 'CUL-01', sous_titre: null, actif: 1, maj: null }]
+        : []
+    );
+
+    const groupes = await rechercherPartout('ma');
+
+    expect(groupes.map((g) => g.table)).toEqual(['pesticide', 'culture']);
+    expect(groupes[1].lignes[0]).toMatchObject({ cle: 'x1', titre: 'Maïs', code: 'CUL-01' });
+  });
+
+  it('les trois tables à écran dédié sont cherchées aussi (pesticide, station, code stade)', async () => {
+    await rechercherPartout('ih');
+    const requetes = getAllAsync.mock.calls.map((c) => c[0] as string).join('\n');
+    expect(requetes).toContain('FROM pesticide t');
+    expect(requetes).toContain('FROM station_fixe t');
+    expect(requetes).toContain('FROM code_stade t');
   });
 });

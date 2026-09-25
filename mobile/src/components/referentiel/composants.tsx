@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EQ } from '@/components/equipe/tokens';
 import { ThemedText } from '@/components/themed-text';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -163,6 +164,12 @@ export function EnteteDetail({ actif, badge }: { actif: boolean; badge: ReactNod
       <ThemedText style={styles.lectureSeule}>Lecture seule</ThemedText>
     </View>
   );
+}
+
+/** Le badge de statut d'une entrée : « ACTIF » en vert doux, « INACTIF » en neutre (« ACTIVE » au féminin, pour les stations). */
+export function BadgeActif({ actif, feminin = false }: { actif: boolean; feminin?: boolean }) {
+  const texte = feminin ? (actif ? 'ACTIVE' : 'INACTIVE') : actif ? 'ACTIF' : 'INACTIF';
+  return <EquipeBadge texte={texte} ton={actif ? 'vertDoux' : 'neutre'} />;
 }
 
 export function EtatVide({ texte }: { texte: string }) {

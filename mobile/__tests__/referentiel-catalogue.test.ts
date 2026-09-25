@@ -1,5 +1,6 @@
 import { REFERENTIEL_TABLES } from '../src/lib/referentiel-schema.generated';
 import { CONFIGS_GENERIQUES } from '../src/lib/referentiel-generique';
+import { routeFiche } from '../src/lib/referentiel-catalogue';
 import { CATALOGUE, entreesCatalogue, filtrerCatalogue, libelleCourtEntite } from '../src/lib/referentiel-catalogue';
 
 // Le catalogue ne touche pas la base : `referentiel-generique` l'importe seulement pour ses configurations.
@@ -50,5 +51,12 @@ describe('catalogue des référentiels', () => {
   it('donne le nom court d’une entité pour la liste des tables restantes', () => {
     expect(libelleCourtEntite('equipe_membres')).toBe('membres');
     expect(libelleCourtEntite('utilisateurs_equipe')).toBe('utilisateurs');
+  });
+
+  it('la fiche d’une entrée s’ouvre sur son écran dédié, sinon sur la fiche générique', () => {
+    expect(routeFiche('pesticide', 'p1')).toEqual({ pathname: '/(app)/referentiel-pesticide', params: { id: 'p1' } });
+    expect(routeFiche('station_fixe', 's1')).toEqual({ pathname: '/(app)/referentiel-station', params: { id: 's1' } });
+    expect(routeFiche('code_stade', 'c1')).toEqual({ pathname: '/(app)/referentiel-code-stade', params: { id: 'c1' } });
+    expect(routeFiche('culture', 'x')).toEqual({ pathname: '/(app)/referentiel-fiche', params: { table: 'culture', cle: 'x' } });
   });
 });

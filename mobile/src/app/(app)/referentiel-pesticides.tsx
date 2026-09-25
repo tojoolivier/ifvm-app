@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { EquipeBadge } from '@/components/equipe/EquipeBadge';
 import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import {
   BarreRecherche,
@@ -15,6 +14,7 @@ import {
   RF,
   SectionFiltre,
   TitreSection,
+  BadgeActif
 } from '@/components/referentiel/composants';
 import { ThemedText } from '@/components/themed-text';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -147,7 +147,7 @@ export default function ReferentielPesticidesScreen() {
                 <ThemedText style={styles.nom} numberOfLines={1}>
                   {item.nom}
                 </ThemedText>
-                <EquipeBadge texte={item.actif ? 'ACTIF' : 'INACTIF'} ton={item.actif ? 'vertDoux' : 'neutre'} />
+                <BadgeActif actif={item.actif} />
               </View>
               <View style={styles.ligneBasse}>
                 <ThemedText style={styles.code}>{item.code}</ThemedText>
