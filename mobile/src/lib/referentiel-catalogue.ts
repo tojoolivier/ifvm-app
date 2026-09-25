@@ -15,7 +15,7 @@ export interface EntreeCatalogue {
   /** Nom court, en minuscules, pour la phrase « N tables restantes : … » de la réinitialisation. */
   court: string;
   icone: AppIconName;
-  route: string | null;
+  route: string;
 }
 
 export interface SectionCatalogue {
@@ -27,7 +27,7 @@ export const CATALOGUE: SectionCatalogue[] = [
   {
     titre: 'TERRAIN',
     entrees: [
-      { table: 'poste_acridien', entite: 'postes_acridiens', libelle: 'Postes acridiens', court: 'postes acridiens', icone: 'criquet', route: null },
+      { table: 'poste_acridien', entite: 'postes_acridiens', libelle: 'Postes acridiens', court: 'postes acridiens', icone: 'criquet', route: '/(app)/referentiel-liste?table=poste_acridien' },
       { table: 'station_fixe', entite: 'stations_fixes', libelle: 'Stations fixes', court: 'stations fixes', icone: 'localisation', route: '/(app)/referentiel-stations' },
     ],
   },
@@ -35,31 +35,31 @@ export const CATALOGUE: SectionCatalogue[] = [
     titre: 'PRODUITS',
     entrees: [
       { table: 'pesticide', entite: 'pesticides', libelle: 'Pesticides', court: 'pesticides', icone: 'pluie', route: '/(app)/referentiel-pesticides' },
-      { table: 'culture', entite: 'cultures', libelle: 'Cultures', court: 'cultures', icone: 'tracteur', route: null },
+      { table: 'culture', entite: 'cultures', libelle: 'Cultures', court: 'cultures', icone: 'tracteur', route: '/(app)/referentiel-liste?table=culture' },
     ],
   },
   {
     titre: 'STADES & CAMPAGNES',
     entrees: [
       { table: 'code_stade', entite: 'codes_stades', libelle: 'Codes stades', court: 'codes stades', icone: 'rapport-fiche', route: '/(app)/referentiel-codes-stades' },
-      { table: 'campagne', entite: 'campagnes', libelle: 'Campagnes', court: 'campagnes', icone: 'calendrier', route: null },
+      { table: 'campagne', entite: 'campagnes', libelle: 'Campagnes', court: 'campagnes', icone: 'calendrier', route: '/(app)/referentiel-liste?table=campagne' },
     ],
   },
   {
     titre: 'AÉRIEN',
     entrees: [
-      { table: 'aeronef', entite: 'aeronefs', libelle: 'Aéronefs', court: 'aéronefs', icone: 'aeronef-avion', route: null },
-      { table: 'lieu_aerien', entite: 'lieux_aeriens', libelle: 'Lieux aériens', court: 'lieux aériens', icone: 'carte-infestation', route: null },
-      { table: 'site_aerien', entite: 'sites_aeriens', libelle: 'Sites aériens', court: 'sites aériens', icone: 'accueil', route: null },
+      { table: 'aeronef', entite: 'aeronefs', libelle: 'Aéronefs', court: 'aéronefs', icone: 'aeronef-avion', route: '/(app)/referentiel-liste?table=aeronef' },
+      { table: 'lieu_aerien', entite: 'lieux_aeriens', libelle: 'Lieux aériens', court: 'lieux aériens', icone: 'carte-infestation', route: '/(app)/referentiel-liste?table=lieu_aerien' },
+      { table: 'site_aerien', entite: 'sites_aeriens', libelle: 'Sites aériens', court: 'sites aériens', icone: 'accueil', route: '/(app)/referentiel-liste?table=site_aerien' },
     ],
   },
   {
     titre: 'ÉQUIPES',
     entrees: [
-      { table: 'equipe', entite: 'equipes', libelle: 'Équipes', court: 'équipes', icone: 'utilisateurs', route: null },
-      { table: 'equipe_membre', entite: 'equipe_membres', libelle: 'Membres d’équipe', court: 'membres', icone: 'utilisateur', route: null },
-      { table: 'equipe_aeronef', entite: 'equipe_aeronefs', libelle: 'Affectations aéronef', court: 'affectations', icone: 'heures-de-vol', route: null },
-      { table: 'utilisateur_equipe', entite: 'utilisateurs_equipe', libelle: 'Utilisateurs', court: 'utilisateurs', icone: 'utilisateur', route: null },
+      { table: 'equipe', entite: 'equipes', libelle: 'Équipes', court: 'équipes', icone: 'utilisateurs', route: '/(app)/referentiel-liste?table=equipe' },
+      { table: 'equipe_membre', entite: 'equipe_membres', libelle: 'Membres d’équipe', court: 'membres', icone: 'utilisateur', route: '/(app)/referentiel-liste?table=equipe_membre' },
+      { table: 'equipe_aeronef', entite: 'equipe_aeronefs', libelle: 'Affectations aéronef', court: 'affectations', icone: 'heures-de-vol', route: '/(app)/referentiel-liste?table=equipe_aeronef' },
+      { table: 'utilisateur_equipe', entite: 'utilisateurs_equipe', libelle: 'Utilisateurs', court: 'utilisateurs', icone: 'utilisateur', route: '/(app)/referentiel-liste?table=utilisateur_equipe' },
     ],
   },
 ];

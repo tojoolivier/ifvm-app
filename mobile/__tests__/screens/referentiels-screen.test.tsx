@@ -60,7 +60,7 @@ describe('ReferentielsScreen', () => {
     expect(await screen.findByText('JAMAIS SYNCHRONISÉ')).toBeTruthy();
   });
 
-  it('seules les listes dessinées s’ouvrent : pesticides, stations, codes stades', async () => {
+  it('chaque ligne s’ouvre : écrans dédiés pour trois, liste générique pour les autres', async () => {
     await render(<ReferentielsScreen />);
     await screen.findByText('TERRAIN');
 
@@ -68,11 +68,14 @@ describe('ReferentielsScreen', () => {
     await fireEvent.press(screen.getByTestId('referentiel-station_fixe'));
     await fireEvent.press(screen.getByTestId('referentiel-code_stade'));
     await fireEvent.press(screen.getByTestId('referentiel-culture'));
+    await fireEvent.press(screen.getByTestId('referentiel-equipe_membre'));
 
     expect(mockPush.mock.calls.map((c) => c[0])).toEqual([
       '/(app)/referentiel-pesticides',
       '/(app)/referentiel-stations',
       '/(app)/referentiel-codes-stades',
+      '/(app)/referentiel-liste?table=culture',
+      '/(app)/referentiel-liste?table=equipe_membre',
     ]);
   });
 

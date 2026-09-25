@@ -138,16 +138,14 @@ export default function ReferentielsScreen() {
               {section.entrees.map((entree, i) => {
                 const etat = parTable.get(entree.table);
                 const majLe = etat?.majLe ? ` · màj ${formaterJourMois(etat.majLe)}` : '';
-                const ouvrable = entree.route !== null;
                 return (
                   <View key={entree.table}>
                     {i > 0 ? <View style={styles.filet} /> : null}
                     <TouchableOpacity
                       testID={`referentiel-${entree.table}`}
                       style={styles.ligne}
-                      disabled={!ouvrable}
-                      onPress={() => router.push(entree.route as never)}
-                      accessibilityRole={ouvrable ? 'button' : 'text'}
+                        onPress={() => router.push(entree.route as never)}
+                      accessibilityRole="button"
                     >
                       <View style={styles.tuile}>
                         <AppIcon name={entree.icone} size={23.04} color={RF.vert} />
@@ -158,7 +156,7 @@ export default function ReferentielsScreen() {
                           style={styles.ligneSous}
                         >{`${libelleEntrees(etat?.lignes ?? 0)}${majLe}`}</ThemedText>
                       </View>
-                      {ouvrable ? <AppIcon name="suivant" boite={21.6} color={RF.attenue} /> : null}
+                      <AppIcon name="suivant" boite={21.6} color={RF.attenue} />
                     </TouchableOpacity>
                   </View>
                 );

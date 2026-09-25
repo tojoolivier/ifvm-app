@@ -1,5 +1,9 @@
 import { REFERENTIEL_TABLES } from '../src/lib/referentiel-schema.generated';
+import { CONFIGS_GENERIQUES } from '../src/lib/referentiel-generique';
 import { CATALOGUE, entreesCatalogue, filtrerCatalogue, libelleCourtEntite } from '../src/lib/referentiel-catalogue';
+
+// Le catalogue ne touche pas la base : `referentiel-generique` l'importe seulement pour ses configurations.
+jest.mock('../src/lib/referentiel-db', () => ({ getReferentielDb: jest.fn() }));
 
 describe('catalogue des référentiels', () => {
   it('couvre chacune des 13 tables du cache, une seule fois', () => {
@@ -11,9 +15,22 @@ describe('catalogue des référentiels', () => {
     expect(CATALOGUE.map((s) => s.titre)).toEqual(['TERRAIN', 'PRODUITS', 'STADES & CAMPAGNES', 'AÉRIEN', 'ÉQUIPES']);
   });
 
-  it('seules les listes dessinées (pesticides, stations, codes stades) s’ouvrent', () => {
-    const ouvrables = entreesCatalogue().filter((e) => e.route).map((e) => e.table).sort();
-    expect(ouvrables).toEqual(['code_stade', 'pesticide', 'station_fixe']);
+  it('chaque table s’ouvre : trois écrans dessinés, dix génériques', () => {
+    const dediees = ['/(app)/referentiel-stations', '/(app)/referentiel-pesticides', '/(app)/referentiel-codes-stades'];
+    const entrees = entreesCatalogue();
+    expect(entrees.filter((e) => dediees.includes(e.route)).map((e) => e.table).sort()).toEqual([
+      'code_stade',
+      'pesticide',
+      'station_fixe',
+    ]);
+    for (const e of entrees.filter((x) => !dediees.includes(x.route))) {
+      expect(e.route).toBe(`/(app)/referentiel-liste?table=${e.table}`);
+    }
+  });
+
+  it('les tables génériques du catalogue sont exactement celles que sait lire referentiel-generique', () => {
+    const generiques = entreesCatalogue().filter((e) => e.route.startsWith('/(app)/referentiel-liste')).map((e) => e.table);
+    expect(generiques.sort()).toEqual(Object.keys(CONFIGS_GENERIQUES).sort());
   });
 
   it('la recherche filtre les lignes sans tenir compte des accents ni de la casse', () => {
