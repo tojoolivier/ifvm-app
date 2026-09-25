@@ -212,12 +212,11 @@ async def test_update_culture_code_deja_pris_retourne_409(
 
 
 @pytest.mark.asyncio
-async def test_pas_de_suppression_physique(client: AsyncClient, auth_headers: dict, culture):
-    """Aucune route DELETE : le pull ne transporte que des upserts, une ligne
-    supprimée en base resterait sur les téléphones déjà synchronisés."""
+async def test_suppression_reservee_a_ladmin(client: AsyncClient, auth_headers: dict, culture):
+    """DELETE = soft-delete `deleted_at` (#674) : réservé à l'admin, un agent reçoit 403."""
     response = await client.delete(f"/cultures/{culture.id}", headers=auth_headers)
 
-    assert response.status_code == 405
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

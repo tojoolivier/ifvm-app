@@ -7,18 +7,22 @@ from app.domain.campagne import Campagne
 from app.domain.prospection import AuditLog, Prospection
 from app.domain.referentiel import (
     Aeronef,
-    BaseAerienne,
+    AffectationAeronef,
     CodeStade,
     Commune,
     Culture,
-    EquipeAerienne,
-    EquipeTerrestre,
+    Equipe,
     LieuAerien,
+    MembreEquipe,
+    MouvementPesticide,
     Pesticide,
     PosteAcridien,
-    StandRemplissage,
+    SiteAerienne,
+    SiteAeriennePosition,
+    SoldePesticide,
     StationFixe,
     UtilisateurEquipe,
+    Vol,
     ZoneAntiAcridien,
 )
 from app.domain.traitement import Bloc, ProduitUtilise, Rotation, Traitement, TraitementSignature
@@ -60,6 +64,8 @@ class ProspectionRepository(ABC):
         campagne_id: uuid.UUID | None = None,
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
+        equipe_id: uuid.UUID | None = None,
+        vol_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
     ) -> list[Prospection]:
@@ -128,7 +134,6 @@ class TraitementRepository(ABC):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -139,7 +144,6 @@ class TraitementRepository(ABC):
         rotation: Rotation,
         nb_rotations: int,
         total_pesticide_l: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -150,7 +154,6 @@ class TraitementRepository(ABC):
         rotation_id: uuid.UUID,
         nb_rotations: int,
         total_pesticide_l: float | None,
-        pesticide_stock_restant_l: float | None,
     ) -> Traitement:
         pass
 
@@ -213,6 +216,12 @@ class TraitementRepository(ABC):
 class UtilisateurRepository(ABC):
     @abstractmethod
     async def get_by_id(self, utilisateur_id: uuid.UUID) -> UtilisateurRef | None:
+        pass
+
+    @abstractmethod
+    async def creer_a_la_volee(self, nom: str, prenom: str, role: str) -> UtilisateurRef:
+        """Compte « identité seule » (`peut_se_connecter=False`) pour un membre
+        d'équipe externe, sans écrire en base tant que l'équipe n'est pas commitée."""
         pass
 
 
@@ -445,32 +454,71 @@ class LieuAerienRepository(ABC):
         pass
 
 
-class BaseAerienneRepository(ABC):
+class SiteAerienneRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
 
     @abstractmethod
-    async def list_since(self, since: datetime | None) -> list[BaseAerienne]:
+    async def list_since(self, since: datetime | None) -> list[SiteAerienne]:
         pass
 
     @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[BaseAerienne]:
+    async def list_all(self, actif: bool | None = True) -> list[SiteAerienne]:
         pass
 
     @abstractmethod
-    async def get_by_id(self, base_id: uuid.UUID) -> BaseAerienne | None:
+    async def get_by_id(self, site_id: uuid.UUID) -> SiteAerienne | None:
         pass
 
     @abstractmethod
-    async def create(self, base: BaseAerienne) -> BaseAerienne:
+    async def create(self, site: SiteAerienne) -> SiteAerienne:
         pass
 
     @abstractmethod
-    async def update(self, base: BaseAerienne) -> BaseAerienne:
+    async def update(self, site: SiteAerienne) -> SiteAerienne:
+        pass
+
+
+class SiteAeriennePositionRepository(ABC):
+    """Historique des implantations d'un `site_aerienne` (migration 0088, #604)."""
+
+    @abstractmethod
+    async def list_par_site(self, site_id: uuid.UUID) -> list[SiteAeriennePosition]:
+        pass
+
+    @abstractmethod
+    async def get_active(self, site_id: uuid.UUID) -> SiteAeriennePosition | None:
+        pass
+
+    @abstractmethod
+    async def installer(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
+        pass
+
+    @abstractmethod
+    async def demonter(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
+        pass
+
+    @abstractmethod
+    async def deplacer(
+        self,
+        site_ids: list[uuid.UUID],
+        latitude: float,
+        longitude: float,
+        altitude: float | None,
+        aujourdhui: date,
+    ) -> list[SiteAeriennePosition]:
+        """Une nouvelle position active par site, en UNE transaction (#655). La position
+        active précédente est close à J-1 ; si elle date d'aujourd'hui elle est corrigée
+        en place (`date_fin >= date_debut`), ce qui rend un rejeu du même jour inoffensif."""
         pass
 
 
 class AeronefRepository(ABC):
     """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+
+    @abstractmethod
+    async def list_since(self, since: datetime | None) -> list[Aeronef]:
+        """Pull mobile : inactifs inclus, une désactivation doit remonter (#638)."""
+        pass
 
     @abstractmethod
     async def list_all(self, actif: bool | None = True) -> list[Aeronef]:
@@ -481,76 +529,106 @@ class AeronefRepository(ABC):
         pass
 
     @abstractmethod
+    async def create(self, aeronef: Aeronef) -> Aeronef:
+        """Enregistre un appareil au référentiel, sans équipe (#621). Un aéronef n'est
+        plus lié à une équipe pour exister : il peut arriver sur la campagne avant sa
+        première affectation, et rester au parc entre deux (#603)."""
+        pass
+
+    @abstractmethod
     async def update(self, aeronef: Aeronef) -> Aeronef:
-        """Pas de `create` : un aéronef naît avec son équipe (cf.
-        `EquipeAerienneRepository.create`), jamais orphelin."""
         pass
 
 
-class EquipeAerienneRepository(ABC):
-    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+class EquipeAeronefRepository(ABC):
+    """Affectations d'aéronefs à une équipe, bornées dans le temps (#603).
+
+    Aucune méthode de suppression : retirer un appareil, c'est borner l'affectation
+    (`date_fin`), pas effacer la ligne — tout l'intérêt de la table est l'historique."""
 
     @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[EquipeAerienne]:
+    async def list_since(self, since: datetime | None) -> list[AffectationAeronef]:
+        """Pull mobile (#638) : affectations créées ou clôturées depuis `since`."""
         pass
 
     @abstractmethod
-    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
+    async def list_par_equipe(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
+        """Historique complet, affectation en cours d'abord (`date_debut` décroissante)."""
         pass
 
     @abstractmethod
-    async def get_by_chef_de_base_id(self, chef_de_base_id: uuid.UUID) -> EquipeAerienne | None:
-        """L'équipe dirigée par cet utilisateur (UNIQUE `chef_de_base_id`), `None` s'il
-        n'en dirige aucune — c'est ainsi qu'on déduit « son » équipe."""
+    async def get_by_id(self, affectation_id: uuid.UUID) -> AffectationAeronef | None:
         pass
 
     @abstractmethod
-    async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
-        """Crée l'équipe et, si `equipe.aeronef` est fourni, son aéronef dans la même
-        transaction."""
-        pass
-
-
-class EquipeTerrestreRepository(ABC):
-    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`.
-    Pas de `PUT` pour ce lot (mirroring `EquipeAerienneRepository`) : ni le
-    renommage, ni le changement de chef, ni l'édition des membres après création
-    ne sont exposés."""
-
-    @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[EquipeTerrestre]:
+    async def list_chevauchements(
+        self,
+        date_debut: date,
+        date_fin: date | None,
+        equipe_id: uuid.UUID | None = None,
+        aeronef_id: uuid.UUID | None = None,
+        sauf_id: uuid.UUID | None = None,
+    ) -> list[AffectationAeronef]:
+        """Affectations dont l'intervalle recoupe `[date_debut, date_fin)`, pour cette
+        équipe et/ou cet appareil. `sauf_id` exclut l'affectation en cours de
+        modification, qui se chevauche toujours elle-même."""
         pass
 
     @abstractmethod
-    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeTerrestre | None:
+    async def create(self, affectation: AffectationAeronef) -> AffectationAeronef:
         pass
 
     @abstractmethod
-    async def create(self, equipe: EquipeTerrestre) -> EquipeTerrestre:
+    async def update(self, affectation: AffectationAeronef) -> AffectationAeronef:
+        """Seule `date_fin` est réécrite : borner une affectation, c'est la clôturer."""
         pass
 
 
-class StandRemplissageRepository(ABC):
-    """Aucune méthode de suppression : la sortie du référentiel est `actif=false`."""
+class EquipeRepository(ABC):
+    """Référentiel unique des équipes (ADR-018). Aucune méthode de suppression : la
+    sortie du référentiel est `actif=false`."""
 
     @abstractmethod
-    async def list_since(self, since: datetime | None) -> list[StandRemplissage]:
+    async def list_since(self, since: datetime | None) -> list[Equipe]:
+        """Pull mobile (#638) : inactives incluses, avec leurs membres."""
         pass
 
     @abstractmethod
-    async def list_all(self, actif: bool | None = True) -> list[StandRemplissage]:
+    async def list_membres_since(self, since: datetime | None) -> list[MembreEquipe]:
+        """Pull mobile (#638) : membres ajoutés depuis `since` (une ligne de membre
+        est immuable — jamais mise à jour, donc `created_at` suffit comme curseur)."""
         pass
 
     @abstractmethod
-    async def get_by_id(self, stand_id: uuid.UUID) -> StandRemplissage | None:
+    async def list_all(
+        self, actif: bool | None = True, type_equipe: str | None = None
+    ) -> list[Equipe]:
         pass
 
     @abstractmethod
-    async def create(self, stand: StandRemplissage) -> StandRemplissage:
+    async def get_by_id(self, equipe_id: uuid.UUID) -> Equipe | None:
         pass
 
     @abstractmethod
-    async def update(self, stand: StandRemplissage) -> StandRemplissage:
+    async def get_by_chef_id(self, user_id: uuid.UUID) -> Equipe | None:
+        """L'équipe dirigée par cet utilisateur (index partiel
+        `uq_equipe_membre_chef_par_utilisateur`), `None` s'il n'en dirige aucune —
+        c'est ainsi qu'on déduit « son » équipe."""
+        pass
+
+    @abstractmethod
+    async def create(self, equipe: Equipe) -> Equipe:
+        """Crée l'équipe, ses membres et, si `equipe.aeronef` est fourni, son aéronef
+        dans la même transaction."""
+        pass
+
+    @abstractmethod
+    async def update(self, equipe: Equipe) -> Equipe:
+        """Renommage / mise hors service uniquement : `type` n'est jamais réécrit."""
+        pass
+
+    @abstractmethod
+    async def ajouter_membre(self, membre: MembreEquipe) -> MembreEquipe:
         pass
 
 
@@ -589,4 +667,71 @@ class CodeStadeRepository(ABC):
         espece: str | None,
     ) -> uuid.UUID | None:
         """Identifiant de la place occupant déjà cette grille, `None` si elle est libre."""
+        pass
+
+
+class MouvementPesticideRepository(ABC):
+    """Aucune mise à jour ni suppression : un mouvement, une fois enregistré, est
+    définitif (#606) — corriger une saisie passe par un mouvement compensatoire,
+    pas par une modification de l'historique."""
+
+    @abstractmethod
+    async def create(self, mouvement: MouvementPesticide) -> MouvementPesticide:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, mouvement_id: uuid.UUID) -> MouvementPesticide | None:
+        pass
+
+    @abstractmethod
+    async def solde(
+        self,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+    ) -> list[SoldePesticide]:
+        """Solde agrégé par (site, pesticide, unité), calculé à la volée — pas de
+        colonne dénormalisée (décision actée, #606)."""
+        pass
+
+    @abstractmethod
+    async def regenerer_consommation(
+        self,
+        traitement_id: uuid.UUID,
+        site_id: uuid.UUID | None,
+        date_mouvement: date,
+        consommations: list[tuple[uuid.UUID, str, float]],
+    ) -> None:
+        """Seule exception à l'immutabilité ci-dessus (#609) : remplace les mouvements
+        `consommation` rattachés à `traitement_id` par `consommations` (un mouvement
+        par couple (pesticide_id, unité)) — appelée à chaque écriture sur les
+        rotations d'une fiche aérienne (ajout, modification, suppression), jamais
+        depuis une saisie manuelle.
+
+        `site_id=None` (fiche historique sans `site_principal_id` rapproché, #605)
+        supprime les mouvements existants sans en recréer : pas de débit sans site
+        connu, mais pas de résidu non plus si la fiche en avait déjà (cas impossible
+        aujourd'hui, la validation à la création l'exclut, mais couvert par
+        symétrie)."""
+        pass
+
+
+class VolRepository(ABC):
+    """Lignes d'activité aérienne (#608). Aucune méthode de suppression dans ce
+    ticket : hors scope, le vol saisi n'est pas corrigé après coup — seul le
+    rattachement différé d'un traitement (#610, `update`) y échappe."""
+
+    @abstractmethod
+    async def create(self, vol: Vol) -> Vol:
+        pass
+
+    @abstractmethod
+    async def update(self, vol: Vol) -> Vol:
+        pass
+
+    @abstractmethod
+    async def get_by_id(self, vol_id: uuid.UUID) -> Vol | None:
+        pass
+
+    @abstractmethod
+    async def list_all(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
         pass

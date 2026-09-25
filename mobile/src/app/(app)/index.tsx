@@ -1,4 +1,5 @@
 import {
+  Alert,
   View,
   ScrollView,
   TouchableOpacity,
@@ -21,6 +22,14 @@ import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { peutVoirEquipesAeriennes } from '@/lib/equipe-aerienne-access';
+import { EquipeChip } from '@/components/equipe/EquipeChip';
+import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
+import { MenuDrawer } from '@/components/menu/MenuDrawer';
+import { entreesNavigation } from '@/lib/menu-navigation';
+import { AppIcon } from '@/components/ui/AppIcon';
+import { EQ } from '@/components/equipe/tokens';
+import { libelleRole } from '@/lib/role-libelle';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,19 +39,17 @@ import type { ThemePalette } from '@/constants/theme';
 // CONSTANTES - PALETTE CLAIRE
 // ============================================
 
-const IFVM_GREEN = '#1B5E1B';
-const IFVM_GREEN_LIGHT = '#4CAF50';
-const IFVM_GREEN_BG = '#E8F5E9';
-const IFVM_BG_LIGHT = '#F0F2F5';
+const IFVM_GREEN = '#235A36';
+const IFVM_GREEN_BG = '#EAF2EC';
+const IFVM_BG_LIGHT = '#FAF7EF';
 const CARD_BG = '#FFFFFF';
-const IFVM_ORANGE = '#E67E22';
-const IFVM_ORANGE_BG = '#FFF3E0';
+const IFVM_AMBER = '#8A6D2F';
+const IFVM_AMBER_BG = '#FDF6E7';
 const IFVM_BROUILLON = '#6B7280';
 const IFVM_BROUILLON_BG = '#F3F4F6';
-const HEADER_BG = '#1B5E1B';
-const TEXT_BLACK = '#000000';
-const TEXT_DARK = '#1A1A1A';
-const TEXT_SECONDARY = '#757575';
+const HEADER_BG = '#235A36';
+const TEXT_DARK = '#16201A';
+const TEXT_SECONDARY = '#6F6A59';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -121,6 +128,17 @@ export default function DashboardScreen() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  // #641 : équipe de travail — carte de l'Accueil, relue au retour sur l'écran (après un changement
+  // dans Paramètres ou une synchro du référentiel).
+  const { courante, recharger } = useEquipesDeTravail();
+  const ouvrirChoixEquipe = useEquipeSheetStore((s) => s.ouvrir);
+  const logout = useAuthStore((s) => s.logout);
+  const [menuVisible, setMenuVisible] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      recharger();
+    }, [recharger])
+  );
 
   // Animations
   const fadeAnim = useMemo(() => new Animated.Value(0), []);
@@ -213,6 +231,10 @@ export default function DashboardScreen() {
   const navigateTo = (path: string) => {
     router.push(path as any);
   };
+  const allerDepuisMenu = (path: string) => {
+    setMenuVisible(false);
+    navigateTo(path);
+  };
 
   // Activité récente — prospections ET traitements confondus, triés par
   // dernière modification (#activite-recente-traitements : les fiches de
@@ -244,20 +266,16 @@ export default function DashboardScreen() {
     <View style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-            {isOffline && (
-              <View style={styles.headerTopRow}>
-                <ThemedText style={styles.networkStatus}>⚠ Hors-ligne</ThemedText>
-              </View>
-            )}
-
             <View style={styles.headerContent}>
-              <Image
-                source={require('../../../assets/images/logo-ifvm.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              <View style={styles.logoWrap}>
+                <Image
+                  source={require('../../../assets/images/logo-ifvm.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
               <View style={styles.headerTextContainer} testID="dashboard-header">
                 <ThemedText style={styles.headerGreeting}>Bonjour</ThemedText>
                 <ThemedText style={styles.headerName}>
@@ -265,8 +283,15 @@ export default function DashboardScreen() {
                 </ThemedText>
                 <ThemedText style={styles.headerRole}>Agent de terrain</ThemedText>
               </View>
-              <TouchableOpacity onPress={() => navigateTo('/(app)/profile')} activeOpacity={0.7}>
-                <ThemedText style={styles.gearIcon}>⚙️</ThemedText>
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={() => setMenuVisible(true)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Ouvrir le menu"
+                testID="dashboard-menu-button"
+              >
+                <AppIcon name="menu" size={24} color={EQ.surMarque} />
               </TouchableOpacity>
             </View>
 
@@ -275,7 +300,15 @@ export default function DashboardScreen() {
                 <View style={styles.badgeDot} />
                 <ThemedText style={styles.badgeAvailableText}>Disponible</ThemedText>
               </View>
+              {isOffline && (
+                <View style={styles.badgeOffline}>
+                  <ThemedText style={styles.badgeOfflineText}>⚠ Hors-ligne</ThemedText>
+                </View>
+              )}
             </View>
+
+            {/* Équipe active (#641) — Figma « EquipeChip » */}
+            <EquipeChip equipe={courante} onChanger={ouvrirChoixEquipe} />
           </Animated.View>
         </SafeAreaView>
       </View>
@@ -303,9 +336,6 @@ export default function DashboardScreen() {
         {showSyncBanner && (
           <Animated.View style={[styles.syncBanner, { opacity: fadeAnim }]}>
             <View style={styles.syncBannerContent}>
-              <View style={styles.syncBannerIcon}>
-                <ThemedText style={styles.syncBannerIconText}>📡</ThemedText>
-              </View>
               <View style={styles.syncBannerText}>
                 <ThemedText style={styles.syncBannerTitle}>
                   {pendingSyncCount} fiche(s) en attente
@@ -332,7 +362,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(app)/prospection')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>✚</ThemedText>
+              <AppIcon name="ajouter" size={24} color={EQ.surMarque} />
               <ThemedText style={styles.quickTileTextPrimary}>Nouvelle prospection</ThemedText>
             </TouchableOpacity>
 
@@ -341,7 +371,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(app)/fiches')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>📄</ThemedText>
+              <AppIcon name="rapport-fiche" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Mes fiches</ThemedText>
             </TouchableOpacity>
 
@@ -355,7 +385,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(app)/brouillons')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>📝</ThemedText>
+              <AppIcon name="modifier" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>
                 Brouillons{draftsCount > 0 ? ` (${draftsCount})` : ''}
               </ThemedText>
@@ -366,7 +396,7 @@ export default function DashboardScreen() {
               onPress={() => navigateTo('/(traitement)/select')}
               activeOpacity={0.85}
             >
-              <ThemedText style={styles.quickTileIcon}>🚁</ThemedText>
+              <AppIcon name="aeronef-avion" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Nouveau traitement</ThemedText>
             </TouchableOpacity>
 
@@ -380,15 +410,14 @@ export default function DashboardScreen() {
                 onPress={() => navigateTo('/(app)/equipes-aeriennes')}
                 activeOpacity={0.85}
               >
-                <ThemedText style={styles.quickTileIcon}>🛫</ThemedText>
+                <AppIcon name="utilisateurs" size={24} color={IFVM_GREEN} />
                 <ThemedText style={styles.quickTileText}>Équipes aériennes</ThemedText>
               </TouchableOpacity>
             )}
 
             <View style={[styles.quickTile, styles.quickTileDisabled]}>
-              <ThemedText style={styles.quickTileIcon}>🔔</ThemedText>
+              <AppIcon name="notifications" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Alertes</ThemedText>
-              <ThemedText style={styles.quickTileSoon}>Bientôt disponible</ThemedText>
             </View>
           </View>
         </Animated.View>
@@ -421,14 +450,14 @@ export default function DashboardScreen() {
                         ? IFVM_BROUILLON_BG
                         : item.synced
                           ? IFVM_GREEN_BG
-                          : IFVM_ORANGE_BG,
+                          : IFVM_AMBER_BG,
                     },
                   ]}
                 >
                   <ThemedText
                     style={[
                       styles.statusBadgeText,
-                      { color: item.brouillon ? IFVM_BROUILLON : item.synced ? IFVM_GREEN_LIGHT : IFVM_ORANGE },
+                      { color: item.brouillon ? IFVM_BROUILLON : item.synced ? IFVM_GREEN : IFVM_AMBER },
                     ]}
                   >
                     {item.brouillon ? 'BROUILLON' : item.synced ? 'SYNCHRO ✓' : 'À SYNCHRO'}
@@ -446,6 +475,26 @@ export default function DashboardScreen() {
       </ScrollView>
 
       <NewFicheFab />
+
+      <MenuDrawer
+        visible={menuVisible}
+        onFermer={() => setMenuVisible(false)}
+        nom={`${user?.prenom ?? ''} ${user?.nom ?? ''}`.trim()}
+        email={user?.email}
+        role={user?.role ? libelleRole(user.role) : null}
+        navigation={entreesNavigation(user?.role, allerDepuisMenu)}
+        compte={[
+          { cle: 'profil', libelle: 'Profil', icone: 'profil', active: true, onPress: () => allerDepuisMenu('/(app)/profile') },
+          { cle: 'parametres', libelle: 'Paramètres', icone: 'parametres', onPress: () => allerDepuisMenu('/(app)/profile') },
+        ]}
+        onDeconnexion={() => {
+          setMenuVisible(false);
+          Alert.alert('Se déconnecter', 'Vos fiches non synchronisées restent sur cet appareil.', [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Se déconnecter', style: 'destructive', onPress: () => void logout() },
+          ]);
+        }}
+      />
     </View>
   );
 }
@@ -470,7 +519,7 @@ function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
             <View
               style={[
                 styles.weekChartBar,
-                { height, backgroundColor: d.isToday ? IFVM_GREEN : '#D9D3C7' },
+                { height, backgroundColor: d.isToday ? IFVM_GREEN : IFVM_GREEN_BG },
               ]}
             />
             <ThemedText style={[styles.weekChartLabel, d.isToday && styles.weekChartLabelToday]}>
@@ -489,14 +538,12 @@ function WeekChart({ data }: { data: { count: number; isToday: boolean }[] }) {
 
 const BASE_TYPE_SIZES = {
   networkStatus: 12,
-  gearIcon: 18,
   headerGreeting: 13,
   headerName: 20,
   headerRole: 12,
   badgeAvailableText: 12,
   chartTitle: 16,
   weekChartLabel: 12,
-  syncBannerIconText: 20,
   syncBannerTitle: 14,
   syncBannerSub: 11,
   syncBannerButtonText: 12,
@@ -508,7 +555,6 @@ const BASE_TYPE_SIZES = {
   quickTileIcon: 26,
   quickTileText: 13,
   quickTileTextPrimary: 13,
-  quickTileSoon: 10,
   footerText: 12,
 };
 
@@ -528,39 +574,56 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     header: {
       backgroundColor: HEADER_BG,
       paddingHorizontal: 16,
-      paddingBottom: 20,
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
+      paddingBottom: 14,
+      borderBottomLeftRadius: 22,
+      borderBottomRightRadius: 22,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.15,
       shadowRadius: 12,
       elevation: 8,
     },
-    headerTopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingTop: 8,
+    // Maquette « Hors-ligne » : pastille ambre à côté de « Disponible » (Figma 131:124).
+    badgeOffline: {
+      backgroundColor: '#FDF6E7',
+      paddingHorizontal: 16,
+      paddingVertical: 5,
+      minHeight: 24,
+      borderRadius: 12,
+      justifyContent: 'center',
     },
-    networkStatus: {
-      color: 'rgba(255,255,255,0.85)',
+    badgeOfflineText: {
+      color: '#8A6D2F',
       fontSize: typeSizes.networkStatus,
-      fontWeight: '600',
-    },
-    gearIcon: {
-      fontSize: typeSizes.gearIcon,
+      lineHeight: typeSizes.networkStatus + 4,
+      fontWeight: '700',
+      includeFontPadding: false,
     },
     headerContent: {
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 12,
     },
+    logoWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
     logo: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      padding: 6,
+      width: 34,
+      height: 34,
+    },
+    menuButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 11,
+      backgroundColor: EQ.surVert,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     headerTextContainer: {
       flex: 1,
@@ -583,27 +646,30 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     badgeRow: {
       flexDirection: 'row',
       gap: 8,
-      marginTop: 14,
+      marginTop: 8,
     },
     badgeAvailable: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 14,
+      backgroundColor: EQ.surVert,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      minHeight: 24,
+      borderRadius: 12,
     },
     badgeDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
-      backgroundColor: IFVM_GREEN_LIGHT,
-      marginRight: 6,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#FFFFFF',
+      marginRight: 7,
     },
     badgeAvailableText: {
       color: '#FFFFFF',
       fontSize: typeSizes.badgeAvailableText,
-      fontWeight: '600',
+      lineHeight: typeSizes.badgeAvailableText + 4,
+      fontWeight: '700',
+      includeFontPadding: false,
     },
     scrollContent: {
       padding: 16,
@@ -653,12 +719,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontWeight: '700',
     },
     syncBanner: {
-      backgroundColor: IFVM_ORANGE_BG,
+      backgroundColor: IFVM_AMBER_BG,
       borderRadius: 14,
       padding: 14,
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: IFVM_ORANGE + '40',
+      borderColor: IFVM_AMBER + '40',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
@@ -669,25 +735,13 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       flexDirection: 'row',
       alignItems: 'center',
     },
-    syncBannerIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: IFVM_ORANGE + '20',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
-    },
-    syncBannerIconText: {
-      fontSize: typeSizes.syncBannerIconText,
-    },
     syncBannerText: {
       flex: 1,
     },
     syncBannerTitle: {
       fontSize: typeSizes.syncBannerTitle,
       fontWeight: '600',
-      color: IFVM_ORANGE,
+      color: IFVM_AMBER,
     },
     syncBannerSub: {
       fontSize: typeSizes.syncBannerSub,
@@ -748,7 +802,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     ficheTitle: {
       fontSize: typeSizes.ficheTitle,
       fontWeight: '700',
-      color: TEXT_BLACK,
+      color: TEXT_DARK,
     },
     ficheSub: {
       fontSize: typeSizes.ficheSub,
@@ -770,15 +824,20 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     quickAccessGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 10,
+      justifyContent: 'space-between',
+      rowGap: 8,
     },
     quickTile: {
-      width: '48%',
+      width: '48.5%',
+      minHeight: 64,
       backgroundColor: CARD_BG,
-      borderRadius: 16,
-      paddingVertical: 22,
-      alignItems: 'center',
-      justifyContent: 'center',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: EQ.bordure,
+      padding: 12,
+      gap: 8,
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
@@ -786,7 +845,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       elevation: 3,
     },
     quickTilePrimary: {
-      backgroundColor: IFVM_ORANGE,
+      backgroundColor: IFVM_GREEN,
     },
     quickTileDisabled: {
       opacity: 0.55,
@@ -799,18 +858,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontSize: typeSizes.quickTileText,
       fontWeight: '600',
       color: TEXT_DARK,
-      textAlign: 'center',
     },
     quickTileTextPrimary: {
       fontSize: typeSizes.quickTileTextPrimary,
       fontWeight: '700',
       color: '#FFFFFF',
-      textAlign: 'center',
-    },
-    quickTileSoon: {
-      fontSize: typeSizes.quickTileSoon,
-      color: TEXT_SECONDARY,
-      marginTop: 4,
     },
     footer: {
       alignItems: 'center',

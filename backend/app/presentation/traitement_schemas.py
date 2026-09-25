@@ -91,6 +91,10 @@ class TraitementAerienCreate(BaseModel):
     # que pilote/mécanicien/consultant_international ci-dessus, migration
     # 0048). Base principale obligatoire, stand/base secondaire facultatifs.
     base_principale: str = Field(..., min_length=1, max_length=255)
+    # FK référentiel (migration 0089, #605) : nullable en base pour les fiches
+    # existantes non rapprochées au backfill, mais exigée ici pour toute
+    # nouvelle fiche — base_principale (texte) reste conservée en parallèle.
+    site_principal_id: uuid.UUID
     stand: str | None = Field(None, max_length=255)
     # Date d'installation (migration 0056) — facultative et indépendante du
     # texte libre lui-même. Rien d'équivalent pour base_principale (hors
@@ -101,8 +105,10 @@ class TraitementAerienCreate(BaseModel):
     immatricule_aeronef: str = Field(..., min_length=1)
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée de la somme
     # des `surface_ha` de rotation, ajoutées après coup via /rotations.
-    pesticide_recu_l: float | None = Field(None, ge=0)
-    # Surface restante abandonnée ? (migration 0086) — mirroir de TraitementTerrestreCreate.
+    # pesticide_recu_l supprimé (#609) : le stock est désormais débité
+    # automatiquement du site principal via `mouvement_pesticide` (#606), plus
+    # de saisie manuelle du reçu par fiche.
+    # Surface restante abandonnée ? (migration 0097) — mirroir de TraitementTerrestreCreate.
     surface_restante_abandonnee: bool | None = None
     motif_surface_restante_abandonnee: str | None = None
     # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
@@ -187,6 +193,11 @@ class EvaluationRisquePopulationCreate(BaseModel):
 
 class TraitementCreate(BaseModel):
     prospection_id: uuid.UUID
+    # Équipe qui a mené la fiche (#607) — nullable en base (rétro-compatibilité),
+    # exigée ici pour toute nouvelle fiche. Portée par la fiche de base, commune
+    # à Aérien et Terrestre : `type_traitement` détermine seul le type d'équipe
+    # attendu (validé côté serveur, cf. traitement_use_cases._valider_equipe).
+    equipe_id: uuid.UUID
     numero_fiche: str | None = Field(None, max_length=50)
     mode_traitement: ModeTraitement | None = None
     date_traitement: date
@@ -436,6 +447,7 @@ class TraitementAerienRead(BaseModel):
     chef_de_base_id: uuid.UUID
     consultant_international: str | None
     base_principale: str
+    site_principal_id: uuid.UUID | None
     stand: str | None
     stand_date_installation: date | None
     base_secondaire: str | None
@@ -454,8 +466,6 @@ class TraitementAerienRead(BaseModel):
     # Surface couverte cumulée : précédente + traitée + protégée.
     surface_cumulee_ha: float
     surface_restante_ha: float | None
-    pesticide_recu_l: float | None
-    pesticide_stock_restant_l: float | None
     surface_restante_abandonnee: bool | None
     motif_surface_restante_abandonnee: str | None
     taux_mortalite_pourcent: float | None
@@ -546,6 +556,7 @@ class TraitementRead(BaseModel):
     observations: str | None
     statut: StatutTraitement
     statut_sync: str
+    equipe_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -4,6 +4,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
+import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
+import { EquipeSheetGlobale } from '@/components/equipe/EquipeSheetGlobale';
 import { useFontScaleStore } from '@/lib/font-scale-store';
 import { useThemeStore } from '@/lib/theme-store';
 import { getDb } from '@/lib/prospection-db';
@@ -58,7 +60,10 @@ export default function RootLayout() {
   // un autre agent se connecte sur ce même appareil.
   useEffect(() => {
     void useThemeStore.getState().init();
-    if (userId) void useFontScaleStore.getState().init(userId);
+    if (userId) {
+      void useFontScaleStore.getState().init(userId);
+      void useEquipeTravailStore.getState().init(userId);
+    }
   }, [userId]);
 
   // Hook de synchronisation automatique du référentiel
@@ -127,6 +132,7 @@ export default function RootLayout() {
           <Stack.Screen name="(traitement)" options={{ headerShown: false }} />
         </Stack>
       </ErrorBoundary>
+      <EquipeSheetGlobale />
       <ErrorBanner />
       <BandeauOta />
       <ModaleBloquante />

@@ -1,90 +1,138 @@
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.referentiel_use_cases import (
-    CreateBaseAerienne,
+    AffecterAeronef,
+    AjouterMembreEquipe,
+    CloturerAffectationAeronef,
+    ConsulterSoldePesticide,
+    CreateAeronef,
     CreateCodeStade,
     CreateCulture,
-    CreateEquipeAerienne,
-    CreateEquipeTerrestre,
+    CreateEquipe,
     CreateLieuAerien,
+    CreateMouvementPesticide,
     CreatePesticide,
     CreatePosteAcridien,
-    CreateStandRemplissage,
+    CreateSiteAerienne,
     CreateStation,
+    CreateVol,
     CreateZoneAntiAcridien,
-    GetBaseAerienne,
+    DemonterPositionSiteAerienne,
+    DeplacerSiteAerienne,
+    GetAeronef,
     GetCodeStade,
     GetCulture,
-    GetEquipeAerienne,
-    GetEquipeTerrestre,
+    GetEquipe,
     GetLieuAerien,
     GetPesticide,
+    GetPositionActiveSiteAerienne,
     GetPosteAcridien,
-    GetStandRemplissage,
+    GetSiteAerienne,
     GetStation,
+    GetVol,
+    InstallerPositionSiteAerienne,
     ListAeronefs,
-    ListBasesAeriennes,
     ListCodesStades,
     ListCommunes,
     ListCultures,
-    ListEquipesAeriennes,
-    ListEquipesTerrestres,
+    ListEquipes,
+    ListerAffectationsAeronef,
+    ListerPositionsSiteAerienne,
     ListLieuxAeriens,
     ListPesticides,
     ListPostesAcridiens,
-    ListStandsRemplissage,
+    ListSitesAeriens,
     ListStations,
+    ListVols,
     ListZonesAntiAcridiennes,
+    MembreDemande,
     PullReferentiel,
     ReferentielSinceCursors,
     UpdateAeronef,
-    UpdateBaseAerienne,
     UpdateCodeStade,
     UpdateCulture,
+    UpdateEquipe,
     UpdateLieuAerien,
     UpdatePesticide,
     UpdatePosteAcridien,
-    UpdateStandRemplissage,
+    UpdateSiteAerienne,
     UpdateStation,
+    UpdateVol,
     UpdateZoneAntiAcridien,
 )
-from app.auth import get_current_user
+from app.auth import get_current_user, require_admin, require_chef_de_base_ou_admin
 from app.database import get_db
 from app.domain.referentiel import (
     Aeronef,
     AeronefDejaAffecteError,
     AeronefIntrouvableError,
-    BaseAerienneEquipeInvalideError,
-    BaseAerienneParentInvalideError,
-    ChefDeBaseDejaEquipeError,
-    ChefDeBaseEquipeInvalideError,
-    ChefEquipeDejaEquipeError,
+    AeronefNonAffecteError,
+    AffectationAeronefIntrouvableError,
+    AffectationDejaCloturee,
+    ChefDejaDansUneAutreEquipeError,
     ChefEquipeInvalideError,
     CodeReferentielDejaPrisError,
     CommuneInconnueError,
+    CompteALaVoleeInterditError,
+    EquipeADejaUnChefError,
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
+    EquipeDejaEquipeeError,
+    EquipeIntrouvableError,
+    EquipeNonAerienneError,
     EquipeNonAutoriseeError,
-    EquipeRequiseError,
     EquipeTerrestreIntrouvableError,
     GrilleDejaOccupeeError,
+    IdentifiantDejaUtiliseError,
     ImmatriculationAeronefDejaPriseError,
-    NumeroBaseAerienneDejaPrisError,
-    NumeroStandRemplissageDejaPrisError,
+    MembreDejaDansEquipeError,
+    NumeroSiteAerienneDejaPrisError,
+    PeriodeAffectationInvalideError,
+    PesticideIntrouvableError,
+    PositionActiveIntrouvableError,
+    PositionDejaActiveError,
     PosteAcridienAvecStationsActivesError,
     PosteAcridienInactifError,
     PosteAcridienIntrouvableError,
+    SiteAerienneDependantInvalideError,
+    SiteAerienneEquipeInvalideError,
+    SiteAerienneIntrouvableError,
+    SiteAerienneParentAbsentError,
+    SiteAerienneParentInvalideError,
+    SiteDestinationIncoherentError,
+    SiteHorsBaseError,
+    SiteNonPrincipalError,
     StadeInconnuError,
+    TraitementAerienIntrouvableError,
     TypeLieuAerienInvalideError,
+    UtilisateurMembreIntrouvableError,
+    VolIntrouvableError,
+    VolLieuxConvoyageRequisError,
+    VolMotifRequisError,
+    VolSiteObligatoireError,
+    VolTypeNonApplicationError,
     ZoneAntiAcridienAvecPostesActifsError,
     ZoneAntiAcridienIntrouvableError,
 )
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
+from app.infrastructure.referentiel_model import (
+    AeronefModel,
+    CodeStadeModel,
+    CultureModel,
+    EquipeAeronefModel,
+    EquipeModel,
+    LieuAerienModel,
+    PesticideModel,
+    PosteAcridienModel,
+    SiteAerienneModel,
+    StationFixeModel,
+    ZoneAntiAcridienModel,
+)
 from app.infrastructure.referentiel_repository import (
     CommuneRepositoryImpl,
     PosteAcridienRepositoryImpl,
@@ -93,24 +141,28 @@ from app.infrastructure.referentiel_repository import (
 )
 from app.infrastructure.referentiel_sync_repository import (
     AeronefRepositoryImpl,
-    BaseAerienneRepositoryImpl,
     CodeStadeRepositoryImpl,
     CultureRepositoryImpl,
-    EquipeAerienneRepositoryImpl,
-    EquipeTerrestreRepositoryImpl,
+    EquipeAeronefRepositoryImpl,
+    EquipeRepositoryImpl,
     LieuAerienRepositoryImpl,
+    MouvementPesticideRepositoryImpl,
     PesticideRepositoryImpl,
-    StandRemplissageRepositoryImpl,
+    SiteAeriennePositionRepositoryImpl,
+    SiteAerienneRepositoryImpl,
     UtilisateurEquipeRepositoryImpl,
+    VolRepositoryImpl,
 )
+from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.referentiel_schemas import (
+    AeronefCreate,
     AeronefRead,
     AeronefUpdate,
-    BaseAerienneCreate,
-    BaseAerienneRead,
-    BaseAerienneUpdate,
+    AffectationAeronefCloture,
+    AffectationAeronefCreate,
+    AffectationAeronefRead,
     CodeStadeCreate,
     CodeStadeRead,
     CodeStadeUpdate,
@@ -119,13 +171,16 @@ from app.presentation.referentiel_schemas import (
     CultureRead,
     CultureUpdate,
     EntityPull,
-    EquipeAerienneCreate,
-    EquipeAerienneRead,
-    EquipeTerrestreCreate,
-    EquipeTerrestreRead,
+    EquipeCreate,
+    EquipeRead,
+    EquipeUpdate,
     LieuAerienCreate,
     LieuAerienRead,
     LieuAerienUpdate,
+    MembreEquipeCreate,
+    MembreEquipeRead,
+    MouvementPesticideCreate,
+    MouvementPesticideRead,
     PesticideCreate,
     PesticideRead,
     PesticideUpdate,
@@ -133,15 +188,28 @@ from app.presentation.referentiel_schemas import (
     PosteAcridienRead,
     PosteAcridienUpdate,
     ReferentielPullResponse,
-    StandRemplissageCreate,
-    StandRemplissageRead,
-    StandRemplissageUpdate,
+    SiteAerienneCreate,
+    SiteAerienneDeplacer,
+    SiteAeriennePositionInstaller,
+    SiteAeriennePositionRead,
+    SiteAerienneRead,
+    SiteAerienneSyncRead,
+    SiteAerienneUpdate,
+    SoldePesticideRead,
     StationFixeCreate,
     StationFixeRead,
     StationFixeUpdate,
+    VolCreate,
+    VolRead,
+    VolUpdate,
     ZoneAntiAcridienCreate,
     ZoneAntiAcridienRead,
     ZoneAntiAcridienUpdate,
+)
+from app.presentation.suppression_routes import (
+    ajouter_route_suppression,
+    charger_ligne_vivante,
+    marquer_supprime,
 )
 
 router = APIRouter()
@@ -249,7 +317,7 @@ async def create_poste_acridien(
     use_case = CreatePosteAcridien(
         repository=PosteAcridienRepositoryImpl(db),
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
-        equipe_terrestre_repository=EquipeTerrestreRepositoryImpl(db),
+        equipe_terrestre_repository=EquipeRepositoryImpl(db),
     )
     try:
         return await use_case.execute(
@@ -275,9 +343,9 @@ async def create_poste_acridien(
         ) from exc
 
 
-# Aucune route DELETE, volontairement : `GET /referentiel/pull` ne transporte que des
-# upserts, une suppression physique resterait sur les téléphones déjà synchronisés.
-# La désactivation logique passe par `PUT` avec `actif: false`.
+# Suppression : soft-delete `deleted_at` (#674) — cf. `suppression_routes.py`. Le pull
+# renvoie la ligne avec `deleted_at`, les mobiles la purgent. `PUT actif:false` reste la
+# désactivation restaurable.
 @router.put("/postes-acridiens/{pa_id}", response_model=PosteAcridienRead)
 async def update_poste_acridien(
     pa_id: uuid.UUID,
@@ -288,7 +356,7 @@ async def update_poste_acridien(
     use_case = UpdatePosteAcridien(
         repository=PosteAcridienRepositoryImpl(db),
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
-        equipe_terrestre_repository=EquipeTerrestreRepositoryImpl(db),
+        equipe_terrestre_repository=EquipeRepositoryImpl(db),
     )
     try:
         poste = await use_case.execute(
@@ -652,7 +720,7 @@ async def create_lieu_aerien(
     db: Annotated[AsyncSession, Depends(get_db)],
     acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateLieuAerien(LieuAerienRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
+    use_case = CreateLieuAerien(LieuAerienRepositoryImpl(db), EquipeRepositoryImpl(db))
     try:
         return await use_case.execute(
             acteur=acteur,
@@ -697,7 +765,7 @@ async def update_lieu_aerien(
     db: Annotated[AsyncSession, Depends(get_db)],
     acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = UpdateLieuAerien(LieuAerienRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
+    use_case = UpdateLieuAerien(LieuAerienRepositoryImpl(db), EquipeRepositoryImpl(db))
     try:
         lieu = await use_case.execute(
             acteur=acteur,
@@ -730,89 +798,329 @@ async def update_lieu_aerien(
     return lieu
 
 
-# --- equipe_aerienne / base_aerienne / stand_remplissage (gestion d'équipe) ---------
+# --- equipe_aerienne / site_aerienne (gestion d'équipe) ----------------------------
 #
-# Référentiel dédié à la gestion d'équipe aérienne (migration 0064), distinct de lieu_aerien malgré
-# le chevauchement conceptuel — cf. docstring de BaseAerienneModel. `equipe_aerienne`
-# (migration 0066, #equipe-aerienne) s'ajoute au-dessus de la base principale. Aucune
-# route DELETE, volontairement : la sortie de service passe par `actif=false`.
+# --- equipe (référentiel unifié, ADR-018 / migration 0086) -------------------------
+#
+# Une seule table `equipe`, typée `terrestre` | `aerien`, et des membres génériques
+# porteurs de leur `fonction` — à la place des deux tables asymétriques
+# `equipe_terrestre` / `equipe_aerienne` et de leurs rôles nommés en dur. Aucune route
+# DELETE, volontairement : la sortie de service passe par `actif=false`.
 
 
-@router.get("/equipes-aeriennes", response_model=list[EquipeAerienneRead])
-async def list_equipes_aeriennes(
+def _conflit_membre(exc: Exception) -> HTTPException:
+    """Traduit les violations d'unicité de `equipe_membre` en 409 explicites."""
+    if isinstance(exc, EquipeADejaUnChefError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="cette équipe a déjà un chef"
+        )
+    if isinstance(exc, ChefDejaDansUneAutreEquipeError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="cet utilisateur dirige déjà une autre équipe",
+        )
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT, detail="cet utilisateur est déjà membre de l'équipe"
+    )
+
+
+def _erreur_membre_invalide(exc: Exception) -> HTTPException:
+    if isinstance(exc, ChefEquipeInvalideError):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"le chef désigné n'a pas le rôle attendu pour ce type d'équipe : {exc.args[0]}",
+        )
+    if isinstance(exc, UtilisateurMembreIntrouvableError):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"utilisateur inconnu : {exc.args[0]}"
+        )
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"création de compte à la volée impossible : {exc.args[0]}",
+    )
+
+
+def _erreur_affectation(exc: Exception) -> HTTPException:
+    """422 pour toutes : ce ne sont pas des collisions de clé mais des périodes qui ne
+    tiennent pas ensemble — le corps est recevable, le calendrier ne l'est pas (#603)."""
+    if isinstance(exc, AeronefDejaAffecteError):
+        detail = f"aéronef déjà affecté sur une période qui se chevauche : {exc.args[0]}"
+    elif isinstance(exc, EquipeDejaEquipeeError):
+        detail = f"l'équipe a déjà un aéronef sur cette période : {exc.args[0]}"
+    elif isinstance(exc, EquipeNonAerienneError):
+        detail = f"un aéronef ne s'affecte qu'à une équipe aérienne : {exc.args[0]}"
+    else:
+        detail = f"période d'affectation invalide : {exc.args[0]}"
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+
+
+def _demande(membre: MembreEquipeCreate) -> MembreDemande:
+    return MembreDemande(
+        fonction=membre.fonction, user_id=membre.user_id, nom=membre.nom, prenom=membre.prenom
+    )
+
+
+@router.get("/equipes", response_model=list[EquipeRead])
+async def list_equipes(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
+    type: Annotated[
+        Literal["terrestre", "aerien"] | None,
+        Query(description="Filtre sur le type d'équipe ; toutes si absent."),
+    ] = None,
     inclure_inactifs: bool = Query(
         default=False,
         description="Renvoie les équipes des deux états — écran d'administration.",
     ),
 ):
-    use_case = ListEquipesAeriennes(EquipeAerienneRepositoryImpl(db))
-    return await use_case.execute(actif=None if inclure_inactifs else True)
+    use_case = ListEquipes(EquipeRepositoryImpl(db))
+    return await use_case.execute(actif=None if inclure_inactifs else True, type_equipe=type)
 
 
-@router.post("/equipes-aeriennes", response_model=EquipeAerienneRead, status_code=201)
-async def create_equipe_aerienne(
-    body: EquipeAerienneCreate,
+@router.post("/equipes", response_model=EquipeRead, status_code=201)
+async def create_equipe(
+    body: EquipeCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateEquipeAerienne(EquipeAerienneRepositoryImpl(db), UtilisateurRepositoryImpl(db))
+    use_case = CreateEquipe(
+        EquipeRepositoryImpl(db),
+        UtilisateurRepositoryImpl(db),
+        AeronefRepositoryImpl(db),
+        EquipeAeronefRepositoryImpl(db),
+    )
     try:
         return await use_case.execute(
             nom=body.nom,
-            chef_de_base_id=body.chef_de_base_id,
-            pilote=body.pilote,
-            mecanicien=body.mecanicien,
-            consultant_international=body.consultant_international,
-            membres=[m.nom for m in body.membres],
-            aeronef=Aeronef(
-                immatriculation=body.aeronef.immatriculation,
-                societe=body.aeronef.societe,
-                volume_cuve_l=body.aeronef.volume_cuve_l,
+            type_equipe=body.type,
+            membres=[_demande(m) for m in body.membres],
+            aeronef=(
+                None
+                if body.aeronef is None
+                else Aeronef(
+                    immatriculation=body.aeronef.immatriculation,
+                    societe=body.aeronef.societe,
+                    volume_cuve_l=body.aeronef.volume_cuve_l,
+                )
             ),
+            aeronef_id=body.aeronef_id,
         )
-    except ChefDeBaseEquipeInvalideError as exc:
+    except (
+        ChefEquipeInvalideError,
+        UtilisateurMembreIntrouvableError,
+        CompteALaVoleeInterditError,
+    ) as exc:
+        raise _erreur_membre_invalide(exc) from exc
+    except (
+        EquipeADejaUnChefError,
+        ChefDejaDansUneAutreEquipeError,
+        MembreDejaDansEquipeError,
+    ) as exc:
+        raise _conflit_membre(exc) from exc
+    except AeronefIntrouvableError as exc:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"chef_de_base_id n'a pas le rôle chef_de_base : {exc.args[0]}",
-        ) from exc
-    except ChefDeBaseDejaEquipeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"chef_de_base_id dirige déjà une autre équipe : {exc.args[0]}",
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"aéronef inconnu : {exc.args[0]}"
         ) from exc
     except ImmatriculationAeronefDejaPriseError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"immatriculation déjà utilisée par un autre aéronef : {exc.args[0]}",
         ) from exc
-    except AeronefDejaAffecteError as exc:
+    except (AeronefDejaAffecteError, EquipeDejaEquipeeError) as exc:
+        # 409 et non le 422 de `POST /equipes/{id}/aeronefs` : ici l'appelant ne choisit
+        # pas de période — il n'a donc rien à corriger dans son calendrier, c'est bien
+        # une collision avec l'état du parc (#621).
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"aéronef déjà affecté à une autre équipe : {exc.args[0]}",
         ) from exc
 
 
-@router.get("/equipes-aeriennes/{equipe_id}", response_model=EquipeAerienneRead)
-async def get_equipe_aerienne(
+@router.get("/equipes/{equipe_id}", response_model=EquipeRead)
+async def get_equipe(
     equipe_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = GetEquipeAerienne(EquipeAerienneRepositoryImpl(db))
-    equipe = await use_case.execute(equipe_id)
+    equipe = await GetEquipe(EquipeRepositoryImpl(db)).execute(equipe_id)
     if equipe is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe aérienne non trouvée"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Équipe non trouvée")
     return equipe
 
 
-# --- aeronef (hélicoptère d'une équipe aérienne, migration 0078) -------------------
+@router.put("/equipes/{equipe_id}", response_model=EquipeRead)
+async def update_equipe(
+    equipe_id: uuid.UUID,
+    body: EquipeUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    try:
+        return await UpdateEquipe(EquipeRepositoryImpl(db)).execute(
+            equipe_id=equipe_id, nom=body.nom, actif=body.actif
+        )
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe non trouvée"
+        ) from exc
+
+
+@router.post("/equipes/{equipe_id}/membres", response_model=MembreEquipeRead, status_code=201)
+async def ajouter_membre_equipe(
+    equipe_id: uuid.UUID,
+    body: MembreEquipeCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = AjouterMembreEquipe(EquipeRepositoryImpl(db), UtilisateurRepositoryImpl(db))
+    try:
+        return await use_case.execute(equipe_id, _demande(body))
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe non trouvée"
+        ) from exc
+    except (
+        ChefEquipeInvalideError,
+        UtilisateurMembreIntrouvableError,
+        CompteALaVoleeInterditError,
+    ) as exc:
+        raise _erreur_membre_invalide(exc) from exc
+    except (
+        EquipeADejaUnChefError,
+        ChefDejaDansUneAutreEquipeError,
+        MembreDejaDansEquipeError,
+    ) as exc:
+        raise _conflit_membre(exc) from exc
+
+
+# --- affectations d'aéronefs (equipe_aeronef, migration 0087, #603) ---------------
 #
-# Pas de POST : un aéronef naît avec son équipe (POST /equipes-aeriennes, champ
-# `aeronef`), jamais orphelin. Pas de DELETE : la sortie de service est `actif=false`.
+# Une équipe aérienne dispose de 2 à 3 appareils utilisés l'un après l'autre. Affecter
+# ouvre une période, retirer la borne ; la ligne reste, c'est l'historique. Pas de
+# DELETE : une affectation effacée ne se distinguerait plus d'une qui n'a jamais eu
+# lieu.
+
+
+@router.get("/equipes/{equipe_id}/aeronefs", response_model=list[AffectationAeronefRead])
+async def list_affectations_aeronef(
+    equipe_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = ListerAffectationsAeronef(EquipeRepositoryImpl(db), EquipeAeronefRepositoryImpl(db))
+    try:
+        return await use_case.execute(equipe_id)
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe non trouvée"
+        ) from exc
+
+
+@router.post(
+    "/equipes/{equipe_id}/aeronefs", response_model=AffectationAeronefRead, status_code=201
+)
+async def affecter_aeronef(
+    equipe_id: uuid.UUID,
+    body: AffectationAeronefCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = AffecterAeronef(
+        EquipeRepositoryImpl(db), AeronefRepositoryImpl(db), EquipeAeronefRepositoryImpl(db)
+    )
+    try:
+        return await use_case.execute(
+            equipe_id=equipe_id,
+            aeronef_id=body.aeronef_id,
+            date_debut=body.date_debut,
+            date_fin=body.date_fin,
+        )
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe non trouvée"
+        ) from exc
+    except AeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"aéronef inconnu : {exc.args[0]}"
+        ) from exc
+    except (
+        EquipeNonAerienneError,
+        AeronefDejaAffecteError,
+        EquipeDejaEquipeeError,
+        PeriodeAffectationInvalideError,
+    ) as exc:
+        raise _erreur_affectation(exc) from exc
+
+
+@router.put("/equipes/{equipe_id}/aeronefs/{affectation_id}", response_model=AffectationAeronefRead)
+async def cloturer_affectation_aeronef(
+    equipe_id: uuid.UUID,
+    affectation_id: uuid.UUID,
+    body: AffectationAeronefCloture,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CloturerAffectationAeronef(EquipeAeronefRepositoryImpl(db))
+    try:
+        return await use_case.execute(
+            equipe_id=equipe_id, affectation_id=affectation_id, date_fin=body.date_fin
+        )
+    except AffectationAeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Affectation non trouvée"
+        ) from exc
+    except AffectationDejaCloturee as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"affectation déjà clôturée : {exc.args[0]}",
+        ) from exc
+    except (
+        AeronefDejaAffecteError,
+        EquipeDejaEquipeeError,
+        PeriodeAffectationInvalideError,
+    ) as exc:
+        raise _erreur_affectation(exc) from exc
+
+
+# --- aeronef (parc d'hélicoptères, migration 0078 ; référentiel autonome #621) -----
+#
+# Référentiel à part entière : un appareil s'enregistre sans équipe, arrive sur la
+# campagne avant sa première affectation et reste au parc entre deux (#603). Il reste
+# créable dans la foulée d'une équipe (POST /equipes, champ `aeronef`) pour les
+# formulaires existants. Pas de DELETE : la sortie de service est `actif=false`.
+#
+# Écriture réservée aux admins : le parc est une donnée d'administration.
+
+
+@router.post("/aeronefs", response_model=AeronefRead, status_code=201)
+async def create_aeronef(
+    body: AeronefCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(require_admin)],
+):
+    try:
+        return await CreateAeronef(AeronefRepositoryImpl(db)).execute(
+            immatriculation=body.immatriculation,
+            societe=body.societe,
+            volume_cuve_l=body.volume_cuve_l,
+        )
+    except ImmatriculationAeronefDejaPriseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"immatriculation déjà utilisée par un autre aéronef : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/aeronefs/{aeronef_id}", response_model=AeronefRead)
+async def get_aeronef(
+    aeronef_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    aeronef = await GetAeronef(AeronefRepositoryImpl(db)).execute(aeronef_id)
+    if aeronef is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aéronef non trouvé")
+    return aeronef
 
 
 @router.get("/aeronefs", response_model=list[AeronefRead])
@@ -833,13 +1141,9 @@ async def update_aeronef(
     aeronef_id: uuid.UUID,
     body: AeronefUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    acteur: Annotated[Utilisateur, Depends(get_current_user)],
+    _: Annotated[Utilisateur, Depends(require_admin)],
 ):
     # Le parc d'hélicoptères est une donnée d'administration : réservé aux admins.
-    if acteur.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux administrateurs"
-        )
     use_case = UpdateAeronef(AeronefRepositoryImpl(db))
     try:
         return await use_case.execute(
@@ -860,109 +1164,70 @@ async def update_aeronef(
         ) from exc
 
 
-# --- equipe_terrestre --------------------------------------------------------------
-#
-# Équipe terrestre (migration 0073) : même patron que equipe_aerienne, un chef
-# d'équipe (rôle chef_equipe) + des membres à nombre variable. Contrairement à
-# l'aérien, pas de base physique unique — plusieurs postes acridiens peuvent
-# partager la même équipe (poste_acridien.equipe_terrestre_id, sans UNIQUE).
-# Aucune route PUT dans ce lot, même périmètre réduit que equipe_aerienne.
-
-
-@router.get("/equipes-terrestres", response_model=list[EquipeTerrestreRead])
-async def list_equipes_terrestres(
+@router.get("/sites-aeriens", response_model=list[SiteAerienneRead])
+async def list_sites_aeriens(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
     inclure_inactifs: bool = Query(
         default=False,
-        description="Renvoie les équipes des deux états — écran d'administration.",
+        description="Renvoie les sites des deux états — écran d'administration.",
     ),
 ):
-    use_case = ListEquipesTerrestres(EquipeTerrestreRepositoryImpl(db))
+    use_case = ListSitesAeriens(SiteAerienneRepositoryImpl(db))
     return await use_case.execute(actif=None if inclure_inactifs else True)
 
 
-@router.post("/equipes-terrestres", response_model=EquipeTerrestreRead, status_code=201)
-async def create_equipe_terrestre(
-    body: EquipeTerrestreCreate,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
-):
-    use_case = CreateEquipeTerrestre(
-        EquipeTerrestreRepositoryImpl(db), UtilisateurRepositoryImpl(db)
+def _parent_absent_http(exc: SiteAerienneParentAbsentError) -> HTTPException:
+    """409 rejouable : le mobile hors-ligne peut envoyer un dépendant avant son principal (#655).
+    Le mobile le reconnaît au préfixe « parent_site_id inconnu » — `traduireErreurCreation`,
+    mobile/src/lib/site-aerien-sync.ts. Le changer là-bas aussi."""
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=f"parent_site_id inconnu du serveur, à rejouer après son principal : {exc.args[0]}",
     )
-    try:
-        return await use_case.execute(
-            nom=body.nom,
-            chef_equipe_id=body.chef_equipe_id,
-            membres=[m.nom for m in body.membres],
-        )
-    except ChefEquipeInvalideError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"chef_equipe_id n'a pas le rôle chef_equipe : {exc.args[0]}",
-        ) from exc
-    except ChefEquipeDejaEquipeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"chef_equipe_id dirige déjà une autre équipe : {exc.args[0]}",
-        ) from exc
 
 
-@router.get("/equipes-terrestres/{equipe_id}", response_model=EquipeTerrestreRead)
-async def get_equipe_terrestre(
-    equipe_id: uuid.UUID,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
-):
-    use_case = GetEquipeTerrestre(EquipeTerrestreRepositoryImpl(db))
-    equipe = await use_case.execute(equipe_id)
-    if equipe is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Équipe terrestre non trouvée"
-        )
-    return equipe
-
-
-@router.get("/bases-aeriennes", response_model=list[BaseAerienneRead])
-async def list_bases_aeriennes(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
-    inclure_inactifs: bool = Query(
-        default=False,
-        description="Renvoie les bases des deux états — écran d'administration.",
-    ),
-):
-    use_case = ListBasesAeriennes(BaseAerienneRepositoryImpl(db))
-    return await use_case.execute(actif=None if inclure_inactifs else True)
-
-
-@router.post("/bases-aeriennes", response_model=BaseAerienneRead, status_code=201)
-async def create_base_aerienne(
-    body: BaseAerienneCreate,
+@router.post("/sites-aeriens", response_model=SiteAerienneRead, status_code=201)
+async def create_site_aerienne(
+    body: SiteAerienneCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = CreateBaseAerienne(BaseAerienneRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
+    use_case = CreateSiteAerienne(
+        SiteAerienneRepositoryImpl(db),
+        EquipeRepositoryImpl(db),
+        SiteAeriennePositionRepositoryImpl(db),
+    )
+    position = body.position
     try:
         return await use_case.execute(
             acteur=acteur,
             numero=body.numero,
             localite=body.localite,
-            parent_base_id=body.parent_base_id,
+            parent_site_id=body.parent_site_id,
             equipe_id=body.equipe_id,
-            longitude=body.longitude,
-            latitude=body.latitude,
-            altitude=body.altitude,
+            client_id=body.id,
+            position=(
+                (position.latitude, position.longitude, position.altitude)
+                if position is not None
+                else None
+            ),
         )
+    except IdentifiantDejaUtiliseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"l'identifiant {exc.args[0]} est déjà utilisé par un site différent",
+        ) from exc
+    except SiteAerienneParentAbsentError as exc:
+        raise _parent_absent_http(exc) from exc
     except EquipeNonAutoriseeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except BaseAerienneParentInvalideError as exc:
+    except SiteAerienneParentInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"parent_base_id invalide : {exc.args[0]}",
+            detail=f"parent_site_id invalide : {exc.args[0]}",
         ) from exc
-    except BaseAerienneEquipeInvalideError as exc:
+    except SiteAerienneEquipeInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
@@ -973,62 +1238,59 @@ async def create_base_aerienne(
     except EquipeAerienneDejaAssigneeError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"equipe_id possède déjà une base principale : {exc.args[0]}",
+            detail=f"equipe_id possède déjà un site principal : {exc.args[0]}",
         ) from exc
-    except NumeroBaseAerienneDejaPrisError as exc:
+    except NumeroSiteAerienneDejaPrisError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"numero déjà pris : {exc.args[0]}",
         ) from exc
 
 
-@router.get("/bases-aeriennes/{base_id}", response_model=BaseAerienneRead)
-async def get_base_aerienne(
-    base_id: uuid.UUID,
+@router.get("/sites-aeriens/{site_id}", response_model=SiteAerienneRead)
+async def get_site_aerienne(
+    site_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = GetBaseAerienne(BaseAerienneRepositoryImpl(db))
-    base = await use_case.execute(base_id)
-    if base is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Base aérienne non trouvée"
-        )
-    return base
+    use_case = GetSiteAerienne(SiteAerienneRepositoryImpl(db))
+    site = await use_case.execute(site_id)
+    if site is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Site aérien non trouvé")
+    return site
 
 
-@router.put("/bases-aeriennes/{base_id}", response_model=BaseAerienneRead)
-async def update_base_aerienne(
-    base_id: uuid.UUID,
-    body: BaseAerienneUpdate,
+@router.put("/sites-aeriens/{site_id}", response_model=SiteAerienneRead)
+async def update_site_aerienne(
+    site_id: uuid.UUID,
+    body: SiteAerienneUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
     acteur: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = UpdateBaseAerienne(BaseAerienneRepositoryImpl(db), EquipeAerienneRepositoryImpl(db))
+    use_case = UpdateSiteAerienne(SiteAerienneRepositoryImpl(db), EquipeRepositoryImpl(db))
     try:
-        base = await use_case.execute(
+        site = await use_case.execute(
             acteur=acteur,
-            base_id=base_id,
+            site_id=site_id,
             numero=body.numero,
             localite=body.localite,
-            parent_base_id=body.parent_base_id,
+            parent_site_id=body.parent_site_id,
             equipe_id=body.equipe_id,
-            longitude=body.longitude,
-            latitude=body.latitude,
-            altitude=body.altitude,
             actif=body.actif,
-            # Coordonnées, parent_base_id et equipe_id nullables : seul le corps reçu
-            # distingue « absent » de « mis à NULL ».
+            # parent_site_id et equipe_id nullables : seul le corps reçu distingue
+            # « absent » de « mis à NULL ».
             champs_fournis=body.model_fields_set,
         )
     except EquipeNonAutoriseeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except BaseAerienneParentInvalideError as exc:
+    except SiteAerienneParentAbsentError as exc:
+        raise _parent_absent_http(exc) from exc
+    except SiteAerienneParentInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"parent_base_id invalide : {exc.args[0]}",
+            detail=f"parent_site_id invalide : {exc.args[0]}",
         ) from exc
-    except BaseAerienneEquipeInvalideError as exc:
+    except SiteAerienneEquipeInvalideError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
@@ -1039,121 +1301,148 @@ async def update_base_aerienne(
     except EquipeAerienneDejaAssigneeError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"equipe_id possède déjà une base principale : {exc.args[0]}",
+            detail=f"equipe_id possède déjà un site principal : {exc.args[0]}",
         ) from exc
-    except NumeroBaseAerienneDejaPrisError as exc:
+    except NumeroSiteAerienneDejaPrisError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"numero déjà pris : {exc.args[0]}",
         ) from exc
-    if base is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Base aérienne non trouvée"
-        )
-    return base
+    if site is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Site aérien non trouvé")
+    return site
 
 
-@router.get("/stands-remplissage", response_model=list[StandRemplissageRead])
-async def list_stands_remplissage(
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
-    inclure_inactifs: bool = Query(
-        default=False,
-        description="Renvoie les stands des deux états — écran d'administration.",
-    ),
-):
-    use_case = ListStandsRemplissage(StandRemplissageRepositoryImpl(db))
-    return await use_case.execute(actif=None if inclure_inactifs else True)
-
-
-@router.post("/stands-remplissage", response_model=StandRemplissageRead, status_code=201)
-async def create_stand_remplissage(
-    body: StandRemplissageCreate,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    acteur: Annotated[Utilisateur, Depends(get_current_user)],
-):
-    use_case = CreateStandRemplissage(
-        StandRemplissageRepositoryImpl(db), EquipeAerienneRepositoryImpl(db)
+def _position_read(position) -> SiteAeriennePositionRead:
+    return SiteAeriennePositionRead(
+        id=position.id,
+        site_id=position.site_id,
+        latitude=position.latitude,
+        longitude=position.longitude,
+        altitude=position.altitude,
+        date_debut=position.date_debut,
+        date_fin=position.date_fin,
+        duree_jours=position.duree_jours(),
+        created_at=position.created_at,
     )
-    try:
-        return await use_case.execute(
-            acteur=acteur,
-            numero=body.numero,
-            localite=body.localite,
-            equipe_aerienne_id=body.equipe_aerienne_id,
-            longitude=body.longitude,
-            latitude=body.latitude,
-            altitude=body.altitude,
-        )
-    except EquipeNonAutoriseeError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except EquipeRequiseError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
-    except EquipeAerienneIntrouvableError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"equipe_aerienne_id introuvable : {exc.args[0]}",
-        ) from exc
-    except NumeroStandRemplissageDejaPrisError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"numero déjà pris : {exc.args[0]}",
-        ) from exc
 
 
-@router.get("/stands-remplissage/{stand_id}", response_model=StandRemplissageRead)
-async def get_stand_remplissage(
-    stand_id: uuid.UUID,
+@router.post(
+    "/sites-aeriens/{site_id}/positions", response_model=SiteAeriennePositionRead, status_code=201
+)
+async def installer_position_site_aerienne(
+    site_id: uuid.UUID,
+    body: SiteAeriennePositionInstaller,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = GetStandRemplissage(StandRemplissageRepositoryImpl(db))
-    stand = await use_case.execute(stand_id)
-    if stand is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stand non trouvé")
-    return stand
-
-
-@router.put("/stands-remplissage/{stand_id}", response_model=StandRemplissageRead)
-async def update_stand_remplissage(
-    stand_id: uuid.UUID,
-    body: StandRemplissageUpdate,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    acteur: Annotated[Utilisateur, Depends(get_current_user)],
-):
-    use_case = UpdateStandRemplissage(
-        StandRemplissageRepositoryImpl(db), EquipeAerienneRepositoryImpl(db)
+    use_case = InstallerPositionSiteAerienne(
+        SiteAeriennePositionRepositoryImpl(db), SiteAerienneRepositoryImpl(db)
     )
     try:
-        stand = await use_case.execute(
-            acteur=acteur,
-            stand_id=stand_id,
-            numero=body.numero,
-            localite=body.localite,
-            longitude=body.longitude,
+        position = await use_case.execute(
+            site_id=site_id,
             latitude=body.latitude,
+            longitude=body.longitude,
             altitude=body.altitude,
-            equipe_aerienne_id=body.equipe_aerienne_id,
-            actif=body.actif,
-            champs_fournis=body.model_fields_set,
         )
-    except EquipeNonAutoriseeError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except EquipeAerienneIntrouvableError as exc:
+    except SiteAerienneIntrouvableError as exc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"equipe_aerienne_id introuvable : {exc.args[0]}",
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Site aérien non trouvé : {exc.args[0]}"
         ) from exc
-    except NumeroStandRemplissageDejaPrisError as exc:
+    except PositionDejaActiveError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"numero déjà pris : {exc.args[0]}",
+            detail=f"le site a déjà une position active, le démonter d'abord : {exc.args[0]}",
         ) from exc
-    if stand is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stand non trouvé")
-    return stand
+    return _position_read(position)
+
+
+@router.post("/sites-aeriens/{site_id}/deplacer", response_model=list[SiteAeriennePositionRead])
+async def deplacer_site_aerienne(
+    site_id: uuid.UUID,
+    body: SiteAerienneDeplacer,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Déplace le site et ses `dependants` en une transaction (#655) : chaque position
+    active est close à J-1 et remplacée. Atomique : tout est déplacé ou rien."""
+    use_case = DeplacerSiteAerienne(
+        SiteAeriennePositionRepositoryImpl(db), SiteAerienneRepositoryImpl(db)
+    )
+    try:
+        positions = await use_case.execute(
+            site_id=site_id,
+            latitude=body.latitude,
+            longitude=body.longitude,
+            altitude=body.altitude,
+            dependants=body.dependants,
+        )
+    except SiteAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Site aérien non trouvé : {exc.args[0]}"
+        ) from exc
+    except SiteAerienneDependantInvalideError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"dependants invalide (inconnu ou rattaché à un autre principal) : "
+            f"{exc.args[0]}",
+        ) from exc
+    except PositionDejaActiveError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"conflit de position active, réessayer : {exc.args[0]}",
+        ) from exc
+    return [_position_read(p) for p in positions]
+
+
+@router.post("/sites-aeriens/{site_id}/positions/demonter", response_model=SiteAeriennePositionRead)
+async def demonter_position_site_aerienne(
+    site_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = DemonterPositionSiteAerienne(
+        SiteAeriennePositionRepositoryImpl(db), SiteAerienneRepositoryImpl(db)
+    )
+    try:
+        position = await use_case.execute(site_id=site_id)
+    except SiteAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Site aérien non trouvé : {exc.args[0]}"
+        ) from exc
+    except PositionActiveIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"aucune position active à démonter : {exc.args[0]}",
+        ) from exc
+    return _position_read(position)
+
+
+@router.get("/sites-aeriens/{site_id}/positions", response_model=list[SiteAeriennePositionRead])
+async def lister_positions_site_aerienne(
+    site_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = ListerPositionsSiteAerienne(SiteAeriennePositionRepositoryImpl(db))
+    positions = await use_case.execute(site_id)
+    return [_position_read(p) for p in positions]
+
+
+@router.get("/sites-aeriens/{site_id}/positions/active", response_model=SiteAeriennePositionRead)
+async def get_position_active_site_aerienne(
+    site_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = GetPositionActiveSiteAerienne(SiteAeriennePositionRepositoryImpl(db))
+    position = await use_case.execute(site_id)
+    if position is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Aucune position active pour ce site"
+        )
+    return _position_read(position)
 
 
 # --- pesticide -------------------------------------------------------------------
@@ -1241,6 +1530,207 @@ async def update_pesticide(
     return pesticide
 
 
+@router.post("/mouvements-pesticide", response_model=MouvementPesticideRead, status_code=201)
+async def create_mouvement_pesticide(
+    body: MouvementPesticideCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(require_chef_de_base_ou_admin)],
+):
+    use_case = CreateMouvementPesticide(
+        MouvementPesticideRepositoryImpl(db),
+        SiteAerienneRepositoryImpl(db),
+        PesticideRepositoryImpl(db),
+    )
+    try:
+        return await use_case.execute(
+            type=body.type,
+            pesticide_id=body.pesticide_id,
+            site_id=body.site_id,
+            quantite=body.quantite,
+            unite=body.unite,
+            site_destination_id=body.site_destination_id,
+            date_mouvement=body.date_mouvement,
+            client_id=body.id,
+        )
+    except IdentifiantDejaUtiliseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"l'identifiant {exc.args[0]} est déjà utilisé par un mouvement différent",
+        ) from exc
+    except SiteDestinationIncoherentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except SiteNonPrincipalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"le stock de pesticides est rattaché au site aérien principal : "
+            f"{exc.args[0]} n'en est pas un",
+        ) from exc
+    except SiteAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"site introuvable : {exc.args[0]}"
+        ) from exc
+    except PesticideIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"pesticide_id introuvable : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/stock-pesticide/solde", response_model=list[SoldePesticideRead])
+async def get_solde_pesticide(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    site_id: uuid.UUID | None = Query(default=None),
+    pesticide_id: uuid.UUID | None = Query(default=None),
+):
+    use_case = ConsulterSoldePesticide(MouvementPesticideRepositoryImpl(db))
+    return await use_case.execute(site_id=site_id, pesticide_id=pesticide_id)
+
+
+@router.post("/vols", response_model=VolRead, status_code=201)
+async def create_vol(
+    body: VolCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = CreateVol(
+        VolRepositoryImpl(db),
+        EquipeRepositoryImpl(db),
+        AeronefRepositoryImpl(db),
+        EquipeAeronefRepositoryImpl(db),
+        SiteAerienneRepositoryImpl(db),
+    )
+    try:
+        return await use_case.execute(
+            type=body.type,
+            equipe_id=body.equipe_id,
+            aeronef_id=body.aeronef_id,
+            date_vol=body.date_vol,
+            heure_debut=body.heure_debut,
+            heure_fin=body.heure_fin,
+            site_principal_id=body.site_principal_id,
+            stand_id=body.stand_id,
+            base_secondaire_id=body.base_secondaire_id,
+            motif=body.motif,
+            lieu_depart=body.lieu_depart,
+            lieu_arrivee=body.lieu_arrivee,
+            observations=body.observations,
+            client_id=body.id,
+        )
+    except IdentifiantDejaUtiliseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"l'identifiant {exc.args[0]} est déjà utilisé par un vol différent",
+        ) from exc
+    except EquipeIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"équipe introuvable : {exc.args[0]}"
+        ) from exc
+    except EquipeNonAerienneError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"l'équipe {exc.args[0]} n'est pas une équipe aérienne",
+        ) from exc
+    except AeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"aéronef introuvable : {exc.args[0]}",
+        ) from exc
+    except AeronefNonAffecteError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"l'aéronef {exc.args[0]} n'est pas affecté à cette équipe à la date du vol",
+        ) from exc
+    except VolSiteObligatoireError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except VolMotifRequisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except VolLieuxConvoyageRequisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except SiteHorsBaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"le site {exc.args[0]} n'est pas rattaché au site principal du vol",
+        ) from exc
+    except SiteAerienneIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"site introuvable : {exc.args[0]}"
+        ) from exc
+
+
+@router.patch("/vols/{vol_id}", response_model=VolRead)
+async def update_vol(
+    vol_id: uuid.UUID,
+    body: VolUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    use_case = UpdateVol(VolRepositoryImpl(db), TraitementRepositoryImpl(db))
+    try:
+        return await use_case.execute(vol_id=vol_id, traitement_id=body.traitement_id)
+    except VolIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"vol introuvable : {exc.args[0]}"
+        ) from exc
+    except VolTypeNonApplicationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"le vol {exc.args[0]} n'est pas de type application, "
+            "il ne peut pas porter de traitement",
+        ) from exc
+    except TraitementAerienIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"traitement aérien introuvable : {exc.args[0]}",
+        ) from exc
+
+
+@router.get("/vols/{vol_id}", response_model=VolRead)
+async def get_vol(
+    vol_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    vol = await GetVol(VolRepositoryImpl(db)).execute(vol_id)
+    if vol is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vol non trouvé")
+    return vol
+
+
+@router.get("/vols", response_model=list[VolRead])
+async def list_vols(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    equipe_id: uuid.UUID | None = Query(default=None),
+):
+    return await ListVols(VolRepositoryImpl(db)).execute(equipe_id=equipe_id)
+
+
+def _site_sync_read(site) -> SiteAerienneSyncRead:
+    p = site.position_active
+    return SiteAerienneSyncRead(
+        id=site.id,
+        parent_site_id=site.parent_site_id,
+        equipe_id=site.equipe_id,
+        numero=site.numero,
+        localite=site.localite,
+        actif=site.actif,
+        latitude=p.latitude if p else None,
+        longitude=p.longitude if p else None,
+        altitude=p.altitude if p else None,
+        date_debut_position=p.date_debut if p else None,
+        updated_at=site.updated_at,
+    )
+
+
 @router.get("/referentiel/pull", response_model=ReferentielPullResponse)
 async def pull_referentiel(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -1254,6 +1744,11 @@ async def pull_referentiel(
     since_codes_stades: datetime | None = Query(default=None),
     since_campagnes: datetime | None = Query(default=None),
     since_lieux_aeriens: datetime | None = Query(default=None),
+    since_sites_aeriens: datetime | None = Query(default=None),
+    since_equipes: datetime | None = Query(default=None),
+    since_equipe_membres: datetime | None = Query(default=None),
+    since_aeronefs: datetime | None = Query(default=None),
+    since_equipe_aeronefs: datetime | None = Query(default=None),
 ):
     use_case = PullReferentiel(
         zone_repository=ZoneAntiAcridienRepositoryImpl(db),
@@ -1265,6 +1760,10 @@ async def pull_referentiel(
         code_stade_repository=CodeStadeRepositoryImpl(db),
         campagne_repository=CampagneRepositoryImpl(db),
         lieu_aerien_repository=LieuAerienRepositoryImpl(db),
+        site_aerien_repository=SiteAerienneRepositoryImpl(db),
+        equipe_unifiee_repository=EquipeRepositoryImpl(db),
+        aeronef_repository=AeronefRepositoryImpl(db),
+        affectation_aeronef_repository=EquipeAeronefRepositoryImpl(db),
     )
     cursors = ReferentielSinceCursors(
         zones_anti_acridiennes=since_zones_anti_acridiennes,
@@ -1276,6 +1775,11 @@ async def pull_referentiel(
         codes_stades=since_codes_stades,
         campagnes=since_campagnes,
         lieux_aeriens=since_lieux_aeriens,
+        sites_aeriens=since_sites_aeriens,
+        equipes=since_equipes,
+        equipe_membres=since_equipe_membres,
+        aeronefs=since_aeronefs,
+        equipe_aeronefs=since_equipe_aeronefs,
     )
     result = await use_case.execute(cursors=cursors)
 
@@ -1295,4 +1799,52 @@ async def pull_referentiel(
         codes_stades=EntityPull(upserts=result.codes_stades, server_time=result.server_time),
         campagnes=EntityPull(upserts=result.campagnes, server_time=result.server_time),
         lieux_aeriens=EntityPull(upserts=result.lieux_aeriens, server_time=result.server_time),
+        sites_aeriens=EntityPull(
+            upserts=[_site_sync_read(s) for s in result.sites_aeriens],
+            server_time=result.server_time,
+        ),
+        equipes=EntityPull(upserts=result.equipes, server_time=result.server_time),
+        equipe_membres=EntityPull(upserts=result.equipe_membres, server_time=result.server_time),
+        aeronefs=EntityPull(upserts=result.aeronefs, server_time=result.server_time),
+        equipe_aeronefs=EntityPull(upserts=result.equipe_aeronefs, server_time=result.server_time),
     )
+
+
+ajouter_route_suppression(
+    router,
+    "/zones-anti-acridiennes/{item_id}",
+    ZoneAntiAcridienModel,
+    "Zone anti-acridienne",
+    enfants=((PosteAcridienModel, "za_id", "postes acridiens"),),
+)
+ajouter_route_suppression(
+    router,
+    "/postes-acridiens/{item_id}",
+    PosteAcridienModel,
+    "Poste acridien",
+    enfants=((StationFixeModel, "pa_id", "stations"),),
+)
+ajouter_route_suppression(router, "/stations/{item_id}", StationFixeModel, "Station")
+ajouter_route_suppression(router, "/codes-stades/{item_id}", CodeStadeModel, "Code stade")
+ajouter_route_suppression(router, "/cultures/{item_id}", CultureModel, "Culture")
+ajouter_route_suppression(router, "/lieux-aeriens/{item_id}", LieuAerienModel, "Lieu aérien")
+ajouter_route_suppression(router, "/equipes/{item_id}", EquipeModel, "Équipe")
+ajouter_route_suppression(router, "/aeronefs/{item_id}", AeronefModel, "Aéronef")
+ajouter_route_suppression(router, "/sites-aeriens/{item_id}", SiteAerienneModel, "Site aérien")
+ajouter_route_suppression(router, "/pesticides/{item_id}", PesticideModel, "Pesticide")
+
+
+@router.delete(
+    "/equipes/{equipe_id}/aeronefs/{affectation_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def supprimer_affectation_aeronef(
+    equipe_id: uuid.UUID,
+    affectation_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(require_admin)],
+) -> Response:
+    ligne = await charger_ligne_vivante(db, EquipeAeronefModel, affectation_id, "Affectation")
+    if ligne.equipe_id != equipe_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Affectation non trouvée")
+    await marquer_supprime(db, ligne)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

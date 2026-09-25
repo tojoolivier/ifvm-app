@@ -2,7 +2,7 @@ import {
   useRequestLogStore,
   RequestLogEntry,
 } from './request-log-store';
-import type { components } from './api-schema.generated';
+import type { components, paths } from './api-schema.generated';
 import { storage } from './storage';
 import { AuthError, NetworkError, isTypedError } from './errors';
 import { logger } from './logger';
@@ -12,6 +12,13 @@ const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
 const log = logger.child({ module: 'api-client' });
+
+/**
+ * Un chemin d'URL n'est accepté que s'il existe dans le contrat OpenAPI
+ * (`paths`) : une route supprimée côté backend casse `tsc` au lieu d'un 404 à
+ * l'exécution (#640, cf. `/bases-aeriennes` retirée par #604).
+ */
+const cheminDuContrat = <P extends keyof paths>(chemin: P): P => chemin;
 
 /**
  * Le statut HTTP, joint à l'erreur typée — ADR-012 décision 2, issue #173.
@@ -291,6 +298,8 @@ export interface PosteAcridienSync {
   za_id: string;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 export interface StationFixeSync {
@@ -306,6 +315,8 @@ export interface StationFixeSync {
   region: string;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 export interface UtilisateurEquipeSync {
@@ -333,6 +344,8 @@ export interface CultureSync {
   nom: string;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 /**
@@ -348,6 +361,8 @@ export interface CampagneSync {
   end_date: string | null;
   actif: boolean;
   updated_at: string;
+  /** Soft-delete (#674) : non nul = la ligne est supprimée, à purger du cache local. */
+  deleted_at?: string | null;
 }
 
 /**
@@ -358,6 +373,17 @@ export interface CampagneSync {
  */
 export type LieuAerienSync = components['schemas']['LieuAerienSyncRead'];
 
+/**
+ * Équipes de travail (référentiel unifié, ADR-018 / #638) : une équipe et ses membres se
+ * pullent chacun avec leur propre curseur. Types tirés du contrat OpenAPI.
+ */
+export type EquipeSync = components['schemas']['EquipeSyncRead'];
+export type EquipeMembreSync = components['schemas']['EquipeMembreSyncRead'];
+
+export type SiteAerienSync = components['schemas']['SiteAerienneSyncRead'];
+export type AeronefSync = components['schemas']['AeronefSyncRead'];
+export type EquipeAeronefSync = components['schemas']['EquipeAeronefSyncRead'];
+
 export interface ReferentielPullResponse {
   postes_acridiens: EntityPull<PosteAcridienSync>;
   stations_fixes: EntityPull<StationFixeSync>;
@@ -367,6 +393,11 @@ export interface ReferentielPullResponse {
   codes_stades: EntityPull<CodeStadeSync>;
   campagnes: EntityPull<CampagneSync>;
   lieux_aeriens: EntityPull<LieuAerienSync>;
+  equipes: EntityPull<EquipeSync>;
+  equipe_membres: EntityPull<EquipeMembreSync>;
+  sites_aeriens: EntityPull<SiteAerienSync>;
+  aeronefs: EntityPull<AeronefSync>;
+  equipe_aeronefs: EntityPull<EquipeAeronefSync>;
 }
 
 /**
@@ -978,7 +1009,9 @@ export const apiClient = {
   pullReferentiel: async (
     token: string,
     cursors: ReferentielSinceCursors,
-    onUnauthorized?: OnUnauthorized
+    onUnauthorized?: OnUnauthorized,
+    /** Coupe la requête en cours (« Annuler » pendant la réinitialisation du référentiel). */
+    signal?: AbortSignal
   ): Promise<ReferentielPullResponse> => {
     const query =
       new URLSearchParams();
@@ -1039,12 +1072,33 @@ export const apiClient = {
       );
     }
 
+    if (cursors.equipes) {
+      query.set('since_equipes', cursors.equipes);
+    }
+
+    if (cursors.equipe_membres) {
+      query.set('since_equipe_membres', cursors.equipe_membres);
+    }
+
+    if (cursors.sites_aeriens) {
+      query.set('since_sites_aeriens', cursors.sites_aeriens);
+    }
+
+    if (cursors.aeronefs) {
+      query.set('since_aeronefs', cursors.aeronefs);
+    }
+
+    if (cursors.equipe_aeronefs) {
+      query.set('since_equipe_aeronefs', cursors.equipe_aeronefs);
+    }
+
     const qs = query.toString();
 
     return makeRequest<ReferentielPullResponse>(
       `/referentiel/pull${qs ? `?${qs}` : ''}`,
       {
         method: 'GET',
+        ...(signal ? { signal } : {}),
       },
       token,
       onUnauthorized
@@ -1113,56 +1167,32 @@ export const apiClient = {
   },
 
   /**
-   * Référentiels aériens (bases, stands, équipes) —
-   * `numero`/`localite` saisis à la main (pas d'auto-génération côté backend,
-   * cf. CreateBaseAerienne/CreateStandRemplissage), en ligne uniquement : ni
-   * `id` client, ni sync hors-ligne pour ces deux référentiels — même contrat
-   * que le web (ReferentielsPage.tsx), qui les crée de la même façon.
+   * Sites aériens (référentiel unifié, ADR-018 / #604) : un site principal
+   * (`parent_site_id` absent, `equipe_id` requis) ou un site secondaire — base
+   * secondaire ou stand — rattaché à son principal (`parent_site_id`).
+   * `numero`/`localite` saisis à la main, en ligne uniquement. Les coordonnées
+   * ne se saisissent plus à la création : elles vivent dans les positions
+   * datées du site (`/sites-aeriens/{id}/positions`, #643).
    */
-  listBasesAeriennes: async (
+  listSitesAeriens: async (
     token: string,
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['BaseAerienneRead'][]> => {
-    return makeRequest<components['schemas']['BaseAerienneRead'][]>(
-      '/bases-aeriennes',
+  ): Promise<components['schemas']['SiteAerienneRead'][]> => {
+    return makeRequest<components['schemas']['SiteAerienneRead'][]>(
+      cheminDuContrat('/sites-aeriens'),
       { method: 'GET' },
       token,
       onUnauthorized
     );
   },
 
-  createBaseAerienne: async (
+  createSiteAerien: async (
     token: string,
-    body: components['schemas']['BaseAerienneCreate'],
+    body: components['schemas']['SiteAerienneCreate'],
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['BaseAerienneRead']> => {
-    return makeRequest<components['schemas']['BaseAerienneRead']>(
-      '/bases-aeriennes',
-      { method: 'POST', body: JSON.stringify(body) },
-      token,
-      onUnauthorized
-    );
-  },
-
-  listStandsRemplissage: async (
-    token: string,
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['StandRemplissageRead'][]> => {
-    return makeRequest<components['schemas']['StandRemplissageRead'][]>(
-      '/stands-remplissage',
-      { method: 'GET' },
-      token,
-      onUnauthorized
-    );
-  },
-
-  createStandRemplissage: async (
-    token: string,
-    body: components['schemas']['StandRemplissageCreate'],
-    onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['StandRemplissageRead']> => {
-    return makeRequest<components['schemas']['StandRemplissageRead']>(
-      '/stands-remplissage',
+  ): Promise<components['schemas']['SiteAerienneRead']> => {
+    return makeRequest<components['schemas']['SiteAerienneRead']>(
+      cheminDuContrat('/sites-aeriens'),
       { method: 'POST', body: JSON.stringify(body) },
       token,
       onUnauthorized
@@ -1170,17 +1200,202 @@ export const apiClient = {
   },
 
   /**
-   * Équipe aérienne (#equipe-aerienne) — une équipe = un chef de base = une
-   * base aérienne principale (migration 0066). En ligne uniquement, même
-   * contrat que les autres référentiels aériens.
+   * Renomme un site (numéro/localité) — seul cas où un déplacement passe par ce PUT (#643).
+   */
+  updateSiteAerien: async (
+    token: string,
+    siteId: string,
+    body: components['schemas']['SiteAerienneUpdate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['SiteAerienneRead']> => {
+    return makeRequest<components['schemas']['SiteAerienneRead']>(
+      `/sites-aeriens/${siteId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Déplacement groupé (#655) : la même position sur le site et ses `dependants`, en une
+   * transaction côté serveur. Un rejeu du même jour est inoffensif (position corrigée en place).
+   */
+  deplacerSiteAerien: async (
+    token: string,
+    siteId: string,
+    body: components['schemas']['SiteAerienneDeplacer'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['SiteAeriennePositionRead'][]> => {
+    return makeRequest<components['schemas']['SiteAeriennePositionRead'][]>(
+      `/sites-aeriens/${siteId}/deplacer`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Vol (ADR-018, #608) — idempotent par `id` client (#639). Ici : le vol de mise en place. */
+  createVol: async (
+    token: string,
+    body: components['schemas']['VolCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['VolRead']> => {
+    return makeRequest<components['schemas']['VolRead']>(
+      cheminDuContrat('/vols'),
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Mouvement de stock de pesticide (#606, #645) — idempotent par `id` client (#639) : rejouer après
+   * une coupure ne double pas le mouvement. Ici : approvisionnement et transfert (la consommation est
+   * générée par le serveur, #609).
+   */
+  createMouvementPesticide: async (
+    token: string,
+    body: components['schemas']['MouvementPesticideCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['MouvementPesticideRead']> => {
+    return makeRequest<components['schemas']['MouvementPesticideRead']>(
+      cheminDuContrat('/mouvements-pesticide'),
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Solde par (site, produit, unité) — jamais sommé entre unités (#606). */
+  getSoldesPesticide: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['SoldePesticideRead'][]> => {
+    return makeRequest<components['schemas']['SoldePesticideRead'][]>(
+      cheminDuContrat('/stock-pesticide/solde'),
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Rattache un vol d'application à son traitement (#610) — seul champ modifiable d'un vol. */
+  updateVol: async (
+    token: string,
+    volId: string,
+    body: components['schemas']['VolUpdate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['VolRead']> => {
+    return makeRequest<components['schemas']['VolRead']>(
+      `/vols/${volId}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Équipes (référentiel unifié, ADR-018 / migration 0082) : une seule table
+   * `equipe` typée `terrestre` | `aerien`, et des membres génériques porteurs de
+   * leur `fonction` — le chef de base est devenu un membre `fonction: 'chef'`.
+   * En ligne uniquement, même contrat que les autres référentiels aériens.
    */
   listEquipesAeriennes: async (
     token: string,
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['EquipeAerienneRead'][]> => {
-    return makeRequest<components['schemas']['EquipeAerienneRead'][]>(
-      '/equipes-aeriennes',
+  ): Promise<components['schemas']['EquipeRead'][]> => {
+    return makeRequest<components['schemas']['EquipeRead'][]>(
+      '/equipes?type=aerien',
       { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Équipes terrestres et aériennes, avec leurs membres (écran Équipes, #641). */
+  listEquipes: async (
+    token: string,
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['EquipeRead'][]> => {
+    return makeRequest<components['schemas']['EquipeRead'][]>(
+      '/equipes',
+      { method: 'GET' },
+      token,
+      onUnauthorized
+    );
+  },
+
+  createEquipe: async (
+    token: string,
+    body: components['schemas']['EquipeCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['EquipeRead']> => {
+    return makeRequest<components['schemas']['EquipeRead']>(
+      '/equipes',
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /** Ajoute un membre : compte existant (`user_id`) ou compte « à la volée » (`nom`/`prenom`). */
+  ajouterMembreEquipe: async (
+    token: string,
+    equipeId: string,
+    body: components['schemas']['MembreEquipeCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['MembreEquipeRead']> => {
+    return makeRequest<components['schemas']['MembreEquipeRead']>(
+      `/equipes/${equipeId}/membres`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  /**
+   * Parc aéronefs (#621, #603) — administrateur pour la création. En ligne uniquement : ni
+   * création d'appareil ni affectation ne passent par la file d'envoi hors-ligne, l'écran
+   * dit « nécessite le réseau » (décision #642 : la consultation reste locale, l'écriture
+   * exige le serveur, seul juge des chevauchements de dates et de l'unicité d'immatriculation).
+   */
+  createAeronef: async (
+    token: string,
+    body: components['schemas']['AeronefCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['AeronefRead']> => {
+    return makeRequest<components['schemas']['AeronefRead']>(
+      cheminDuContrat('/aeronefs'),
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  affecterAeronef: async (
+    token: string,
+    equipeId: string,
+    body: components['schemas']['AffectationAeronefCreate'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['AffectationAeronefRead']> => {
+    return makeRequest<components['schemas']['AffectationAeronefRead']>(
+      `/equipes/${equipeId}/aeronefs`,
+      { method: 'POST', body: JSON.stringify(body) },
+      token,
+      onUnauthorized
+    );
+  },
+
+  cloturerAffectationAeronef: async (
+    token: string,
+    equipeId: string,
+    affectationId: string,
+    body: components['schemas']['AffectationAeronefCloture'],
+    onUnauthorized?: OnUnauthorized
+  ): Promise<components['schemas']['AffectationAeronefRead']> => {
+    return makeRequest<components['schemas']['AffectationAeronefRead']>(
+      `/equipes/${equipeId}/aeronefs/${affectationId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
       token,
       onUnauthorized
     );
@@ -1188,11 +1403,11 @@ export const apiClient = {
 
   createEquipeAerienne: async (
     token: string,
-    body: components['schemas']['EquipeAerienneCreate'],
+    body: components['schemas']['EquipeCreate'],
     onUnauthorized?: OnUnauthorized
-  ): Promise<components['schemas']['EquipeAerienneRead']> => {
-    return makeRequest<components['schemas']['EquipeAerienneRead']>(
-      '/equipes-aeriennes',
+  ): Promise<components['schemas']['EquipeRead']> => {
+    return makeRequest<components['schemas']['EquipeRead']>(
+      '/equipes',
       { method: 'POST', body: JSON.stringify(body) },
       token,
       onUnauthorized

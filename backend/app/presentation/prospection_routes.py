@@ -14,6 +14,7 @@ from app.application.prospection_use_cases import (
     GetAuditLog,
     GetProspection,
     ListProspections,
+    ProspectionIdentifiantPrisError,
     UpdateProspection,
 )
 from app.auth import get_current_user
@@ -31,6 +32,7 @@ from app.domain.referentiel import StationNotFoundError
 from app.infrastructure.audit_log_repository import AuditLogRepositoryImpl
 from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
+from app.infrastructure.referentiel_sync_repository import EquipeRepositoryImpl, VolRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.prospection_pdf import build_prospection_html
 from app.presentation.prospection_schemas import (
@@ -60,6 +62,21 @@ async def list_prospections(
     campagne_id: uuid.UUID | None = Query(default=None),
     station_id: uuid.UUID | None = Query(default=None),
     prospecteur_id: uuid.UUID | None = Query(default=None),
+    equipe_id: uuid.UUID | None = Query(
+        default=None,
+        description=(
+            "Interventions menées par cette équipe, triées par date_prospection "
+            "décroissante (#607) — la position courante d'une équipe mobile "
+            "terrestre se déduit de la première ligne."
+        ),
+    ),
+    vol_id: uuid.UUID | None = Query(
+        default=None,
+        description=(
+            "Fiches rattachées à ce vol de prospection (#610) — permet de relire, "
+            "depuis un vol, les prospections qu'il a produites."
+        ),
+    ),
     disponible_pour_traitement: bool = Query(
         default=False,
         description=(
@@ -86,6 +103,8 @@ async def list_prospections(
         campagne_id=campagne_id,
         station_id=station_id,
         prospecteur_id=prospecteur_id,
+        equipe_id=equipe_id,
+        vol_id=vol_id,
         disponible_pour_traitement=disponible_pour_traitement,
         a_revalider=a_revalider,
     )
@@ -98,12 +117,19 @@ async def create_prospection(
     current_user: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
-    use_case = CreateProspection(repository, AuditLogRepositoryImpl(db))
+    use_case = CreateProspection(
+        repository,
+        EquipeRepositoryImpl(db),
+        AuditLogRepositoryImpl(db),
+        VolRepositoryImpl(db),
+    )
     try:
         prospection = await use_case.execute(
+            prospection_id=body.id,
             type_prospection=body.type_prospection,
             campagne_id=body.campagne_id,
             prospecteur_id=current_user.id,
+            equipe_id=body.equipe_id,
             date_prospection=body.date_prospection,
             station_id=body.station_id,
             n_fiche=body.n_fiche,
@@ -191,6 +217,7 @@ async def create_prospection(
             signature_chef_base_horodatage=body.signature_chef_base_horodatage,
             signature_chef_base_image=body.signature_chef_base_image,
             revalide_de_id=body.revalide_de_id,
+            vol_id=body.vol_id,
         )
 
         # 👇 AJOUTE CETTE VÉRIFICATION POUR ÉVITER L'ERREUR 500
@@ -202,6 +229,8 @@ async def create_prospection(
 
         return prospection
 
+    except ProspectionIdentifiantPrisError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except StationNotFoundError as e:
@@ -296,7 +325,7 @@ async def update_prospection(
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
     repository = get_repository(db)
-    use_case = UpdateProspection(repository)
+    use_case = UpdateProspection(repository, VolRepositoryImpl(db))
     try:
         prospection = await use_case.execute(
             prospection_id=prospection_id,
@@ -347,6 +376,7 @@ async def update_prospection(
             signalement_description=body.signalement_description,
             conclusion_validation=body.conclusion_validation,
             avertissements=body.avertissements,
+            vol_id=body.vol_id,
         )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))

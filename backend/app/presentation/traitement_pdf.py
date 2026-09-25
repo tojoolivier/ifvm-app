@@ -400,11 +400,22 @@ def _section_pesticides(traitement: TraitementRead) -> str:
         )
         + _ligne(
             ("5.3 Stock initial", getattr(fait, "stock_initial_l", None) if fait else None),
-            (f"5.4 Approvisionnement ({unite})", fait.pesticide_recu_l if fait else None),
+            # pesticide_recu_l/pesticide_stock_restant_l : Terrestre uniquement
+            # depuis #609 — le stock Aérien vit dans `mouvement_pesticide`, hors
+            # périmètre de ce PDF (écrans de consultation du stock, hors scope
+            # #609). Même repli `getattr` que pesticide_unite/stock_initial_l
+            # ci-dessus pour l'Aérien.
+            (
+                f"5.4 Approvisionnement ({unite})",
+                getattr(fait, "pesticide_recu_l", None) if fait else None,
+            ),
         )
         + _ligne(
             (f"5.5 Produit consommé ({unite})", consomme),
-            (f"5.6 Stock final ({unite})", fait.pesticide_stock_restant_l if fait else None),
+            (
+                f"5.6 Stock final ({unite})",
+                getattr(fait, "pesticide_stock_restant_l", None) if fait else None,
+            ),
         )
     )
 

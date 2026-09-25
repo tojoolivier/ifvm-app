@@ -2,12 +2,15 @@
  * Libellés « Pesticides » alignés sur le vocabulaire de la fiche CRT papier
  * (section 5, Pesticides) : « Pesticide reçu » devient « Approvisionnement »,
  * « Quantité » (par produit/rotation) devient « Pesticides consommés » — sur
- * Terrestre (TerrestreForm.tsx, écran Équipe) comme sur Aérien (rotations.tsx).
- * Aucun champ ni type ne change, seul le texte affiché.
+ * Terrestre (TerrestreForm.tsx, écran Équipe). Aucun champ ni type ne change,
+ * seul le texte affiché.
+ *
+ * L'Aérien (rotations.tsx) avait le même vocabulaire jusqu'à la suppression de
+ * son « Approvisionnement » par #609 (stock désormais dans `mouvement_pesticide`,
+ * #606) — « Pesticides consommés » (par rotation) y reste inchangé.
  */
 import { render, screen, waitFor } from '@testing-library/react-native';
 import TraitementScreen from '@/app/(traitement)/traitement';
-import RotationsScreen from '@/app/(traitement)/rotations';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import * as traitementRepository from '@/lib/traitement-repository';
 
@@ -26,7 +29,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   deleteAllProduitsForTraitementTerrestre: jest.fn().mockResolvedValue(undefined),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
-  updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),
   updateTraitementAerienSurfaceRestante: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -90,27 +92,5 @@ describe('TraitementScreen (Équipe, Terrestre) — libellés Pesticides', () =>
     expect(screen.getByText('Pesticides consommés (L)')).toBeVisible();
     expect(screen.queryByText('Pesticide reçu (l)')).toBeNull();
     expect(screen.queryByText('Quantité (l)')).toBeNull();
-  });
-});
-
-describe('RotationsScreen (Aérien) — libellés Pesticides', () => {
-  beforeEach(() => {
-    mockRouteParams = { traitementId: 'trait-1' };
-    useTraitementCaptureStore.setState({ ...RESET_STATE, typeTraitement: 'AERIEN' });
-    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
-      id: 'trait-1',
-      type_traitement: 'AERIEN',
-      cible: { surface_infestee_ha: 100 },
-      aerien: { pesticide_recu_l: null, rotations: [] },
-    } as any);
-  });
-
-  it('affiche « Approvisionnement (l) » et « Pesticides consommés (l) », plus « Pesticide reçu »/« Quantité »', async () => {
-    await render(<RotationsScreen />);
-
-    await waitFor(() => expect(screen.getByText('Approvisionnement (l)')).toBeVisible());
-    expect(screen.getByText('Pesticides consommés (l) *')).toBeVisible();
-    expect(screen.queryByText('Pesticide reçu (l)')).toBeNull();
-    expect(screen.queryByText('Quantité (l) *')).toBeNull();
   });
 });

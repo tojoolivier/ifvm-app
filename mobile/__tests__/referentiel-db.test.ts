@@ -8,13 +8,19 @@ import {
   listCultures,
   listCodesStades,
   getStationById,
+  listEquipesDeUtilisateur,
+  listToutesEquipes,
+  getEquipeLocale,
 } from '../src/lib/referentiel-db';
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue([]);
 const getFirstAsync = jest.fn().mockResolvedValue(null);
 const runAsync = jest.fn().mockResolvedValue(undefined);
-const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync, getFirstAsync, runAsync });
+const withTransactionAsync = jest.fn(async (tache: () => Promise<void>) => tache());
+const openDatabaseAsync = jest
+  .fn()
+  .mockResolvedValue({ execAsync, getAllAsync, getFirstAsync, runAsync, withTransactionAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -55,7 +61,7 @@ describe('referentiel-db', () => {
       const tableSql = sqlCalls.slice(sqlCalls.indexOf(`CREATE TABLE IF NOT EXISTS ${table}`));
       const tableBlock = tableSql.slice(0, tableSql.indexOf(');'));
       expect(tableBlock).toContain('updated_at TEXT NOT NULL');
-      expect(tableBlock).toContain('actif INTEGER NOT NULL DEFAULT 1');
+      expect(tableBlock).toContain('actif INTEGER NOT NULL');
     }
   });
 
@@ -76,6 +82,7 @@ describe('referentiel-db', () => {
     const drops = execAsync.mock.calls.filter((call) =>
       String(call[0]).includes('DROP TABLE IF EXISTS code_stade')
     );
+    // Premier démarrage (aucune version stockée) : une seule reconstruction, pas deux.
     expect(drops).toHaveLength(1);
   });
 
@@ -252,6 +259,8 @@ describe('listUtilisateursByRole', () => {
  * depuis doit rester résolvable pour une prospection existante). */
 describe('getStationById', () => {
   it('résout une station active ou non, sans filtrer sur actif', async () => {
+    await getReferentielDb(); // la préparation du schéma lit déjà la version via getFirstAsync
+    getFirstAsync.mockClear();
     getFirstAsync.mockResolvedValueOnce({
       id: 'station-1',
       code: 'ST01',
@@ -281,5 +290,43 @@ describe('getStationById', () => {
     const result = await getStationById('station-inconnue');
 
     expect(result).toBeNull();
+  });
+});
+
+describe('équipes de travail', () => {
+  it('liste les équipes actives dont l’utilisateur est membre, avec leur effectif', async () => {
+    const lignes = [{ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 }];
+    await getReferentielDb(); // ouvre la base : les PRAGMA de migration consomment leurs propres réponses
+    getAllAsync.mockResolvedValueOnce(lignes);
+
+    const equipes = await listEquipesDeUtilisateur('u-1');
+
+    expect(equipes).toEqual(lignes);
+    const [sql, params] = getAllAsync.mock.calls[getAllAsync.mock.calls.length - 1];
+    expect(sql).toContain('FROM equipe');
+    expect(sql).toContain('actif = 1');
+    expect(sql).toContain('equipe_membre');
+    expect(params).toEqual(['u-1']);
+  });
+
+  it('liste toutes les équipes actives, sans filtre d’appartenance (administrateur)', async () => {
+    const lignes = [{ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 }];
+    await getReferentielDb();
+    getAllAsync.mockResolvedValueOnce(lignes);
+
+    expect(await listToutesEquipes()).toEqual(lignes);
+    const [sql] = getAllAsync.mock.calls[getAllAsync.mock.calls.length - 1];
+    expect(sql).toContain('actif = 1');
+    expect(sql).not.toContain('EXISTS');
+  });
+
+  it('résout une équipe par id, active ou non, et renvoie null si elle est inconnue', async () => {
+    await getReferentielDb();
+    getFirstAsync.mockClear();
+    getFirstAsync.mockResolvedValueOnce({ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+    expect(await getEquipeLocale('eq-1')).toEqual({ id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', nb_membres: 4 });
+
+    getFirstAsync.mockResolvedValueOnce(null);
+    expect(await getEquipeLocale('inconnue')).toBeNull();
   });
 });

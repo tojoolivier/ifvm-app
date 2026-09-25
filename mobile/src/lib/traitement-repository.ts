@@ -1,4 +1,5 @@
 import { getDb } from './prospection-db';
+import { creerOutbox } from './outbox';
 import { generateId } from './id';
 import { composerNumeroFiche } from './traitement-numero-fiche';
 import { PreconditionError } from './errors';
@@ -30,6 +31,8 @@ function normalizeBoolean(value: unknown): boolean | null {
 export interface DraftTraitementRow {
   id: string;
   prospection_id: string;
+  /** Équipe d'origine (#641) ; `null` pour un brouillon antérieur — « Non renseignée ». */
+  equipe_id: string | null;
   numero_fiche: string | null;
   type_traitement: TypeTraitement;
   mode_traitement: string | null;
@@ -130,9 +133,9 @@ export interface TraitementAerien {
   traitement_origine_id: string | null;
   surface_cumulee_ha: number | null;
   surface_restante_ha: number | null;
-  pesticide_recu_l: number | null;
-  pesticide_stock_restant_l: number | null;
-  // Surface restante abandonnée ? (migration backend 0086) — mirroir du Terrestre.
+  // pesticide_recu_l/pesticide_stock_restant_l supprimés (#609) : le stock aérien
+  // vit désormais dans `mouvement_pesticide` (#606).
+  // Surface restante abandonnée ? (migration backend 0097) — mirroir du Terrestre.
   surface_restante_abandonnee: boolean | null;
   motif_surface_restante_abandonnee: string | null;
   // Efficacité (migration backend 0058) : une seule évaluation par fiche
@@ -268,11 +271,15 @@ export interface EvaluationRisquePopulation {
 export interface DraftTraitementAerienInput {
   id: string;
   prospectionId: string;
+  /** Équipe de travail de l'agent à la création (#641) — reprise automatiquement par l'appelant. */
+  equipeId?: string | null;
   dateTraitement?: string | null;
   pilote: string;
   mecanicien: string;
   chefDeBaseId: string;
   consultantInternational?: string | null;
+  /** Aéronef de l'affectation active de l'équipe à la date de saisie (#642), modifiable ensuite. */
+  immatriculeAeronef?: string | null;
   // Chaînage de reprise (migration backend 0050) — mirroir de
   // DraftTraitementTerrestreInput, généralisé à l'Aérien.
   repriseTraitement?: boolean;
@@ -282,6 +289,8 @@ export interface DraftTraitementAerienInput {
 export interface DraftTraitementTerrestreInput {
   id: string;
   prospectionId: string;
+  /** Équipe de travail de l'agent à la création (#641) — reprise automatiquement par l'appelant. */
+  equipeId?: string | null;
   dateTraitement?: string | null;
   chefEquipeId: string;
   agentEncadreur?: string | null;
@@ -391,23 +400,24 @@ export async function createDraftTraitementAerien(
 
   await db.runAsync(
     `INSERT INTO traitement (
-      id, prospection_id, type_traitement, date_traitement,
+      id, prospection_id, equipe_id, type_traitement, date_traitement,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, 'AERIEN', ?, 'brouillon', 'brouillon', ?, ?)`,
-    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now]
+    ) VALUES (?, ?, ?, 'AERIEN', ?, 'brouillon', 'brouillon', ?, ?)`,
+    [input.id, input.prospectionId, input.equipeId ?? null, input.dateTraitement ?? null, now, now]
   );
 
   await db.runAsync(
     `INSERT INTO traitement_aerien (
       traitement_id, pilote, mecanicien, chef_de_base_id, consultant_international,
-      reprise_traitement, traitement_origine_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      immatricule_aeronef, reprise_traitement, traitement_origine_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.id,
       input.pilote,
       input.mecanicien,
       input.chefDeBaseId,
       input.consultantInternational ?? null,
+      input.immatriculeAeronef || null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,
     ]
@@ -428,10 +438,10 @@ export async function createDraftTraitementTerrestre(
 
   await db.runAsync(
     `INSERT INTO traitement (
-      id, prospection_id, type_traitement, date_traitement,
+      id, prospection_id, equipe_id, type_traitement, date_traitement,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, 'TERRESTRE', ?, 'brouillon', 'brouillon', ?, ?)`,
-    [input.id, input.prospectionId, input.dateTraitement ?? null, now, now]
+    ) VALUES (?, ?, ?, 'TERRESTRE', ?, 'brouillon', 'brouillon', ?, ?)`,
+    [input.id, input.prospectionId, input.equipeId ?? null, input.dateTraitement ?? null, now, now]
   );
 
   await db.runAsync(
@@ -568,7 +578,7 @@ export interface AerienUpdateInput {
   // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée des rotations,
   // même traitement que nb_rotations/total_pesticide_l — jamais mise à jour par cette
   // fonction, seulement par la synchronisation.
-  pesticideRecuL?: number | null;
+  // pesticideRecuL supprimé (#609) : hors de la table locale, cf. updateTraitementAerien ci-dessous.
   // Chaînage de reprise (migration backend 0050) — mirroir de TerrestreUpdateInput,
   // généralisé à l'Aérien.
   repriseTraitement?: boolean | null;
@@ -593,7 +603,6 @@ export async function updateTraitementAerien(
       stand_date_installation = ?,
       base_secondaire = ?,
       base_secondaire_date_installation = ?,
-      pesticide_recu_l = ?,
       reprise_traitement = ?,
       traitement_origine_id = ?
      WHERE traitement_id = ?`,
@@ -608,7 +617,6 @@ export async function updateTraitementAerien(
       input.standDateInstallation ?? null,
       input.baseSecondaire ?? null,
       input.baseSecondaireDateInstallation ?? null,
-      input.pesticideRecuL ?? null,
       input.repriseTraitement ?? null,
       input.traitementOrigineId ?? null,
       traitementId,
@@ -623,7 +631,7 @@ export async function updateTraitementAerien(
 }
 
 /**
- * Surface restante abandonnée ? (migration backend 0086) — décision de l'agent
+ * Surface restante abandonnée ? (migration backend 0097) — décision de l'agent
  * sur l'écran « Pesticides & rotations » (rotations.tsx), mirroir du Terrestre.
  * Le motif n'a de sens que pour un abandon : remis à NULL sinon (même invariant
  * que la CHECK `ck_traitement_aerien_motif_abandon` côté serveur).
@@ -641,30 +649,6 @@ export async function updateTraitementAerienSurfaceRestante(
      WHERE traitement_id = ?`,
     [abandonnee === null ? null : abandonnee ? 1 : 0, abandonnee ? input.motif ?? null : null, traitementId]
   );
-}
-
-/**
- * Pesticide reçu (l) — libellé affiché « Approvisionnement (l) » — saisi sur
- * l'écran « Traitement » (rotations.tsx), pas « Équipe » (#equipe-slide-aerien) :
- * fonction dédiée plutôt qu'un champ de plus sur `AerienUpdateInput`, pour que
- * chaque écran n'écrive que ce qui lui appartient.
- */
-export async function updateTraitementAerienPesticideRecu(
-  traitementId: string,
-  pesticideRecuL: number | null | undefined
-): Promise<DraftTraitement> {
-  const db = await getDb();
-
-  await db.runAsync(
-    `UPDATE traitement_aerien SET pesticide_recu_l = ? WHERE traitement_id = ?`,
-    [pesticideRecuL ?? null, traitementId]
-  );
-
-  const updated = await getTraitement(traitementId);
-  if (!updated) {
-    throw new Error('Échec de la mise à jour de la fiche brouillon locale');
-  }
-  return updated;
 }
 
 /**
@@ -1528,15 +1512,11 @@ export async function markTraitementConflict(
  * Pendant de {@link markProspectionEchec} côté traitement : même règle, même
  * motif journalisé plutôt que stocké en colonne.
  */
-export async function markTraitementEchec(id: string): Promise<void> {
-  const db = await getDb();
-  const now = new Date().toISOString();
-
-  await db.runAsync(
-    `UPDATE traitement SET statut_sync = 'echec', updated_at = ? WHERE id = ?`,
-    [now, id]
-  );
-}
+export const markTraitementEchec = creerOutbox({
+  table: 'traitement',
+  base: () => getDb(),
+  horodate: true,
+}).marquerEnEchec;
 
 export async function countUnsyncedTraitements(): Promise<number> {
   const db = await getDb();

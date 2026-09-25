@@ -374,11 +374,28 @@ export interface FicheLectureViewModel {
   hauteurHerbeCm: number | null;
 }
 
+/**
+ * Libellé de statut de la Fiche de lecture. « Validée ✓ » reste le libellé historique ; une fiche
+ * encore en cours de vérification (« En attente », « Vérifiée », « Rejetée ») porte le sien plutôt
+ * que d'être présentée comme validée.
+ */
+const LIBELLES_STATUT_LECTURE: Record<string, string> = {
+  en_attente: 'En attente',
+  verifiee: 'Vérifiée',
+  rejetee: 'Rejetée',
+  brouillon: 'Brouillon',
+};
+
+function libelleStatutLecture(prospection: Pick<ProspectionRead, 'statut'>): string {
+  if (isFicheValidee(prospection)) return 'Validée ✓';
+  return LIBELLES_STATUT_LECTURE[prospection.statut] ?? prospection.statut;
+}
+
 /** Construit la vue de la Fiche de lecture (#16) à partir de la fiche telle que renvoyée par l'API — aucune resaisie. */
 export function buildFicheLecture(prospection: ProspectionRead): FicheLectureViewModel {
   return {
     nFiche: prospection.n_fiche ?? '—',
-    statutLabel: 'Validée ✓',
+    statutLabel: libelleStatutLecture(prospection),
     stationLabel: prospection.station_id ?? formatCoordinates(prospection.latitude, prospection.longitude),
     dateProspection: prospection.date_prospection,
     especes: buildEspecesSynthese(prospection.captures, prospection.populations),

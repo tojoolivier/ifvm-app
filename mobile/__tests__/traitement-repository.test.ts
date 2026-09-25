@@ -131,6 +131,30 @@ describe('createDraftTraitementAerien', () => {
     expect(result.aerien?.pilote).toBe(AERIEN_INPUT.pilote);
   });
 
+  it('pré-remplit l’immatriculation depuis l’affectation active de l’équipe (#642)', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await createDraftTraitementAerien({ ...AERIEN_INPUT, immatriculeAeronef: '5R-MHR' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO traitement_aerien \([\s\S]*immatricule_aeronef/),
+      expect.arrayContaining(['5R-MHR'])
+    );
+  });
+
+  it('rattache le brouillon à l’équipe de travail reçue en entrée (#641)', async () => {
+    getFirstAsync.mockResolvedValueOnce(STORED_TRAITEMENT_ROW).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await createDraftTraitementAerien({ ...AERIEN_INPUT, equipeId: 'eq-1' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO traitement \([\s\S]*equipe_id/),
+      expect.arrayContaining(['eq-1'])
+    );
+  });
+
   // #traitement-brouillon-distinct-fiche-creee : une fiche neuve naît hors de la file de
   // synchronisation (statut_sync = 'brouillon'), pas « local ».
   it('crée la fiche avec statut_sync = brouillon (hors file de synchronisation)', async () => {

@@ -12,40 +12,48 @@ const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>
 const mockedPost = api.post as unknown as ReturnType<typeof vi.fn>
 const mockedPut = api.put as unknown as ReturnType<typeof vi.fn>
 
+type Membre = { user_id: string; fonction: string; nom: string | null; prenom: string | null }
+
 const CHEF_TOKY = { id: 'chef-1', nom: 'Rabe', prenom: 'Toky' }
 const CHEF_LALA = { id: 'chef-2', nom: 'Rasoa', prenom: 'Lala' }
 
 const EQUIPE_IHOSY = {
   id: 'equipe-1',
   nom: 'Équipe Ihosy',
-  chef_de_base_id: 'chef-1',
-  pilote: 'Jean Rakoto',
-  mecanicien: 'Paul Andria',
-  consultant_international: null as string | null,
+  type: 'aerien',
   aeronef: {
     id: 'aeronef-1',
     immatriculation: '5R-MJA',
     societe: 'Heli Madagascar',
     volume_cuve_l: 800,
   } as { id: string; immatriculation: string; societe: string; volume_cuve_l: number } | null,
-  membres: [] as { id: string; nom: string }[],
+  // Référentiel unifié (ADR-018) : chef, pilote, mécanicien et consultant sont des
+  // membres porteurs de leur `fonction`, plus des colonnes de l'équipe.
+  membres: [
+    { user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' },
+    { user_id: 'u-p1', fonction: 'pilote', nom: 'Rakoto', prenom: 'Jean' },
+    { user_id: 'u-m1', fonction: 'mecanicien', nom: 'Andria', prenom: 'Paul' },
+  ] as Membre[],
   actif: true,
 }
 const EQUIPE_LIBRE = {
   id: 'equipe-2',
   nom: 'Équipe Toliara',
-  chef_de_base_id: 'chef-2',
-  pilote: 'Marc Randria',
-  mecanicien: 'Ali Hasan',
-  consultant_international: 'John Smith',
+  type: 'aerien',
   aeronef: null,
-  membres: [{ id: 'm-1', nom: 'Voahangy' }],
+  membres: [
+    { user_id: 'chef-2', fonction: 'chef', nom: 'Rasoa', prenom: 'Lala' },
+    { user_id: 'u-p2', fonction: 'pilote', nom: 'Randria', prenom: 'Marc' },
+    { user_id: 'u-m2', fonction: 'mecanicien', nom: 'Hasan', prenom: 'Ali' },
+    { user_id: 'u-c2', fonction: 'consultant_international', nom: 'Smith', prenom: 'John' },
+    { user_id: 'u-x2', fonction: 'membre', nom: 'Voahangy', prenom: '' },
+  ] as Membre[],
   actif: true,
 }
 
 const BASE_IHOSY = {
   id: 'base-1',
-  parent_base_id: null,
+  parent_site_id: null,
   equipe_id: 'equipe-1',
   numero: 'IHO01',
   localite: 'Ihosy',
@@ -56,18 +64,15 @@ function mockApi({
   chefs = [CHEF_TOKY, CHEF_LALA],
   equipes = [EQUIPE_IHOSY, EQUIPE_LIBRE],
   bases = [BASE_IHOSY],
-  stands = [] as { id: string; numero: string; localite: string; equipe_aerienne_id?: string | null }[],
 }: {
   chefs?: typeof CHEF_TOKY[]
   equipes?: typeof EQUIPE_IHOSY[]
   bases?: typeof BASE_IHOSY[]
-  stands?: { id: string; numero: string; localite: string; equipe_aerienne_id?: string | null }[]
 } = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/users/chefs-de-base') return Promise.resolve({ data: chefs })
-    if (url === '/equipes-aeriennes') return Promise.resolve({ data: equipes })
-    if (url === '/bases-aeriennes') return Promise.resolve({ data: bases })
-    if (url === '/stands-remplissage') return Promise.resolve({ data: stands })
+    if (url === '/equipes?type=aerien') return Promise.resolve({ data: equipes })
+    if (url === '/sites-aeriens') return Promise.resolve({ data: bases })
     return Promise.resolve({ data: [] })
   })
 }
@@ -128,14 +133,15 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
-      expect(mockedPost).toHaveBeenCalledWith('/equipes-aeriennes', {
+      expect(mockedPost).toHaveBeenCalledWith('/equipes', {
         nom: 'Équipe Betroka',
-        chef_de_base_id: 'chef-2',
-        pilote: 'Jean Rakoto',
-        mecanicien: 'Paul Andria',
-        consultant_international: null,
+        type: 'aerien',
         aeronef: { immatriculation: '5R-MJA', societe: 'Heli Madagascar', volume_cuve_l: 800 },
-        membres: [],
+        membres: [
+          { user_id: 'chef-2', fonction: 'chef' },
+          { nom: 'Jean Rakoto', fonction: 'pilote' },
+          { nom: 'Paul Andria', fonction: 'mecanicien' },
+        ],
       }),
     )
   })
@@ -184,8 +190,15 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
 
     await waitFor(() =>
       expect(mockedPost).toHaveBeenCalledWith(
-        '/equipes-aeriennes',
-        expect.objectContaining({ membres: [{ nom: 'Tovo Randria' }] }),
+        '/equipes',
+        expect.objectContaining({
+          membres: [
+            { user_id: 'chef-2', fonction: 'chef' },
+            { nom: 'X', fonction: 'pilote' },
+            { nom: 'Y', fonction: 'mecanicien' },
+            { nom: 'Tovo Randria', fonction: 'membre' },
+          ],
+        }),
       ),
     )
   })
@@ -193,7 +206,7 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
   it('crée une base aérienne principale rattachée à une équipe encore libre', async () => {
     mockApi()
     mockedPost.mockResolvedValue({
-      data: { id: 'base-2', parent_base_id: null, equipe_id: 'equipe-2', numero: 'TLR01', localite: 'Toliara', actif: true },
+      data: { id: 'base-2', parent_site_id: null, equipe_id: 'equipe-2', numero: 'TLR01', localite: 'Toliara', actif: true },
     })
     renderSection()
 
@@ -206,7 +219,7 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
-      expect(mockedPost).toHaveBeenCalledWith('/bases-aeriennes', {
+      expect(mockedPost).toHaveBeenCalledWith('/sites-aeriens', {
         numero: 'TLR01',
         localite: 'Toliara',
         equipe_id: 'equipe-2',
@@ -233,14 +246,14 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
     fireEvent.change(select, { target: { value: 'equipe-2' } })
 
     await waitFor(() =>
-      expect(mockedPut).toHaveBeenCalledWith('/bases-aeriennes/base-1', { equipe_id: 'equipe-2' }),
+      expect(mockedPut).toHaveBeenCalledWith('/sites-aeriens/base-1', { equipe_id: 'equipe-2' }),
     )
   })
 
   it('crée une base aérienne secondaire rattachée à une base principale', async () => {
     mockApi()
     mockedPost.mockResolvedValue({
-      data: { id: 'base-3', parent_base_id: 'base-1', equipe_id: null, numero: 'IHO02', localite: 'Ihosy Sud', actif: true },
+      data: { id: 'base-3', parent_site_id: 'base-1', equipe_id: null, numero: 'IHO02', localite: 'Ihosy Sud', actif: true },
     })
     renderSection()
 
@@ -253,78 +266,22 @@ describe('EquipesAeriennesSection — assigner un chef de base à une base aéri
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
-      expect(mockedPost).toHaveBeenCalledWith('/bases-aeriennes', {
+      expect(mockedPost).toHaveBeenCalledWith('/sites-aeriens', {
         numero: 'IHO02',
         localite: 'Ihosy Sud',
-        parent_base_id: 'base-1',
+        parent_site_id: 'base-1',
       }),
     )
   })
-
-  it('crée un stand de remplissage', async () => {
-    mockApi()
-    mockedPost.mockResolvedValue({
-      data: { id: 'stand-1', numero: 'STD01', localite: 'Ihosy', actif: true },
-    })
-    renderSection()
-
-    await screen.findByText('Équipe Ihosy')
-    fireEvent.click(screen.getByText('+ Nouveau stand'))
-
-    fireEvent.change(screen.getByLabelText('Numéro *'), { target: { value: 'STD01' } })
-    fireEvent.change(screen.getByLabelText('Localité *'), { target: { value: 'Ihosy' } })
-    fireEvent.change(screen.getByLabelText('Équipe *'), { target: { value: 'equipe-1' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
-
-    await waitFor(() =>
-      expect(mockedPost).toHaveBeenCalledWith('/stands-remplissage', {
-        numero: 'STD01',
-        localite: 'Ihosy',
-        equipe_aerienne_id: 'equipe-1',
-      }),
-    )
-  })
-
-  it("affiche l'équipe propriétaire de chaque stand", async () => {
-    mockApi({
-      stands: [{ id: 'stand-1', numero: 'STD01', localite: 'Ihosy', equipe_aerienne_id: 'equipe-1' }],
-    })
-    renderSection()
-
-    await screen.findByText('STD01')
-    const ligne = screen.getByText('STD01').closest('tr') as HTMLElement
-    expect(within(ligne).getByText('Équipe Ihosy')).toBeInTheDocument()
-  })
-
-  it('rattache à une équipe un stand antérieur à la migration, sans équipe', async () => {
-    mockApi({
-      stands: [{ id: 'stand-0', numero: 'STD00', localite: 'Ancien', equipe_aerienne_id: null }],
-    })
-    mockedPut.mockResolvedValue({ data: {} })
-    renderSection()
-
-    await screen.findByText('STD00')
-    fireEvent.change(screen.getByLabelText('Rattacher le stand STD00 à une équipe'), {
-      target: { value: 'equipe-1' },
-    })
-
-    await waitFor(() =>
-      expect(mockedPut).toHaveBeenCalledWith('/stands-remplissage/stand-0', {
-        equipe_aerienne_id: 'equipe-1',
-      }),
-    )
-  })
-
   it('affiche une bannière d’erreur si les équipes aériennes ne peuvent pas être chargées', async () => {
     mockedGet.mockImplementation((url: string) => {
-      if (url === '/equipes-aeriennes') {
+      if (url === '/equipes?type=aerien') {
         const err = new Error('500') as Error & { response: { status: number; data: { detail: string } } }
         err.response = { status: 500, data: { detail: 'panne serveur' } }
         return Promise.reject(err)
       }
       if (url === '/users/chefs-de-base') return Promise.resolve({ data: [CHEF_TOKY] })
-      if (url === '/bases-aeriennes') return Promise.resolve({ data: [] })
-      if (url === '/stands-remplissage') return Promise.resolve({ data: [] })
+      if (url === '/sites-aeriens') return Promise.resolve({ data: [] })
       return Promise.resolve({ data: [] })
     })
     renderSection()

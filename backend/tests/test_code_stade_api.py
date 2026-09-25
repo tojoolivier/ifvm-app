@@ -352,13 +352,13 @@ async def test_update_code_stade_vers_une_grille_deja_prise_refuse(
 
 
 @pytest.mark.asyncio
-async def test_pas_de_suppression_physique(client: AsyncClient, auth_headers: dict):
-    """Aucune route DELETE : le pull ne transporte pas les suppressions."""
+async def test_suppression_reservee_a_ladmin(client: AsyncClient, auth_headers: dict):
+    """DELETE = soft-delete `deleted_at` (#674) : réservé à l'admin, un agent reçoit 403."""
     cible = await _un_code_stade(client, auth_headers)
 
     response = await client.delete(f"/codes-stades/{cible['id']}", headers=auth_headers)
 
-    assert response.status_code == 405
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

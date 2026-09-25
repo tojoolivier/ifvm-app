@@ -83,8 +83,8 @@ describe('FichesScreen — traitement : Brouillon (parcours non terminé) vs À 
     await render(<FichesScreen />);
 
     await waitFor(() => expect(screen.getByText('Jean-Terrestre-2026-09-17')).toBeVisible());
-    // Une fiche à synchro porte son bouton de synchro : le badge devient « À SYNCHRO ↻ ».
-    expect(screen.getByText('À SYNCHRO ↻')).toBeVisible();
+    // Une fiche à synchro porte son bouton de synchro : le badge « À SYNCHRO » devient ce bouton.
+    expect(screen.getByText('À SYNCHRO')).toBeVisible();
     expect(screen.queryByText('Brouillon')).toBeNull();
   });
 });

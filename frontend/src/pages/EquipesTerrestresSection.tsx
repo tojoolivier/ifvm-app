@@ -10,7 +10,18 @@ import type { components } from '@/lib/api-schema.generated'
 // cf. package.json) — jamais recopiés à la main, même règle que côté mobile
 // (CLAUDE.md, « Contrat API mobile ↔ backend »).
 type ChefEquipe = components['schemas']['UtilisateurAnnuaireRead']
-type EquipeTerrestre = components['schemas']['EquipeTerrestreRead']
+type EquipeTerrestre = components['schemas']['EquipeRead']
+type MembreEquipe = components['schemas']['MembreEquipeRead']
+
+/** Le chef n'est plus une colonne de l'équipe mais un membre `fonction: 'chef'`
+ *  (référentiel unifié, ADR-018 / migration 0082). */
+function chefDe(equipe: EquipeTerrestre): MembreEquipe | undefined {
+  return equipe.membres?.find((m) => m.fonction === 'chef')
+}
+
+function autresMembres(equipe: EquipeTerrestre): MembreEquipe[] {
+  return (equipe.membres ?? []).filter((m) => m.fonction !== 'chef')
+}
 
 const inputClass =
   'w-full rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500'
@@ -55,7 +66,7 @@ export function EquipesTerrestresSection() {
     error: equipesError,
   } = useQuery<EquipeTerrestre[]>({
     queryKey: ['equipes-terrestres'],
-    queryFn: () => api.get('/equipes-terrestres').then((r) => r.data),
+    queryFn: () => api.get('/equipes?type=terrestre').then((r) => r.data),
   })
 
   const chefsById = new Map(chefs.map((c) => [c.id, c]))
@@ -65,14 +76,18 @@ export function EquipesTerrestresSection() {
     return chef ? `${chef.prenom} ${chef.nom}` : '—'
   }
 
-  // Chef -> équipe qu'il dirige déjà (au plus une, UNIQUE(chef_equipe_id)).
-  const equipeIdParChef = new Map(equipes.filter((e) => e.actif).map((e) => [e.chef_equipe_id, e.id]))
+  // Chef -> équipe qu'il dirige déjà (au plus une, `uq_equipe_membre_chef_par_utilisateur`).
+  const equipeIdParChef = new Map(
+    equipes.filter((e) => e.actif).flatMap((e) => {
+      const chef = chefDe(e)
+      return chef ? [[chef.user_id, e.id] as const] : []
+    })
+  )
   // Chefs sans équipe — seuls proposés à la création d'une nouvelle équipe.
   const chefsLibres = chefs.filter((c) => !equipeIdParChef.has(c.id))
 
   const createEquipeMutation = useMutation({
-    mutationFn: (data: components['schemas']['EquipeTerrestreCreate']) =>
-      api.post('/equipes-terrestres', data),
+    mutationFn: (data: components['schemas']['EquipeCreate']) => api.post('/equipes', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipes-terrestres'] })
       setShowCreateEquipe(false)
@@ -100,13 +115,15 @@ export function EquipesTerrestresSection() {
 
   const equipeColumns: DataTableColumn<EquipeTerrestre>[] = [
     { key: 'nom', header: 'Équipe', render: (e) => <span className="font-semibold">{e.nom}</span> },
-    { key: 'chef', header: "Chef d'équipe", render: (e) => nomChef(e.chef_equipe_id) },
+    { key: 'chef', header: "Chef d'équipe", render: (e) => nomChef(chefDe(e)?.user_id ?? '') },
     {
       key: 'membres',
       header: 'Autres membres',
       render: (e) =>
-        e.membres && e.membres.length > 0 ? (
-          e.membres.map((m) => m.nom).join(', ')
+        autresMembres(e).length > 0 ? (
+          autresMembres(e)
+            .map((m) => [m.prenom, m.nom].filter(Boolean).join(' '))
+            .join(', ')
         ) : (
           <span className="text-ifvm-text-weak">—</span>
         ),
@@ -172,8 +189,12 @@ export function EquipesTerrestresSection() {
                 setCreateEquipeError('')
                 createEquipeMutation.mutate({
                   nom: nomEquipe.trim(),
-                  chef_equipe_id: chefEquipeId,
-                  membres: membres.map((nom) => ({ nom })),
+                  type: 'terrestre',
+                  membres: [
+                    { user_id: chefEquipeId, fonction: 'chef' as const },
+                    // Sans compte : le backend en crée un à la volée.
+                    ...membres.map((nom) => ({ nom, fonction: 'membre' as const })),
+                  ],
                 })
               }}
               className="space-y-4 px-6 py-4"

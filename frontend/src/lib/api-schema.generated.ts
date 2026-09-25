@@ -433,34 +433,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/equipes-aeriennes": {
+    "/equipes": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Equipes Aeriennes */
-        get: operations["list_equipes_aeriennes_equipes_aeriennes_get"];
+        /** List Equipes */
+        get: operations["list_equipes_equipes_get"];
         put?: never;
-        /** Create Equipe Aerienne */
-        post: operations["create_equipe_aerienne_equipes_aeriennes_post"];
+        /** Create Equipe */
+        post: operations["create_equipe_equipes_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/equipes-aeriennes/{equipe_id}": {
+    "/equipes/{equipe_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Equipe Aerienne */
-        get: operations["get_equipe_aerienne_equipes_aeriennes__equipe_id__get"];
+        /** Get Equipe */
+        get: operations["get_equipe_equipes__equipe_id__get"];
+        /** Update Equipe */
+        put: operations["update_equipe_equipes__equipe_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes/{equipe_id}/membres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
         put?: never;
+        /** Ajouter Membre Equipe */
+        post: operations["ajouter_membre_equipe_equipes__equipe_id__membres_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes/{equipe_id}/aeronefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Affectations Aeronef */
+        get: operations["list_affectations_aeronef_equipes__equipe_id__aeronefs_get"];
+        put?: never;
+        /** Affecter Aeronef */
+        post: operations["affecter_aeronef_equipes__equipe_id__aeronefs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/equipes/{equipe_id}/aeronefs/{affectation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cloturer Affectation Aeronef */
+        put: operations["cloturer_affectation_aeronef_equipes__equipe_id__aeronefs__affectation_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -478,7 +531,8 @@ export interface paths {
         /** List Aeronefs */
         get: operations["list_aeronefs_aeronefs_get"];
         put?: never;
-        post?: never;
+        /** Create Aeronef */
+        post: operations["create_aeronef_aeronefs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -492,7 +546,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Aeronef */
+        get: operations["get_aeronef_aeronefs__aeronef_id__get"];
         /** Update Aeronef */
         put: operations["update_aeronef_aeronefs__aeronef_id__put"];
         post?: never;
@@ -502,34 +557,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/equipes-terrestres": {
+    "/sites-aeriens": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Equipes Terrestres */
-        get: operations["list_equipes_terrestres_equipes_terrestres_get"];
+        /** List Sites Aeriens */
+        get: operations["list_sites_aeriens_sites_aeriens_get"];
         put?: never;
-        /** Create Equipe Terrestre */
-        post: operations["create_equipe_terrestre_equipes_terrestres_post"];
+        /** Create Site Aerienne */
+        post: operations["create_site_aerienne_sites_aeriens_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/equipes-terrestres/{equipe_id}": {
+    "/sites-aeriens/{site_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Equipe Terrestre */
-        get: operations["get_equipe_terrestre_equipes_terrestres__equipe_id__get"];
-        put?: never;
+        /** Get Site Aerienne */
+        get: operations["get_site_aerienne_sites_aeriens__site_id__get"];
+        /** Update Site Aerienne */
+        put: operations["update_site_aerienne_sites_aeriens__site_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -537,71 +593,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/bases-aeriennes": {
+    "/sites-aeriens/{site_id}/positions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Bases Aeriennes */
-        get: operations["list_bases_aeriennes_bases_aeriennes_get"];
+        /** Lister Positions Site Aerienne */
+        get: operations["lister_positions_site_aerienne_sites_aeriens__site_id__positions_get"];
         put?: never;
-        /** Create Base Aerienne */
-        post: operations["create_base_aerienne_bases_aeriennes_post"];
+        /** Installer Position Site Aerienne */
+        post: operations["installer_position_site_aerienne_sites_aeriens__site_id__positions_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/bases-aeriennes/{base_id}": {
+    "/sites-aeriens/{site_id}/positions/demonter": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Base Aerienne */
-        get: operations["get_base_aerienne_bases_aeriennes__base_id__get"];
-        /** Update Base Aerienne */
-        put: operations["update_base_aerienne_bases_aeriennes__base_id__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stands-remplissage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Stands Remplissage */
-        get: operations["list_stands_remplissage_stands_remplissage_get"];
+        get?: never;
         put?: never;
-        /** Create Stand Remplissage */
-        post: operations["create_stand_remplissage_stands_remplissage_post"];
+        /** Demonter Position Site Aerienne */
+        post: operations["demonter_position_site_aerienne_sites_aeriens__site_id__positions_demonter_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/stands-remplissage/{stand_id}": {
+    "/sites-aeriens/{site_id}/positions/active": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Stand Remplissage */
-        get: operations["get_stand_remplissage_stands_remplissage__stand_id__get"];
-        /** Update Stand Remplissage */
-        put: operations["update_stand_remplissage_stands_remplissage__stand_id__put"];
+        /** Get Position Active Site Aerienne */
+        get: operations["get_position_active_site_aerienne_sites_aeriens__site_id__positions_active_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -643,6 +679,76 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/mouvements-pesticide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Mouvement Pesticide */
+        post: operations["create_mouvement_pesticide_mouvements_pesticide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock-pesticide/solde": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Solde Pesticide */
+        get: operations["get_solde_pesticide_stock_pesticide_solde_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vols": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vols */
+        get: operations["list_vols_vols_get"];
+        put?: never;
+        /** Create Vol */
+        post: operations["create_vol_vols_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vols/{vol_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Vol */
+        get: operations["get_vol_vols__vol_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Vol */
+        patch: operations["update_vol_vols__vol_id__patch"];
         trace?: never;
     };
     "/referentiel/pull": {
@@ -1048,8 +1154,8 @@ export interface components {
         ActionAudit: "creation" | "modification" | "soumission" | "verification" | "validation" | "rejet" | "commentaire";
         /**
          * AeronefCreate
-         * @description Aéronef créé avec son équipe (`EquipeAerienneCreate.aeronef`) — pas d'endpoint de
-         *     création isolé : un aéronef n'existe pas sans équipe.
+         * @description Corps de `POST /aeronefs` (#621), et forme imbriquée de `EquipeCreate.aeronef`
+         *     pour les formulaires qui saisissent l'appareil en même temps que l'équipe.
          */
         AeronefCreate: {
             /** Immatriculation */
@@ -1085,6 +1191,27 @@ export interface components {
              */
             updated_at: string;
         };
+        /** AeronefSyncRead */
+        AeronefSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Immatriculation */
+            immatriculation: string;
+            /** Societe */
+            societe: string;
+            /** Volume Cuve L */
+            volume_cuve_l: number;
+            /** Actif */
+            actif: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /**
          * AeronefUpdate
          * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
@@ -1098,6 +1225,71 @@ export interface components {
             volume_cuve_l?: number | null;
             /** Actif */
             actif?: boolean | null;
+        };
+        /**
+         * AffectationAeronefCloture
+         * @description Retrait d'un appareil : on borne la période, on n'efface pas la ligne.
+         */
+        AffectationAeronefCloture: {
+            /**
+             * Date Fin
+             * Format: date
+             */
+            date_fin: string;
+        };
+        /**
+         * AffectationAeronefCreate
+         * @description `date_debut` est explicite : une affectation est saisie après coup aussi souvent
+         *     qu'en temps réel, et la dater du jour de la saisie fausserait l'historique.
+         */
+        AffectationAeronefCreate: {
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Debut
+             * Format: date
+             */
+            date_debut: string;
+            /** Date Fin */
+            date_fin?: string | null;
+        };
+        /**
+         * AffectationAeronefRead
+         * @description Période pendant laquelle un appareil a servi dans une équipe (#603).
+         *     `date_fin: null` désigne l'affectation en cours.
+         */
+        AffectationAeronefRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Debut
+             * Format: date
+             */
+            date_debut: string;
+            /** Date Fin */
+            date_fin?: string | null;
+            aeronef?: components["schemas"]["AeronefRead"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** AuditLogRead */
         AuditLogRead: {
@@ -1127,79 +1319,6 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
-        };
-        /** BaseAerienneCreate */
-        BaseAerienneCreate: {
-            /** Numero */
-            numero: string;
-            /** Localite */
-            localite: string;
-            /** Parent Base Id */
-            parent_base_id?: string | null;
-            /** Equipe Id */
-            equipe_id?: string | null;
-            /** Longitude */
-            longitude?: number | null;
-            /** Latitude */
-            latitude?: number | null;
-            /** Altitude */
-            altitude?: number | null;
-        };
-        /** BaseAerienneRead */
-        BaseAerienneRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Parent Base Id */
-            parent_base_id: string | null;
-            /** Equipe Id */
-            equipe_id: string | null;
-            /** Numero */
-            numero: string;
-            /** Localite */
-            localite: string;
-            /** Longitude */
-            longitude: number | null;
-            /** Latitude */
-            latitude: number | null;
-            /** Altitude */
-            altitude: number | null;
-            /** Actif */
-            actif: boolean;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /**
-         * BaseAerienneUpdate
-         * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
-         */
-        BaseAerienneUpdate: {
-            /** Numero */
-            numero?: string | null;
-            /** Localite */
-            localite?: string | null;
-            /** Parent Base Id */
-            parent_base_id?: string | null;
-            /** Equipe Id */
-            equipe_id?: string | null;
-            /** Longitude */
-            longitude?: number | null;
-            /** Latitude */
-            latitude?: number | null;
-            /** Altitude */
-            altitude?: number | null;
-            /** Actif */
-            actif?: boolean | null;
         };
         /**
          * Biotope
@@ -1631,6 +1750,16 @@ export interface components {
          * @enum {string}
          */
         EmpoisonnementType: "AGENT" | "POPULATION";
+        /** EntityPull[AeronefSyncRead] */
+        EntityPull_AeronefSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["AeronefSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /** EntityPull[CampagneSyncRead] */
         EntityPull_CampagneSyncRead_: {
             /** Upserts */
@@ -1655,6 +1784,36 @@ export interface components {
         EntityPull_CultureSyncRead_: {
             /** Upserts */
             upserts: components["schemas"]["CultureSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        /** EntityPull[EquipeAeronefSyncRead] */
+        EntityPull_EquipeAeronefSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["EquipeAeronefSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        /** EntityPull[EquipeMembreSyncRead] */
+        EntityPull_EquipeMembreSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["EquipeMembreSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        /** EntityPull[EquipeSyncRead] */
+        EntityPull_EquipeSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["EquipeSyncRead"][];
             /**
              * Server Time
              * Format: date-time
@@ -1691,6 +1850,16 @@ export interface components {
              */
             server_time: string;
         };
+        /** EntityPull[SiteAerienneSyncRead] */
+        EntityPull_SiteAerienneSyncRead_: {
+            /** Upserts */
+            upserts: components["schemas"]["SiteAerienneSyncRead"][];
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
         /** EntityPull[StationFixeSyncRead] */
         EntityPull_StationFixeSyncRead_: {
             /** Upserts */
@@ -1721,27 +1890,81 @@ export interface components {
              */
             server_time: string;
         };
-        /** EquipeAerienneCreate */
-        EquipeAerienneCreate: {
+        /**
+         * EquipeAeronefSyncRead
+         * @description Affectation d'un appareil à une équipe (#638). `date_fin: null` = en cours ;
+         *     une clôture remonte comme une ligne mise à jour, jamais comme une absence.
+         */
+        EquipeAeronefSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Debut
+             * Format: date
+             */
+            date_debut: string;
+            /** Date Fin */
+            date_fin?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** EquipeCreate */
+        EquipeCreate: {
             /** Nom */
             nom: string;
             /**
-             * Chef De Base Id
+             * Type
+             * @enum {string}
+             */
+            type: "terrestre" | "aerien";
+            aeronef?: components["schemas"]["AeronefCreate"] | null;
+            /** Aeronef Id */
+            aeronef_id?: string | null;
+            /** Membres */
+            membres?: components["schemas"]["MembreEquipeCreate"][];
+        };
+        /** EquipeMembreSyncRead */
+        EquipeMembreSyncRead: {
+            /**
+             * Equipe Id
              * Format: uuid
              */
-            chef_de_base_id: string;
-            /** Pilote */
-            pilote: string;
-            /** Mecanicien */
-            mecanicien: string;
-            /** Consultant International */
-            consultant_international?: string | null;
-            aeronef: components["schemas"]["AeronefCreate"];
-            /** Membres */
-            membres?: components["schemas"]["MembreEquipeAerienneCreate"][];
+            equipe_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Fonction */
+            fonction: string;
+            /** Nom */
+            nom?: string | null;
+            /** Prenom */
+            prenom?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
-        /** EquipeAerienneRead */
-        EquipeAerienneRead: {
+        /** EquipeRead */
+        EquipeRead: {
             /**
              * Id
              * Format: uuid
@@ -1750,21 +1973,15 @@ export interface components {
             /** Nom */
             nom: string;
             /**
-             * Chef De Base Id
-             * Format: uuid
+             * Type
+             * @enum {string}
              */
-            chef_de_base_id: string;
-            /** Pilote */
-            pilote?: string | null;
-            /** Mecanicien */
-            mecanicien?: string | null;
-            /** Consultant International */
-            consultant_international?: string | null;
+            type: "terrestre" | "aerien";
             /** Aeronef Id */
             aeronef_id?: string | null;
             aeronef?: components["schemas"]["AeronefRead"] | null;
             /** Membres */
-            membres?: components["schemas"]["MembreEquipeAerienneRead"][];
+            membres?: components["schemas"]["MembreEquipeRead"][];
             /** Actif */
             actif: boolean;
             /**
@@ -1778,20 +1995,13 @@ export interface components {
              */
             updated_at: string;
         };
-        /** EquipeTerrestreCreate */
-        EquipeTerrestreCreate: {
-            /** Nom */
-            nom: string;
-            /**
-             * Chef Equipe Id
-             * Format: uuid
-             */
-            chef_equipe_id: string;
-            /** Membres */
-            membres?: components["schemas"]["MembreEquipeTerrestreCreate"][];
-        };
-        /** EquipeTerrestreRead */
-        EquipeTerrestreRead: {
+        /**
+         * EquipeSyncRead
+         * @description Équipe pour le pull mobile (#638). Les membres et affectations d'appareil ont
+         *     leurs propres collections (`equipe_membres`, `equipe_aeronefs`) : elles évoluent
+         *     à des moments différents et se pullent avec leur propre curseur.
+         */
+        EquipeSyncRead: {
             /**
              * Id
              * Format: uuid
@@ -1800,24 +2010,29 @@ export interface components {
             /** Nom */
             nom: string;
             /**
-             * Chef Equipe Id
-             * Format: uuid
+             * Type
+             * @enum {string}
              */
-            chef_equipe_id: string;
-            /** Membres */
-            membres?: components["schemas"]["MembreEquipeTerrestreRead"][];
+            type: "terrestre" | "aerien";
             /** Actif */
             actif: boolean;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
             /**
              * Updated At
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * EquipeUpdate
+         * @description Mise à jour partielle. `type` en est volontairement absent : le type d'une équipe
+         *     n'est pas modifiable après création (ADR-018) — garanti ici, sans trigger en base.
+         *     Pas de suppression non plus : `actif=False` est la seule sortie.
+         */
+        EquipeUpdate: {
+            /** Nom */
+            nom?: string | null;
+            /** Actif */
+            actif?: boolean | null;
         };
         /**
          * EspeceAcridienne
@@ -2141,35 +2356,37 @@ export interface components {
             /** Password */
             password: string;
         };
-        /** MembreEquipeAerienneCreate */
-        MembreEquipeAerienneCreate: {
-            /** Nom */
-            nom: string;
-        };
-        /** MembreEquipeAerienneRead */
-        MembreEquipeAerienneRead: {
+        /**
+         * MembreEquipeCreate
+         * @description Membre désigné soit par son compte (`user_id`), soit par son identité — auquel
+         *     cas un compte non authentifiable est créé à la volée (`ROLES_A_LA_VOLEE`).
+         */
+        MembreEquipeCreate: {
             /**
-             * Id
+             * Fonction
+             * @enum {string}
+             */
+            fonction: "chef" | "prospecteur" | "verificateur" | "validation_finale" | "chef_equipe" | "agent_encadreur" | "pilote" | "mecanicien" | "chef_de_base" | "consultant_international" | "membre" | "admin";
+            /** User Id */
+            user_id?: string | null;
+            /** Nom */
+            nom?: string | null;
+            /** Prenom */
+            prenom?: string | null;
+        };
+        /** MembreEquipeRead */
+        MembreEquipeRead: {
+            /**
+             * User Id
              * Format: uuid
              */
-            id: string;
+            user_id: string;
+            /** Fonction */
+            fonction: string;
             /** Nom */
-            nom: string;
-        };
-        /** MembreEquipeTerrestreCreate */
-        MembreEquipeTerrestreCreate: {
-            /** Nom */
-            nom: string;
-        };
-        /** MembreEquipeTerrestreRead */
-        MembreEquipeTerrestreRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Nom */
-            nom: string;
+            nom?: string | null;
+            /** Prenom */
+            prenom?: string | null;
         };
         /**
          * MethodeEvaluationEfficacite
@@ -2194,6 +2411,80 @@ export interface components {
          * @enum {string}
          */
         ModeTraitement: "TOTAL" | "BARRIERE" | "IRREGULIER";
+        /**
+         * MouvementPesticideCreate
+         * @description `site_destination_id` requis si et seulement si `type == 'transfert'` — même
+         *     règle que le CHECK `ck_mouvement_pesticide_destination_coherente` (#606), vérifiée
+         *     ici en amont pour un 422 lisible plutôt qu'une violation de contrainte brute.
+         */
+        MouvementPesticideCreate: {
+            /** Id */
+            id?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "approvisionnement" | "transfert" | "consommation";
+            /**
+             * Pesticide Id
+             * Format: uuid
+             */
+            pesticide_id: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Site Destination Id */
+            site_destination_id?: string | null;
+            /** Quantite */
+            quantite: number;
+            /**
+             * Unite
+             * @enum {string}
+             */
+            unite: "L" | "kg";
+            /** Date Mouvement */
+            date_mouvement?: string | null;
+        };
+        /** MouvementPesticideRead */
+        MouvementPesticideRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Type */
+            type: string;
+            /**
+             * Pesticide Id
+             * Format: uuid
+             */
+            pesticide_id: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Site Destination Id */
+            site_destination_id: string | null;
+            /** Quantite */
+            quantite: number;
+            /** Unite */
+            unite: string;
+            /**
+             * Date Mouvement
+             * Format: date
+             */
+            date_mouvement: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Traitement Id */
+            traitement_id: string | null;
+        };
         /**
          * NiveauPopulation
          * @description Accouplement/Ponte — réduit à 3 niveaux communs LMC/NSE (migration 0059,
@@ -2640,6 +2931,11 @@ export interface components {
              * Format: uuid
              */
             campagne_id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
             /** Station Id */
             station_id?: string | null;
             /** N Fiche */
@@ -2806,6 +3102,8 @@ export interface components {
             surface_infestee_pourcent?: number | null;
             /** Revalide De Id */
             revalide_de_id?: string | null;
+            /** Vol Id */
+            vol_id?: string | null;
         };
         /** ProspectionRead */
         ProspectionRead: {
@@ -2896,6 +3194,10 @@ export interface components {
             validated_at?: string | null;
             /** Revalide De Id */
             revalide_de_id?: string | null;
+            /** Equipe Id */
+            equipe_id?: string | null;
+            /** Vol Id */
+            vol_id?: string | null;
             /** Prospecteur Nom */
             prospecteur_nom?: string | null;
             /** Verified By Nom */
@@ -3145,6 +3447,8 @@ export interface components {
             signature_chef_base_horodatage?: string | null;
             /** Signature Chef Base Image */
             signature_chef_base_image?: string | null;
+            /** Vol Id */
+            vol_id?: string | null;
         };
         /** ReferentielPullResponse */
         ReferentielPullResponse: {
@@ -3156,7 +3460,13 @@ export interface components {
             cultures: components["schemas"]["EntityPull_CultureSyncRead_"];
             codes_stades: components["schemas"]["EntityPull_CodeStadeSyncRead_"];
             campagnes: components["schemas"]["EntityPull_CampagneSyncRead_"];
+            /** @deprecated */
             lieux_aeriens: components["schemas"]["EntityPull_LieuAerienSyncRead_"];
+            sites_aeriens: components["schemas"]["EntityPull_SiteAerienneSyncRead_"];
+            equipes: components["schemas"]["EntityPull_EquipeSyncRead_"];
+            equipe_membres: components["schemas"]["EntityPull_EquipeMembreSyncRead_"];
+            aeronefs: components["schemas"]["EntityPull_AeronefSyncRead_"];
+            equipe_aeronefs: components["schemas"]["EntityPull_EquipeAeronefSyncRead_"];
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -3303,50 +3613,74 @@ export interface components {
              */
             horodatage: string;
         };
-        /**
-         * StadeDominant
-         * @enum {string}
-         */
-        StadeDominant: "l1_l3" | "l4_l5";
-        /**
-         * StadeImago
-         * @enum {string}
-         */
-        StadeImago: "A1" | "A2" | "A3" | "A4" | "A5";
-        /** StandRemplissageCreate */
-        StandRemplissageCreate: {
+        /** SiteAerienneCreate */
+        SiteAerienneCreate: {
             /** Numero */
             numero: string;
             /** Localite */
             localite: string;
-            /** Longitude */
-            longitude?: number | null;
+            /** Parent Site Id */
+            parent_site_id?: string | null;
+            /** Equipe Id */
+            equipe_id?: string | null;
+        };
+        /** SiteAeriennePositionInstaller */
+        SiteAeriennePositionInstaller: {
             /** Latitude */
-            latitude?: number | null;
+            latitude: number;
+            /** Longitude */
+            longitude: number;
             /** Altitude */
             altitude?: number | null;
-            /** Equipe Aerienne Id */
-            equipe_aerienne_id?: string | null;
         };
-        /** StandRemplissageRead */
-        StandRemplissageRead: {
+        /** SiteAeriennePositionRead */
+        SiteAeriennePositionRead: {
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Altitude */
+            altitude: number | null;
+            /**
+             * Date Debut
+             * Format: date
+             */
+            date_debut: string;
+            /** Date Fin */
+            date_fin: string | null;
+            /** Duree Jours */
+            duree_jours: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SiteAerienneRead */
+        SiteAerienneRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Site Id */
+            parent_site_id: string | null;
+            /** Equipe Id */
+            equipe_id: string | null;
             /** Numero */
             numero: string;
             /** Localite */
             localite: string;
-            /** Longitude */
-            longitude: number | null;
-            /** Latitude */
-            latitude: number | null;
-            /** Altitude */
-            altitude: number | null;
-            /** Equipe Aerienne Id */
-            equipe_aerienne_id?: string | null;
             /** Actif */
             actif: boolean;
             /**
@@ -3361,25 +3695,86 @@ export interface components {
             updated_at: string;
         };
         /**
-         * StandRemplissageUpdate
+         * SiteAerienneSyncRead
+         * @description Site aérien pour le pull mobile (#638), avec sa position active aplatie.
+         *
+         *     `latitude`/`longitude`/`date_debut_position` valent `None` pour un site sans
+         *     implantation en cours (jamais installé, ou démonté) : le mobile doit distinguer
+         *     « pas de position » de « position à (0, 0) ».
+         */
+        SiteAerienneSyncRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Site Id */
+            parent_site_id: string | null;
+            /** Equipe Id */
+            equipe_id: string | null;
+            /** Numero */
+            numero: string;
+            /** Localite */
+            localite: string;
+            /** Actif */
+            actif: boolean;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Altitude */
+            altitude?: number | null;
+            /** Date Debut Position */
+            date_debut_position?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SiteAerienneUpdate
          * @description Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie.
          */
-        StandRemplissageUpdate: {
+        SiteAerienneUpdate: {
             /** Numero */
             numero?: string | null;
             /** Localite */
             localite?: string | null;
-            /** Longitude */
-            longitude?: number | null;
-            /** Latitude */
-            latitude?: number | null;
-            /** Altitude */
-            altitude?: number | null;
-            /** Equipe Aerienne Id */
-            equipe_aerienne_id?: string | null;
+            /** Parent Site Id */
+            parent_site_id?: string | null;
+            /** Equipe Id */
+            equipe_id?: string | null;
             /** Actif */
             actif?: boolean | null;
         };
+        /** SoldePesticideRead */
+        SoldePesticideRead: {
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /**
+             * Pesticide Id
+             * Format: uuid
+             */
+            pesticide_id: string;
+            /** Unite */
+            unite: string;
+            /** Quantite */
+            quantite: number;
+        };
+        /**
+         * StadeDominant
+         * @enum {string}
+         */
+        StadeDominant: "l1_l3" | "l4_l5";
+        /**
+         * StadeImago
+         * @enum {string}
+         */
+        StadeImago: "A1" | "A2" | "A3" | "A4" | "A5";
         /**
          * StationFixeCreate
          * @description Bornes reprises du domaine géographique : un 422 lisible plutôt qu'une station
@@ -3563,6 +3958,11 @@ export interface components {
             consultant_international?: string | null;
             /** Base Principale */
             base_principale: string;
+            /**
+             * Site Principal Id
+             * Format: uuid
+             */
+            site_principal_id: string;
             /** Stand */
             stand?: string | null;
             /** Stand Date Installation */
@@ -3573,8 +3973,6 @@ export interface components {
             base_secondaire_date_installation?: string | null;
             /** Immatricule Aeronef */
             immatricule_aeronef: string;
-            /** Pesticide Recu L */
-            pesticide_recu_l?: number | null;
             /** Surface Restante Abandonnee */
             surface_restante_abandonnee?: boolean | null;
             /** Motif Surface Restante Abandonnee */
@@ -3607,6 +4005,8 @@ export interface components {
             consultant_international: string | null;
             /** Base Principale */
             base_principale: string;
+            /** Site Principal Id */
+            site_principal_id: string | null;
             /** Stand */
             stand: string | null;
             /** Stand Date Installation */
@@ -3635,10 +4035,6 @@ export interface components {
             surface_cumulee_ha: number;
             /** Surface Restante Ha */
             surface_restante_ha: number | null;
-            /** Pesticide Recu L */
-            pesticide_recu_l: number | null;
-            /** Pesticide Stock Restant L */
-            pesticide_stock_restant_l: number | null;
             /** Surface Restante Abandonnee */
             surface_restante_abandonnee: boolean | null;
             /** Motif Surface Restante Abandonnee */
@@ -3666,6 +4062,11 @@ export interface components {
              * Format: uuid
              */
             prospection_id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
             /** Numero Fiche */
             numero_fiche?: string | null;
             mode_traitement?: components["schemas"]["ModeTraitement"] | null;
@@ -3888,6 +4289,8 @@ export interface components {
             statut: components["schemas"]["StatutTraitement"];
             /** Statut Sync */
             statut_sync: string;
+            /** Equipe Id */
+            equipe_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -3928,6 +4331,11 @@ export interface components {
              * Format: uuid
              */
             prospection_id: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
             /** Numero Fiche */
             numero_fiche?: string | null;
             mode_traitement?: components["schemas"]["ModeTraitement"] | null;
@@ -4385,6 +4793,139 @@ export interface components {
          * @enum {string}
          */
         VerdureStrate: "faible" | "moyenne" | "forte";
+        /**
+         * VolCreate
+         * @description Les règles d'obligation par catégorie (site principal + stand pour
+         *     mise_en_place/application, motif pour convoyage/divers, lieux pour convoyage —
+         *     §6/§5.3/§5.5 du document de cadrage) sont vérifiées côté use case, pas ici : le
+         *     message d'erreur y est plus précis qu'un `ValueError` de validateur Pydantic.
+         */
+        VolCreate: {
+            /** Id */
+            id?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "mise_en_place" | "application" | "convoyage" | "prospection" | "divers";
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /**
+             * Date Vol
+             * Format: date
+             */
+            date_vol: string;
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
+            /** Site Principal Id */
+            site_principal_id?: string | null;
+            /** Stand Id */
+            stand_id?: string | null;
+            /** Base Secondaire Id */
+            base_secondaire_id?: string | null;
+            /** Motif */
+            motif?: string | null;
+            /** Lieu Depart */
+            lieu_depart?: string | null;
+            /** Lieu Arrivee */
+            lieu_arrivee?: string | null;
+            /** Observations */
+            observations?: string | null;
+        };
+        /** VolRead */
+        VolRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Type */
+            type: string;
+            /**
+             * Equipe Id
+             * Format: uuid
+             */
+            equipe_id: string;
+            /**
+             * Aeronef Id
+             * Format: uuid
+             */
+            aeronef_id: string;
+            /** Site Principal Id */
+            site_principal_id: string | null;
+            /** Stand Id */
+            stand_id: string | null;
+            /** Base Secondaire Id */
+            base_secondaire_id: string | null;
+            /** Traitement Id */
+            traitement_id: string | null;
+            /**
+             * Date Vol
+             * Format: date
+             */
+            date_vol: string;
+            /**
+             * Heure Debut
+             * Format: time
+             */
+            heure_debut: string;
+            /**
+             * Heure Fin
+             * Format: time
+             */
+            heure_fin: string;
+            /** Motif */
+            motif: string | null;
+            /** Lieu Depart */
+            lieu_depart: string | null;
+            /** Lieu Arrivee */
+            lieu_arrivee: string | null;
+            /** Observations */
+            observations: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Duree Minutes
+             * @description Dérivée de heure_debut/heure_fin à la lecture, jamais stockée (#608).
+             */
+            readonly duree_minutes: number;
+        };
+        /**
+         * VolUpdate
+         * @description Rattachement différé d'un traitement aérien (#610) — seul champ mutable
+         *     après création d'un vol.
+         */
+        VolUpdate: {
+            /**
+             * Traitement Id
+             * Format: uuid
+             */
+            traitement_id: string;
+        };
         /** ZoneAntiAcridienCreate */
         ZoneAntiAcridienCreate: {
             /** Code */
@@ -5603,9 +6144,11 @@ export interface operations {
             };
         };
     };
-    list_equipes_aeriennes_equipes_aeriennes_get: {
+    list_equipes_equipes_get: {
         parameters: {
             query?: {
+                /** @description Filtre sur le type d'équipe ; toutes si absent. */
+                type?: ("terrestre" | "aerien") | null;
                 /** @description Renvoie les équipes des deux états — écran d'administration. */
                 inclure_inactifs?: boolean;
             };
@@ -5621,7 +6164,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipeAerienneRead"][];
+                    "application/json": components["schemas"]["EquipeRead"][];
                 };
             };
             /** @description Validation Error */
@@ -5635,7 +6178,7 @@ export interface operations {
             };
         };
     };
-    create_equipe_aerienne_equipes_aeriennes_post: {
+    create_equipe_equipes_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -5644,7 +6187,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EquipeAerienneCreate"];
+                "application/json": components["schemas"]["EquipeCreate"];
             };
         };
         responses: {
@@ -5654,7 +6197,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipeAerienneRead"];
+                    "application/json": components["schemas"]["EquipeRead"];
                 };
             };
             /** @description Validation Error */
@@ -5668,7 +6211,7 @@ export interface operations {
             };
         };
     };
-    get_equipe_aerienne_equipes_aeriennes__equipe_id__get: {
+    get_equipe_equipes__equipe_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5685,7 +6228,179 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipeAerienneRead"];
+                    "application/json": components["schemas"]["EquipeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_equipe_equipes__equipe_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EquipeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ajouter_membre_equipe_equipes__equipe_id__membres_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembreEquipeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembreEquipeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_affectations_aeronef_equipes__equipe_id__aeronefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectationAeronefRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    affecter_aeronef_equipes__equipe_id__aeronefs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffectationAeronefCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectationAeronefRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cloturer_affectation_aeronef_equipes__equipe_id__aeronefs__affectation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipe_id: string;
+                affectation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffectationAeronefCloture"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectationAeronefRead"];
                 };
             };
             /** @description Validation Error */
@@ -5718,6 +6433,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AeronefRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_aeronef_aeronefs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AeronefCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AeronefRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_aeronef_aeronefs__aeronef_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aeronef_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AeronefRead"];
                 };
             };
             /** @description Validation Error */
@@ -5766,10 +6545,10 @@ export interface operations {
             };
         };
     };
-    list_equipes_terrestres_equipes_terrestres_get: {
+    list_sites_aeriens_sites_aeriens_get: {
         parameters: {
             query?: {
-                /** @description Renvoie les équipes des deux états — écran d'administration. */
+                /** @description Renvoie les sites des deux états — écran d'administration. */
                 inclure_inactifs?: boolean;
             };
             header?: never;
@@ -5784,7 +6563,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipeTerrestreRead"][];
+                    "application/json": components["schemas"]["SiteAerienneRead"][];
                 };
             };
             /** @description Validation Error */
@@ -5798,7 +6577,7 @@ export interface operations {
             };
         };
     };
-    create_equipe_terrestre_equipes_terrestres_post: {
+    create_site_aerienne_sites_aeriens_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -5807,7 +6586,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EquipeTerrestreCreate"];
+                "application/json": components["schemas"]["SiteAerienneCreate"];
             };
         };
         responses: {
@@ -5817,7 +6596,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipeTerrestreRead"];
+                    "application/json": components["schemas"]["SiteAerienneRead"];
                 };
             };
             /** @description Validation Error */
@@ -5831,12 +6610,12 @@ export interface operations {
             };
         };
     };
-    get_equipe_terrestre_equipes_terrestres__equipe_id__get: {
+    get_site_aerienne_sites_aeriens__site_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                equipe_id: string;
+                site_id: string;
             };
             cookie?: never;
         };
@@ -5848,7 +6627,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipeTerrestreRead"];
+                    "application/json": components["schemas"]["SiteAerienneRead"];
                 };
             };
             /** @description Validation Error */
@@ -5862,48 +6641,84 @@ export interface operations {
             };
         };
     };
-    list_bases_aeriennes_bases_aeriennes_get: {
-        parameters: {
-            query?: {
-                /** @description Renvoie les bases des deux états — écran d'administration. */
-                inclure_inactifs?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseAerienneRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_base_aerienne_bases_aeriennes_post: {
+    update_site_aerienne_sites_aeriens__site_id__put: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                site_id: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BaseAerienneCreate"];
+                "application/json": components["schemas"]["SiteAerienneUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAerienneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_positions_site_aerienne_sites_aeriens__site_id__positions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAeriennePositionRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    installer_position_site_aerienne_sites_aeriens__site_id__positions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteAeriennePositionInstaller"];
             };
         };
         responses: {
@@ -5913,7 +6728,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BaseAerienneRead"];
+                    "application/json": components["schemas"]["SiteAeriennePositionRead"];
                 };
             };
             /** @description Validation Error */
@@ -5927,12 +6742,12 @@ export interface operations {
             };
         };
     };
-    get_base_aerienne_bases_aeriennes__base_id__get: {
+    demonter_position_site_aerienne_sites_aeriens__site_id__positions_demonter_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                base_id: string;
+                site_id: string;
             };
             cookie?: never;
         };
@@ -5944,7 +6759,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BaseAerienneRead"];
+                    "application/json": components["schemas"]["SiteAeriennePositionRead"];
                 };
             };
             /** @description Validation Error */
@@ -5958,112 +6773,12 @@ export interface operations {
             };
         };
     };
-    update_base_aerienne_bases_aeriennes__base_id__put: {
+    get_position_active_site_aerienne_sites_aeriens__site_id__positions_active_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                base_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BaseAerienneUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseAerienneRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_stands_remplissage_stands_remplissage_get: {
-        parameters: {
-            query?: {
-                /** @description Renvoie les stands des deux états — écran d'administration. */
-                inclure_inactifs?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StandRemplissageRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_stand_remplissage_stands_remplissage_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StandRemplissageCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StandRemplissageRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_stand_remplissage_stands_remplissage__stand_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                stand_id: string;
+                site_id: string;
             };
             cookie?: never;
         };
@@ -6075,42 +6790,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StandRemplissageRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_stand_remplissage_stands_remplissage__stand_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                stand_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StandRemplissageUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StandRemplissageRead"];
+                    "application/json": components["schemas"]["SiteAeriennePositionRead"];
                 };
             };
             /** @description Validation Error */
@@ -6256,6 +6936,201 @@ export interface operations {
             };
         };
     };
+    create_mouvement_pesticide_mouvements_pesticide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MouvementPesticideCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MouvementPesticideRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_solde_pesticide_stock_pesticide_solde_get: {
+        parameters: {
+            query?: {
+                site_id?: string | null;
+                pesticide_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoldePesticideRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vols_vols_get: {
+        parameters: {
+            query?: {
+                equipe_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_vol_vols_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_vol_vols__vol_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_vol_vols__vol_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vol_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pull_referentiel_referentiel_pull_get: {
         parameters: {
             query?: {
@@ -6268,6 +7143,11 @@ export interface operations {
                 since_codes_stades?: string | null;
                 since_campagnes?: string | null;
                 since_lieux_aeriens?: string | null;
+                since_sites_aeriens?: string | null;
+                since_equipes?: string | null;
+                since_equipe_membres?: string | null;
+                since_aeronefs?: string | null;
+                since_equipe_aeronefs?: string | null;
             };
             header?: never;
             path?: never;
@@ -6303,6 +7183,10 @@ export interface operations {
                 campagne_id?: string | null;
                 station_id?: string | null;
                 prospecteur_id?: string | null;
+                /** @description Interventions menées par cette équipe, triées par date_prospection décroissante (#607) — la position courante d'une équipe mobile terrestre se déduit de la première ligne. */
+                equipe_id?: string | null;
+                /** @description Fiches rattachées à ce vol de prospection (#610) — permet de relire, depuis un vol, les prospections qu'il a produites. */
+                vol_id?: string | null;
                 /** @description N'inclut que les fiches sans traitement associé, ni périmées (#revalidation-prospection : extensive/validation validées depuis plus de 5 jours sans traitement) — « Fiches de traitement → Consulter une fiche validée » (mobile), combiné à statut=validee. */
                 disponible_pour_traitement?: boolean;
                 /** @description N'inclut que les fiches périmées (#revalidation-prospection) — exactement celles qu'exclut disponible_pour_traitement pour cette raison, sans traitement associé et pas déjà revalidées. */

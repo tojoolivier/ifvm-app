@@ -1,3 +1,4 @@
+import { synchroniserVols } from './vol-sync';
 import * as Network from 'expo-network';
 import type { components } from './api-schema.generated';
 import { apiClient, conflitSync } from './api-client';
@@ -9,7 +10,8 @@ import {
   markTraitementSynced,
   ServerTraitement,
 } from './traitement-repository';
-import { PreconditionError } from './errors';
+import { useEquipeTravailStore } from './equipe-travail-store';
+import { assertPresent, PreconditionError } from './errors';
 import { logger } from './logger';
 import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
 
@@ -59,8 +61,17 @@ function especesArrayToDict(value: string | null | undefined): Record<string, bo
  * silencieux d'une version serveur plus récente.
  */
 function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas']['TraitementSyncPush'] {
+  // #641 : l'équipe d'origine de la fiche prime ; une fiche antérieure (« Non renseignée »)
+  // reste synchronisable avec l'équipe de travail courante.
+  const equipeId = draft.equipe_id ?? useEquipeTravailStore.getState().equipeId;
+  assertPresent(
+    equipeId,
+    'Aucune équipe de travail : choisissez-en une dans Paramètres avant de synchroniser cette fiche.'
+  );
+
   const common = {
     id: draft.id,
+    equipe_id: equipeId,
     base_updated_at: draft.server_updated_at ?? draft.created_at,
     prospection_id: draft.prospection_id,
     numero_fiche: draft.numero_fiche,
@@ -142,8 +153,9 @@ function buildTraitementSyncPayload(draft: DraftTraitement): components['schemas
         base_secondaire_date_installation: draft.aerien.base_secondaire_date_installation,
         // surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
         // côté serveur, plus un champ accepté par TraitementSyncPush.
-        pesticide_recu_l: draft.aerien.pesticide_recu_l,
-        // Surface restante abandonnée ? (migration backend 0086) — SQLite stocke
+        // pesticide_recu_l supprimé (#609) : le stock aérien vit désormais dans
+        // `mouvement_pesticide` (#606), plus un champ de `TraitementAerienCreate`.
+        // Surface restante abandonnée ? (migration backend 0097) — SQLite stocke
         // 0/1, l'API attend un booléen (même conversion que le Terrestre).
         surface_restante_abandonnee:
           draft.aerien.surface_restante_abandonnee == null ? null : !!draft.aerien.surface_restante_abandonnee,
@@ -300,6 +312,9 @@ export async function syncOneTraitement(draft: DraftTraitement, token: string): 
 
   await pushRotationsEtProduits(draft, token, body as ServerTraitement);
   await markTraitementSynced(draft.id, (body as ServerTraitement)?.updated_at);
+  // #644 : le vol d'application attendait ce traitement pour s'y rattacher (#610). `syncAll` du lot
+  // vol résume ses échecs sans lever : ceux du vol ne font pas échouer une fiche déjà envoyée.
+  await synchroniserVols(token);
 }
 
 /** Ce que le domaine « traitement » fournit pour être synchronisé en lot. */

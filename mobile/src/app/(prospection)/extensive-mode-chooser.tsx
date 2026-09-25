@@ -3,6 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
+import { motifEquipeIncompatible } from '@/lib/equipe-travail';
+import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { setProspectionModeExtensif } from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
@@ -39,7 +42,21 @@ export default function ExtensiveModeChooserScreen() {
   const token = useAuthStore((s) => s.token);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const { run, isRunning: isCreating } = useAsyncAction();
-  const [mode, setMode] = useState<ModeExtensif | null>(null);
+  const [modeChoisi, setMode] = useState<ModeExtensif | null>(null);
+  const ouvrirChoixEquipe = useEquipeSheetStore((s) => s.ouvrir);
+  const { courante } = useEquipesDeTravail();
+
+  // Même principe que le menu « Nouvelle fiche » : un mode incompatible avec l'équipe de travail
+  // n'est pas une erreur, c'est une invitation à changer d'équipe. Valable aussi pour une validation,
+  // dont le brouillon reprend l'équipe courante au moment où son mode est fixé.
+  const motifPour = (voulu: ModeExtensif) => motifEquipeIncompatible(voulu, courante);
+  // Un changement d'équipe (feuille globale) peut rendre le mode déjà choisi incompatible : il est
+  // alors ignoré plutôt que reporté sur une équipe qui ne lui convient pas.
+  const mode = modeChoisi && !motifPour(modeChoisi) ? modeChoisi : null;
+  const choisirMode = (voulu: ModeExtensif) => {
+    if (motifPour(voulu)) ouvrirChoixEquipe();
+    else setMode(voulu);
+  };
 
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
@@ -50,7 +67,7 @@ export default function ExtensiveModeChooserScreen() {
     run(
       async () => {
         const draft = existingDraftId
-          ? await setProspectionModeExtensif(existingDraftId, mode!)
+          ? await setProspectionModeExtensif(existingDraftId, mode!, courante?.id ?? null)
           : await startNewProspection({
               token: token!,
               prospecteurId: user!.id,
@@ -84,21 +101,21 @@ export default function ExtensiveModeChooserScreen() {
           <Text style={styles.hint}>Choisissez comment cette prospection a été réalisée.</Text>
 
           <TouchableOpacity
-            style={[styles.card, mode === 'terrestre' && styles.cardActiveGreen]}
-            onPress={() => setMode('terrestre')}
+            style={[styles.card, mode === 'terrestre' && styles.cardActiveGreen, motifPour('terrestre') && styles.cardIndisponible]}
+            onPress={() => choisirMode('terrestre')}
             activeOpacity={0.85}
           >
             <Text style={styles.cardTitle}>Prospection Terrestre</Text>
-            <Text style={styles.cardSubtitle}>Prospection réalisée au sol.</Text>
+            <Text style={styles.cardSubtitle}>{motifPour('terrestre') ?? 'Prospection réalisée au sol.'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.card, mode === 'aerien' && styles.cardActiveBlue]}
-            onPress={() => setMode('aerien')}
+            style={[styles.card, mode === 'aerien' && styles.cardActiveBlue, motifPour('aerien') && styles.cardIndisponible]}
+            onPress={() => choisirMode('aerien')}
             activeOpacity={0.85}
           >
             <Text style={styles.cardTitle}>Prospection Aérienne</Text>
-            <Text style={styles.cardSubtitle}>Prospection réalisée à partir d&apos;un aéronef.</Text>
+            <Text style={styles.cardSubtitle}>{motifPour('aerien') ?? "Prospection réalisée à partir d'un aéronef."}</Text>
           </TouchableOpacity>
         </View>
 
@@ -143,6 +160,7 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: Them
   card: { borderRadius: 14, padding: 17, marginBottom: 12, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.inputBorder },
   cardActiveGreen: { borderColor: GREEN, borderWidth: 2, backgroundColor: theme.successBg },
   cardActiveBlue: { borderColor: BLUE, borderWidth: 2, backgroundColor: '#eaf0f7' },
+  cardIndisponible: { opacity: 0.55 },
   cardIcon: { fontSize: typeSizes.cardIcon, marginBottom: 4 },
   cardTitle: { fontSize: typeSizes.cardTitle, fontWeight: '800', color: theme.text },
   cardSubtitle: { fontSize: typeSizes.cardSubtitle, lineHeight: 16, color: theme.muted, marginTop: 4 },

@@ -12,9 +12,11 @@ from app.application.campagne_use_cases import (
 )
 from app.auth import get_current_user
 from app.database import get_db
+from app.infrastructure.campagne_model import CampagneModel
 from app.infrastructure.campagne_repository import CampagneRepositoryImpl
 from app.models.users import Utilisateur
 from app.presentation.campagne_schemas import CampagneCreate, CampagneRead, CampagneUpdate
+from app.presentation.suppression_routes import ajouter_route_suppression
 
 router = APIRouter()
 
@@ -63,10 +65,7 @@ async def get_campagne(
     return campagne
 
 
-# Aucune route DELETE, volontairement (ADR-010, #137) : `GET /referentiel/pull` ne
-# transporte que des upserts, une suppression physique resterait indéfiniment dans le
-# SQLite des téléphones déjà synchronisés. La désactivation logique passe par `PUT`
-# avec `actif: false`, comme les 6 autres référentiels.
+# Suppression : soft-delete `deleted_at` (#674) — cf. `suppression_routes.py`.
 @router.put("/{campagne_id}", response_model=CampagneRead)
 async def update_campagne(
     campagne_id: uuid.UUID,
@@ -86,3 +85,6 @@ async def update_campagne(
     if campagne is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campagne non trouvée")
     return campagne
+
+
+ajouter_route_suppression(router, "/{item_id}", CampagneModel, "Campagne")

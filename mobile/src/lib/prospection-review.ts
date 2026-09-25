@@ -1,3 +1,4 @@
+import { assurerVolDeProspection } from './vol-sync';
 import * as Network from 'expo-network';
 import {
   apiClient,
@@ -30,6 +31,7 @@ import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { formatDirectionDeplacement } from './prospection-infestation-insights';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
+import { useEquipeTravailStore } from './equipe-travail-store';
 import { assertPresent, ReferentialError } from './errors';
 import { logger } from './logger';
 import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
@@ -525,9 +527,22 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     log.detail('station.ignoree_extensive', { prospectionId: draft.id, stationId });
   }
 
+  // #641 : l'équipe d'origine du brouillon prime ; un brouillon antérieur (« Non
+  // renseignée ») reste synchronisable avec l'équipe de travail courante.
+  const equipeId = draft.equipe_id ?? useEquipeTravailStore.getState().equipeId;
+  assertPresent(
+    equipeId,
+    'Aucune équipe de travail : choisissez-en une dans Paramètres avant de synchroniser cette fiche.'
+  );
+
   return {
+    // #678 : la fiche garde SON id sur le serveur. Sans lui l'appareil et le serveur ne se
+    // reconnaissent plus (doublon dans « Mes fiches », statut local figé) et un envoi refait après
+    // une réponse perdue créerait une seconde fiche.
+    id: draft.id,
     type_prospection: draft.type_prospection as ProspectionCreateInput['type_prospection'],
     campagne_id: draft.campagne_id,
+    equipe_id: equipeId,
     // 🔑 station_id = null pour extensive, la valeur pour intensive
     station_id: draft.type_prospection === 'extensive' ? null : stationId,
     n_fiche: draft.n_fiche || null,
@@ -853,8 +868,12 @@ export async function syncOneProspection(
   // `densite_diffuse` obligatoire, cf. `populationRowHasData`.
   const populationsAvecDonnees = populations.filter((row) => populationRowHasData(row, captures));
 
+  // #644 : `prospection.vol_id` référence le vol — il doit exister sur le serveur avant la fiche.
+  const volId = await assurerVolDeProspection(token, draft.id);
+
   const payload = {
     ...(await buildProspectionPayload(draft, token)),
+    ...(volId ? { vol_id: volId } : {}),
     captures: buildCapturesPayload(captures),
     populations: buildPopulationsPayload(populationsAvecDonnees),
     infestations: buildInfestationsPayload(infestations),

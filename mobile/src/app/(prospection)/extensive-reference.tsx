@@ -43,6 +43,7 @@ import { scaleTypeSizes } from '@/lib/typography';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
+import { BlocVol } from '@/components/vol/BlocVol';
 import { useTheme } from '@/hooks/use-theme';
 import type { ThemePalette } from '@/constants/theme';
 
@@ -1003,6 +1004,8 @@ export default function ExtensiveReferenceScreen() {
                   <Text style={styles.totalJourLabel}>TOTAL HEURES</Text>
                   <Text style={styles.totalJourValue}>{formatDuree(totalJourMinutes)}</Text>
                 </View>
+
+                {draftId && <BlocVol categorie="prospection" ficheId={draftId} dateParDefaut={draft?.date_prospection} />}
               </>
             )}
 

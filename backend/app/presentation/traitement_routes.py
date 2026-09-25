@@ -38,6 +38,7 @@ from app.domain.traitement import (
     ProspectionIntrouvableError,
     RotationBlocInvalideError,
     RotationIntrouvableError,
+    SitePrincipalIntrouvableError,
     TraitementIntrouvableError,
     TraitementNonValideeError,
     TraitementOrigineDejaUtiliseeError,
@@ -48,6 +49,11 @@ from app.domain.traitement import (
 )
 from app.infrastructure.pdf_renderer import render_html_to_pdf
 from app.infrastructure.prospection_repository import ProspectionRepositoryImpl
+from app.infrastructure.referentiel_sync_repository import (
+    EquipeRepositoryImpl,
+    MouvementPesticideRepositoryImpl,
+    SiteAerienneRepositoryImpl,
+)
 from app.infrastructure.traitement_repository import TraitementRepositoryImpl
 from app.infrastructure.utilisateur_repository import UtilisateurRepositoryImpl
 from app.models.users import Utilisateur
@@ -93,6 +99,7 @@ async def list_traitements(
 def _champs_communs(body: TraitementCreate) -> dict[str, Any]:
     return dict(
         prospection_id=body.prospection_id,
+        equipe_id=body.equipe_id,
         numero_fiche=body.numero_fiche,
         mode_traitement=body.mode_traitement,
         date_traitement=body.date_traitement,
@@ -150,12 +157,16 @@ async def create_traitement(
     repository = get_repository(db)
     prospection_repository = ProspectionRepositoryImpl(db)
     utilisateur_repository = UtilisateurRepositoryImpl(db)
+    site_aerienne_repository = SiteAerienneRepositoryImpl(db)
+    equipe_repository = EquipeRepositoryImpl(db)
     try:
         if body.aerien is not None:
             use_case = CreateTraitementAerien(
                 traitement_repository=repository,
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
+                site_aerienne_repository=site_aerienne_repository,
+                equipe_repository=equipe_repository,
             )
             return await use_case.execute(
                 **_champs_communs(body),
@@ -164,12 +175,12 @@ async def create_traitement(
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
                 base_principale=body.aerien.base_principale,
+                site_principal_id=body.aerien.site_principal_id,
                 stand=body.aerien.stand,
                 stand_date_installation=body.aerien.stand_date_installation,
                 base_secondaire=body.aerien.base_secondaire,
                 base_secondaire_date_installation=body.aerien.base_secondaire_date_installation,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                pesticide_recu_l=body.aerien.pesticide_recu_l,
                 surface_restante_abandonnee=body.aerien.surface_restante_abandonnee,
                 motif_surface_restante_abandonnee=body.aerien.motif_surface_restante_abandonnee,
                 taux_mortalite_pourcent=body.aerien.taux_mortalite_pourcent,
@@ -182,6 +193,7 @@ async def create_traitement(
             traitement_repository=repository,
             prospection_repository=prospection_repository,
             utilisateur_repository=utilisateur_repository,
+            equipe_repository=equipe_repository,
         )
         return await use_case_terrestre.execute(
             **_champs_communs(body),
@@ -211,7 +223,11 @@ async def create_traitement(
         )
     except (ChefDeBaseInvalideError, ChefEquipeInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except (ProspectionIntrouvableError, TraitementOrigineIntrouvableError) as e:
+    except (
+        ProspectionIntrouvableError,
+        TraitementOrigineIntrouvableError,
+        SitePrincipalIntrouvableError,
+    ) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except (NumeroFicheConflitError, TraitementOrigineDejaUtiliseeError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -234,12 +250,16 @@ async def sync_traitement(
     repository = get_repository(db)
     prospection_repository = ProspectionRepositoryImpl(db)
     utilisateur_repository = UtilisateurRepositoryImpl(db)
+    site_aerienne_repository = SiteAerienneRepositoryImpl(db)
+    equipe_repository = EquipeRepositoryImpl(db)
     try:
         if body.aerien is not None:
             use_case = SyncPushTraitementAerien(
                 traitement_repository=repository,
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
+                site_aerienne_repository=site_aerienne_repository,
+                equipe_repository=equipe_repository,
             )
             traitement, cree = await use_case.execute(
                 traitement_id=body.id,
@@ -250,12 +270,12 @@ async def sync_traitement(
                 chef_de_base_id=body.aerien.chef_de_base_id,
                 consultant_international=body.aerien.consultant_international,
                 base_principale=body.aerien.base_principale,
+                site_principal_id=body.aerien.site_principal_id,
                 stand=body.aerien.stand,
                 stand_date_installation=body.aerien.stand_date_installation,
                 base_secondaire=body.aerien.base_secondaire,
                 base_secondaire_date_installation=body.aerien.base_secondaire_date_installation,
                 immatricule_aeronef=body.aerien.immatricule_aeronef,
-                pesticide_recu_l=body.aerien.pesticide_recu_l,
                 surface_restante_abandonnee=body.aerien.surface_restante_abandonnee,
                 motif_surface_restante_abandonnee=body.aerien.motif_surface_restante_abandonnee,
                 taux_mortalite_pourcent=body.aerien.taux_mortalite_pourcent,
@@ -269,6 +289,7 @@ async def sync_traitement(
                 traitement_repository=repository,
                 prospection_repository=prospection_repository,
                 utilisateur_repository=utilisateur_repository,
+                equipe_repository=equipe_repository,
             )
             traitement, cree = await use_case_terrestre.execute(
                 traitement_id=body.id,
@@ -305,7 +326,11 @@ async def sync_traitement(
         )
     except (ChefDeBaseInvalideError, ChefEquipeInvalideError) as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except (ProspectionIntrouvableError, TraitementOrigineIntrouvableError) as e:
+    except (
+        ProspectionIntrouvableError,
+        TraitementOrigineIntrouvableError,
+        SitePrincipalIntrouvableError,
+    ) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except (NumeroFicheConflitError, TraitementOrigineDejaUtiliseeError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -365,7 +390,7 @@ async def add_rotation(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = AddRotation(get_repository(db))
+    use_case = AddRotation(get_repository(db), MouvementPesticideRepositoryImpl(db))
     try:
         return await use_case.execute(
             traitement_id=traitement_id,
@@ -400,7 +425,7 @@ async def update_rotation(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = UpdateRotation(get_repository(db))
+    use_case = UpdateRotation(get_repository(db), MouvementPesticideRepositoryImpl(db))
     try:
         return await use_case.execute(
             traitement_id=traitement_id,
@@ -435,7 +460,7 @@ async def remove_rotation(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
 ):
-    use_case = RemoveRotation(get_repository(db))
+    use_case = RemoveRotation(get_repository(db), MouvementPesticideRepositoryImpl(db))
     try:
         return await use_case.execute(traitement_id=traitement_id, rotation_id=rotation_id)
     except (TraitementIntrouvableError, RotationIntrouvableError) as e:

@@ -21,7 +21,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
   addRotation: jest.fn().mockResolvedValue({}),
   deleteAllRotationsForTraitementAerien: jest.fn().mockResolvedValue(undefined),
-  updateTraitementAerienPesticideRecu: jest.fn().mockResolvedValue({}),
   updateTraitementAerienSurfaceRestante: jest.fn().mockResolvedValue(undefined),
   updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
 }));
@@ -54,11 +53,10 @@ beforeEach(() => {
     id: 'trait-1',
     type_traitement: 'AERIEN',
     cible: { surface_infestee_ha: 100 },
-    aerien: { surface_restante_abandonnee: false, pesticide_recu_l: null, rotations: [] },
+    aerien: { surface_restante_abandonnee: false, rotations: [] },
   } as any);
   jest.mocked(traitementRepository.addRotation).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.deleteAllRotationsForTraitementAerien).mockClear().mockResolvedValue(undefined);
-  jest.mocked(traitementRepository.updateTraitementAerienPesticideRecu).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.updateTraitementAerienEfficacite).mockClear().mockResolvedValue({} as any);
   useTraitementCaptureStore.setState(RESET_STATE);
 });
@@ -245,58 +243,8 @@ describe('RotationsScreen — validation des heures de vanne', () => {
   });
 });
 
-/**
- * « Pesticide reçu (l) » a été déplacé depuis l'écran Équipe (traitement.tsx) vers
- * celui-ci — #equipe-slide-aerien : c'est une information propre au traitement
- * (stock de pesticide), pas à l'équipe.
- */
-describe('RotationsScreen — pesticide reçu (déplacé depuis Équipe)', () => {
-  it('restaure la valeur déjà enregistrée et la réenregistre via updateTraitementAerienPesticideRecu', async () => {
-    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
-      id: 'trait-1',
-      type_traitement: 'AERIEN',
-      cible: { surface_infestee_ha: 100 },
-      aerien: { surface_restante_abandonnee: false, pesticide_recu_l: 200, rotations: [] },
-    } as any);
-    useTraitementCaptureStore.setState({
-      ...RESET_STATE,
-      aerien: {
-        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
-      },
-    });
-
-    await render(<RotationsScreen />);
-    expect(await screen.findByDisplayValue('200')).toBeVisible();
-
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementAerienPesticideRecu).toHaveBeenCalledWith('trait-1', 200)
-    );
-  });
-
-  it('saisit puis enregistre une nouvelle valeur de pesticide reçu', async () => {
-    useTraitementCaptureStore.setState({
-      ...RESET_STATE,
-      aerien: {
-        rotations: [{ localId: 'r1', produit_id: 'p1', quantite: 10, unite: 'L', surface_ha: 5 }],
-      },
-    });
-    await render(<RotationsScreen />);
-    await screen.findByTestId('rotation-numero-cuve-0');
-
-    fireEvent.changeText(screen.getByTestId('pesticide-recu-input'), '150');
-    await settle();
-    fireEvent.press(screen.getByText('Continuer  ›'));
-
-    await waitFor(() =>
-      expect(traitementRepository.updateTraitementAerienPesticideRecu).toHaveBeenCalledWith('trait-1', 150)
-    );
-  });
-});
-
 describe('RotationsScreen — unité automatique selon le produit', () => {
-  it("pose « Kilos (kg) » et libelle Approvisionnement en kg pour un produit en poudre", async () => {
+  it("pose « Kilos (kg) » pour un produit en poudre", async () => {
     useTraitementCaptureStore.setState({
       ...RESET_STATE,
       aerien: { rotations: [{ localId: 'r1', produit_id: 'poudre', quantite: 10, unite: 'L', surface_ha: 5 }] },
@@ -304,12 +252,11 @@ describe('RotationsScreen — unité automatique selon le produit', () => {
 
     await render(<RotationsScreen />);
 
-    expect(await screen.findByText('Approvisionnement (kg)')).toBeVisible();
-    expect(screen.getByTestId('rotation-unite-auto-0')).toHaveTextContent('Kilos (kg)');
+    expect(await screen.findByTestId('rotation-unite-auto-0')).toHaveTextContent('Kilos (kg)');
     expect(useTraitementCaptureStore.getState().aerien.rotations[0].unite).toBe('kg');
   });
 
-  it("garde « Litres (L) » et Approvisionnement en l pour un produit liquide", async () => {
+  it("garde « Litres (L) » pour un produit liquide", async () => {
     useTraitementCaptureStore.setState({
       ...RESET_STATE,
       aerien: { rotations: [{ localId: 'r1', produit_id: 'liquide', quantite: 10, unite: 'L', surface_ha: 5 }] },
@@ -317,8 +264,7 @@ describe('RotationsScreen — unité automatique selon le produit', () => {
 
     await render(<RotationsScreen />);
 
-    expect(await screen.findByText('Approvisionnement (l)')).toBeVisible();
-    expect(screen.getByTestId('rotation-unite-auto-0')).toHaveTextContent('Litres (L)');
+    expect(await screen.findByTestId('rotation-unite-auto-0')).toHaveTextContent('Litres (L)');
   });
 });
 
@@ -334,7 +280,7 @@ describe('RotationsScreen — surface restante abandonnée ? (comme le Terrestre
       id: 'trait-1',
       type_traitement: 'AERIEN',
       cible: { surface_infestee_ha: 100 },
-      aerien: { pesticide_recu_l: null, rotations: [] },
+      aerien: { rotations: [] },
     } as any);
   });
 
@@ -391,7 +337,7 @@ describe('RotationsScreen — surface restante abandonnée ? (comme le Terrestre
       id: 'trait-1',
       type_traitement: 'AERIEN',
       cible: { surface_infestee_ha: 5 },
-      aerien: { pesticide_recu_l: null, rotations: [] },
+      aerien: { rotations: [] },
     } as any);
     useTraitementCaptureStore.setState(rotationsRestante);
 

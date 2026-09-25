@@ -4,7 +4,10 @@ from typing import Any
 
 from app.domain.prospection import Prospection
 from app.domain.repositories import (
+    EquipeRepository,
+    MouvementPesticideRepository,
     ProspectionRepository,
+    SiteAerienneRepository,
     TraitementRepository,
     UtilisateurRepository,
 )
@@ -21,6 +24,7 @@ from app.domain.traitement import (
     Rotation,
     RotationBlocInvalideError,
     RotationIntrouvableError,
+    SitePrincipalIntrouvableError,
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
@@ -71,6 +75,37 @@ def _valider_dates(date_traitement: date, date_validation: date) -> None:
         raise ValueError("date_traitement doit être postérieure ou égale à date_validation")
 
 
+async def _valider_equipe(
+    equipe_repository: EquipeRepository, equipe_id: uuid.UUID, type_attendu: str
+) -> None:
+    """Partagée entre les quatre use cases de création/sync (#607) — même
+    principe que `_valider_site_principal` : échouer explicitement (ValueError
+    -> 422) avant l'écriture plutôt que de laisser remonter une violation de FK
+    composite anonyme. `type_attendu` ne dépend que de `type_traitement`, sans
+    ambiguïté (contrairement à la prospection, cf. `equipe_type` généré de
+    `TraitementModel`)."""
+    equipe = await equipe_repository.get_by_id(equipe_id)
+    if equipe is None:
+        raise ValueError(f"equipe_id {equipe_id} ne référence aucune équipe du référentiel")
+    if equipe.type != type_attendu:
+        raise ValueError(
+            f"equipe_id {equipe_id} référence une équipe '{equipe.type}', "
+            f"attendu '{type_attendu}' pour cette fiche"
+        )
+
+
+async def _valider_site_principal(
+    site_aerienne_repository: SiteAerienneRepository, site_principal_id: uuid.UUID
+) -> None:
+    """Partagée entre `CreateTraitementAerien` et `SyncPushTraitementAerien` (#605)."""
+    site_principal = await site_aerienne_repository.get_by_id(site_principal_id)
+    if site_principal is None:
+        raise SitePrincipalIntrouvableError(
+            f"site_principal_id {site_principal_id} ne référence aucun site du "
+            "référentiel des sites aériens"
+        )
+
+
 def _generer_et_valider_numero_fiche(
     numero_fiche: str | None, prenom_chef: str, date_traitement: date, type_libelle: str
 ) -> str:
@@ -90,6 +125,7 @@ def _construire_traitement_base(
     base_numero: str,
     traitement_id: uuid.UUID | None = None,
     type_traitement: str,
+    equipe_id: uuid.UUID,
     mode_traitement: str | None,
     date_traitement: date,
     date_validation: date,
@@ -136,6 +172,7 @@ def _construire_traitement_base(
         prospection_id=prospection.id,
         numero_fiche=base_numero,
         type_traitement=type_traitement,
+        equipe_id=equipe_id,
         mode_traitement=mode_traitement,
         date_traitement=date_traitement,
         date_validation=date_validation,
@@ -192,10 +229,14 @@ class CreateTraitementAerien:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        site_aerienne_repository: SiteAerienneRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.site_aerienne_repository = site_aerienne_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -207,13 +248,14 @@ class CreateTraitementAerien:
         mecanicien: str,
         chef_de_base_id: uuid.UUID,
         base_principale: str,
+        site_principal_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         immatricule_aeronef: str,
         consultant_international: str | None = None,
         stand: str | None = None,
         stand_date_installation: date | None = None,
         base_secondaire: str | None = None,
         base_secondaire_date_installation: date | None = None,
-        pesticide_recu_l: float | None = None,
         surface_restante_abandonnee: bool | None = None,
         motif_surface_restante_abandonnee: str | None = None,
         taux_mortalite_pourcent: float | None = None,
@@ -299,6 +341,9 @@ class CreateTraitementAerien:
             )
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
+        await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
+        await _valider_equipe(self.equipe_repository, equipe_id, "aerien")
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
         )
@@ -307,6 +352,7 @@ class CreateTraitementAerien:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="AERIEN",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,
@@ -354,12 +400,12 @@ class CreateTraitementAerien:
             chef_de_base_id=chef_de_base_id,
             consultant_international=consultant_international,
             base_principale=base_principale,
+            site_principal_id=site_principal_id,
             stand=stand,
             stand_date_installation=stand_date_installation,
             base_secondaire=base_secondaire,
             base_secondaire_date_installation=base_secondaire_date_installation,
             immatricule_aeronef=immatricule_aeronef,
-            pesticide_recu_l=pesticide_recu_l,
             surface_restante_abandonnee=surface_restante_abandonnee,
             motif_surface_restante_abandonnee=motif_surface_restante_abandonnee,
             taux_mortalite_pourcent=taux_mortalite_pourcent,
@@ -392,10 +438,12 @@ class CreateTraitementTerrestre:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -408,6 +456,7 @@ class CreateTraitementTerrestre:
         vitesse_vent_ms: float,
         temperature_c: float,
         chef_equipe_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         direction_vent: str | None = None,
         agent_encadreur: str | None = None,
         consultant_international: str | None = None,
@@ -502,6 +551,8 @@ class CreateTraitementTerrestre:
                 "avec le rôle 'chef_equipe'"
             )
 
+        await _valider_equipe(self.equipe_repository, equipe_id, "terrestre")
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Terrestre"
         )
@@ -510,6 +561,7 @@ class CreateTraitementTerrestre:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="TERRESTRE",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,
@@ -703,9 +755,34 @@ def _valider_heures_vanne(
         )
 
 
+async def _regenerer_consommation_pesticide(
+    mouvement_repository: MouvementPesticideRepository,
+    traitement: Traitement,
+    aerien: TraitementAerien,
+) -> None:
+    """Rattache l'écriture sur une rotation à la génération/régénération des
+    mouvements `consommation` de la fiche (AC #609) — un mouvement par couple
+    (pesticide, unité), agrégé sur `aerien.rotations` déjà à jour.
+
+    `aerien.site_principal_id` peut être `None` pour une fiche historique non
+    rapprochée à un site (#605) : dans ce cas on supprime sans recréer, on ne
+    débite jamais un site inconnu (point délicat #609)."""
+    await mouvement_repository.regenerer_consommation(
+        traitement_id=aerien.traitement_id,
+        site_id=aerien.site_principal_id,
+        date_mouvement=traitement.date_traitement,
+        consommations=aerien.consommations_pesticide(),
+    )
+
+
 class AddRotation:
-    def __init__(self, repository: TraitementRepository):
+    def __init__(
+        self,
+        repository: TraitementRepository,
+        mouvement_pesticide_repository: MouvementPesticideRepository,
+    ):
         self.repository = repository
+        self.mouvement_pesticide_repository = mouvement_pesticide_repository
 
     async def execute(
         self,
@@ -764,7 +841,7 @@ class AddRotation:
         aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
-        return await self.repository.add_rotation(
+        resultat = await self.repository.add_rotation(
             traitement_id,
             rotation,
             aerien.nb_rotations,
@@ -774,13 +851,21 @@ class AddRotation:
             aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
-            aerien.pesticide_stock_restant_l,
         )
+        await _regenerer_consommation_pesticide(
+            self.mouvement_pesticide_repository, traitement, aerien
+        )
+        return resultat
 
 
 class UpdateRotation:
-    def __init__(self, repository: TraitementRepository):
+    def __init__(
+        self,
+        repository: TraitementRepository,
+        mouvement_pesticide_repository: MouvementPesticideRepository,
+    ):
         self.repository = repository
+        self.mouvement_pesticide_repository = mouvement_pesticide_repository
 
     async def execute(
         self,
@@ -831,7 +916,7 @@ class UpdateRotation:
         aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
-        return await self.repository.update_rotation(
+        resultat = await self.repository.update_rotation(
             traitement_id,
             rotation,
             aerien.nb_rotations,
@@ -841,13 +926,21 @@ class UpdateRotation:
             aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
-            aerien.pesticide_stock_restant_l,
         )
+        await _regenerer_consommation_pesticide(
+            self.mouvement_pesticide_repository, traitement, aerien
+        )
+        return resultat
 
 
 class RemoveRotation:
-    def __init__(self, repository: TraitementRepository):
+    def __init__(
+        self,
+        repository: TraitementRepository,
+        mouvement_pesticide_repository: MouvementPesticideRepository,
+    ):
         self.repository = repository
+        self.mouvement_pesticide_repository = mouvement_pesticide_repository
 
     async def execute(self, traitement_id: uuid.UUID, rotation_id: uuid.UUID) -> Traitement:
         traitement = await _get_traitement_aerien(self.repository, traitement_id)
@@ -860,7 +953,7 @@ class RemoveRotation:
         aerien.recalculer_totaux(traitement.mode_traitement)
         aerien.recalculer_surfaces(_surface_infestee_ha(traitement), surface_cumulee_precedente)
 
-        return await self.repository.remove_rotation(
+        resultat = await self.repository.remove_rotation(
             traitement_id,
             rotation_id,
             aerien.nb_rotations,
@@ -870,8 +963,11 @@ class RemoveRotation:
             aerien.surface_protegee_ha,
             aerien.surface_cumulee_ha,
             aerien.surface_restante_ha,
-            aerien.pesticide_stock_restant_l,
         )
+        await _regenerer_consommation_pesticide(
+            self.mouvement_pesticide_repository, traitement, aerien
+        )
+        return resultat
 
 
 class AddBloc:
@@ -1092,10 +1188,14 @@ class SyncPushTraitementAerien:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        site_aerienne_repository: SiteAerienneRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.site_aerienne_repository = site_aerienne_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -1109,13 +1209,14 @@ class SyncPushTraitementAerien:
         mecanicien: str,
         chef_de_base_id: uuid.UUID,
         base_principale: str,
+        site_principal_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         immatricule_aeronef: str,
         consultant_international: str | None = None,
         stand: str | None = None,
         stand_date_installation: date | None = None,
         base_secondaire: str | None = None,
         base_secondaire_date_installation: date | None = None,
-        pesticide_recu_l: float | None = None,
         surface_restante_abandonnee: bool | None = None,
         motif_surface_restante_abandonnee: str | None = None,
         taux_mortalite_pourcent: float | None = None,
@@ -1208,6 +1309,9 @@ class SyncPushTraitementAerien:
             )
         valider_roles_aerien_distincts(f"{chef.prenom} {chef.nom}", pilote, mecanicien)
 
+        await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
+        await _valider_equipe(self.equipe_repository, equipe_id, "aerien")
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Aerien"
         )
@@ -1217,6 +1321,7 @@ class SyncPushTraitementAerien:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="AERIEN",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,
@@ -1263,12 +1368,12 @@ class SyncPushTraitementAerien:
             chef_de_base_id=chef_de_base_id,
             consultant_international=consultant_international,
             base_principale=base_principale,
+            site_principal_id=site_principal_id,
             stand=stand,
             stand_date_installation=stand_date_installation,
             base_secondaire=base_secondaire,
             base_secondaire_date_installation=base_secondaire_date_installation,
             immatricule_aeronef=immatricule_aeronef,
-            pesticide_recu_l=pesticide_recu_l,
             surface_restante_abandonnee=surface_restante_abandonnee,
             motif_surface_restante_abandonnee=motif_surface_restante_abandonnee,
             taux_mortalite_pourcent=taux_mortalite_pourcent,
@@ -1305,9 +1410,11 @@ class SyncPushTraitementAerien:
         # nb_rotations/total_pesticide_l/total_pesticide_kg/surface couverte
         # existants ne sont pas renvoyés par ce push (rotations = sous-ressource
         # distincte) : on les reprend tels quels, puis on recalcule ce qui en dépend
-        # (surface_restante_ha, stock de pesticide). Seule exception : le mode peut
-        # changer via ce push — la surface couverte (inchangée) est alors reclassée
-        # en traitée/protégée selon le nouveau produit (migration 0081).
+        # (surface_restante_ha). Seule exception : le mode peut changer via ce push —
+        # la surface couverte (inchangée) est alors reclassée en traitée/protégée
+        # selon le nouveau produit (migration 0081). Les mouvements de consommation
+        # (#609) ne sont pas concernés : générés depuis les rotations, sous-ressource
+        # distincte au même titre, ce push ne les touche pas.
         candidat.aerien.nb_rotations = existant.aerien.nb_rotations
         candidat.aerien.total_pesticide_l = existant.aerien.total_pesticide_l
         candidat.aerien.total_pesticide_kg = existant.aerien.total_pesticide_kg
@@ -1317,7 +1424,6 @@ class SyncPushTraitementAerien:
         candidat.aerien.recalculer_surfaces(
             candidat.cible.surface_infestee_ha, surface_cumulee_precedente
         )
-        candidat.aerien.recalculer_stock_pesticide()
 
         candidat.created_at = existant.created_at
         synced = await self.traitement_repository.update_sync(candidat)
@@ -1333,10 +1439,12 @@ class SyncPushTraitementTerrestre:
         traitement_repository: TraitementRepository,
         prospection_repository: ProspectionRepository,
         utilisateur_repository: UtilisateurRepository,
+        equipe_repository: EquipeRepository,
     ):
         self.traitement_repository = traitement_repository
         self.prospection_repository = prospection_repository
         self.utilisateur_repository = utilisateur_repository
+        self.equipe_repository = equipe_repository
 
     async def execute(
         self,
@@ -1351,6 +1459,7 @@ class SyncPushTraitementTerrestre:
         vitesse_vent_ms: float,
         temperature_c: float,
         chef_equipe_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         direction_vent: str | None = None,
         agent_encadreur: str | None = None,
         consultant_international: str | None = None,
@@ -1451,6 +1560,8 @@ class SyncPushTraitementTerrestre:
                 "avec le rôle 'chef_equipe'"
             )
 
+        await _valider_equipe(self.equipe_repository, equipe_id, "terrestre")
+
         base_numero = _generer_et_valider_numero_fiche(
             numero_fiche, chef.prenom, date_traitement, "Terrestre"
         )
@@ -1460,6 +1571,7 @@ class SyncPushTraitementTerrestre:
             prospection=prospection,
             base_numero=base_numero,
             type_traitement="TERRESTRE",
+            equipe_id=equipe_id,
             mode_traitement=mode_traitement,
             date_traitement=date_traitement,
             date_validation=date_validation,

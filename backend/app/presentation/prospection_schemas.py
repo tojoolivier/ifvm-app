@@ -446,8 +446,17 @@ class OperationAerienneRead(BaseModel):
 
 
 class ProspectionCreate(BaseModel):
+    # Identifiant choisi par le client (#678) : la fiche naît sur l'appareil, son id local reste
+    # son id. Rejouer un envoi avec le même id renvoie la fiche déjà créée au lieu d'en créer une
+    # seconde ; optionnel pour les clients (web) qui laissent le serveur le générer.
+    id: uuid.UUID | None = None
     type_prospection: TypeProspection
     campagne_id: uuid.UUID
+    # Équipe qui a mené la fiche (#607) — nullable en base (rétro-compatibilité),
+    # exigée ici pour toute nouvelle fiche. Une intensive/validation ne peut être
+    # rattachée qu'à une équipe terrestre (validée côté serveur, cf.
+    # CreateProspection._valider_equipe) ; une extensive suit `mode_extensif`.
+    equipe_id: uuid.UUID
     station_id: uuid.UUID | None = None
     n_fiche: str | None = None
     n_message: str | None = None
@@ -548,6 +557,9 @@ class ProspectionCreate(BaseModel):
     # revalide une fiche périmée (extensive/validation validée depuis plus de
     # 5 jours sans traitement) — jamais décidé côté serveur.
     revalide_de_id: uuid.UUID | None = None
+    # Vol de prospection ayant produit cette fiche (#610) — facultatif, doit
+    # référencer un vol de type `prospection` (vérifié côté use case).
+    vol_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _biotope_obligatoire(self) -> "ProspectionCreate":
@@ -651,6 +663,10 @@ class ProspectionUpdate(BaseModel):
     signature_chef_base_horodatage: datetime | None = None
     signature_chef_base_image: str | None = None
 
+    # Vol de prospection ayant produit cette fiche (#610) — doit référencer un
+    # vol de type `prospection` (vérifié côté use case).
+    vol_id: uuid.UUID | None = None
+
 
 class StatutChange(BaseModel):
     statut: StatutProspection
@@ -737,6 +753,9 @@ class ProspectionRead(BaseModel):
     # #revalidation-prospection : auto-référence vers la fiche périmée que
     # celle-ci revalide, `None` pour une fiche "normale" (cf. migration 0062).
     revalide_de_id: uuid.UUID | None = None
+    equipe_id: uuid.UUID | None = None
+    # Vol de prospection ayant produit cette fiche (#610).
+    vol_id: uuid.UUID | None = None
     # Champs dérivés (jointure `utilisateur`, jamais stockés) — évite à chaque
     # client de résoudre lui-même id -> nom pour l'affichage.
     prospecteur_nom: str | None = None

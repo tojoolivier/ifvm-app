@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient } from '@/lib/api-client';
-import { getCurrentPosition } from '@/lib/location';
+import type { components } from '@/lib/api-schema.generated';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { logger } from '@/lib/logger';
 import { peutCreerLieuAerien } from '@/lib/equipe-aerienne-access';
@@ -30,28 +30,22 @@ interface Chef {
 interface Equipe {
   id: string;
   nom: string;
-  chef_de_base_id: string;
+  // Le chef n'est plus une colonne de l'équipe mais un membre `fonction: 'chef'`
+  // (référentiel unifié, ADR-018) ; résolu ici pour garder l'affichage inchangé.
+  chef_de_base_id: string | null;
   aeronef?: { immatriculation: string; societe: string; volume_cuve_l: number } | null;
 }
 
-interface Base {
-  id: string;
-  numero: string;
-  localite: string;
-  parent_base_id: string | null;
-  equipe_id: string | null;
+function chefDe(equipe: { membres?: { user_id: string; fonction: string }[] }): string | null {
+  return equipe.membres?.find((m) => m.fonction === 'chef')?.user_id ?? null;
 }
 
-interface Stand {
-  id: string;
-  numero: string;
-  localite: string;
-}
+type Site = components['schemas']['SiteAerienneRead'];
 
 /**
  * Écran de gestion des référentiels aériens (#equipe-aerienne) :
- * équipes aériennes, bases principales, bases secondaires, stands de
- * remplissage. Cardinalités (confirmées avec l'utilisateur le 2026-09-16) :
+ * équipes aériennes, bases principales, bases secondaires (sites aériens
+ * unifiés depuis #604 : un stand est un site secondaire, cf. /sites-aeriens). Cardinalités (confirmées avec l'utilisateur le 2026-09-16) :
  * 1 équipe = 1 chef de base = 1 base principale ; une base secondaire hérite
  * de l'équipe de sa principale. En ligne uniquement, comme tous les
  * référentiels aériens (pas de synchronisation hors-ligne).
@@ -69,28 +63,26 @@ export default function ReferentielsAeriensScreen() {
 
   const [chefs, setChefs] = useState<Chef[]>([]);
   const [equipes, setEquipes] = useState<Equipe[]>([]);
-  const [bases, setBases] = useState<Base[]>([]);
-  const [stands, setStands] = useState<Stand[]>([]);
+  const [bases, setBases] = useState<Site[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [echecsPartiels, setEchecsPartiels] = useState<string[]>([]);
 
   const { run: runChargement, isRunning: isChargement } = useAsyncAction();
 
-  // `Promise.allSettled`, pas `Promise.all` : les quatre référentiels sont
-  // indépendants (bases secondaires et stands ne dépendent d'aucun des deux
+  // `Promise.allSettled`, pas `Promise.all` : les trois référentiels sont
+  // indépendants (les bases secondaires ne dépendent d'aucun des deux
   // autres) — un seul en panne (ex. /equipes-aeriennes non déployé sur cet
   // environnement) ne doit pas empêcher `loaded` de passer à `true` et
   // renvoyer tout l'écran sur le lien de repli « Charger les référentiels »,
-  // alors que 3 référentiels sur 4 étaient en réalité disponibles.
+  // alors que 2 référentiels sur 3 étaient en réalité disponibles.
   const charger = useCallback(
     () =>
       runChargement(
         async () => {
-          const [chefsRes, equipesRes, basesRes, standsRes] = await Promise.allSettled([
+          const [chefsRes, equipesRes, basesRes] = await Promise.allSettled([
             apiClient.listChefsDeBase(token!),
             apiClient.listEquipesAeriennes(token!),
-            apiClient.listBasesAeriennes(token!),
-            apiClient.listStandsRemplissage(token!),
+            apiClient.listSitesAeriens(token!),
           ]);
 
           const echecs: string[] = [];
@@ -99,20 +91,23 @@ export default function ReferentielsAeriensScreen() {
             echecs.push('chefs de base');
             log.ignore(chefsRes.reason, 'Chefs de base indisponibles — écran affiché en dégradé.');
           }
-          if (equipesRes.status === 'fulfilled') setEquipes(equipesRes.value);
+          if (equipesRes.status === 'fulfilled')
+            setEquipes(
+              equipesRes.value.map((e) => ({
+                id: e.id,
+                nom: e.nom,
+                chef_de_base_id: chefDe(e),
+                aeronef: e.aeronef ?? null,
+              }))
+            );
           else {
             echecs.push('équipes aériennes');
             log.ignore(equipesRes.reason, 'Équipes aériennes indisponibles — écran affiché en dégradé.');
           }
           if (basesRes.status === 'fulfilled') setBases(basesRes.value);
           else {
-            echecs.push('bases aériennes');
-            log.ignore(basesRes.reason, 'Bases aériennes indisponibles — écran affiché en dégradé.');
-          }
-          if (standsRes.status === 'fulfilled') setStands(standsRes.value);
-          else {
-            echecs.push('stands de remplissage');
-            log.ignore(standsRes.reason, 'Stands de remplissage indisponibles — écran affiché en dégradé.');
+            echecs.push('sites aériens');
+            log.ignore(basesRes.reason, 'Sites aériens indisponibles — écran affiché en dégradé.');
           }
           setEchecsPartiels(echecs);
           setLoaded(true);
@@ -124,7 +119,7 @@ export default function ReferentielsAeriensScreen() {
 
   // Chargé automatiquement à l'ouverture (#referentiel-creation-sans-recharger)
   // — plus de bouton « Charger les référentiels » à taper avant d'atteindre les
-  // formulaires de création (équipe, base principale/secondaire, stand).
+  // formulaires de création (équipe, base principale/secondaire).
   useFocusEffect(useCallback(() => {
     void charger();
   }, [charger]));
@@ -156,8 +151,8 @@ export default function ReferentielsAeriensScreen() {
   const chefsById = new Map(chefs.map((c) => [c.id, c]));
   const equipesById = new Map(equipes.map((e) => [e.id, e]));
   const basesById = new Map(bases.map((b) => [b.id, b]));
-  const basesPrincipales = bases.filter((b) => b.parent_base_id === null);
-  const basesSecondaires = bases.filter((b) => b.parent_base_id !== null);
+  const basesPrincipales = bases.filter((b) => b.parent_site_id === null);
+  const basesSecondaires = bases.filter((b) => b.parent_site_id !== null);
   const chefsLibres = chefs.filter((c) => !equipes.some((e) => e.chef_de_base_id === c.id));
   const equipesSansBasePrincipale = equipes.filter((e) => !bases.some((b) => b.equipe_id === e.id));
   // Un chef de base ne peut créer une base principale que pour SA propre équipe — le
@@ -224,12 +219,6 @@ export default function ReferentielsAeriensScreen() {
             onCreated={(b) => setBases((prev) => [...prev, b])}
           />
 
-          <SectionStand
-            stands={stands}
-            token={token!}
-            peutCreer={peutCreer}
-            onCreated={(s) => setStands((prev) => [...prev, s])}
-          />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -279,23 +268,35 @@ function SectionEquipes({
   const creer = () =>
     run(
       async () => {
+        // Les rôles autrefois en texte libre (pilote, mécanicien, consultant) sont
+        // désormais des membres : sans compte, le backend en crée un à la volée.
         const cree = await apiClient.createEquipeAerienne(token, {
           nom: nom.trim(),
-          chef_de_base_id: chefDeBaseId!,
-          pilote: pilote.trim(),
-          mecanicien: mecanicien.trim(),
-          consultant_international: consultantInternational.trim() || null,
+          type: 'aerien',
           aeronef: {
             immatriculation: immatriculation.trim(),
             societe: societe.trim(),
             volume_cuve_l: parseFloat(volumeCuve.replace(',', '.')),
           },
-          membres: membres.map((nomMembre) => ({ nom: nomMembre })),
+          membres: [
+            { user_id: chefDeBaseId!, fonction: 'chef' as const },
+            { nom: pilote.trim(), fonction: 'pilote' as const },
+            { nom: mecanicien.trim(), fonction: 'mecanicien' as const },
+            ...(consultantInternational.trim()
+              ? [
+                  {
+                    nom: consultantInternational.trim(),
+                    fonction: 'consultant_international' as const,
+                  },
+                ]
+              : []),
+            ...membres.map((nomMembre) => ({ nom: nomMembre, fonction: 'membre' as const })),
+          ],
         });
         onCreated({
           id: cree.id,
           nom: cree.nom,
-          chef_de_base_id: cree.chef_de_base_id,
+          chef_de_base_id: chefDe(cree),
           aeronef: cree.aeronef ?? null,
         });
         setCreation(false);
@@ -333,7 +334,7 @@ function SectionEquipes({
       {equipes.map((equipe) => (
         <View key={equipe.id} style={styles.item}>
           <Text style={styles.itemText}>{equipe.nom}</Text>
-          <Text style={styles.itemSubtext}>Chef de base : {nomChef(equipe.chef_de_base_id)}</Text>
+          <Text style={styles.itemSubtext}>Chef de base : {nomChef(equipe.chef_de_base_id ?? '')}</Text>
           {equipe.aeronef && (
             <Text style={styles.itemSubtext}>
               Hélicoptère : {equipe.aeronef.immatriculation} — {equipe.aeronef.societe} (cuve{' '}
@@ -461,22 +462,6 @@ function SectionEquipes({
   );
 }
 
-function useGps() {
-  const [position, setPosition] = useState<{ latitude: number; longitude: number; altitude: number | null } | null>(
-    null
-  );
-  const { run, isRunning } = useAsyncAction();
-  const capturer = () =>
-    run(
-      async () => {
-        const pos = await getCurrentPosition();
-        setPosition({ latitude: pos.latitude, longitude: pos.longitude, altitude: pos.altitude });
-      },
-      { screen: 'referentiels-aeriens' }
-    );
-  return { position, isGpsLoading: isRunning, capturer, reset: () => setPosition(null) };
-}
-
 function SectionBasePrincipale({
   basesPrincipales,
   equipes,
@@ -487,12 +472,12 @@ function SectionBasePrincipale({
   onCreated,
 }: {
   peutCreer: boolean;
-  basesPrincipales: Base[];
+  basesPrincipales: Site[];
   equipes: Equipe[];
   equipesLibres: Equipe[];
   equipesById: Map<string, Equipe>;
   token: string;
-  onCreated: (base: Base) => void;
+  onCreated: (base: Site) => void;
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
@@ -502,37 +487,23 @@ function SectionBasePrincipale({
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
   const [equipeId, setEquipeId] = useState<string | null>(null);
-  const { position, isGpsLoading, capturer, reset } = useGps();
   const { run, isRunning } = useAsyncAction();
 
-  const ouvrir = () => {
-    setCreation(true);
-    void capturer();
-  };
+  const ouvrir = () => setCreation(true);
 
   const creer = () =>
     run(
       async () => {
-        const cree = await apiClient.createBaseAerienne(token, {
+        const cree = await apiClient.createSiteAerien(token, {
           numero: numero.trim(),
           localite: localite.trim(),
           equipe_id: equipeId,
-          latitude: position?.latitude ?? null,
-          longitude: position?.longitude ?? null,
-          altitude: position?.altitude ?? null,
         });
-        onCreated({
-          id: cree.id,
-          numero: cree.numero,
-          localite: cree.localite,
-          parent_base_id: cree.parent_base_id,
-          equipe_id: cree.equipe_id,
-        });
+        onCreated(cree);
         setCreation(false);
         setNumero('');
         setLocalite('');
         setEquipeId(null);
-        reset();
       },
       {
         screen: 'referentiels-aeriens',
@@ -598,16 +569,6 @@ function SectionBasePrincipale({
               </TouchableOpacity>
             ))}
           </View>
-          <View style={styles.gpsRow}>
-            <Text style={styles.gpsRowText}>Coordonnées (auto, facultatif)</Text>
-            <Text style={styles.gpsValue}>
-              {isGpsLoading
-                ? 'Localisation…'
-                : position
-                  ? `${position.latitude.toFixed(4)}, ${position.longitude.toFixed(4)}`
-                  : '—'}
-            </Text>
-          </View>
           <View style={styles.actionsRow}>
             <TouchableOpacity onPress={() => setCreation(false)} accessibilityRole="button">
               <Text style={styles.annulerText}>Annuler</Text>
@@ -636,11 +597,11 @@ function SectionBaseSecondaire({
   onCreated,
 }: {
   peutCreer: boolean;
-  basesSecondaires: Base[];
-  basesPrincipales: Base[];
-  basesById: Map<string, Base>;
+  basesSecondaires: Site[];
+  basesPrincipales: Site[];
+  basesById: Map<string, Site>;
   token: string;
-  onCreated: (base: Base) => void;
+  onCreated: (base: Site) => void;
 }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
@@ -650,37 +611,23 @@ function SectionBaseSecondaire({
   const [numero, setNumero] = useState('');
   const [localite, setLocalite] = useState('');
   const [parentBaseId, setParentBaseId] = useState<string | null>(null);
-  const { position, isGpsLoading, capturer, reset } = useGps();
   const { run, isRunning } = useAsyncAction();
 
-  const ouvrir = () => {
-    setCreation(true);
-    void capturer();
-  };
+  const ouvrir = () => setCreation(true);
 
   const creer = () =>
     run(
       async () => {
-        const cree = await apiClient.createBaseAerienne(token, {
+        const cree = await apiClient.createSiteAerien(token, {
           numero: numero.trim(),
           localite: localite.trim(),
-          parent_base_id: parentBaseId,
-          latitude: position?.latitude ?? null,
-          longitude: position?.longitude ?? null,
-          altitude: position?.altitude ?? null,
+          parent_site_id: parentBaseId,
         });
-        onCreated({
-          id: cree.id,
-          numero: cree.numero,
-          localite: cree.localite,
-          parent_base_id: cree.parent_base_id,
-          equipe_id: cree.equipe_id,
-        });
+        onCreated(cree);
         setCreation(false);
         setNumero('');
         setLocalite('');
         setParentBaseId(null);
-        reset();
       },
       {
         screen: 'referentiels-aeriens',
@@ -699,7 +646,7 @@ function SectionBaseSecondaire({
             {base.numero} — {base.localite}
           </Text>
           <Text style={styles.itemSubtext}>
-            Principale : {base.parent_base_id ? basesById.get(base.parent_base_id)?.numero ?? '—' : '—'}
+            Principale : {base.parent_site_id ? basesById.get(base.parent_site_id)?.numero ?? '—' : '—'}
           </Text>
         </View>
       ))}
@@ -743,128 +690,6 @@ function SectionBaseSecondaire({
               </TouchableOpacity>
             ))}
           </View>
-          <View style={styles.gpsRow}>
-            <Text style={styles.gpsRowText}>Coordonnées (auto, facultatif)</Text>
-            <Text style={styles.gpsValue}>
-              {isGpsLoading
-                ? 'Localisation…'
-                : position
-                  ? `${position.latitude.toFixed(4)}, ${position.longitude.toFixed(4)}`
-                  : '—'}
-            </Text>
-          </View>
-          <View style={styles.actionsRow}>
-            <TouchableOpacity onPress={() => setCreation(false)} accessibilityRole="button">
-              <Text style={styles.annulerText}>Annuler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.creerButton, isRunning && styles.creerButtonDisabled]}
-              onPress={creer}
-              disabled={isRunning}
-              accessibilityRole="button"
-            >
-              <Text style={styles.creerButtonText}>{isRunning ? 'Création…' : 'Créer'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function SectionStand({
-  stands,
-  token,
-  peutCreer,
-  onCreated,
-}: {
-  peutCreer: boolean;
-  stands: Stand[];
-  token: string;
-  onCreated: (stand: Stand) => void;
-}) {
-  const { scale } = useFontScale();
-  const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const theme = useTheme();
-  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
-  const [creation, setCreation] = useState(false);
-  const [numero, setNumero] = useState('');
-  const [localite, setLocalite] = useState('');
-  const { position, isGpsLoading, capturer, reset } = useGps();
-  const { run, isRunning } = useAsyncAction();
-
-  const ouvrir = () => {
-    setCreation(true);
-    void capturer();
-  };
-
-  const creer = () =>
-    run(
-      async () => {
-        const cree = await apiClient.createStandRemplissage(token, {
-          numero: numero.trim(),
-          localite: localite.trim(),
-          latitude: position?.latitude ?? null,
-          longitude: position?.longitude ?? null,
-          altitude: position?.altitude ?? null,
-        });
-        onCreated({ id: cree.id, numero: cree.numero, localite: cree.localite });
-        setCreation(false);
-        setNumero('');
-        setLocalite('');
-        reset();
-      },
-      {
-        screen: 'referentiels-aeriens',
-        precondition: !!token && numero.trim().length > 0 && localite.trim().length > 0,
-        preconditionMessage: 'Renseignez le numéro et la localité avant de créer le stand.',
-      }
-    );
-
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>STANDS DE REMPLISSAGE</Text>
-      {stands.length === 0 && <Text style={styles.vide}>Aucun stand de remplissage.</Text>}
-      {stands.map((stand) => (
-        <View key={stand.id} style={styles.item}>
-          <Text style={styles.itemText}>
-            {stand.numero} — {stand.localite}
-          </Text>
-        </View>
-      ))}
-
-      {!creation && peutCreer && (
-        <TouchableOpacity style={styles.nouveauLink} onPress={ouvrir} accessibilityRole="button">
-          <Text style={styles.nouveauLinkText}>+ Nouveau stand de remplissage</Text>
-        </TouchableOpacity>
-      )}
-
-      {creation && (
-        <View style={styles.formulaire}>
-          <TextInput
-            value={numero}
-            onChangeText={setNumero}
-            placeholder="Numéro (ex. STD01)"
-            placeholderTextColor={TEXT_SECONDARY}
-            style={styles.input}
-          />
-          <TextInput
-            value={localite}
-            onChangeText={setLocalite}
-            placeholder="Localité"
-            placeholderTextColor={TEXT_SECONDARY}
-            style={styles.input}
-          />
-          <View style={styles.gpsRow}>
-            <Text style={styles.gpsRowText}>Coordonnées (auto, facultatif)</Text>
-            <Text style={styles.gpsValue}>
-              {isGpsLoading
-                ? 'Localisation…'
-                : position
-                  ? `${position.latitude.toFixed(4)}, ${position.longitude.toFixed(4)}`
-                  : '—'}
-            </Text>
-          </View>
           <View style={styles.actionsRow}>
             <TouchableOpacity onPress={() => setCreation(false)} accessibilityRole="button">
               <Text style={styles.annulerText}>Annuler</Text>
@@ -898,8 +723,6 @@ const BASE_TYPE_SIZES = {
   input: 13,
   sousLabel: 9,
   chipText: 12,
-  gpsRowText: 11.5,
-  gpsValue: 12,
   annulerText: 13,
   creerButtonText: 13,
 };
@@ -942,9 +765,6 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     chipSelectionne: { borderColor: GREEN, backgroundColor: theme.successBg },
     chipText: { fontSize: typeSizes.chipText, fontWeight: '600', color: TEXT_SECONDARY },
     chipTextSelectionne: { color: GREEN },
-    gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    gpsRowText: { fontSize: typeSizes.gpsRowText, color: TEXT_SECONDARY },
-    gpsValue: { fontSize: typeSizes.gpsValue, fontWeight: '700', color: TEXT },
     actionsRow: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end', alignItems: 'center' },
     annulerText: { fontSize: typeSizes.annulerText, fontWeight: '600', color: TEXT_SECONDARY },
     creerButton: { backgroundColor: GREEN, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },

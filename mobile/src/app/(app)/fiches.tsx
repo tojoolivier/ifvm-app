@@ -33,6 +33,10 @@ import {
 } from '@/components/fiches/tokens';
 import { statutFicheAffiche } from '@/lib/prospection-statut';
 import { useAsyncAction } from '@/hooks/use-async-action';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
+import { BandeauEquipe } from '@/components/equipe/BandeauEquipe';
+import { AppIcon } from '@/components/ui/AppIcon';
+import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { useTheme } from '@/hooks/use-theme';
@@ -41,10 +45,10 @@ import type { ThemePalette } from '@/constants/theme';
 type FilterKey = 'TOUS' | 'PROSPECTION' | 'CRT' | 'METEO';
 
 const FILTERS: FilterOption<FilterKey>[] = [
-  { value: 'TOUS', label: 'Toutes', icon: '📋' },
-  { value: 'PROSPECTION', label: 'Prospection', icon: '🔍' },
-  { value: 'CRT', label: 'CRT', icon: '💊' },
-  { value: 'METEO', label: 'Météo', icon: '🌤️', disabled: true },
+  { value: 'TOUS', label: 'Toutes', iconName: 'rapport-fiche' },
+  { value: 'PROSPECTION', label: 'Prospection', iconName: 'prospections' },
+  { value: 'CRT', label: 'CRT', iconName: 'crt' },
+  { value: 'METEO', label: 'Météo', iconName: 'meteo', disabled: true },
 ];
 
 /**
@@ -89,6 +93,8 @@ interface FicheRow {
   insigneBadge?: BadgeStyle | null;
   statutBadge: BadgeStyle;
   date: string;
+  /** Équipe de travail de la saisie (#641) — `null` : « Non renseignée », jamais masquée par le filtre d'équipe. */
+  equipeId: string | null;
   onPress: () => void;
   /**
    * Non-null seulement pour une fiche encore « à synchro »/« échec envoi » —
@@ -110,6 +116,10 @@ export default function FichesScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
+  // L'équipe de travail est le contexte : par défaut la liste n'en montre que les fiches (#678).
+  const { courante } = useEquipesDeTravail();
+  const [toutesEquipes, setToutesEquipes] = useState(false);
+  const filtreEquipe = courante && !toutesEquipes ? courante : null;
   const [draftsRecent, setDraftsRecent] = useState<DraftProspection[]>([]);
   const [validated, setValidated] = useState<ProspectionRead[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
@@ -301,6 +311,7 @@ export default function FichesScreen() {
           subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[draft.type_prospection] ?? null,
           statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
           date: draft.date_prospection,
+          equipeId: draft.equipe_id,
           onPress: () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
           onSyncPress: estEncoreASynchroniser(cleBadge) ? () => handleSyncProspection(draft) : null,
         };
@@ -317,6 +328,7 @@ export default function FichesScreen() {
       subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[prospection.type_prospection] ?? null,
       statutBadge: STATUT_BADGE_CONFIG[statutFicheAffiche(prospection.statut, 'synced')],
       date: prospection.date_prospection,
+      equipeId: prospection.equipe_id ?? null,
       onPress: () => navigateToProspectionConsult(router, prospection),
       onSyncPress: null,
     }));
@@ -333,6 +345,7 @@ export default function FichesScreen() {
         insigneBadge: reprenableIds.has(traitement.id) ? TRAITEMENT_INSIGNE_REPRISE : null,
         statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
         date: traitement.date_traitement ?? traitement.updated_at,
+        equipeId: traitement.equipe_id,
         onPress: () =>
           navigateToTraitement(router, traitement, { validationView: traitement.statut === 'validee' }),
         onSyncPress: estEncoreASynchroniser(cleBadge) ? () => handleSyncTraitement(traitement) : null,
@@ -349,9 +362,10 @@ export default function FichesScreen() {
         row.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
         row.meta.toLowerCase().includes(searchQuery.toLowerCase());
       const matchType = filterKey === 'TOUS' || row.filterKey === filterKey;
-      return matchSearch && matchType;
+      const matchEquipe = !filtreEquipe || row.equipeId === null || row.equipeId === filtreEquipe.id;
+      return matchSearch && matchType && matchEquipe;
     });
-  }, [rows, searchQuery, filterKey]);
+  }, [rows, searchQuery, filterKey, filtreEquipe]);
 
   return (
     <View style={styles.root}>
@@ -359,7 +373,7 @@ export default function FichesScreen() {
         <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-              <Text style={styles.backIcon}>‹</Text>
+              <AppIcon name="retour" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>Mes fiches</Text>
@@ -378,6 +392,24 @@ export default function FichesScreen() {
         activeFilter={filterKey}
         onFilterChange={setFilterKey}
       />
+
+      <View style={styles.equipeBar}>
+        <BandeauEquipe equipe={courante} />
+        {courante ? (
+          <TouchableOpacity
+            testID="fiches-toutes-equipes"
+            onPress={() => setToutesEquipes((v) => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: toutesEquipes }}
+            style={[styles.equipeToggle, toutesEquipes && styles.equipeToggleActif]}
+          >
+            <Text style={[styles.equipeToggleTexte, toutesEquipes && styles.equipeToggleTexteActif]}>
+              Toutes les équipes
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       <View style={styles.resultCountContainer}>
         <Text style={styles.resultCount}>
@@ -410,7 +442,11 @@ export default function FichesScreen() {
             erreur={erreurDeLecture}
             titreVide="Aucune fiche trouvée"
             sousTitreVide={
-              searchQuery ? 'Essayez de modifier votre recherche' : 'Créez votre première fiche'
+              searchQuery
+                ? 'Essayez de modifier votre recherche'
+                : filtreEquipe
+                  ? `Aucune fiche pour « ${filtreEquipe.nom} » — essayez « Toutes les équipes »`
+                  : 'Créez votre première fiche'
             }
             onReessayer={refresh}
           />
@@ -426,10 +462,10 @@ export default function FichesScreen() {
 }
 
 const BASE_TYPE_SIZES = {
-  backIcon: 22,
-  headerTitle: 18,
-  headerSub: 12,
-  resultCount: 13,
+  headerTitle: 17,
+  headerSub: 11.5,
+  resultCount: 12,
+  equipeLabel: 12,
   emptyIcon: 48,
   emptyTitle: 18,
   emptySub: 14,
@@ -441,34 +477,53 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       flex: 1,
       backgroundColor: FICHES_BG,
     },
+    equipeBar: {
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 4,
+    },
+    equipeToggle: {
+      alignSelf: 'flex-end',
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: EQ.bordure,
+      backgroundColor: EQ.carte,
+      paddingVertical: 5,
+      paddingHorizontal: 12,
+    },
+    equipeToggleActif: {
+      borderColor: EQ.vert,
+      backgroundColor: EQ.vertDoux,
+    },
+    equipeToggleTexte: {
+      fontSize: typeSizes.equipeLabel,
+      fontWeight: '600',
+      color: EQ.attenue,
+    },
+    equipeToggleTexteActif: {
+      color: EQ.vert,
+    },
     header: {
       backgroundColor: FICHES_GREEN_DARK,
       paddingHorizontal: 16,
-      paddingBottom: 14,
+      paddingBottom: 18,
     },
     headerContent: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingTop: 8,
+      gap: 12,
+      paddingTop: 14,
     },
     backBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 8,
-      backgroundColor: '#FFFFFF22',
+      width: 28,
+      height: 28,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    backIcon: {
-      color: '#FFFFFF',
-      fontSize: typeSizes.backIcon,
-      fontWeight: '300',
-      lineHeight: 26,
-      marginTop: -2,
-    },
     headerTextContainer: {
       flex: 1,
-      marginLeft: 12,
+      gap: 2,
     },
     headerTitle: {
       color: '#FFFFFF',
@@ -476,25 +531,24 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontWeight: '700',
     },
     headerSub: {
-      color: '#FFFFFFAA',
+      color: 'rgba(255,255,255,0.28)',
       fontSize: typeSizes.headerSub,
-      marginTop: 1,
     },
     headerRight: {
       width: 32,
     },
     resultCountContainer: {
       paddingHorizontal: 16,
-      paddingVertical: 8,
-      backgroundColor: theme.inputBg,
+      paddingTop: 14,
+      paddingBottom: 8,
     },
     resultCount: {
       fontSize: typeSizes.resultCount,
       color: theme.muted,
-      fontWeight: '500',
+      fontWeight: '600',
     },
     listContent: {
-      padding: 16,
+      paddingHorizontal: 16,
       paddingBottom: 100,
     },
     emptyContainer: {

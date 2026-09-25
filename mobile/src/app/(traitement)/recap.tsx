@@ -452,12 +452,6 @@ export default function RecapScreen() {
     (draft.aerien && !draft.aerien.reprise_traitement
       ? computeSurfaceRestante(draft.cible?.surface_infestee_ha, computeSurfaceTraiteeAerien(rotationsAerien))
       : null);
-  const stockRestantAerien =
-    draft.aerien?.pesticide_stock_restant_l ??
-    computePesticideStockRestant(
-      draft.aerien?.pesticide_recu_l,
-      uniteApproAerien === 'kg' ? totauxAerien.kg : totauxAerien.l
-    );
   const totalPesticideTerrestre = draft.terrestre ? computeTotalPesticideTerrestre(draft.terrestre.produits) : 0;
   const pesticideStockRestantTerrestre = draft.terrestre
     ? computePesticideStockRestant(draft.terrestre.pesticide_recu_l, totalPesticideTerrestre, draft.terrestre.stock_initial_l)
@@ -726,12 +720,6 @@ export default function RecapScreen() {
               {!!draft.aerien.surface_restante_abandonnee && (
                 <RecapLigne label="Motif d'abandon" value={draft.aerien.motif_surface_restante_abandonnee} />
               )}
-              <Text style={styles.subsectionTitle}>Stock</Text>
-              <RecapLigne
-                label={`Approvisionnement (${uniteApproAerienLabel})`}
-                value={draft.aerien.pesticide_recu_l != null ? String(draft.aerien.pesticide_recu_l) : null}
-              />
-              <RecapLigne label={`Reste en stock (${uniteApproAerienLabel})`} value={display(stockRestantAerien)} />
             </Card>
           </>
         )}

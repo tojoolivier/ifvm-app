@@ -425,11 +425,11 @@ async def test_update_station_sans_authentification_retourne_401(client: AsyncCl
 
 
 @pytest.mark.asyncio
-async def test_pas_de_suppression_physique(client: AsyncClient, auth_headers: dict, station_fixe):
-    """Le pull ne transporte que des upserts : aucune route DELETE n'est exposée."""
+async def test_suppression_reservee_a_ladmin(client: AsyncClient, auth_headers: dict, station_fixe):
+    """DELETE = soft-delete `deleted_at` (#674) : réservé à l'admin, un agent reçoit 403."""
     response = await client.delete(f"/stations/{station_fixe.id}", headers=auth_headers)
 
-    assert response.status_code == 405
+    assert response.status_code == 403
 
     survivante = await client.get(f"/stations/{station_fixe.id}", headers=auth_headers)
     assert survivante.status_code == 200

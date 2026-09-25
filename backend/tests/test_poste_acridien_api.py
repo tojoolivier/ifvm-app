@@ -341,12 +341,13 @@ async def test_update_ignore_nb_stations_champ_derive(
 
 
 @pytest.mark.asyncio
-async def test_aucune_route_delete(client: AsyncClient, auth_headers: dict, poste_acridien):
-    """Le pull ne transporte que des upserts : une ligne supprimée resterait sur les
-    téléphones déjà synchronisés. La désactivation logique est la seule sortie."""
+async def test_suppression_reservee_a_ladmin(
+    client: AsyncClient, auth_headers: dict, poste_acridien
+):
+    """DELETE = soft-delete `deleted_at` (#674) : réservé à l'admin, un agent reçoit 403."""
     response = await client.delete(f"/postes-acridiens/{poste_acridien.id}", headers=auth_headers)
 
-    assert response.status_code == 405
+    assert response.status_code == 403
 
 
 # --- Propagation au pull hors-ligne --------------------------------------------
@@ -455,7 +456,7 @@ async def test_update_detache_le_poste_de_son_equipe_terrestre(
     client: AsyncClient, auth_headers: dict, poste_acridien, equipe_terrestre
 ):
     """`equipe_terrestre_id: null` explicite doit détacher le poste — distinct d'un
-    corps qui omet le champ (`champs_fournis`, cf. UpdateBaseAerienne.equipe_id)."""
+    corps qui omet le champ (`champs_fournis`, cf. UpdateSiteAerienne.equipe_id)."""
     await client.put(
         f"/postes-acridiens/{poste_acridien.id}",
         json={"equipe_terrestre_id": str(equipe_terrestre.id)},

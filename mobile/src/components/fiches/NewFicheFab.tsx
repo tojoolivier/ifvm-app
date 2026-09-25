@@ -2,10 +2,16 @@ import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
+import { peutSaisirVols } from '@/lib/equipe-aerienne-access';
+import { motifEquipeIncompatible } from '@/lib/equipe-travail';
+import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
 import { startNewProspection } from '@/lib/prospection-accueil';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
-import { FICHES_CARD_BG, FICHES_ORANGE, FICHES_TEXT_DARK, FICHES_TEXT_SECONDARY } from './tokens';
+import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
+import { BandeauEquipe } from '@/components/equipe/BandeauEquipe';
+import { AppIcon, type AppIconName } from '@/components/ui/AppIcon';
+import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 
@@ -26,15 +32,38 @@ export function NewFicheFab() {
   const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
+  const avecVol = peutSaisirVols(user?.role);
   const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
   const { run: runQuickStart, isRunning: isStartingProspection } = useAsyncAction();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [etape, setEtape] = useState<'choix' | 'prospection'>('choix');
+  const ouvrirChoixEquipe = useEquipeSheetStore((s) => s.ouvrir);
+  const { courante } = useEquipesDeTravail();
+  // Seule l'intensive est toujours terrestre. L'extensive et la validation se mènent aussi en mode
+  // aérien : c'est leur écran de choix du mode qui vérifie l'équipe (#641) — la prospection dans son
+  // ensemble n'est donc jamais bloquée.
+  const motifTerrestre = motifEquipeIncompatible('terrestre', courante);
+  const motifVol = motifEquipeIncompatible('aerien', courante);
 
-  const startQuickProspection = (typeProspection: 'intensive' | 'extensive') => {
+  // Deux Modal ne se superposent pas proprement sur iOS : on ferme le menu avant d'ouvrir la feuille.
+  const fermerMenu = () => {
+    setMenuVisible(false);
+    setEtape('choix');
+  };
+  const aller = (pathname: string) => {
+    fermerMenu();
+    router.push(pathname as any);
+  };
+  const changerEquipe = () => {
+    fermerMenu();
+    ouvrirChoixEquipe();
+  };
+
+  const startQuickProspection = (typeProspection: 'intensive') => {
     runQuickStart(
       async () => {
         if (!user || !token) return;
-        setMenuVisible(false);
+        fermerMenu();
         const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection });
         await hydrateFromDraft(draft.id);
         router.push({ pathname: PROSPECTION_DESTINATIONS[typeProspection] as any, params: { draftId: draft.id } });
@@ -50,57 +79,117 @@ export function NewFicheFab() {
 
   return (
     <>
-      <TouchableOpacity style={styles.fab} onPress={() => setMenuVisible(true)} activeOpacity={0.85}>
-        <Text style={styles.fabIcon}>+</Text>
+      <TouchableOpacity testID="fab-nouvelle-fiche" style={styles.fab} onPress={() => setMenuVisible(true)} activeOpacity={0.85}>
+        <AppIcon name="ajouter" size={26} color={EQ.surMarque} />
       </TouchableOpacity>
 
-      <Modal animationType="slide" transparent visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+      <Modal animationType="slide" transparent visible={menuVisible} onRequestClose={fermerMenu}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={fermerMenu}>
           <View style={styles.sheet}>
             <View style={styles.handle} />
-            <Text style={styles.title}>Nouvelle fiche</Text>
-            <Text style={styles.subtitle}>Choisissez le type de fiche à remplir.</Text>
-
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.85}
-              disabled={isStartingProspection}
-              onPress={() => startQuickProspection('intensive')}
-            >
-              <Text style={styles.cardIcon}>🌿</Text>
-              <View style={styles.cardTextWrap}>
-                <Text style={styles.cardTitle}>Prospection intensive</Text>
-                <Text style={styles.cardSubtitle}>Captures détaillées — Locusta / Nomadacris</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.85}
-              disabled={isStartingProspection}
-              onPress={() => startQuickProspection('extensive')}
-            >
-              <Text style={styles.cardIcon}>🗒️</Text>
-              <View style={styles.cardTextWrap}>
-                <Text style={styles.cardTitle}>Prospection extensive</Text>
-                <Text style={styles.cardSubtitle}>Densités agrégées par phase</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.card, styles.cardLast]}
-              activeOpacity={0.85}
-              onPress={() => {
-                setMenuVisible(false);
-                router.push('/(traitement)/select' as any);
-              }}
-            >
-              <Text style={styles.cardIcon}>🧪</Text>
-              <View style={styles.cardTextWrap}>
-                <Text style={styles.cardTitle}>Compte-rendu de traitement (CRT)</Text>
-                <Text style={styles.cardSubtitle}>Évaluation rapide après traitement</Text>
-              </View>
-            </TouchableOpacity>
+            {etape === 'prospection' ? (
+              <>
+                <Text style={styles.title}>Prospection</Text>
+                <Text style={styles.subtitle}>Choisissez le mode de prospection.</Text>
+                <View style={styles.cards}>
+                  <CarteChoix
+                    styles={styles}
+                    testID="fab-prospection-intensive"
+                    icone="prospections"
+                    couleur={EQ.vert}
+                    fond={EQ.vertDoux}
+                    titre="Prospection intensive"
+                    sousTitre={motifTerrestre ?? 'Captures détaillées — Locusta / Nomadacris'}
+                    indisponible={!!motifTerrestre}
+                    disabled={isStartingProspection}
+                    onPress={() => (motifTerrestre ? changerEquipe() : startQuickProspection('intensive'))}
+                  />
+                  <CarteChoix
+                    styles={styles}
+                    testID="fab-prospection-extensive"
+                    icone="prospections"
+                    couleur={EQ.vert}
+                    fond={EQ.vertDoux}
+                    titre="Prospection extensive"
+                    sousTitre="Densités agrégées par phase — terrestre ou aérienne"
+                    onPress={() => aller('/(prospection)/extensive-mode-chooser')}
+                  />
+                  <CarteChoix
+                    styles={styles}
+                    testID="fab-prospection-validation"
+                    icone="prospections"
+                    couleur={EQ.vert}
+                    fond={EQ.vertDoux}
+                    titre="Validation"
+                    sousTitre="Conclue par Confirmée / Infirmée — terrestre ou aérienne"
+                    onPress={() => aller('/(prospection)/extensive-signalement')}
+                  />
+                  <CarteChoix
+                    styles={styles}
+                    testID="fab-prospection-revalidation"
+                    icone="prospections"
+                    couleur={EQ.vert}
+                    fond={EQ.vertDoux}
+                    titre="Revalidation"
+                    sousTitre="Fiches validées depuis plus de 5 jours, à revalider"
+                    onPress={() => aller('/(prospection)/revalidation-liste')}
+                  />
+                  <TouchableOpacity onPress={() => setEtape('choix')} style={styles.retour} activeOpacity={0.7}>
+                    <Text style={styles.retourTexte}>Retour</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.title}>Nouvelle fiche</Text>
+                <Text style={styles.subtitle}>Choisissez le type de fiche à remplir.</Text>
+                <View style={styles.equipe}>
+                  <BandeauEquipe equipe={courante} onChanger={changerEquipe} />
+                </View>
+                <View style={styles.cards}>
+                  <CarteChoix
+                    styles={styles}
+                    testID="fab-prospection"
+                    icone="prospections"
+                    couleur={EQ.vert}
+                    fond={EQ.vertDoux}
+                    titre="Prospection"
+                    sousTitre="Intensive ou extensive"
+                    onPress={() => setEtape('prospection')}
+                  />
+                  <CarteChoix
+                    styles={styles}
+                    testID="fab-traitement"
+                    icone="crt"
+                    couleur={EQ.violet}
+                    fond={EQ.violetDoux}
+                    titre="Traitement"
+                    sousTitre="Compte-rendu après une opération"
+                    onPress={() => {
+                      fermerMenu();
+                      router.push('/(traitement)/select' as any);
+                    }}
+                  />
+                  {avecVol && (
+                    <CarteChoix
+                      styles={styles}
+                      testID="fab-nouveau-vol"
+                      icone="aeronef-avion"
+                      couleur={EQ.bleu}
+                      fond={EQ.bleuDoux}
+                      titre="Vol"
+                      sousTitre={motifVol ?? 'Convoyage ou vol divers'}
+                      indisponible={!!motifVol}
+                      onPress={() => {
+                        if (motifVol) return changerEquipe();
+                        fermerMenu();
+                        router.push('/(app)/vol-nouveau' as any);
+                      }}
+                    />
+                  )}
+                </View>
+              </>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -108,13 +197,48 @@ export function NewFicheFab() {
   );
 }
 
+interface CarteChoixProps {
+  styles: ReturnType<typeof createStyles>;
+  testID: string;
+  icone: AppIconName;
+  couleur: string;
+  fond: string;
+  titre: string;
+  sousTitre: string;
+  indisponible?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}
+
+/** Carte de la feuille « Nouvelle fiche » (Figma 220:90) : pastille d'icône, titre, sous-titre, chevron. */
+function CarteChoix({ styles, testID, icone, couleur, fond, titre, sousTitre, indisponible, disabled, onPress }: CarteChoixProps) {
+  return (
+    <TouchableOpacity
+      testID={testID}
+      style={[styles.card, indisponible && styles.cardIndisponible]}
+      activeOpacity={0.85}
+      disabled={disabled}
+      onPress={onPress}
+    >
+      <View style={[styles.cardIconBox, { backgroundColor: fond }]}>
+        <AppIcon name={icone} size={24} color={couleur} />
+      </View>
+      <View style={styles.cardTextWrap}>
+        <Text style={styles.cardTitle}>{titre}</Text>
+        <Text style={styles.cardSubtitle}>{sousTitre}</Text>
+      </View>
+      <View style={styles.chevron}>
+        <AppIcon name="suivant" size={24} color={EQ.etiquette} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 const BASE_TYPE_SIZES = {
-  fabIcon: 28,
-  title: 22,
-  subtitle: 14,
-  cardIcon: 24,
-  cardTitle: 16,
-  cardSubtitle: 12.5,
+  title: 19,
+  subtitle: 13,
+  cardTitle: 15,
+  cardSubtitle: 12,
 };
 
 function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
@@ -122,11 +246,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     fab: {
       position: 'absolute',
       right: 20,
-      bottom: 28,
+      bottom: 20,
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: FICHES_ORANGE,
+      backgroundColor: EQ.vert,
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: '#000',
@@ -135,19 +259,13 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       shadowRadius: 8,
       elevation: 8,
     },
-    fabIcon: {
-      color: '#FFFFFF',
-      fontSize: typeSizes.fabIcon,
-      fontWeight: '700',
-      lineHeight: 30,
-    },
     overlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.5)',
       justifyContent: 'flex-end',
     },
     sheet: {
-      backgroundColor: FICHES_CARD_BG,
+      backgroundColor: EQ.carte,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       paddingHorizontal: 20,
@@ -158,52 +276,75 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       width: 36,
       height: 4,
       borderRadius: 2,
-      backgroundColor: '#E0E0E0',
+      backgroundColor: EQ.bordureForte,
       alignSelf: 'center',
       marginBottom: 14,
     },
     title: {
       fontSize: typeSizes.title,
-      fontWeight: '700',
-      color: FICHES_TEXT_DARK,
+      fontWeight: '800',
+      color: EQ.encre,
     },
     subtitle: {
       fontSize: typeSizes.subtitle,
-      color: FICHES_TEXT_SECONDARY,
-      marginTop: 4,
-      marginBottom: 18,
+      color: EQ.attenue,
+    },
+    equipe: {
+      marginTop: 12,
+    },
+    cards: {
+      gap: 10,
+      marginTop: 14,
     },
     card: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 14,
-      padding: 16,
-      borderRadius: 16,
+      padding: 14,
+      borderRadius: 12,
       borderWidth: 1,
-      borderColor: '#EDEDED',
-      backgroundColor: FICHES_CARD_BG,
-      marginBottom: 12,
+      borderColor: EQ.bordure,
+      backgroundColor: EQ.carte,
     },
-    cardLast: {
-      marginBottom: 0,
-    },
-    cardIcon: {
-      fontSize: typeSizes.cardIcon,
-      width: 32,
-      textAlign: 'center',
+    cardIconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     cardTextWrap: {
       flex: 1,
+      gap: 2,
     },
     cardTitle: {
       fontSize: typeSizes.cardTitle,
       fontWeight: '700',
-      color: FICHES_TEXT_DARK,
+      color: EQ.encre,
     },
     cardSubtitle: {
       fontSize: typeSizes.cardSubtitle,
-      color: FICHES_TEXT_SECONDARY,
-      marginTop: 2,
+      color: EQ.attenue,
+    },
+    chevron: {
+      width: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'visible',
+    },
+    retour: {
+      alignSelf: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+    },
+    retourTexte: {
+      fontSize: typeSizes.cardSubtitle,
+      fontWeight: '700',
+      color: EQ.vert,
+    },
+    cardIndisponible: {
+      opacity: 0.55,
     },
   });
 }

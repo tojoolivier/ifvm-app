@@ -82,8 +82,6 @@ const DRAFT_AERIEN_COMPLET = {
     total_pesticide_kg: null,
     surface_traitee_ha: 12.5,
     surface_restante_ha: 3,
-    pesticide_recu_l: 100,
-    pesticide_stock_restant_l: 10,
     rotations: [],
   },
 };
@@ -117,7 +115,6 @@ describe('RecapScreen — sections Équipe et Pesticides & rotations (#equipe-sl
     expect(screen.getAllByText('Pesticides & rotations').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('2')).toBeVisible(); // Nb rotations
     expect(screen.getByText('90')).toBeVisible(); // Total pesticide (l)
-    expect(screen.getByText('100')).toBeVisible(); // Pesticide reçu (l)
   });
 
   it('affiche « — » pour les champs facultatifs absents (stand/base secondaire/consultant), sans planter', async () => {

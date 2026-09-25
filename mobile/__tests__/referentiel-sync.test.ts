@@ -38,6 +38,11 @@ function emptyResponse(serverTime: string) {
     codes_stades: { upserts: [], server_time: serverTime },
     campagnes: { upserts: [], server_time: serverTime },
     lieux_aeriens: { upserts: [], server_time: serverTime },
+    equipes: { upserts: [], server_time: serverTime },
+    equipe_membres: { upserts: [], server_time: serverTime },
+    sites_aeriens: { upserts: [], server_time: serverTime },
+    aeronefs: { upserts: [], server_time: serverTime },
+    equipe_aeronefs: { upserts: [], server_time: serverTime },
   };
 }
 
@@ -58,6 +63,11 @@ describe('pullReferentiel', () => {
         codes_stades: null,
         campagnes: null,
         lieux_aeriens: null,
+        equipes: null,
+        equipe_membres: null,
+        sites_aeriens: null,
+        aeronefs: null,
+        equipe_aeronefs: null,
       },
       undefined
     );
@@ -106,9 +116,96 @@ describe('pullReferentiel', () => {
         codes_stades: null,
         campagnes: null,
         lieux_aeriens: null,
+        equipes: null,
+        equipe_membres: null,
+        sites_aeriens: null,
+        aeronefs: null,
+        equipe_aeronefs: null,
       },
       undefined
     );
+  });
+
+  it('upserts each équipe et chaque membre idempotently by clé', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      equipes: {
+        upserts: [
+          { id: 'eq-1', nom: 'Équipe Sud', type: 'aerien', actif: true, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      equipe_membres: {
+        upserts: [
+          {
+            equipe_id: 'eq-1',
+            user_id: 'u-1',
+            fonction: 'chef',
+            nom: 'Rakoto',
+            prenom: 'Jean',
+            created_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    const appels = runAsync.mock.calls.map(([sql, params]) => [String(sql), params]);
+    const equipe = appels.find(([sql]) => sql.includes('INSERT INTO equipe ('));
+    expect(equipe?.[0]).toContain('ON CONFLICT(id) DO UPDATE');
+    expect(equipe?.[1]).toEqual(['eq-1', 'Équipe Sud', 'aerien', 1, '2026-08-01T00:00:00Z']);
+    const membre = appels.find(([sql]) => sql.includes('INSERT INTO equipe_membre'));
+    expect(membre?.[0]).toContain('ON CONFLICT(equipe_id, user_id) DO UPDATE');
+    expect(membre?.[1]).toEqual(['eq-1', 'u-1', 'chef', 'Rakoto', 'Jean']);
+  });
+
+  it('upserts les sites aériens (avec leur position active), les aéronefs et leurs affectations', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      sites_aeriens: {
+        upserts: [
+          {
+            id: 'site-1',
+            parent_site_id: null,
+            equipe_id: 'eq-1',
+            numero: 'n°03',
+            localite: 'Isoanala',
+            actif: true,
+            latitude: -22.1,
+            longitude: 46.2,
+            altitude: null,
+            date_debut_position: '2026-09-12',
+            updated_at: '2026-08-01T00:00:00Z',
+          },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      aeronefs: {
+        upserts: [
+          { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188', volume_cuve_l: 800, actif: true, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      equipe_aeronefs: {
+        upserts: [
+          { id: 'aff-1', equipe_id: 'eq-1', aeronef_id: 'ae-1', date_debut: '2026-08-01', date_fin: null, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    });
+
+    await pullReferentiel('token-1');
+
+    const appels = runAsync.mock.calls.map(([sql, params]) => [String(sql), params]);
+    const site = appels.find(([sql]) => sql.includes('INSERT INTO site_aerien'));
+    expect(site?.[0]).toContain('ON CONFLICT(id) DO UPDATE');
+    expect(site?.[1]).toEqual(['site-1', null, 'eq-1', 'n°03', 'Isoanala', 1, -22.1, 46.2, null, '2026-09-12', '2026-08-01T00:00:00Z']);
+    const aeronef = appels.find(([sql]) => sql.includes('INSERT INTO aeronef'));
+    expect(aeronef?.[1]).toEqual(['ae-1', '5R-MHR', 'Cessna 188', 800, 1, '2026-08-01T00:00:00Z']);
+    const affectation = appels.find(([sql]) => sql.includes('INSERT INTO equipe_aeronef'));
+    expect(affectation?.[1]).toEqual(['aff-1', 'eq-1', 'ae-1', '2026-08-01', null, '2026-08-01T00:00:00Z']);
   });
 
   it('upserts each poste acridien idempotently by id', async () => {
@@ -311,6 +408,67 @@ describe('pullReferentiel', () => {
       expect.stringContaining('INSERT INTO campagne'),
       ['camp-1', 'Campagne 2026', '2026-01-01', null, 0, '2026-08-01T00:00:00Z']
     );
+  });
+
+  it('purge du cache local une ligne reçue avec deleted_at, sans la réinsérer (#674)', async () => {
+    const vivant = {
+      id: 'pa-vivant',
+      code: 'PA-1',
+      nom: 'Vivant',
+      za_id: 'za-1',
+      actif: true,
+      updated_at: '2026-08-02T00:00:00Z',
+      deleted_at: null,
+    };
+    const supprime = {
+      ...vivant,
+      id: 'pa-supprime',
+      code: 'PA-2',
+      deleted_at: '2026-08-02T00:00:00Z',
+    };
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      postes_acridiens: { upserts: [vivant, supprime], server_time: '2026-08-02T00:00:00Z' },
+    });
+
+    await pullReferentiel('token-1');
+
+    const suppressions = runAsync.mock.calls.filter(([sql]) =>
+      String(sql).includes('DELETE FROM poste_acridien')
+    );
+    expect(suppressions).toHaveLength(1);
+    expect(suppressions[0][1]).toEqual(['pa-supprime']);
+
+    const insertions = runAsync.mock.calls.filter(([sql]) =>
+      String(sql).includes('INSERT INTO poste_acridien')
+    );
+    expect(insertions.map(([, params]) => params[0])).toEqual(['pa-vivant']);
+  });
+
+  it('supprime les enfants avant leur parent quand le pull contient les deux (#674)', async () => {
+    const base = {
+      actif: true,
+      updated_at: '2026-08-02T00:00:00Z',
+      deleted_at: '2026-08-02T00:00:00Z',
+    };
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      postes_acridiens: {
+        upserts: [{ ...base, id: 'pa-1', code: 'PA', nom: 'PA', za_id: 'za' }],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+      stations_fixes: {
+        upserts: [{ ...base, id: 'st-1', code: 'ST', nom: 'ST', pa_id: 'pa-1' }],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    } as never);
+
+    await pullReferentiel('token-1');
+
+    const tables = runAsync.mock.calls
+      .map(([sql]) => /DELETE FROM (\w+)/.exec(String(sql))?.[1])
+      .filter(Boolean);
+    expect(tables.indexOf('station_fixe')).toBeLessThan(tables.indexOf('poste_acridien'));
   });
 
   it('updates the sync cursor for every entity type to its own response server_time', async () => {

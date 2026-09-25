@@ -28,6 +28,10 @@ class ProspectionIntrouvableError(LookupError):
     """La prospection liée au traitement n'existe pas."""
 
 
+class SitePrincipalIntrouvableError(LookupError):
+    """site_principal_id ne référence aucun site du référentiel `site_aerienne`."""
+
+
 class ChefDeBaseInvalideError(PermissionError):
     """chef_de_base_id ne référence pas un utilisateur avec le rôle chef_de_base."""
 
@@ -132,11 +136,8 @@ def _stock_pesticide_restant(
     que `surface_restante_ha`, CDG §9). `None` tant que ni « initial » ni « reçu »
     ne sont renseignés — un stock ne se déduit pas d'une consommation seule.
 
-    `initial` (« Stock initial », fiche CRT papier section 5 — Terrestre
-    uniquement, cf. `TraitementTerrestre.stock_initial_l`) est optionnel : côté
-    Aérien, qui n'a pas cette notion, l'appel reste `_stock_pesticide_restant(recu,
-    consomme)` inchangé, équivalent à `initial=0`.
-    """
+    Terrestre uniquement (`TraitementTerrestre.stock_initial_l`) — l'Aérien a perdu
+    cette notion de stock par fiche au profit de `mouvement_pesticide` (#609)."""
     if recu is None and initial is None:
         return None
     return max((initial or 0.0) + (recu or 0.0) - (consomme or 0.0), 0.0)
@@ -294,6 +295,13 @@ class TraitementAerien:
     # (vide = ravitaillement fait directement à une base) ; base secondaire
     # facultative.
     base_principale: str = ""
+    # FK référentiel (migration 0089, #605) : nullable en base (fiches
+    # existantes non rapprochées, cf. docstring de la migration), mais exigée
+    # côté `TraitementAerienCreate` pour toute nouvelle fiche. `base_principale`
+    # (texte) reste la source affichée/synchronisée avec le mobile ; ceci n'est
+    # qu'un rattachement en plus, pas un remplacement (hors périmètre de ce
+    # ticket, cf. #605 « Ne pas supprimer l'ancienne colonne »).
+    site_principal_id: uuid.UUID | None = None
     stand: str | None = None
     base_secondaire: str | None = None
     # Date d'installation (migration 0056) — facultative et indépendante du
@@ -325,12 +333,7 @@ class TraitementAerien:
     # NOT NULL défaut 0, contrairement à son équivalent Terrestre (nullable) —
     # même choix que les autres champs dérivés ci-dessus.
     surface_cumulee_ha: float = 0.0
-    # Stock de pesticide par fiche (pas de suivi cumulatif par aéronef/opération) :
-    # « reçu » saisi, « consommé » = total_pesticide_l (dérivé des rotations),
-    # « reste en stock » dérivé des deux.
-    pesticide_recu_l: float | None = None
-    pesticide_stock_restant_l: float | None = None
-    # Surface restante abandonnée ? (migration 0086) — mirroir de TraitementTerrestre :
+    # Surface restante abandonnée ? (migration 0097) — mirroir de TraitementTerrestre :
     # None = pas encore tranché, motif obligatoire à la validation si True (CDG §9).
     surface_restante_abandonnee: bool | None = None
     motif_surface_restante_abandonnee: str | None = None
@@ -372,7 +375,6 @@ class TraitementAerien:
         self.total_pesticide_l = sum(r.quantite for r in self.rotations if r.unite == "L")
         self.total_pesticide_kg = sum(r.quantite for r in self.rotations if r.unite == "kg")
         self.repartir_surface(sum(r.surface_ha for r in self.rotations), mode_traitement)
-        self.recalculer_stock_pesticide()
 
     def recalculer_surfaces(
         self, surface_infestee_ha: float | None, surface_cumulee_precedente: float = 0.0
@@ -396,22 +398,17 @@ class TraitementAerien:
             else None
         )
 
-    def recalculer_stock_pesticide(self) -> None:
-        """Seul chemin d'écriture pour pesticide_stock_restant_l — jamais en lecture.
-
-        Basé sur `total_pesticide_l` déjà à jour, pas recalculé depuis les rotations
-        directement : reste utilisable lors d'une synchronisation où les rotations
-        existantes ne sont pas rechargées (elles ne font pas partie du corps du push).
-        """
-        # « Approvisionnement » est saisi dans l'unité du produit (L pour un liquide,
-        # kg pour une poudre) : une fiche n'utilise en pratique qu'une seule des deux,
-        # on déduit donc la consommation dans l'unité réellement employée.
-        consomme = (
-            self.total_pesticide_kg
-            if self.total_pesticide_l == 0 and self.total_pesticide_kg > 0
-            else self.total_pesticide_l
-        )
-        self.pesticide_stock_restant_l = _stock_pesticide_restant(self.pesticide_recu_l, consomme)
+    def consommations_pesticide(self) -> list[tuple[uuid.UUID, str, float]]:
+        """Agrège les rotations par (produit, unité) — un mouvement `consommation`
+        par couple, jamais un total unique mêlant L et kg (AC #609). Recalculée
+        entièrement à chaque appel depuis `self.rotations` (jamais stockée) : c'est
+        `TraitementRepository`/`MouvementPesticideRepository` qui régénèrent les
+        mouvements correspondants à chaque écriture sur les rotations."""
+        totaux: dict[tuple[uuid.UUID, str], float] = {}
+        for rotation in self.rotations:
+            cle = (rotation.produit_id, rotation.unite)
+            totaux[cle] = totaux.get(cle, 0.0) + rotation.quantite
+        return [(produit_id, unite, quantite) for (produit_id, unite), quantite in totaux.items()]
 
 
 @dataclass
@@ -497,9 +494,8 @@ class TraitementTerrestre:
     def recalculer_stock_pesticide(self) -> None:
         """Seul chemin d'écriture pour pesticide_stock_restant_l — jamais en lecture.
 
-        Voir `TraitementAerien.recalculer_stock_pesticide` : séparé de
-        `recalculer_total_pesticide` pour rester appelable seul lors d'une
-        synchronisation où les produits existants ne sont pas rechargés.
+        Séparé de `recalculer_total_pesticide` pour rester appelable seul lors
+        d'une synchronisation où les produits existants ne sont pas rechargés.
         """
         self.pesticide_stock_restant_l = _stock_pesticide_restant(
             self.pesticide_recu_l, self.total_pesticide_l, self.stock_initial_l
@@ -640,6 +636,10 @@ class Traitement:
     observations: str | None = None
     statut: str = "brouillon"
     statut_sync: str = "local"
+    # Équipe qui a mené la fiche (#607, ADR-018) — nullable (fiches déjà
+    # enregistrées avant ce chantier), exigée côté TraitementCreate pour
+    # toute nouvelle fiche (cf. _valider_equipe dans traitement_use_cases.py).
+    equipe_id: uuid.UUID | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -822,7 +822,9 @@ _CHAMPS_CONTENU_AERIEN = (
     # surface_traitee_ha n'y figure plus (migration 0047) : dérivée des rotations
     # (sous-ressource distincte, absente du payload de synchronisation), au même
     # titre que nb_rotations/total_pesticide_l/total_pesticide_kg déjà exclus.
-    "pesticide_recu_l",
+    # pesticide_recu_l/pesticide_stock_restant_l supprimées de TraitementAerien
+    # (#609) — remplacées par des mouvements `mouvement_pesticide`, hors du
+    # payload de synchronisation au même titre que les rotations.
     "surface_restante_abandonnee",
     "motif_surface_restante_abandonnee",
     "taux_mortalite_pourcent",

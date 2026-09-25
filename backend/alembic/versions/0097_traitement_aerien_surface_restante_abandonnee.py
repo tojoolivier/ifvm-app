@@ -16,8 +16,8 @@ uniquement de la clé `traitement_id`, donc 3NF respectée).
 La CHECK garantit au niveau base qu'un motif n'est jamais posé sans décision « abandonnée »
 (`motif IS NULL OR abandonnee IS TRUE`) : le motif n'a de sens que pour un abandon.
 
-Revision ID: 0086
-Revises: 0085
+Revision ID: 0097
+Revises: 0096
 Create Date: 2026-09-24
 """
 
@@ -25,8 +25,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0086"
-down_revision = "0085"
+revision = "0097"
+down_revision = "0096"
 branch_labels = None
 depends_on = None
 

@@ -19,10 +19,10 @@ function mockApi() {
         data: [{ id: 's1', code: 'ST-014', nom: 'Beroroha', actif: true, latitude: null, longitude: null }],
       })
     }
-    if (url === '/equipes-aeriennes') {
+    if (url === '/equipes?type=aerien') {
       return Promise.resolve({ data: [{ id: 'ea1', nom: 'Équipe Ihosy', chef_de_base_id: 'u1', actif: true }] })
     }
-    if (url === '/equipes-terrestres') return Promise.resolve({ data: [] })
+    if (url === '/equipes?type=terrestre') return Promise.resolve({ data: [] })
     return Promise.resolve({ data: [] })
   })
 }
@@ -69,8 +69,8 @@ describe('AdministrationPage — même présentation que ReferentielsPage (nav +
     for (const [label, table] of [
       ['Utilisateurs', 'utilisateur'],
       ['Stations', 'station_fixe'],
-      ['Équipes aériennes', 'equipe_aerienne'],
-      ['Équipes terrestres', 'equipe_terrestre'],
+      ['Équipes aériennes', 'equipe (aerien)'],
+      ['Équipes terrestres', 'equipe (terrestre)'],
     ]) {
       expect(nav().getByText(label)).toBeInTheDocument()
       expect(nav().getByText(table)).toBeInTheDocument()

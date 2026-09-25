@@ -6,7 +6,6 @@ import {
   getTraitement,
   addRotation,
   deleteAllRotationsForTraitementAerien,
-  updateTraitementAerienPesticideRecu,
   updateTraitementAerienSurfaceRestante,
 } from '@/lib/traitement-repository';
 import { listPesticides, Pesticide } from '@/lib/referentiel-db';
@@ -17,8 +16,6 @@ import {
   computeSurfaceTraiteeAerien,
   computeSurfaceCumulee,
   computeSurfaceRestante,
-  computePesticideStockRestant,
-  computeUniteApprovisionnementAerien,
   deriveUniteDepuisDoseReference,
   computeDureesRotation,
   formatDureeRotation,
@@ -48,9 +45,13 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
  * une superficie traitée et des heures d'ouverture/fermeture de vanne, en plus des
  * champs déjà existants (produit, températures, vent, heure_debut/heure_fin de la
  * rotation entière). N° de cuve et les 3 durées ne sont jamais saisis : dérivés à
- * l'affichage. « Pesticide reçu (l) » (libellé affiché « Approvisionnement (l) »)
- * y a été déplacé depuis Équipe : c'est une
- * information propre au traitement (stock de pesticide), pas à l'équipe.
+ * l'affichage.
+ *
+ * « Pesticide reçu (l) » / « Reste en stock (l) » (anciennement affichés ici,
+ * déplacés depuis Équipe par #equipe-slide-aerien) ont été retirés par #609 : le
+ * stock aérien vit désormais dans `mouvement_pesticide` (#606), débité
+ * automatiquement des rotations — plus de saisie manuelle d'un « reçu » par fiche.
+ * Terrestre conserve ce concept (`TerrestreForm.tsx`), hors périmètre de #609.
  */
 // Saisie francophone : la virgule est le séparateur décimal attendu par l'utilisateur,
 // mais JS/JSON n'utilisent que le point en interne — même paire de fonctions que
@@ -68,7 +69,6 @@ function formatDecimalDisplay(value: number | null | undefined): string {
   return value != null ? String(value).replace('.', ',') : '';
 }
 
-type AerienDecimalField = 'pesticideRecuL';
 type RotationDecimalField =
   | 'quantite'
   | 'surface_ha'
@@ -92,32 +92,7 @@ export default function RotationsScreen() {
   // reformate à chaque frappe (cf. `store.aerien.xxx != null ? String(...) : ''`
   // sinon). Un objet pour les champs "aérien" (niveau fiche), un autre indexé par
   // rotation (`localId`) pour les champs propres à chaque rotation.
-  const [aerienDrafts, setAerienDrafts] = useState<Partial<Record<AerienDecimalField, string>>>({});
   const [rotationDrafts, setRotationDrafts] = useState<Record<string, Partial<Record<RotationDecimalField, string>>>>({});
-
-  const getAerienDraft = (field: AerienDecimalField): string | undefined => aerienDrafts[field];
-
-  const handleAerienDecimalChange = (field: AerienDecimalField, raw: string) => {
-    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
-    setAerienDrafts((current) => ({ ...current, [field]: raw }));
-    if (raw === '') {
-      store.updateAerien({ [field]: null });
-      return;
-    }
-    if (raw.endsWith('.') || raw.endsWith(',')) return;
-    const val = parseDecimalInput(raw);
-    if (val === null) return;
-    store.updateAerien({ [field]: val });
-  };
-
-  const clearAerienDraft = (field: AerienDecimalField) => {
-    setAerienDrafts((current) => {
-      if (current[field] === undefined) return current;
-      const next = { ...current };
-      delete next[field];
-      return next;
-    });
-  };
 
   const getRotationDraft = (localId: string, field: RotationDecimalField): string | undefined =>
     rotationDrafts[localId]?.[field];
@@ -157,13 +132,11 @@ export default function RotationsScreen() {
       .then((draft) => {
         if (!draft) return;
         setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
-        // pesticide_recu_l chargé ici depuis #equipe-slide-aerien (déplacé depuis
-        // Équipe/traitement.tsx) — même garde ailleurs sur cet écran : recharge à
-        // chaque montage (bornée à `traitementId`), sans écraser une saisie en cours
-        // entre deux montages du même écran.
+        // Surface restante abandonnée : chargée ici (déplacée avec la décision de l'agent) — même garde
+        // ailleurs sur cet écran : recharge à chaque montage (bornée à `traitementId`), sans écraser
+        // une saisie en cours entre deux montages du même écran.
         if (draft.type_traitement === 'AERIEN' && draft.aerien) {
           store.updateAerien({
-            pesticideRecuL: draft.aerien.pesticide_recu_l,
             // SQLite stocke 0/1 : conversion en booléen tri-état (null = pas encore tranché).
             surfaceRestanteAbandonnee:
               draft.aerien.surface_restante_abandonnee == null ? null : !!draft.aerien.surface_restante_abandonnee,
@@ -254,15 +227,6 @@ export default function RotationsScreen() {
   const surfaceTraitee = computeSurfaceTraiteeAerien(store.aerien.rotations);
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.aerien.repriseTraitement, origineCumuleeHa);
   const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
-  // « Approvisionnement » est saisi dans l'unité du produit (L pour un liquide, kg pour
-  // une poudre) : seule la consommation dans cette même unité s'en déduit, jamais l'autre
-  // (grandeurs différentes, cf. total_pesticide_kg).
-  const uniteAppro = computeUniteApprovisionnementAerien(store.aerien.rotations);
-  const uniteApproLabel = uniteAppro === 'kg' ? 'kg' : 'l';
-  const pesticideStockRestant = computePesticideStockRestant(
-    store.aerien.pesticideRecuL,
-    uniteAppro === 'kg' ? totauxPesticide.kg : totauxPesticide.l
-  );
 
   const handleContinuer = () =>
     run(
@@ -319,7 +283,6 @@ export default function RotationsScreen() {
           }
         }
         setError(undefined);
-        await updateTraitementAerienPesticideRecu(traitementId, store.aerien.pesticideRecuL);
         await updateTraitementAerienSurfaceRestante(traitementId, {
           abandonnee: surfaceRestante > 0 ? store.aerien.surfaceRestanteAbandonnee : null,
           motif: store.aerien.motifSurfaceRestanteAbandonnee,
@@ -363,18 +326,6 @@ export default function RotationsScreen() {
         <ScrollView contentContainerStyle={chrome.content}>
         <ProgressBar currentIndex={3} segments={PROGRESS_SEGMENTS_AERIEN} />
         <Text style={chrome.title}>Pesticides & rotations</Text>
-
-        <Text style={formStyles.label}>{`Approvisionnement (${uniteApproLabel})`}</Text>
-        <TextInput
-          testID="pesticide-recu-input"
-          editable={!readOnly}
-          style={formStyles.input}
-          placeholder="0"
-          keyboardType="decimal-pad"
-          value={getAerienDraft('pesticideRecuL') ?? formatDecimalDisplay(store.aerien.pesticideRecuL)}
-          onChangeText={(v) => handleAerienDecimalChange('pesticideRecuL', v)}
-          onBlur={() => clearAerienDraft('pesticideRecuL')}
-        />
 
         {store.aerien.rotations.map((rotation, index) => {
           const durees = computeDureesRotation({
@@ -687,12 +638,6 @@ export default function RotationsScreen() {
               </>
             )}
           </>
-        )}
-        {pesticideStockRestant != null && (
-          <Card variant="derivee">
-            <Text style={formStyles.label}>{`Reste en stock (${uniteApproLabel})`}</Text>
-            <Text style={formStyles.derivedValue}>{pesticideStockRestant}</Text>
-          </Card>
         )}
 
         {error && <Text style={formStyles.error}>{error}</Text>}

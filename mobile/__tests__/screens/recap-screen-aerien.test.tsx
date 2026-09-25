@@ -263,14 +263,14 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
     await render(<RecapScreen />);
 
     await screen.findAllByText('Rotations');
-    for (const titre of ['Totaux', 'Surfaces', 'Stock', 'Efficacité', 'Végétation']) {
+    for (const titre of ['Totaux', 'Surfaces', 'Efficacité', 'Végétation']) {
       expect(screen.getAllByText(titre).length).toBeGreaterThanOrEqual(1);
     }
     expect(screen.getByText('Surface restante abandonnée')).toBeVisible();
     expect(screen.getByText('Zone inaccessible')).toBeVisible();
   });
 
-  it("libelle Approvisionnement et Reste en stock en kg pour une poudre", async () => {
+  it("affiche la rotation d'une poudre en kg (le stock vit dans les mouvements, #609)", async () => {
     jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
       ...DRAFT_AERIEN,
       aerien: {
@@ -282,9 +282,7 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
     });
     await render(<RecapScreen />);
 
-    expect(await screen.findByText('Approvisionnement (kg)')).toBeVisible();
-    expect(screen.getByText('Reste en stock (kg)')).toBeVisible();
-    expect(screen.getByText('Rotation 1 — Green Muscle')).toBeVisible();
+    expect(await screen.findByText('Rotation 1 — Green Muscle')).toBeVisible();
     expect(screen.getByText('30 kg · 10 ha')).toBeVisible();
   });
 
