@@ -1,7 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 
-import { resetDbForTests, getDb } from '../src/lib/prospection-db';
-import { listUnsyncedProspections } from '../src/lib/prospection-repository';
+import { resetDbForTests, getDb } from '../src/lib/db';
 import { resetReferentielDbForTests } from '../src/lib/referentiel-db';
 import { listVolsEnAttente } from '../src/lib/vol-db';
 
@@ -108,11 +107,26 @@ describe("upgrade d'une ancienne base remplie de saisies non envoyées (#676)", 
     expect(colonnes('site_aerien_deplacement')).toContain('renomme');
 
     // La file d'envoi les voit encore, avec les requêtes mêmes de la synchro.
-    expect((await listUnsyncedProspections()).map((p) => p.id)).toEqual(['p-local']);
     expect((await listVolsEnAttente()).map((v) => v.id)).toEqual(['v-local']);
     expect(
       sqlite.prepare("SELECT id FROM site_aerien_deplacement WHERE statut_sync = 'local'").all()
     ).toEqual([{ id: 'd-local' }]);
+  });
+
+  it('les tables de l’ancien module Prospection sont supprimées, sans toucher au traitement (#726)', async () => {
+    fabriquerAncienneBase(sqlite);
+
+    await getDb();
+
+    const tables = (
+      sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'prospection%'").all() as {
+        name: string;
+      }[]
+    ).map((t) => t.name);
+    expect(tables).toEqual([]);
+    expect(sqlite.prepare("SELECT prospection_id FROM traitement WHERE id = 't-local'").get()).toEqual({
+      prospection_id: 'p-local',
+    });
   });
 
   it('un second démarrage ne rejoue rien', async () => {
@@ -132,7 +146,7 @@ describe("upgrade d'une ancienne base remplie de saisies non envoyées (#676)", 
     await getDb();
 
     expect(version()).toBeGreaterThanOrEqual(1);
-    expect(colonnes('prospection')).toContain('statut_sync');
+    expect(colonnes('traitement')).toContain('statut_sync');
     expect(colonnes('vol_lien')).toContain('ref_id');
     expect(colonnes('mouvement_pesticide_local')).toContain('site_id');
   });

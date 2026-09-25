@@ -15,8 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { ThemedText } from '@/components/themed-text';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { listToutesProspectionsLocal, countUnsyncedProspections, DraftProspection } from '@/lib/prospection-repository';
-import { listToutesTraitementsLocal, DraftTraitementRow } from '@/lib/traitement-repository';
+import { listToutesTraitementsLocal, listUnsyncedTraitements, DraftTraitementRow } from '@/lib/traitement-repository';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import * as Network from 'expo-network';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
@@ -56,18 +55,6 @@ const isTablet = width >= 768;
 
 const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-/**
- * `station_nom` (intensif, référentiel) ou `station_libre` (extensif, saisie
- * libre) sont les deux vrais noms lisibles — même règle que `stationLabel`
- * dans fiches.tsx/prospection.tsx, dupliquée ici plutôt que mutualisée (même
- * choix que ces deux fichiers). « Activité récente » affichait « Station non
- * spécifiée » pour toute fiche extensive/validation alors que la localité
- * saisie (station_libre) existait bel et bien.
- */
-function stationLabel(item: { station_nom?: string | null; station_libre?: string | null }): string {
-  return item.station_nom || item.station_libre || 'Station non spécifiée';
-}
-
 /** Une ligne de la carte « Activité récente » — prospection ou traitement,
  * réduits à ce que la carte affiche, pour ne pas faire dépendre le rendu de
  * deux formes de données différentes (#activite-recente-traitements). */
@@ -81,17 +68,6 @@ interface ActiviteItem {
    * envoyable qu'une fois tout le parcours validé (`completeProspection`). */
   brouillon: boolean;
   updatedAt: string;
-}
-
-function prospectionVersActivite(fiche: DraftProspection): ActiviteItem {
-  return {
-    id: fiche.id,
-    titre: stationLabel(fiche),
-    sousTitre: `N°${fiche.n_fiche ?? '—'} · ${fiche.date_prospection}`,
-    synced: fiche.statut_sync === 'synced',
-    brouillon: fiche.statut === 'brouillon',
-    updatedAt: fiche.updated_at,
-  };
 }
 
 function traitementVersActivite(fiche: DraftTraitementRow): ActiviteItem {
@@ -118,12 +94,7 @@ export default function DashboardScreen() {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
-  const [prospections, setProspections] = useState<DraftProspection[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
-  // #dossier-brouillons : pastille sur la tuile ACCÈS RAPIDE — dérivée de
-  // `prospections` (déjà chargée intégralement par `loadData`), pas d'appel
-  // réseau/local supplémentaire.
-  const draftsCount = useMemo(() => prospections.filter((p) => p.statut === 'brouillon').length, [prospections]);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [showSyncBanner, setShowSyncBanner] = useState(false);
@@ -163,7 +134,7 @@ export default function DashboardScreen() {
       const isConnected = networkState.isConnected && networkState.isInternetReachable;
       setIsOffline(!isConnected);
 
-      const pendingCount = await countUnsyncedProspections();
+      const pendingCount = (await listUnsyncedTraitements()).length;
       setPendingSyncCount(pendingCount);
       setShowSyncBanner(pendingCount > 0);
     } catch (error) {
@@ -200,13 +171,12 @@ export default function DashboardScreen() {
     if (!user?.id) return;
 
     try {
-      const [fiches, ficheTraitements, pendingCount] = await Promise.all([
-        listToutesProspectionsLocal(),
+      const [ficheTraitements, aSynchroniser] = await Promise.all([
         listToutesTraitementsLocal(),
-        countUnsyncedProspections(),
+        listUnsyncedTraitements(),
       ]);
+      const pendingCount = aSynchroniser.length;
 
-      setProspections(fiches);
       setTraitements(ficheTraitements);
       setPendingSyncCount(pendingCount);
       setShowSyncBanner(pendingCount > 0);
@@ -241,10 +211,10 @@ export default function DashboardScreen() {
   // traitement n'y apparaissaient pas du tout, alors que « Mes fiches »
   // (fiches.tsx) les affiche déjà toutes les deux).
   const activiteRecente = useMemo(() => {
-    return [...prospections.map(prospectionVersActivite), ...traitements.map(traitementVersActivite)]
+    return traitements.map(traitementVersActivite)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, 5);
-  }, [prospections, traitements]);
+  }, [traitements]);
 
   // Fiches par jour sur la semaine en cours (L -> D)
   const weekCounts = useMemo(() => {
@@ -257,10 +227,10 @@ export default function DashboardScreen() {
       const day = new Date(monday);
       day.setDate(monday.getDate() + i);
       const dayKey = day.toISOString().split('T')[0];
-      const count = prospections.filter((p) => p.date_prospection === dayKey).length;
+      const count = traitements.filter((t) => t.date_traitement === dayKey).length;
       return { count, isToday: i === dayIndex };
     });
-  }, [prospections]);
+  }, [traitements]);
 
   return (
     <View style={styles.root}>
@@ -359,7 +329,7 @@ export default function DashboardScreen() {
           <View style={styles.quickAccessGrid}>
             <TouchableOpacity
               style={[styles.quickTile, styles.quickTilePrimary]}
-              onPress={() => navigateTo('/(app)/prospection')}
+              onPress={() => navigateTo('/(prospection)/type-chooser')}
               activeOpacity={0.85}
             >
               <AppIcon name="ajouter" size={24} color={EQ.surMarque} />
@@ -373,22 +343,6 @@ export default function DashboardScreen() {
             >
               <AppIcon name="rapport-fiche" size={24} color={IFVM_GREEN} />
               <ThemedText style={styles.quickTileText}>Mes fiches</ThemedText>
-            </TouchableOpacity>
-
-            {/* #dossier-brouillons : toutes les fiches de prospection encore en
-                cours de saisie (intensive/extensive/validation) — jamais
-                envoyées tant qu'elles ne sont pas terminées (completeProspection).
-                Distinct de « Mes fiches », qui liste tout SAUF ces brouillons
-                en pratique confus (cf. statutFicheAffiche avant #dossier-brouillons). */}
-            <TouchableOpacity
-              style={styles.quickTile}
-              onPress={() => navigateTo('/(app)/brouillons')}
-              activeOpacity={0.85}
-            >
-              <AppIcon name="modifier" size={24} color={IFVM_GREEN} />
-              <ThemedText style={styles.quickTileText}>
-                Brouillons{draftsCount > 0 ? ` (${draftsCount})` : ''}
-              </ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity

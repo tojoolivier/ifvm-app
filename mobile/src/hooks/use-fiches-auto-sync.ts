@@ -2,8 +2,6 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 
-import { listUnsyncedProspections } from '@/lib/prospection-repository';
-import { syncAllProspections } from '@/lib/prospection-review';
 import { listUnsyncedTraitements } from '@/lib/traitement-repository';
 import { syncAllTraitements } from '@/lib/traitement-sync';
 import { runTask } from '@/lib/run-task';
@@ -71,16 +69,6 @@ export async function checkAndSyncFiches(
       if (!shouldTriggerAutoSync({ wasConnected, isConnected: isConnectedObserve })) {
         return;
       }
-
-      await runTask(
-        async () => {
-          const prospections = await listUnsyncedProspections();
-          if (prospections.length > 0) {
-            await syncAllProspections(prospections, token);
-          }
-        },
-        { name: 'sync.auto.prospections', criticality: 'best-effort' }
-      );
 
       await runTask(
         async () => {

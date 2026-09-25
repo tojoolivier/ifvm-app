@@ -1,4 +1,4 @@
-import { getDb } from './prospection-db';
+import { getDb } from './db';
 import { creerOutbox } from './outbox';
 import { generateId } from './id';
 import { composerNumeroFiche } from './traitement-numero-fiche';

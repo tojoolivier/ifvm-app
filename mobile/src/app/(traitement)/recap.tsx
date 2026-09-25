@@ -38,7 +38,6 @@ import { useErrorStore } from '@/lib/error-store';
 import { useErrorLogStore } from '@/lib/error-log-store';
 import { toFriendlyError } from '@/lib/friendly-error';
 import { logger } from '@/lib/logger';
-import { formatDirectionDeplacement } from '@/lib/prospection-infestation-insights';
 import { EtatVide } from '@/components/erreurs/etat-vide';
 
 // Aérien : 7 étapes (Équipe/Pesticides & rotations scindés, #equipe-slide-aerien ;
@@ -102,6 +101,23 @@ async function validerEtVerrouillerSurServeur(draft: DraftTraitement, token: str
  * helpers et cartes ci-dessous couvrent chaque écran du parcours, dans son
  * propre ordre de saisie.
  */
+const POINTS_CARDINAUX: Record<string, string> = {
+  N: 'Nord',
+  NE: 'Nord-Est',
+  E: 'Est',
+  SE: 'Sud-Est',
+  S: 'Sud',
+  SO: 'Sud-Ouest',
+  O: 'Ouest',
+  NO: 'Nord-Ouest',
+};
+
+/** « vers Nord-Est » : n'affiche que le point cardinal réellement choisi. */
+function formatDirectionVent(code: string | null | undefined): string {
+  if (!code) return '—';
+  return `vers ${POINTS_CARDINAUX[code] ?? code}`;
+}
+
 function display(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return 'non renseigné';
   return String(value);
@@ -734,7 +750,7 @@ export default function RecapScreen() {
               <RecapLigne label="Heure début" value={draft.terrestre.heure_debut} />
               <RecapLigne label="Heure fin" value={draft.terrestre.heure_fin} />
               <RecapLigne label="Vitesse du vent (m/s)" value={display(draft.terrestre.vitesse_vent_ms)} />
-              <RecapLigne label="Direction du vent" value={formatDirectionDeplacement(draft.terrestre.direction_vent)} />
+              <RecapLigne label="Direction du vent" value={formatDirectionVent(draft.terrestre.direction_vent)} />
               <RecapLigne label="Température (°C)" value={display(draft.terrestre.temperature_c)} />
               <RecapLigne label="Reprise de traitement" value={displayBool(draft.terrestre.reprise_traitement)} />
               <RecapLigne label="Taux de mortalité (%)" value={display(draft.terrestre.taux_mortalite_pourcent)} />

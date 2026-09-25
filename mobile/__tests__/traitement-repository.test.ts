@@ -33,7 +33,7 @@ const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 })
 const getFirstAsync = jest.fn();
 const getAllAsync = jest.fn();
 
-jest.mock('../src/lib/prospection-db', () => ({
+jest.mock('../src/lib/db', () => ({
   getDb: jest.fn().mockResolvedValue({
     runAsync: (...args: unknown[]) => runAsync(...args),
     getFirstAsync: (...args: unknown[]) => getFirstAsync(...args),

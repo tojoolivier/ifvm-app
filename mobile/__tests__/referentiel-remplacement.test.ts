@@ -1,4 +1,4 @@
-import { resetDbForTests } from '../src/lib/prospection-db';
+import { resetDbForTests } from '../src/lib/db';
 import { REFERENTIEL_SCHEMA_VERSION } from '../src/lib/referentiel-schema.generated';
 import { remplacerReferentiel, resetReferentielDbForTests } from '../src/lib/referentiel-db';
 
@@ -47,7 +47,8 @@ describe('remplacerReferentiel', () => {
     await remplacerReferentiel(async () => undefined);
 
     const sqlBase = base.execAsync.mock.calls.map((c) => c[0] as string).join('\n');
-    expect(sqlBase).not.toContain('DROP TABLE');
+    // La migration de schéma (#726) jette des tables de saisie : seul le cache du référentiel compte ici.
+    expect(sqlBase).not.toContain('DROP TABLE IF EXISTS pesticide');
   });
 
   it('vide avant d’écrire', async () => {

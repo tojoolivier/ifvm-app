@@ -7,15 +7,12 @@ import { configure, fireEvent, render, screen } from '@testing-library/react-nat
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
 import { useAuthStore } from '@/lib/auth-store';
 import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
-import { startNewProspection } from '@/lib/prospection-accueil';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   ...require('../test-utils/mock-expo-router').expoRouterMock(),
   useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
 }));
-
-jest.mock('@/lib/prospection-accueil', () => ({ startNewProspection: jest.fn() }));
 
 let mockCourante: { id: string; nom: string; type: 'terrestre' | 'aerien' } | null = null;
 jest.mock('@/hooks/use-equipes-de-travail', () => ({
@@ -33,22 +30,18 @@ const ouvrirMenu = async () => {
 describe('NewFicheFab — menu contextuel selon l’équipe de travail', () => {
   beforeEach(() => {
     mockPush.mockClear();
-    jest.mocked(startNewProspection).mockReset();
     useEquipeSheetStore.setState({ visible: false });
     useAuthStore.setState({ user: { id: 'u1', role: 'admin' } as any, token: 'tok' });
     mockCourante = { id: 'eq-nord', nom: 'Équipe Nord', type: 'aerien' };
   });
 
-  it('équipe aérienne : la prospection reste ouvrable, mais l’intensive est grisée avec son motif', async () => {
+  it('la prospection mène au choix du type, quelle que soit l’équipe', async () => {
     await ouvrirMenu();
+
     await fireEvent.press(screen.getByTestId('fab-prospection'));
 
-    expect(screen.getByText(/Demande une équipe terrestre — « Équipe Nord » est aérienne/)).toBeOnTheScreen();
-
-    await fireEvent.press(screen.getByTestId('fab-prospection-intensive'));
-
-    expect(useEquipeSheetStore.getState().visible).toBe(true);
-    expect(startNewProspection).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/(prospection)/type-chooser');
+    expect(useEquipeSheetStore.getState().visible).toBe(false);
   });
 
   it('équipe aérienne : le vol est permis', async () => {
@@ -79,15 +72,10 @@ describe('NewFicheFab — menu contextuel selon l’équipe de travail', () => {
     expect(mockPush).toHaveBeenCalledWith('/(traitement)/select');
   });
 
-  it('sans équipe choisie : rien n’est grisé, l’intensive démarre', async () => {
+  it('sans équipe choisie : rien n’est grisé', async () => {
     mockCourante = null;
-    jest.mocked(startNewProspection).mockResolvedValue({ id: 'd1' } as any);
     await ouvrirMenu();
 
     expect(screen.queryByText(/Demande une équipe/)).toBeNull();
-    await fireEvent.press(screen.getByTestId('fab-prospection'));
-    await fireEvent.press(screen.getByTestId('fab-prospection-intensive'));
-
-    expect(startNewProspection).toHaveBeenCalledWith(expect.objectContaining({ typeProspection: 'intensive' }));
   });
 });

@@ -1,4 +1,4 @@
-import { getDb, resetDbForTests } from '../src/lib/prospection-db';
+import { getDb, resetDbForTests } from '../src/lib/db';
 
 const MIGRATED_COLUMNS = [
   'region', 'district', 'commune', 'za', 'pa_code', 'pa_nom', 'station_nom',

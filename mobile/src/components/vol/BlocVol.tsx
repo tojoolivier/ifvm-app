@@ -5,7 +5,6 @@ import { ThemedText } from '@/components/themed-text';
 import { TimeField } from '@/components/TimeField';
 import { ChoixField } from '@/components/equipe/ChoixField';
 import { EQ } from '@/components/equipe/tokens';
-import { CaseALigne } from '@/components/site/ChampsSite';
 import { BandeauEquipeVol } from '@/components/vol/BandeauEquipeVol';
 import { useAeronefDuJour } from '@/hooks/use-aeronef-du-jour';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -13,7 +12,6 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { aujourdhuiIso } from '@/lib/equipe-db';
 import { libelleSite } from '@/lib/equipe-regles';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
-import { listProspectionsAeriennesDuJour } from '@/lib/prospection-repository';
 import { getEquipeLocale } from '@/lib/referentiel-db';
 import { type SiteAerienLocal, listSitesAeriensEquipe } from '@/lib/site-aerien-db';
 import { enregistrerVolOperation, getVolDeOperation } from '@/lib/vol-db';
@@ -32,7 +30,7 @@ interface Props {
 /**
  * Bloc « vol » d'une fiche (#644, Figma 81:447) : date, heures, stand de remplissage (choisi parmi les
  * dépendants du site principal), base secondaire facultative. Équipe, aéronef et site principal sont
- * repris de l'équipe de travail. Prospection : « Ce vol couvre aussi » d'autres prospections du jour.
+ * repris de l'équipe de travail.
  * Il s'enregistre sur l'appareil par son propre bouton ; l'envoi suit la fiche (`vol-sync.ts`).
  */
 export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }: Props) {
@@ -44,7 +42,6 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
   const [equipe, setEquipe] = useState<{ nom: string; type: 'terrestre' | 'aerien' } | null>(null);
   const [principal, setPrincipal] = useState<SiteAerienLocal | null>(null);
   const [dependants, setDependants] = useState<SiteAerienLocal[]>([]);
-  const [candidates, setCandidates] = useState<{ id: string; libelle: string; aDejaUnVol: boolean }[]>([]);
   const [volId, setVolId] = useState<string | null>(null);
   const [envoye, setEnvoye] = useState(false);
 
@@ -54,7 +51,6 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
   const [fin, setFin] = useState('');
   const [standId, setStandId] = useState<string | null>(null);
   const [baseId, setBaseId] = useState<string | null>(null);
-  const [aussi, setAussi] = useState<Record<string, boolean>>({});
   const [erreurs, setErreurs] = useState<string[]>([]);
 
   useEffect(() => {
@@ -78,23 +74,8 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
         setStandId(existant.stand_id);
         setBaseId(existant.base_secondaire_id);
       }
-      if (categorie === 'prospection') {
-        const autres = await listProspectionsAeriennesDuJour(equipeId, dateParDefaut ?? aujourdhuiIso(), ficheId);
-        const libres: { id: string; libelle: string; aDejaUnVol: boolean }[] = [];
-        for (const autre of autres) {
-          const vol = await getVolDeOperation('prospection', autre.id);
-          // Un vol déjà envoyé au serveur ne se défait pas : la fiche n'est plus proposée.
-          if (vol?.statut_sync === 'synced') continue;
-          libres.push({
-            id: autre.id,
-            libelle: autre.n_fiche ? `Fiche ${autre.n_fiche}` : 'Autre prospection du jour',
-            aDejaUnVol: !!vol,
-          });
-        }
-        setCandidates(libres);
-      }
     })().catch((error) => signalerChargement(error, { source: 'bloc-vol' }));
-  }, [equipeId, ficheId, type, categorie, dateParDefaut, signalerChargement]);
+  }, [equipeId, ficheId, type, signalerChargement]);
 
   const enregistrer = () => {
     const saisie = {
@@ -118,12 +99,7 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
             ...saisie,
             equipeId: equipeId as string,
             dependantIds: dependants.map((d) => d.id),
-            liens: [
-              { type, refId: ficheId },
-              ...Object.keys(aussi)
-                .filter((k) => aussi[k])
-                .map((refId) => ({ type: 'prospection' as const, refId })),
-            ],
+            liens: [{ type, refId: ficheId }],
             libelleLieu: principal?.localite ?? '',
           });
           setVolId(id);
@@ -201,24 +177,6 @@ export function BlocVol({ categorie, ficheId, dateParDefaut, readOnly = false }:
         placeholder="Aucune"
       />
 
-      {categorie === 'prospection' && candidates.length > 0 && (
-        <>
-          <ThemedText style={styles.etiquette}>Ce vol couvre aussi</ThemedText>
-          <View style={styles.coches}>
-            {candidates.map((c) => (
-              <CaseALigne
-                key={c.id}
-                testID={`vol-couvre-${c.id}`}
-                coche={!!aussi[c.id]}
-                onChange={(coche) => !inactif && setAussi({ ...aussi, [c.id]: coche })}
-                libelle={c.libelle}
-                detail={c.aDejaUnVol ? "Reprend le vol déjà saisi pour cette fiche" : "Même vol, même jour"}
-              />
-            ))}
-          </View>
-        </>
-      )}
-
       {!inactif && (
         <TouchableOpacity
           style={[styles.cta, isRunning && { opacity: 0.6 }]}
@@ -257,7 +215,6 @@ const styles = StyleSheet.create({
   duree: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, backgroundColor: EQ.fond },
   dureeEtiquette: { fontSize: 10, lineHeight: 13, fontWeight: '500', color: EQ.attenue },
   dureeValeur: { fontSize: 11, lineHeight: 14, fontWeight: '700', color: EQ.encre },
-  coches: { gap: 6 },
   erreurs: { gap: 4, padding: 10, borderRadius: 11, borderWidth: 1, borderColor: EQ.ambreBordure, backgroundColor: EQ.ambreFond },
   erreur: { fontSize: 11, lineHeight: 14, fontWeight: '500', color: EQ.ambre },
   cta: { height: 48, borderRadius: 13, backgroundColor: EQ.vert, alignItems: 'center', justifyContent: 'center', marginTop: 8 },

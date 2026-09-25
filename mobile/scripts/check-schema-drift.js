@@ -3,7 +3,7 @@
 /**
  * Vérifie que chaque champ du contrat OpenAPI backend (api-schema.generated.ts,
  * régénéré via `npm run generate:api-types`) a une colonne SQLite correspondante
- * dans db-baseline.ts / migrations-captures.ts. C'est le garde-fou anti-régression du bug `phase` :
+ * dans db-baseline.ts / db-schema.ts. C'est le garde-fou anti-régression du bug `phase` :
  * une colonne ajoutée côté backend et jamais répercutée côté mobile causait un
  * écran blanc silencieux (requête SQL en échec, promesse rejetée sans .catch).
  *
@@ -33,7 +33,7 @@ const { verifierFraicheur, OUT_PATH: REFERENTIEL_OUT_PATH } = require('./referen
 
 // Schéma de base (figé, migration 1) puis étapes numérotées suivantes (#676).
 const DB_PATH = path.join(process.cwd(), 'src', 'lib', 'db-baseline.ts');
-const MIGRATIONS_PATH = path.join(process.cwd(), 'src', 'lib', 'migrations-captures.ts');
+const MIGRATIONS_PATH = path.join(process.cwd(), 'src', 'lib', 'db-schema.ts');
 const SCHEMA_PATH = path.join(process.cwd(), 'src', 'lib', 'api-schema.generated.ts');
 
 // table SQLite -> schéma OpenAPI "*Create" correspondant
@@ -113,7 +113,7 @@ function extraireColonnesDeMigration(source) {
  *
  * Limite assumée : une étape qui crée une table (`CREATE TABLE`), renomme une colonne ou construit
  * son SQL par code n'est pas vue ici. Écrire les ajouts de colonnes en `ALTER TABLE … ADD COLUMN`
- * littéral, sur une seule ligne, dans `migrations-captures.ts`.
+ * littéral, sur une seule ligne, dans `db-schema.ts`.
  */
 function extraireColonnesDesEtapes(source) {
   const parTable = {};
@@ -184,7 +184,7 @@ function main() {
 
   if (hasDrift) {
     console.error('\nRégénère api-schema.generated.ts (npm run generate:api-types) si le backend a évolué,');
-    console.error('sinon ajoute la colonne manquante par une nouvelle étape de migrations-captures.ts (ALTER TABLE ... ADD COLUMN)');
+    console.error('sinon ajoute la colonne manquante par une nouvelle étape de db-schema.ts (ALTER TABLE ... ADD COLUMN)');
     console.error('(une base neuve reçoit la même chose : le schéma de base plus les étapes, dans l’ordre).');
     process.exit(1);
   }

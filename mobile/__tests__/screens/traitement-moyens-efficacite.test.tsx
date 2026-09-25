@@ -11,7 +11,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MoyensScreen from '@/app/(traitement)/moyens';
 import * as traitementRepository from '@/lib/traitement-repository';
-import * as prospectionRepository from '@/lib/prospection-repository';
 
 let mockRouteParams: Record<string, string> = { traitementId: 'trait-1' };
 
@@ -26,9 +25,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   updateTraitementAerienEfficacite: jest.fn().mockResolvedValue({}),
 }));
 
-jest.mock('@/lib/prospection-repository', () => ({
-  getProspection: jest.fn().mockResolvedValue(null),
-}));
 
 function draft(overrides: Record<string, unknown> = {}) {
   return {
@@ -52,7 +48,6 @@ beforeEach(() => {
   jest.mocked(traitementRepository.getTraitement).mockReset().mockResolvedValue(draft());
   jest.mocked(traitementRepository.updateTraitementMoyens).mockClear().mockResolvedValue({} as any);
   jest.mocked(traitementRepository.updateTraitementAerienEfficacite).mockClear().mockResolvedValue({} as any);
-  jest.mocked(prospectionRepository.getProspection).mockReset().mockResolvedValue(null);
 });
 
 /** Laisse un vrai tick s'écouler entre deux interactions — même prudence

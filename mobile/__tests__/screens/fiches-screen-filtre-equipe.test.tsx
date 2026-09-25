@@ -13,18 +13,6 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void) => effect(),
 }));
 
-jest.mock('@/lib/prospection-accueil', () => ({
-  loadAccueilData: jest.fn().mockResolvedValue({
-    unsyncedCount: 0,
-    activeDraft: null,
-    draftsCount: 0,
-    recent: [],
-    validated: [],
-    pendingSync: [],
-  }),
-  loadMesProspectionsServeur: jest.fn().mockResolvedValue([]),
-}));
-
 jest.mock('@/lib/traitement-repository', () => ({
   listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
 }));

@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
-import { getDb } from './prospection-db';
+import { getDb } from './db';
 import { ReferentialError } from './errors';
 import { REFERENTIEL_DDL, REFERENTIEL_SCHEMA_VERSION, REFERENTIEL_TABLES } from './referentiel-schema.generated';
 

@@ -10,7 +10,6 @@ import { render, screen, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import DashboardScreen from '@/app/(app)/index';
 import { useAuthStore } from '@/lib/auth-store';
-import * as prospectionRepository from '@/lib/prospection-repository';
 import * as traitementRepository from '@/lib/traitement-repository';
 import * as Network from 'expo-network';
 
@@ -24,13 +23,9 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void) => effect(),
 }));
 
-jest.mock('@/lib/prospection-repository', () => ({
-  listToutesProspectionsLocal: jest.fn().mockResolvedValue([]),
-  countUnsyncedProspections: jest.fn().mockResolvedValue(0),
-}));
-
 jest.mock('@/lib/traitement-repository', () => ({
   listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
+  listUnsyncedTraitements: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('expo-network', () => ({
@@ -51,7 +46,6 @@ describe('DashboardScreen — Activité récente : inclut les fiches de traiteme
       } as any,
       token: 'token-test',
     });
-    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockReset().mockResolvedValue([]);
     jest.mocked(traitementRepository.listToutesTraitementsLocal).mockReset().mockResolvedValue([]);
     jest.mocked(Network.getNetworkStateAsync).mockClear();
   });
@@ -80,19 +74,17 @@ describe('DashboardScreen — Activité récente : inclut les fiches de traiteme
     expect(screen.getByText('À SYNCHRO')).toBeTruthy();
   });
 
-  it('mélange prospections et traitements, triés par dernière modification', async () => {
-    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockResolvedValue([
+  it('trie les traitements par dernière modification', async () => {
+    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockResolvedValue([
       {
-        id: 'prosp-1',
-        station_nom: 'Poste Ambatondrazaka',
-        station_libre: null,
-        n_fiche: 'EXT-1',
-        date_prospection: '2026-09-10',
+        id: 'trait-0',
+        numero_fiche: 'CRT-0',
+        type_traitement: 'TERRESTRE',
+        localite: 'Betioky',
+        date_traitement: '2026-09-10',
         statut_sync: 'synced',
         updated_at: '2026-09-10T08:00:00Z',
       } as any,
-    ]);
-    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockResolvedValue([
       {
         id: 'trait-1',
         numero_fiche: 'CRT-1',
@@ -111,14 +103,13 @@ describe('DashboardScreen — Activité récente : inclut les fiches de traiteme
     );
 
     await waitFor(() => expect(screen.getByText('Ambovombe')).toBeTruthy());
-    expect(screen.getByText('Poste Ambatondrazaka')).toBeTruthy();
 
-    const titres = screen.getAllByText(/Ambovombe|Poste Ambatondrazaka/).map((n) => n.props.children);
-    // Le traitement (updated_at plus récent) doit apparaître avant la prospection.
-    expect(titres).toEqual(['Ambovombe', 'Poste Ambatondrazaka']);
+    const titres = screen.getAllByText(/Ambovombe|Betioky/).map((n) => n.props.children);
+    // Le traitement le plus récemment modifié apparaît en premier.
+    expect(titres).toEqual(['Ambovombe', 'Betioky']);
   });
 
-  it('n’affiche pas la section quand ni prospection ni traitement n’existe', async () => {
+  it('n’affiche pas la section quand aucun traitement n’existe', async () => {
     await render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
         <DashboardScreen />

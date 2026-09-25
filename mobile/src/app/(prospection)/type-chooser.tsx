@@ -2,10 +2,6 @@ import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuthStore } from '@/lib/auth-store';
-import { startNewProspection } from '@/lib/prospection-accueil';
-import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { useAsyncAction } from '@/hooks/use-async-action';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,51 +11,14 @@ const GREEN = '#235a36';
 
 export default function TypeChooserScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const token = useAuthStore((s) => s.token);
-  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
-  const { run, isRunning: isCreating } = useAsyncAction();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
   const theme = useTheme();
   const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
-  const chooseIntensive = () =>
-    run(
-      async () => {
-        const draft = await startNewProspection({ token: token!, prospecteurId: user!.id, typeProspection: 'intensive' });
-        await hydrateFromDraft(draft.id);
-        router.replace({ pathname: '/(prospection)/reference' as any, params: { draftId: draft.id } });
-      },
-      {
-        screen: 'type-chooser',
-        precondition: !!user && !!token,
-        preconditionMessage: 'Session expirée — reconnectez-vous pour créer une fiche.',
-        context: { typeProspection: 'intensive' },
-      }
-    );
-
-  // Le brouillon extensif n'est pas créé ici : l'écran de choix du mode
-  // (terrestre/aérien) le crée lui-même une fois le mode choisi — même report
-  // qu'avant "☑ Vérifier un signalement" ci-dessous, pour ne jamais créer de
-  // brouillon orphelin si l'agent revient en arrière avant d'avoir choisi.
-  const chooseExtensive = () => {
-    router.push('/(prospection)/extensive-mode-chooser' as any);
-  };
-
-  const chooseValidation = () => {
-    router.push('/(prospection)/extensive-signalement' as any);
-  };
-
-  // #revalidation-prospection : une fiche extensive/validation validée
-  // depuis plus de 5 jours sans traitement n'est plus proposée dans
-  // « Consulter une fiche validée » — c'est ici qu'elle redevient accessible,
-  // pour être revalidée avant traitement (déplacé depuis l'accès rapide du
-  // tableau de bord, qui n'accueille plus que les points d'entrée de premier
-  // niveau).
-  const chooseRevalidation = () => {
-    router.push('/(prospection)/revalidation-liste' as any);
-  };
+  // Les trois entrées seront rebranchées sur le nouveau wizard (#683) ; d'ici là, elles mènent
+  // à l'écran « En reconstruction ».
+  const versReconstruction = () => router.push('/(app)/en-reconstruction' as any);
 
   return (
     <View style={styles.root}>
@@ -74,34 +33,26 @@ export default function TypeChooserScreen() {
         <View style={styles.content}>
           <TouchableOpacity
             style={[styles.card, styles.cardIntensive]}
-            onPress={chooseIntensive}
-            disabled={isCreating}
+            onPress={versReconstruction}
             activeOpacity={0.85}
           >
-            <Text style={styles.cardTitleIntensive}>{isCreating ? 'Création…' : 'Intensive'}</Text>
+            <Text style={styles.cardTitleIntensive}>Intensive</Text>
             <Text style={styles.cardSubtitleIntensive}>
               Captures détaillées par phénotype, sexe et phase — ce parcours.
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.card} onPress={chooseExtensive} disabled={isCreating} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.card} onPress={versReconstruction} activeOpacity={0.85}>
             <Text style={styles.cardTitle}>Extensive</Text>
             <Text style={styles.cardSubtitle}>
               Densités agrégées par phase (A1–A5 / L1–L7) — mêmes espèces LMC/NSE.
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={chooseValidation} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={versReconstruction} activeOpacity={0.85}>
             <Text style={styles.cardTitle}>☑ Validation</Text>
             <Text style={styles.cardSubtitle}>
               Même fiche A→D, conclue par Confirmée / Infirmée sur place.
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={chooseRevalidation} activeOpacity={0.85}>
-            <Text style={styles.cardTitle}>🔁 Revalidation</Text>
-            <Text style={styles.cardSubtitle}>
-              Fiches validées depuis plus de 5 jours sans traitement, à revalider avant traitement.
             </Text>
           </TouchableOpacity>
         </View>

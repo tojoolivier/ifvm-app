@@ -3,8 +3,6 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTraitement, Cible } from '@/lib/traitement-repository';
-import { getProspection, listAllProspectionCaptures, listAllProspectionPopulations } from '@/lib/prospection-repository';
-import { construireDetailPhaseStade, PhaseStadeGroup } from '@/lib/traitement-cible';
 import { Card } from '@/components/traitement/Card';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
@@ -50,37 +48,6 @@ function displayEspeces(cible: Cible | null): string {
   return display(cible?.espece);
 }
 
-/** Extensif/Signalement, prospection "rien trouvé" (#cible-extensif-signalement-
- * defauts-zero) : "0" plutôt que "non renseigné" quand aucune phase/stade n'a
- * été capturé pour ce groupe espèce/catégorie — l'Intensif garde "non renseigné". */
-function PhaseStadeTable({
-  title,
-  entries,
-  defautsZero,
-}: {
-  title: string;
-  entries: { label: string; value: number }[];
-  defautsZero: boolean;
-}) {
-  const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
-  return (
-    <View style={styles.phaseStadeTable}>
-      <Text style={styles.phaseStadeTitle}>{title}</Text>
-      {entries.length === 0 ? (
-        <Text style={styles.value}>{defautsZero ? '0' : 'non renseigné'}</Text>
-      ) : (
-        entries.map((entry) => (
-          <View key={entry.label} style={styles.detailRow}>
-            <Text style={styles.detailRowLabel}>{entry.label}</Text>
-            <Text style={styles.detailRowValue}>{entry.value}</Text>
-          </View>
-        ))
-      )}
-    </View>
-  );
-}
-
 /**
  * Écran B — Cibles.
  *
@@ -106,11 +73,6 @@ export default function CiblesScreen() {
   // Type de traitement de la fiche — décide du nombre d'étapes de ProgressBar (7 en
   // aérien avec l'écran Rotations, 6 en terrestre sans lui).
   const [typeTraitement, setTypeTraitement] = useState<'AERIEN' | 'TERRESTRE' | null>(null);
-  const [phaseStadeGroups, setPhaseStadeGroups] = useState<PhaseStadeGroup[]>([]);
-  // #cible-extensif-signalement-defauts-zero : Extensif/Signalement seulement —
-  // décide si les tableaux Phase/Stade vides affichent "0" (rien trouvé,
-  // conclusif) ou "non renseigné" (Intensif, inchangé).
-  const [defautsZero, setDefautsZero] = useState(false);
   const signalerChargement = useSignalerChargement('cibles');
   const typeSizes = useTraitementTypeSizes();
   const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
@@ -118,23 +80,9 @@ export default function CiblesScreen() {
   useEffect(() => {
     if (!traitementId) return;
     void getTraitement(traitementId)
-      .then(async (draft) => {
+      .then((draft) => {
         setCible(draft?.cible ?? null);
         setTypeTraitement(draft?.type_traitement ?? null);
-        if (!draft?.prospection_id) {
-          setPhaseStadeGroups([]);
-          setDefautsZero(false);
-          return;
-        }
-        const [populations, captures, prospection] = await Promise.all([
-          listAllProspectionPopulations(draft.prospection_id),
-          listAllProspectionCaptures(draft.prospection_id),
-          getProspection(draft.prospection_id),
-        ]);
-        setPhaseStadeGroups(construireDetailPhaseStade(populations, captures));
-        setDefautsZero(
-          prospection?.type_prospection === 'extensive' || prospection?.type_prospection === 'validation'
-        );
       })
       .catch((error) => signalerChargement(error, { traitementId }));
   }, [traitementId, signalerChargement]);
@@ -175,14 +123,6 @@ export default function CiblesScreen() {
             <Text style={styles.value}>{display(cible?.repartition_population)}</Text>
           )}
         </View>
-
-        {phaseStadeGroups.map((group) => (
-          <Card key={`${group.espece}-${group.categorie}`}>
-            <Text style={styles.groupTitle}>{group.label}</Text>
-            <PhaseStadeTable title="Phase" entries={group.phases} defautsZero={defautsZero} />
-            <PhaseStadeTable title="Stade" entries={group.stades} defautsZero={defautsZero} />
-          </Card>
-        ))}
 
         <Card variant="derivee" style={styles.deriveeCentree}>
           <Text style={styles.label}>Surface infestée (ha)</Text>

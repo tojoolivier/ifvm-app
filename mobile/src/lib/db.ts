@@ -2,11 +2,11 @@ import * as SQLite from 'expo-sqlite';
 import { AppError, LocalReadError, LocalWriteError } from './errors';
 import { appliquerMigrations } from './db-migrations';
 import { logger } from './logger';
-import { MIGRATIONS_CAPTURES } from './migrations-captures';
+import { MIGRATIONS_CAPTURES } from './db-schema';
 
 const DB_NAME = 'ifvm.db';
 
-const log = logger.child({ module: 'prospection-db' });
+const log = logger.child({ module: 'db' });
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 

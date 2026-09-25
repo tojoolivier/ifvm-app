@@ -6,7 +6,7 @@ import { COLONNES_DEPLACEMENT, SITE_AERIEN_DDL } from './site-aerien-schema';
 import { STOCK_DDL } from './stock-schema';
 import { COLONNES_VOL_FACULTATIVES, VOL_DDL } from './vol-schema';
 
-const log = logger.child({ module: 'prospection-db' });
+const log = logger.child({ module: 'db' });
 
 /**
  * Migration 1 — l'état du schéma local au moment où `user_version` est introduit (#676).

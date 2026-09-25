@@ -1,4 +1,4 @@
-import { getDb, resetDbForTests } from '../src/lib/prospection-db';
+import { getDb, resetDbForTests } from '../src/lib/db';
 import {
   AppError,
   LocalReadError,

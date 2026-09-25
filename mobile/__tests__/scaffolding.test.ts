@@ -45,7 +45,6 @@ describe('Scaffolding Configuration', () => {
     expect(existsSync(join(appDir, '_layout.tsx'))).toBe(true);
     expect(existsSync(join(appDir, '(app)', '_layout.tsx'))).toBe(true);
     expect(existsSync(join(appDir, '(app)', 'index.tsx'))).toBe(true);
-    expect(existsSync(join(appDir, '(app)', 'prospection.tsx'))).toBe(true);
     expect(existsSync(join(appDir, '(app)', 'profile.tsx'))).toBe(true);
     expect(existsSync(join(appDir, '(auth)', '_layout.tsx'))).toBe(true);
     expect(existsSync(join(appDir, '(auth)', 'login.tsx'))).toBe(true);

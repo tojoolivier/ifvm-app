@@ -1,4 +1,4 @@
-import { resetDbForTests } from '../src/lib/prospection-db';
+import { resetDbForTests } from '../src/lib/db';
 import {
   getReferentielDb,
   resetReferentielDbForTests,

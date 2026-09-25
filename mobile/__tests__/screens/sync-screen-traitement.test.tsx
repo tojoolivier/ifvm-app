@@ -9,8 +9,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import SyncScreen from '@/app/(app)/sync';
 import { useAuthStore } from '@/lib/auth-store';
-import * as prospectionAccueil from '@/lib/prospection-accueil';
-import * as prospectionReview from '@/lib/prospection-review';
 import * as referentielSync from '@/lib/referentiel-sync';
 import * as referentielDb from '@/lib/referentiel-db';
 import * as traitementRepository from '@/lib/traitement-repository';
@@ -21,13 +19,7 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void) => effect(),
 }));
 
-jest.mock('@/lib/prospection-accueil', () => ({
-  loadAccueilData: jest.fn(),
-}));
 
-jest.mock('@/lib/prospection-review', () => ({
-  syncAllProspections: jest.fn(),
-}));
 
 jest.mock('@/lib/referentiel-sync', () => ({
   pullReferentiel: jest.fn(),
@@ -46,8 +38,6 @@ jest.mock('@/lib/traitement-sync', () => ({
   syncAllTraitements: jest.fn(),
 }));
 
-const EMPTY_ACCUEIL = { unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] };
-
 const TRAITEMENT_EN_ATTENTE = {
   id: 'trait-1',
   prospection_id: 'prosp-1',
@@ -63,10 +53,6 @@ describe('SyncScreen — fiches de traitement en attente', () => {
   beforeEach(() => {
     useAuthStore.setState({ token: 'token-test' } as any);
 
-    jest.mocked(prospectionAccueil.loadAccueilData).mockReset().mockResolvedValue(EMPTY_ACCUEIL);
-    jest.mocked(prospectionReview.syncAllProspections)
-      .mockReset()
-      .mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
     jest.mocked(referentielSync.pullReferentiel).mockReset().mockResolvedValue(undefined);
     jest.mocked(referentielDb.compterReferentielLocal).mockReset().mockResolvedValue([]);
     jest.mocked(traitementRepository.listToutesTraitementsLocal)

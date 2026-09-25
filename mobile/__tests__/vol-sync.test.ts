@@ -2,7 +2,7 @@ import { apiClient } from '../src/lib/api-client';
 import { NetworkError } from '../src/lib/errors';
 import { getTraitement } from '../src/lib/traitement-repository';
 import * as volDb from '../src/lib/vol-db';
-import { assurerVolDeProspection, synchroniserVols } from '../src/lib/vol-sync';
+import { synchroniserVols } from '../src/lib/vol-sync';
 
 jest.mock('../src/lib/storage', () => ({
   storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
@@ -95,44 +95,5 @@ describe('synchroniserVols', () => {
     await synchroniserVols('tok');
 
     expect(volDb.marquerVolSynchronise).not.toHaveBeenCalled();
-  });
-});
-
-describe('assurerVolDeProspection', () => {
-  it('rend null pour une fiche sans vol', async () => {
-    jest.mocked(volDb.getVolDeOperation).mockResolvedValue(null);
-    expect(await assurerVolDeProspection('tok', 'p-1')).toBeNull();
-  });
-
-  it('un vol déjà envoyé n’est pas renvoyé', async () => {
-    jest.mocked(volDb.getVolDeOperation).mockResolvedValue({ id: 'v1', statut_sync: 'synced' } as any);
-    expect(await assurerVolDeProspection('tok', 'p-1')).toBe('v1');
-    expect(apiClient.createVol).not.toHaveBeenCalled();
-  });
-
-  it('envoie le vol local avant la fiche', async () => {
-    jest.mocked(volDb.getVolDeOperation).mockResolvedValue({ id: 'v1', statut_sync: 'local' } as any);
-    jest.mocked(volDb.listVolsEnAttente).mockResolvedValue([vol({ id: 'v1', categorie: 'prospection', origine: 'prospection', traitement_id: null })] as any);
-
-    expect(await assurerVolDeProspection('tok', 'p-1')).toBe('v1');
-    expect(apiClient.createVol).toHaveBeenCalledWith('tok', expect.objectContaining({ id: 'v1', type: 'prospection' }));
-    expect(volDb.marquerVolSynchronise).toHaveBeenCalledWith('v1');
-  });
-
-  it('rejoue un vol refusé (echec) au lieu de laisser partir la fiche avec un vol_id inconnu du serveur', async () => {
-    jest.mocked(volDb.getVolDeOperation).mockResolvedValue({ id: 'v1', statut_sync: 'echec' } as any);
-    jest.mocked(volDb.listVolsEnAttente).mockResolvedValue([vol({ id: 'v1', categorie: 'prospection', origine: 'prospection', traitement_id: null })] as any);
-
-    await assurerVolDeProspection('tok', 'p-1');
-
-    expect(volDb.listVolsEnAttente).toHaveBeenCalledWith('v1');
-    expect(apiClient.createVol).toHaveBeenCalled();
-  });
-
-  it('lève si le vol à rejouer a disparu de la file', async () => {
-    jest.mocked(volDb.getVolDeOperation).mockResolvedValue({ id: 'v1', statut_sync: 'echec' } as any);
-    jest.mocked(volDb.listVolsEnAttente).mockResolvedValue([]);
-
-    await expect(assurerVolDeProspection('tok', 'p-1')).rejects.toThrow('introuvable');
   });
 });

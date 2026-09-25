@@ -36,12 +36,12 @@ describe('TraitementSelectScreen — boutons de la page « Fiches de traitement 
     expect(screen.getByText('Zones à reprendre')).toBeVisible();
   });
 
-  it('« Nouvelle fiche de traitement » fonctionne toujours (sans prospectionId, ouvre le sélecteur de prospection)', async () => {
+  it('« Nouvelle fiche de traitement » fonctionne toujours (sans prospectionId, mène à « En reconstruction »)', async () => {
     await render(<TraitementSelectScreen />);
 
     fireEvent.press(screen.getByText('Nouvelle fiche de traitement'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(traitement)/prospection-picker');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/en-reconstruction');
   });
 
   it('« Mes fiches » ouvre désormais son propre écran, sans afficher de liste ici', async () => {

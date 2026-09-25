@@ -20,7 +20,7 @@ import {
   resetLoggerForTests,
   type LogLine,
 } from '../src/lib/logger';
-import { resetDbForTests } from '../src/lib/prospection-db';
+import { resetDbForTests } from '../src/lib/db';
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const runAsync = jest.fn().mockResolvedValue(undefined);
@@ -48,13 +48,13 @@ function ligne(partiel: Partial<LogLine> = {}): LogLine {
 }
 
 /**
- * `getDb()` joue toute la migration de `prospection` sur le même handle : le
+ * `getDb()` joue toute la migration du schéma local sur le même handle : le
  * journal n'est jamais seul à parler à la base. On filtre donc sur son SQL.
  */
 function sqlDuJournal(): string[] {
   return execAsync.mock.calls
     .map((c) => c[0] as string)
-    // `PRAGMA journal_mode = WAL` de `prospection-db` contient aussi « journal ».
+    // `PRAGMA journal_mode = WAL` de `db` contient aussi « journal ».
     .filter((sql) => sql.includes('CREATE TABLE IF NOT EXISTS journal'));
 }
 
@@ -125,8 +125,8 @@ describe("l'écriture d'un lot", () => {
   it('écrit une ligne par entrée, dans une seule transaction', async () => {
     await creerTransportJournal().write([ligne(), ligne(), ligne()]);
 
-    // Une transaction pour l'unique étape de migration (ouverture de la base), une pour le lot.
-    expect(withTransactionAsync).toHaveBeenCalledTimes(2);
+    // Une transaction par étape de migration (ouverture de la base : 2 étapes), une pour le lot.
+    expect(withTransactionAsync).toHaveBeenCalledTimes(3);
     expect(runAsync).toHaveBeenCalledTimes(3);
   });
 

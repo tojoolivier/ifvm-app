@@ -27,13 +27,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   saveCible: jest.fn(),
 }));
 
-jest.mock('@/lib/prospection-repository', () => ({
-  getProspection: jest.fn().mockResolvedValue(null),
-  listAllProspectionPopulations: jest.fn().mockResolvedValue([]),
-  listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
-  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
-}));
-
 jest.mock('@/lib/location', () => ({
   getCurrentPosition: jest.fn().mockResolvedValue({
     latitude: -18.9,

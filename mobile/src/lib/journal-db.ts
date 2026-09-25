@@ -53,7 +53,7 @@ import * as SQLite from 'expo-sqlite';
 
 import { LocalReadError, LocalWriteError } from './errors';
 import { configureLogger, type LogLine, type LogTransport, type Niveau } from './logger';
-import { getDb } from './prospection-db';
+import { getDb } from './db';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Le schéma

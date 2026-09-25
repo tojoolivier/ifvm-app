@@ -12,11 +12,9 @@ import {
   listMembresEquipe,
   listSitesEquipe,
 } from '../src/lib/equipe-db';
-import { derniereInterventionEquipe } from '../src/lib/prospection-repository';
 import { getReferentielDb } from '../src/lib/referentiel-db';
 
 jest.mock('../src/lib/referentiel-db', () => ({ getReferentielDb: jest.fn() }));
-jest.mock('../src/lib/prospection-repository', () => ({ derniereInterventionEquipe: jest.fn() }));
 
 const getAllAsync = jest.fn();
 const db = { getAllAsync } as unknown as Awaited<ReturnType<typeof getReferentielDb>>;
@@ -108,19 +106,16 @@ describe('chargerResumeEquipe', () => {
       aeronef: { id: 'ae-1', immatriculation: '5R-MHR', societe: 'Cessna 188' },
       derniereIntervention: null,
     });
-    expect(derniereInterventionEquipe).not.toHaveBeenCalled();
   });
 
-  it('équipe terrestre : dernière intervention rattachée, sans site ni aéronef', async () => {
-    jest.mocked(derniereInterventionEquipe).mockResolvedValue('2026-09-20');
-
+  it('équipe terrestre : ni site ni aéronef, pas de dernière intervention', async () => {
     const resume = await chargerResumeEquipe({ id: 'eq-3', type: 'terrestre' }, '2026-09-24');
 
     expect(resume).toEqual({
       sitePrincipal: null,
       sitesSecondaires: [],
       aeronef: null,
-      derniereIntervention: '2026-09-20',
+      derniereIntervention: null,
     });
     expect(getAllAsync).not.toHaveBeenCalled();
   });
@@ -135,12 +130,10 @@ describe('chargerListeEquipes', () => {
       ])
       .mockResolvedValueOnce([]) // sites eq-1
       .mockResolvedValueOnce([]); // aéronefs eq-1
-    jest.mocked(derniereInterventionEquipe).mockResolvedValue('2026-09-20');
-
     const liste = await chargerListeEquipes('2026-09-24');
 
     expect(liste.map((e) => e.equipe.nom)).toEqual(['Équipe Sud', 'EMT Toliara']);
-    expect(liste[1].resume.derniereIntervention).toBe('2026-09-20');
+    expect(liste[1].resume.derniereIntervention).toBeNull();
   });
 });
 

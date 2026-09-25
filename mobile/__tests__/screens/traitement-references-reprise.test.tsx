@@ -11,7 +11,6 @@ import ReferencesScreen from '@/app/(traitement)/references';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { useAuthStore } from '@/lib/auth-store';
 import * as traitementRepository from '@/lib/traitement-repository';
-import * as prospectionRepository from '@/lib/prospection-repository';
 
 let mockRouteParams: Record<string, string> = {};
 
@@ -27,13 +26,6 @@ jest.mock('@/lib/traitement-repository', () => ({
   updateTraitementReference: jest.fn(),
   genererNumeroFicheDisponible: jest.fn().mockResolvedValue('Jean-AERIEN-2026-08-12-ANNEXE'),
   saveCible: jest.fn(),
-}));
-
-jest.mock('@/lib/prospection-repository', () => ({
-  getProspection: jest.fn().mockResolvedValue(null),
-  listAllProspectionPopulations: jest.fn().mockResolvedValue([]),
-  listAllProspectionInfestations: jest.fn().mockResolvedValue([]),
-  listAllProspectionCaptures: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('@/lib/location', () => ({
@@ -59,7 +51,6 @@ describe('ReferencesScreen (traitement) — reprise depuis « Zones à reprendre
   beforeEach(() => {
     mockRouteParams = { prospectionId: 'prosp-1' };
     jest.mocked(traitementRepository.genererNumeroFicheDisponible).mockClear().mockResolvedValue('Jean-AERIEN-2026-08-12-ANNEXE');
-    jest.mocked(prospectionRepository.getProspection).mockReset().mockResolvedValue(null);
     useTraitementCaptureStore.setState(RESET_STATE);
     useAuthStore.setState({
       user: { id: 'u1', nom: 'Rakoto', prenom: 'Jean', email: 'j@x.mg', role: 'chef_equipe', actif: true } as any,
@@ -92,44 +83,5 @@ describe('ReferencesScreen (traitement) — reprise depuis « Zones à reprendre
     await waitFor(() => expect(traitementRepository.genererNumeroFicheDisponible).toHaveBeenCalled());
     const [, , , , , estReprise] = jest.mocked(traitementRepository.genererNumeroFicheDisponible).mock.calls[0];
     expect(estReprise).toBeFalsy();
-  });
-
-  /**
-   * #zone-a-reprendre-surface-reste-a-traiter : la cible de la NOUVELLE fiche
-   * hérite du reste à traiter de l'ANCIEN traitement (`origineId`), jamais de
-   * sa propre `surface_infestee_ha` (qui reste, elle, dérivée normalement de
-   * la prospection liée — vérifié ici en s'assurant qu'elle diffère bien du
-   * reste à traiter injecté).
-   */
-  it("hérite de la surface reste à traiter de l'ANCIEN traitement dans la cible de la nouvelle fiche", async () => {
-    mockRouteParams = { prospectionId: 'prosp-1', origineId: 'trait-origine' };
-    jest.mocked(prospectionRepository.getProspection).mockResolvedValue({
-      id: 'prosp-1',
-      type_prospection: 'extensive',
-      statut: 'validee',
-      date_prospection: '2026-08-10',
-      surface_infestee: 12,
-      station_nom: null,
-      station_libre: 'Ambovombe',
-    } as any);
-    jest.mocked(traitementRepository.createDraftTraitementAerien).mockResolvedValue({ id: 'trait-nouveau' } as any);
-    jest.mocked(traitementRepository.getTraitement).mockImplementation((id: string) =>
-      id === 'trait-origine'
-        ? Promise.resolve({ terrestre: null, aerien: { surface_restante_ha: 2.5 } } as any)
-        : Promise.resolve(null)
-    );
-
-    await render(<ReferencesScreen />);
-    // Le montage (fiche neuve, pas de `traitementId`) réinitialise le store —
-    // le type de traitement se choisit donc interactivement sur cet écran,
-    // comme le ferait réellement l'agent, plutôt que présupposé au montage.
-    fireEvent.press(await screen.findByText('Aérien'));
-    fireEvent.press(await screen.findByText('Continuer — Synthèse ›'));
-
-    await waitFor(() => expect(traitementRepository.saveCible).toHaveBeenCalled());
-    const [, cible] = jest.mocked(traitementRepository.saveCible).mock.calls[0];
-    expect(cible.surface_restante_origine_ha).toBe(2.5);
-    expect(cible.surface_infestee_ha).toBe(12);
-    expect(cible.surface_restante_origine_ha).not.toBe(cible.surface_infestee_ha);
   });
 });

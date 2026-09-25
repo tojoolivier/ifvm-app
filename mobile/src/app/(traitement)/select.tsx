@@ -9,8 +9,8 @@ import type { ThemePalette } from '@/constants/theme';
 /**
  * Écran 0 — point d'entrée du module traitement. `prospectionId` reste accepté
  * en paramètre de route pour les entrées directes (ex. "Zones à reprendre") ;
- * sans ce paramètre, "Nouvelle fiche de traitement" passe par le sélecteur de
- * fiche de prospection (#91) avant l'écran Références.
+ * sans ce paramètre, "Nouvelle fiche de traitement" mène à « En reconstruction »
+ * (le sélecteur de fiche de prospection est supprimé avec l'ancien module, #681).
  */
 export default function TraitementSelectScreen() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function TraitementSelectScreen() {
       router.push({ pathname: '/(traitement)/references' as any, params: { prospectionId } });
       return;
     }
-    router.push('/(traitement)/prospection-picker' as any);
+    router.push('/(app)/en-reconstruction' as any);
   };
 
   return (

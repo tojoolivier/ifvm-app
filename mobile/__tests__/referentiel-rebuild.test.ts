@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 
-import { resetDbForTests } from '../src/lib/prospection-db';
+import { resetDbForTests } from '../src/lib/db';
 import { getReferentielDb, resetReferentielDbForTests } from '../src/lib/referentiel-db';
 import { REFERENTIEL_SCHEMA_VERSION } from '../src/lib/referentiel-schema.generated';
 import { pullReferentiel } from '../src/lib/referentiel-sync';

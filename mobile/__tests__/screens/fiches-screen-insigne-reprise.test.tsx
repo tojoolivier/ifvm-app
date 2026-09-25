@@ -8,7 +8,6 @@
 import { render, screen, waitFor } from '@testing-library/react-native';
 import FichesScreen from '@/app/(app)/fiches';
 import { useAuthStore } from '@/lib/auth-store';
-import * as prospectionAccueil from '@/lib/prospection-accueil';
 import * as traitementRepository from '@/lib/traitement-repository';
 
 jest.mock('expo-router', () => ({
@@ -27,17 +26,6 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('@/lib/prospection-accueil', () => ({
-  loadAccueilData: jest.fn().mockResolvedValue({
-    unsyncedCount: 0,
-    activeDraft: null,
-    draftsCount: 0,
-    recent: [],
-    validated: [],
-    pendingSync: [],
-  }),
-  loadMesProspectionsServeur: jest.fn().mockResolvedValue([]),
-}));
 
 jest.mock('@/lib/traitement-repository', () => ({
   listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
@@ -70,8 +58,6 @@ describe('FichesScreen — insigne « REPRISE POSSIBLE » (#zone-a-reprendre-ins
       user: { id: 'user-1', nom: 'Rakoto', prenom: 'Jean', email: 'jean@test.com', role: 'chef_equipe', actif: true } as any,
       token: 'token-test',
     });
-    jest.mocked(prospectionAccueil.loadAccueilData).mockClear();
-    jest.mocked(prospectionAccueil.loadMesProspectionsServeur).mockClear();
     jest.mocked(traitementRepository.listToutesTraitementsLocal).mockReset().mockResolvedValue([
       TRAITEMENT_AVEC_SURFACE_RESTANTE,
       TRAITEMENT_SANS_SURFACE_RESTANTE,

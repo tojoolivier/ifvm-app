@@ -17,16 +17,6 @@ jest.mock('react-native', () => ({
   },
 }));
 
-const listUnsyncedProspections = jest.fn();
-jest.mock('@/lib/prospection-repository', () => ({
-  listUnsyncedProspections: (...args: unknown[]) => listUnsyncedProspections(...args),
-}));
-
-const syncAllProspections = jest.fn();
-jest.mock('@/lib/prospection-review', () => ({
-  syncAllProspections: (...args: unknown[]) => syncAllProspections(...args),
-}));
-
 const listUnsyncedTraitements = jest.fn();
 const syncAllTraitements = jest.fn();
 jest.mock('@/lib/traitement-repository', () => ({
@@ -50,13 +40,10 @@ function enLigne() {
   getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
 }
 
-const UNE_PROSPECTION = { id: 'presp-1' } as any;
 const UN_TRAITEMENT = { id: 'trait-1' } as any;
 
 beforeEach(() => {
   getNetworkStateAsync.mockReset();
-  listUnsyncedProspections.mockReset().mockResolvedValue([]);
-  syncAllProspections.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   listUnsyncedTraitements.mockReset().mockResolvedValue([]);
   syncAllTraitements.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   synchroniserSitesAeriens.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
@@ -81,15 +68,13 @@ describe('checkAndSyncFiches — sites aériens (#643)', () => {
     expect(synchroniserSitesAeriens).not.toHaveBeenCalled();
   });
 
-  it('une panne côté sites n’empêche pas les prospections ni les traitements', async () => {
+  it('une panne côté sites n’empêche pas les traitements', async () => {
     enLigne();
-    listUnsyncedProspections.mockResolvedValue([UNE_PROSPECTION]);
     listUnsyncedTraitements.mockResolvedValue([UN_TRAITEMENT]);
     synchroniserSitesAeriens.mockRejectedValue(new Error('SQLite indisponible'));
 
     const apres = await checkAndSyncFiches('tok', false);
 
-    expect(syncAllProspections).toHaveBeenCalled();
     expect(syncAllTraitements).toHaveBeenCalled();
     expect(apres).toBe(true);
   });
@@ -112,14 +97,12 @@ describe('checkAndSyncFiches — stock de pesticides (#645)', () => {
 });
 
 describe('checkAndSyncFiches — #synchronisation-automatique', () => {
-  it('synchronise les deux domaines quand la connectivité revient, avec des fiches en attente', async () => {
+  it('synchronise les traitements quand la connectivité revient, avec des fiches en attente', async () => {
     enLigne();
-    listUnsyncedProspections.mockResolvedValue([UNE_PROSPECTION]);
     listUnsyncedTraitements.mockResolvedValue([UN_TRAITEMENT]);
 
     const apres = await checkAndSyncFiches('tok', false);
 
-    expect(syncAllProspections).toHaveBeenCalledWith([UNE_PROSPECTION], 'tok');
     expect(syncAllTraitements).toHaveBeenCalledWith([UN_TRAITEMENT], 'tok');
     expect(apres).toBe(true);
   });
@@ -129,20 +112,16 @@ describe('checkAndSyncFiches — #synchronisation-automatique', () => {
 
     await checkAndSyncFiches('tok', true);
 
-    expect(listUnsyncedProspections).not.toHaveBeenCalled();
     expect(listUnsyncedTraitements).not.toHaveBeenCalled();
-    expect(syncAllProspections).not.toHaveBeenCalled();
     expect(syncAllTraitements).not.toHaveBeenCalled();
   });
 
-  it('n’appelle pas syncAllProspections/syncAllTraitements quand il n’y a rien en attente', async () => {
+  it('n’appelle pas syncAllTraitements quand il n’y a rien en attente', async () => {
     enLigne();
 
     await checkAndSyncFiches('tok', false);
 
-    expect(listUnsyncedProspections).toHaveBeenCalled();
     expect(listUnsyncedTraitements).toHaveBeenCalled();
-    expect(syncAllProspections).not.toHaveBeenCalled();
     expect(syncAllTraitements).not.toHaveBeenCalled();
   });
 
@@ -152,31 +131,15 @@ describe('checkAndSyncFiches — #synchronisation-automatique', () => {
     const apres = await checkAndSyncFiches('tok', true);
 
     expect(apres).toBe(false);
-    expect(syncAllProspections).not.toHaveBeenCalled();
     expect(syncAllTraitements).not.toHaveBeenCalled();
   });
 
-  it('la synchronisation des traitements se lance même si celle des prospections échoue', async () => {
+  it('un échec de lecture des traitements est journalisé, sans rejeter', async () => {
     enLigne();
-    listUnsyncedProspections.mockRejectedValue(new Error('SQLite indisponible'));
-    listUnsyncedTraitements.mockResolvedValue([UN_TRAITEMENT]);
-
-    const apres = await checkAndSyncFiches('tok', false);
-
-    expect(syncAllTraitements).toHaveBeenCalledWith([UN_TRAITEMENT], 'tok');
-    expect(apres).toBe(true);
-    const echecs = lignesEnAttente().filter((l) => l.event === 'sync.auto.prospections.failed');
-    expect(echecs).toHaveLength(1);
-  });
-
-  it('la synchronisation des prospections se lance même si celle des traitements échoue', async () => {
-    enLigne();
-    listUnsyncedProspections.mockResolvedValue([UNE_PROSPECTION]);
     listUnsyncedTraitements.mockRejectedValue(new Error('SQLite indisponible'));
 
     const apres = await checkAndSyncFiches('tok', false);
 
-    expect(syncAllProspections).toHaveBeenCalledWith([UNE_PROSPECTION], 'tok');
     expect(apres).toBe(true);
     const echecs = lignesEnAttente().filter((l) => l.event === 'sync.auto.traitements.failed');
     expect(echecs).toHaveLength(1);
@@ -184,12 +147,12 @@ describe('checkAndSyncFiches — #synchronisation-automatique', () => {
 
   it('ne redéclenche pas de synchronisation à chaque tour après un seul passage réussi', async () => {
     enLigne();
-    listUnsyncedProspections.mockResolvedValue([UNE_PROSPECTION]);
+    listUnsyncedTraitements.mockResolvedValue([UN_TRAITEMENT]);
 
     const apres1 = await checkAndSyncFiches('tok', false);
     await checkAndSyncFiches('tok', apres1);
 
-    expect(syncAllProspections).toHaveBeenCalledTimes(1);
+    expect(syncAllTraitements).toHaveBeenCalledTimes(1);
   });
 
   it('journalise même une panne du relevé de connectivité, sans jamais rejeter', async () => {

@@ -5,20 +5,12 @@ import { useAuthStore } from '@/lib/auth-store';
 import { peutSaisirVols } from '@/lib/equipe-aerienne-access';
 import { motifEquipeIncompatible } from '@/lib/equipe-travail';
 import { useEquipeSheetStore } from '@/lib/equipe-sheet-store';
-import { startNewProspection } from '@/lib/prospection-accueil';
-import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { useAsyncAction } from '@/hooks/use-async-action';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { BandeauEquipe } from '@/components/equipe/BandeauEquipe';
 import { AppIcon, type AppIconName } from '@/components/ui/AppIcon';
 import { EQ } from '@/components/equipe/tokens';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
-
-const PROSPECTION_DESTINATIONS = {
-  intensive: '/(prospection)/reference',
-  extensive: '/(prospection)/extensive-reference',
-} as const;
 
 /**
  * Bouton flottant "+ Nouvelle fiche" mutualisé — extrait de l'accueil ((app)/index.tsx)
@@ -31,24 +23,15 @@ export function NewFicheFab() {
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
   const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
   const user = useAuthStore((s) => s.user);
-  const token = useAuthStore((s) => s.token);
   const avecVol = peutSaisirVols(user?.role);
-  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
-  const { run: runQuickStart, isRunning: isStartingProspection } = useAsyncAction();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [etape, setEtape] = useState<'choix' | 'prospection'>('choix');
   const ouvrirChoixEquipe = useEquipeSheetStore((s) => s.ouvrir);
   const { courante } = useEquipesDeTravail();
-  // Seule l'intensive est toujours terrestre. L'extensive et la validation se mènent aussi en mode
-  // aérien : c'est leur écran de choix du mode qui vérifie l'équipe (#641) — la prospection dans son
-  // ensemble n'est donc jamais bloquée.
-  const motifTerrestre = motifEquipeIncompatible('terrestre', courante);
   const motifVol = motifEquipeIncompatible('aerien', courante);
 
   // Deux Modal ne se superposent pas proprement sur iOS : on ferme le menu avant d'ouvrir la feuille.
   const fermerMenu = () => {
     setMenuVisible(false);
-    setEtape('choix');
   };
   const aller = (pathname: string) => {
     fermerMenu();
@@ -57,24 +40,6 @@ export function NewFicheFab() {
   const changerEquipe = () => {
     fermerMenu();
     ouvrirChoixEquipe();
-  };
-
-  const startQuickProspection = (typeProspection: 'intensive') => {
-    runQuickStart(
-      async () => {
-        if (!user || !token) return;
-        fermerMenu();
-        const draft = await startNewProspection({ token, prospecteurId: user.id, typeProspection });
-        await hydrateFromDraft(draft.id);
-        router.push({ pathname: PROSPECTION_DESTINATIONS[typeProspection] as any, params: { draftId: draft.id } });
-      },
-      {
-        screen: 'NewFicheFab.menu',
-        precondition: !!user && !!token,
-        preconditionMessage: 'Connexion requise pour créer une fiche.',
-        context: { typeProspection },
-      }
-    );
   };
 
   return (
@@ -87,60 +52,7 @@ export function NewFicheFab() {
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={fermerMenu}>
           <View style={styles.sheet}>
             <View style={styles.handle} />
-            {etape === 'prospection' ? (
-              <>
-                <Text style={styles.title}>Prospection</Text>
-                <Text style={styles.subtitle}>Choisissez le mode de prospection.</Text>
-                <View style={styles.cards}>
-                  <CarteChoix
-                    styles={styles}
-                    testID="fab-prospection-intensive"
-                    icone="prospections"
-                    couleur={EQ.vert}
-                    fond={EQ.vertDoux}
-                    titre="Prospection intensive"
-                    sousTitre={motifTerrestre ?? 'Captures détaillées — Locusta / Nomadacris'}
-                    indisponible={!!motifTerrestre}
-                    disabled={isStartingProspection}
-                    onPress={() => (motifTerrestre ? changerEquipe() : startQuickProspection('intensive'))}
-                  />
-                  <CarteChoix
-                    styles={styles}
-                    testID="fab-prospection-extensive"
-                    icone="prospections"
-                    couleur={EQ.vert}
-                    fond={EQ.vertDoux}
-                    titre="Prospection extensive"
-                    sousTitre="Densités agrégées par phase — terrestre ou aérienne"
-                    onPress={() => aller('/(prospection)/extensive-mode-chooser')}
-                  />
-                  <CarteChoix
-                    styles={styles}
-                    testID="fab-prospection-validation"
-                    icone="prospections"
-                    couleur={EQ.vert}
-                    fond={EQ.vertDoux}
-                    titre="Validation"
-                    sousTitre="Conclue par Confirmée / Infirmée — terrestre ou aérienne"
-                    onPress={() => aller('/(prospection)/extensive-signalement')}
-                  />
-                  <CarteChoix
-                    styles={styles}
-                    testID="fab-prospection-revalidation"
-                    icone="prospections"
-                    couleur={EQ.vert}
-                    fond={EQ.vertDoux}
-                    titre="Revalidation"
-                    sousTitre="Fiches validées depuis plus de 5 jours, à revalider"
-                    onPress={() => aller('/(prospection)/revalidation-liste')}
-                  />
-                  <TouchableOpacity onPress={() => setEtape('choix')} style={styles.retour} activeOpacity={0.7}>
-                    <Text style={styles.retourTexte}>Retour</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
+            <>
                 <Text style={styles.title}>Nouvelle fiche</Text>
                 <Text style={styles.subtitle}>Choisissez le type de fiche à remplir.</Text>
                 <View style={styles.equipe}>
@@ -154,8 +66,8 @@ export function NewFicheFab() {
                     couleur={EQ.vert}
                     fond={EQ.vertDoux}
                     titre="Prospection"
-                    sousTitre="Intensive ou extensive"
-                    onPress={() => setEtape('prospection')}
+                    sousTitre="Intensive, extensive ou validation"
+                    onPress={() => aller('/(prospection)/type-chooser')}
                   />
                   <CarteChoix
                     styles={styles}
@@ -188,8 +100,7 @@ export function NewFicheFab() {
                     />
                   )}
                 </View>
-              </>
-            )}
+            </>
           </View>
         </TouchableOpacity>
       </Modal>

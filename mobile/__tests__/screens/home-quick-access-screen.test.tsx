@@ -8,7 +8,6 @@ import { render, screen, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import DashboardScreen from '@/app/(app)/index';
 import { useAuthStore } from '@/lib/auth-store';
-import * as prospectionRepository from '@/lib/prospection-repository';
 import * as Network from 'expo-network';
 
 const TEST_SAFE_AREA_METRICS = {
@@ -21,10 +20,6 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void) => effect(),
 }));
 
-jest.mock('@/lib/prospection-repository', () => ({
-  listToutesProspectionsLocal: jest.fn().mockResolvedValue([]),
-  countUnsyncedProspections: jest.fn().mockResolvedValue(0),
-}));
 
 jest.mock('@/lib/traitement-repository', () => ({
   listToutesTraitementsLocal: jest.fn().mockResolvedValue([]),
@@ -48,8 +43,6 @@ describe('DashboardScreen — Accès rapide', () => {
       } as any,
       token: 'token-test',
     });
-    jest.mocked(prospectionRepository.listToutesProspectionsLocal).mockClear();
-    jest.mocked(prospectionRepository.countUnsyncedProspections).mockClear();
     jest.mocked(Network.getNetworkStateAsync).mockClear();
   });
 

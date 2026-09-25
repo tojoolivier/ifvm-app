@@ -24,7 +24,7 @@
  *    stock_solde (stock-sync), referentiel_sync_meta (curseurs `since`).
  *  Donnée sacrée — jamais DROP, jamais générées :
  *    site_aerien_deplacement (file d'envoi), site_aerien_position (historique local),
- *    vol, vol_lien, mouvement_pesticide_local, et tout ce que contiennent prospection-db /
+ *    vol, vol_lien, mouvement_pesticide_local, et tout ce que contiennent db /
  *    traitement-db / journal-db (captures, outbox, journal).
  *  Cas mixte : site_aerien contient aussi des sites créés hors-ligne et pas encore envoyés
  *    (statut_sync <> 'synced', #643). La reconstruction les met de côté et les réinsère.

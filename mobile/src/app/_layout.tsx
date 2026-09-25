@@ -8,7 +8,7 @@ import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
 import { EquipeSheetGlobale } from '@/components/equipe/EquipeSheetGlobale';
 import { useFontScaleStore } from '@/lib/font-scale-store';
 import { useThemeStore } from '@/lib/theme-store';
-import { getDb } from '@/lib/prospection-db';
+import { getDb } from '@/lib/db';
 import { useReferentielAutoSync } from '@/hooks/use-referentiel-auto-sync';
 import { useFichesAutoSync } from '@/hooks/use-fiches-auto-sync';
 import { useOtaAutoCheck } from '@/hooks/use-ota-auto-check';
@@ -128,7 +128,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(app)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(prospection)" options={{ headerShown: false }} />
+          <Stack.Screen name="(prospection)/type-chooser" options={{ headerShown: false }} />
           <Stack.Screen name="(traitement)" options={{ headerShown: false }} />
         </Stack>
       </ErrorBoundary>

@@ -14,9 +14,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
 import { pullReferentiel, resetReferentielSyncCursors } from '@/lib/referentiel-sync';
 import { compterReferentielLocal, EtatTableReferentiel } from '@/lib/referentiel-db';
-import { loadAccueilData, AccueilViewModel } from '@/lib/prospection-accueil';
-import { syncAllProspections } from '@/lib/prospection-review';
-import { DraftProspection } from '@/lib/prospection-repository';
 import {
   DraftTraitementRow,
   getTraitement,
@@ -49,8 +46,6 @@ const isTablet = SCREEN_WIDTH >= 768;
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
 
-const EMPTY_DATA: AccueilViewModel = { unsyncedCount: 0, activeDraft: null, draftsCount: 0, recent: [], validated: [], pendingSync: [] };
-
 /**
  * Le badge d'état d'une fiche. Sa valeur vient de `statut_sync`, en base : il
  * **survit au départ de l'écran**, contrairement au `useState` d'avant qui
@@ -70,7 +65,6 @@ export default function SyncScreen() {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const token = useAuthStore((s) => s.token);
-  const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   // Domaine « traitement » (#erreur-sync-fiche-introuvable) — absent de cet
   // écran jusqu'ici : ni affiché, ni envoyé par le bouton « Synchroniser »,
   // d'où une fiche de traitement complète signalée indéfiniment « Aucune
@@ -88,7 +82,6 @@ export default function SyncScreen() {
   const { run, isRunning: isSyncing } = useAsyncAction();
 
   const refresh = useCallback(() => {
-    void loadAccueilData().then(setData).catch((error) => signalerChargement(error));
     void listToutesTraitementsLocal().then(setTraitements).catch((error) => signalerChargement(error));
     // « Synchro réussie » ne dit pas ce qui a atterri : on montre le contenu réel.
     void compterReferentielLocal()
@@ -98,19 +91,7 @@ export default function SyncScreen() {
 
   useFocusEffect(refresh);
 
-  // Fiches complétées localement mais pas encore confirmées côté serveur (cf. prospection.tsx).
-  // `statut !== 'brouillon'` et non `statut === 'en_attente'` (#revalidation-
-  // validation-jamais-synchronisee, cf. listUnsyncedProspections) : une fiche
-  // `type_prospection = 'validation'` (signalisation, y compris sa
-  // revalidation) passe directement de 'brouillon' à 'validee', sans jamais
-  // transiter par 'en_attente' — le filtre précédent la faisait disparaître de
-  // cette liste et du bouton « Synchroniser » qui s'appuie dessus.
-  const pendingFiches = data.recent.filter(
-    (item) => item.statut !== 'brouillon' && item.statut_sync !== 'synced'
-  );
-  const syncedFiches = data.recent.filter((item) => item.statut_sync === 'synced');
-
-  // Pendant du filtrage ci-dessus, côté traitement — sans le filtre
+  // Fiches à synchroniser — sans le filtre
   // `statut === 'en_attente'` : une fiche de traitement reste `'brouillon'`
   // jusqu'à son premier envoi réussi (cf. listUnsyncedTraitements), donc
   // l'exiger ici l'aurait rendue hors de portée de toute synchronisation.
@@ -122,9 +103,9 @@ export default function SyncScreen() {
   const syncedTraitements = traitements.filter((item) => item.statut_sync === 'synced');
 
   const stats = {
-    total: data.recent.length + traitements.length,
-    pending: pendingFiches.length + pendingTraitements.length,
-    synced: syncedFiches.length + syncedTraitements.length,
+    total: traitements.length,
+    pending: pendingTraitements.length,
+    synced: syncedTraitements.length,
   };
 
   /**
@@ -138,14 +119,12 @@ export default function SyncScreen() {
    * c'est ce qui permet au « Réessayer les N en échec » d'être encore là quand
    * l'agent revient sur l'écran.
    */
-  const aEnvoyer = pendingFiches.filter((item) => estDansLaFile(item.statut_sync));
-  const enEchec = pendingFiches.filter((item) => statutFicheDe(item.statut_sync) === 'echec');
   const aEnvoyerTraitements = pendingTraitements.filter((item) => estDansLaFile(item.statut_sync));
   const enEchecTraitements = pendingTraitements.filter(
     (item) => statutFicheDe(item.statut_sync) === 'echec'
   );
 
-  const synchroniser = (drafts: DraftProspection[], draftsTraitements: DraftTraitementRow[] = []) =>
+  const synchroniser = (draftsTraitements: DraftTraitementRow[]) =>
     run(
       async () => {
         setReferentielError(null);
@@ -179,16 +158,8 @@ export default function SyncScreen() {
         // `syncAll` ne lève pas : un lot partiellement parti est un état du
         // terrain, pas une erreur. L'`Alert` modale qui l'annonçait
         // interrompait l'agent pour lui dire « réessayez » sans lui dire quoi
-        // (ADR-012 décision 9). Les deux domaines sont indépendants — un échec
-        // de lecture/synchronisation des traitements ne doit jamais empêcher
-        // celle des prospections (et inversement, cf. use-fiches-auto-sync.ts).
-        const resumeProspections = await syncAllProspections(drafts, token!);
-        const resumeTraitements = await syncAllTraitements(traitementsComplets, token!);
-        setResume({
-          reussies: [...resumeProspections.reussies, ...resumeTraitements.reussies],
-          echouees: [...resumeProspections.echouees, ...resumeTraitements.echouees],
-          conflits: [...resumeProspections.conflits, ...resumeTraitements.conflits],
-        });
+        // (ADR-012 décision 9).
+        setResume(await syncAllTraitements(traitementsComplets, token!));
         setLastSync(new Date());
         refresh();
       },
@@ -196,14 +167,14 @@ export default function SyncScreen() {
         screen: 'sync',
         precondition: !!token,
         preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
-        context: { nbFiches: drafts.length + draftsTraitements.length },
+        context: { nbFiches: draftsTraitements.length },
       }
     );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void loadAccueilData()
-      .then(setData)
+    void listToutesTraitementsLocal()
+      .then(setTraitements)
       .catch((error) => signalerChargement(error))
       .finally(() => setRefreshing(false));
   }, [signalerChargement]);
@@ -295,17 +266,17 @@ export default function SyncScreen() {
           sur l'écran — alors qu'un bouton rendu depuis `resume` disparaîtrait
           avec lui (#177, « Réessayer les N en échec »).
         */}
-        {(enEchec.length > 0 || enEchecTraitements.length > 0) && !isSyncing && (
+        {enEchecTraitements.length > 0 && !isSyncing && (
           <TouchableOpacity
             style={styles.retryCible}
-            onPress={() => void synchroniser(enEchec, enEchecTraitements)}
+            onPress={() => void synchroniser(enEchecTraitements)}
             activeOpacity={0.85}
           >
             <Text style={styles.retryCibleText}>
               Réessayer{' '}
-              {enEchec.length + enEchecTraitements.length === 1
+              {enEchecTraitements.length === 1
                 ? 'la fiche'
-                : `les ${enEchec.length + enEchecTraitements.length} fiches`}{' '}
+                : `les ${enEchecTraitements.length} fiches`}{' '}
               en échec
             </Text>
           </TouchableOpacity>
@@ -345,14 +316,14 @@ export default function SyncScreen() {
           </View>
         )}
 
-        {/* Liste des fiches à synchroniser — prospection ET traitement (#erreur-sync-fiche-introuvable) */}
+        {/* Liste des fiches à synchroniser (#erreur-sync-fiche-introuvable) */}
         <View style={styles.syncListContainer}>
           <View style={styles.syncListHeader}>
             <Text style={styles.syncListTitle}>Fiches en attente</Text>
-            <Text style={styles.syncListCount}>{pendingFiches.length + pendingTraitements.length}</Text>
+            <Text style={styles.syncListCount}>{pendingTraitements.length}</Text>
           </View>
 
-          {pendingFiches.length === 0 && pendingTraitements.length === 0 ? (
+          {pendingTraitements.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📭</Text>
               <Text style={styles.emptyTitle}>Aucune fiche en attente</Text>
@@ -360,29 +331,6 @@ export default function SyncScreen() {
             </View>
           ) : (
             <>
-              {pendingFiches.map((draft) => {
-                const statut = statutFicheDe(draft.statut_sync);
-                const { icone, couleur } = STYLE_STATUT[statut];
-                return (
-                  <View key={draft.id} style={styles.syncItem}>
-                    <View style={styles.syncItemLeft}>
-                      <View style={[styles.typeBadge, { backgroundColor: '#DBEAFE' }]}>
-                        <Text style={[styles.typeBadgeText, { color: '#2563EB' }]}>🔍 PRO</Text>
-                      </View>
-                      <View style={styles.syncItemInfo}>
-                        <Text style={styles.syncItemCode}>{draft.n_fiche ?? '—'}</Text>
-                        <Text style={styles.syncItemDate}>{draft.date_prospection}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.syncItemRight}>
-                      <Text style={[styles.syncItemStatus, { color: couleur }]}>{icone}</Text>
-                      <Text style={[styles.syncItemStatusLabel, { color: couleur }]}>
-                        {LIBELLE_STATUT_FICHE[statut]}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
               {pendingTraitements.map((draft) => {
                 const statut = statutFicheDe(draft.statut_sync);
                 const { icone, couleur } = STYLE_STATUT[statut];
@@ -421,7 +369,7 @@ export default function SyncScreen() {
         */}
         <TouchableOpacity
           style={[styles.syncButton, isSyncing && styles.syncButtonDisabled]}
-          onPress={() => void synchroniser(aEnvoyer, aEnvoyerTraitements)}
+          onPress={() => void synchroniser(aEnvoyerTraitements)}
           disabled={isSyncing}
           activeOpacity={0.85}
         >
@@ -432,8 +380,8 @@ export default function SyncScreen() {
             </View>
           ) : (
             <Text style={styles.syncButtonText}>
-              {aEnvoyer.length + aEnvoyerTraitements.length > 0
-                ? `🔄 Synchroniser (${aEnvoyer.length + aEnvoyerTraitements.length})`
+              {aEnvoyerTraitements.length > 0
+                ? `🔄 Synchroniser (${aEnvoyerTraitements.length})`
                 : '🔄 Mettre à jour le référentiel'}
             </Text>
           )}

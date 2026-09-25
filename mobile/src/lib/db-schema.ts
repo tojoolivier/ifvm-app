@@ -2,7 +2,7 @@ import type { Migration } from './db-migrations';
 import { appliquerBaseline } from './db-baseline';
 
 /**
- * Schéma des données saisies sur l'appareil (#676) : captures de prospection, traitements, vols,
+ * Schéma des données saisies sur l'appareil (#676) : traitements, vols,
  * saisies de site aérien et de stock. Le référentiel n'en fait pas partie (cache jetable, #675).
  *
  * Ajouter un changement = ajouter une étape à la fin, numéro suivant, en SQL direct :
@@ -17,5 +17,20 @@ export const MIGRATIONS_CAPTURES: readonly Migration[] = [
     version: 1,
     nom: 'schema-de-base',
     up: appliquerBaseline,
+  },
+  {
+    // Ancien module Prospection supprimé (#726), avant sa réécriture (#681) : on ne migre aucun
+    // brouillon. `traitement.prospection_id` n'a pas de clé étrangère, donc rien d'autre à toucher.
+    version: 2,
+    nom: 'suppression-tables-prospection',
+    up: async (db) => {
+      await db.execAsync(`
+        DROP TABLE IF EXISTS prospection_operation_aerienne;
+        DROP TABLE IF EXISTS prospection_infestation;
+        DROP TABLE IF EXISTS prospection_population;
+        DROP TABLE IF EXISTS prospection_capture;
+        DROP TABLE IF EXISTS prospection;
+      `);
+    },
   },
 ];

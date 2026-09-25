@@ -1,4 +1,3 @@
-import { derniereInterventionEquipe } from './prospection-repository';
 import { getReferentielDb } from './referentiel-db';
 
 /**
@@ -186,7 +185,7 @@ export async function chargerResumeEquipe(
       sitePrincipal: null,
       sitesSecondaires: [],
       aeronef: null,
-      derniereIntervention: await derniereInterventionEquipe(equipe.id),
+      derniereIntervention: null,
     };
   }
   const [sites, aeronefs] = await Promise.all([

@@ -3,10 +3,6 @@ import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuthStore } from '@/lib/auth-store';
-import { loadAccueilData, loadMesProspectionsServeur } from '@/lib/prospection-accueil';
-import { DraftProspection, synchroniserStatutServeur } from '@/lib/prospection-repository';
-import { syncAllProspections } from '@/lib/prospection-review';
-import { ProspectionRead } from '@/lib/api-client';
 import {
   listToutesTraitementsLocal,
   listReprenableTraitements,
@@ -14,8 +10,7 @@ import {
   DraftTraitementRow,
 } from '@/lib/traitement-repository';
 import { syncAllTraitements } from '@/lib/traitement-sync';
-import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
-import { navigateToProspectionConsult, navigateToProspectionDraft, navigateToTraitement } from '@/lib/fiche-routing';
+import { navigateToTraitement } from '@/lib/fiche-routing';
 import { FicheCard } from '@/components/fiches/FicheCard';
 import { SearchAndFilterBar, FilterOption } from '@/components/fiches/SearchAndFilterBar';
 import { NewFicheFab } from '@/components/fiches/NewFicheFab';
@@ -25,13 +20,11 @@ import {
   BadgeStyle,
   FICHES_BG,
   FICHES_GREEN_DARK,
-  PROSPECTION_SUBTYPE_BADGE_CONFIG,
   STATUT_BADGE_CONFIG,
   TRAITEMENT_INSIGNE_REPRISE,
   TRAITEMENT_SUBTYPE_BADGE_CONFIG,
   TYPE_BADGE_CONFIG,
 } from '@/components/fiches/tokens';
-import { statutFicheAffiche } from '@/lib/prospection-statut';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useEquipesDeTravail } from '@/hooks/use-equipes-de-travail';
 import { BandeauEquipe } from '@/components/equipe/BandeauEquipe';
@@ -42,28 +35,16 @@ import { scaleTypeSizes } from '@/lib/typography';
 import { useTheme } from '@/hooks/use-theme';
 import type { ThemePalette } from '@/constants/theme';
 
-type FilterKey = 'TOUS' | 'PROSPECTION' | 'CRT' | 'METEO';
+type FilterKey = 'TOUS' | 'CRT' | 'METEO';
 
 const FILTERS: FilterOption<FilterKey>[] = [
   { value: 'TOUS', label: 'Toutes', iconName: 'rapport-fiche' },
-  { value: 'PROSPECTION', label: 'Prospection', iconName: 'prospections' },
   { value: 'CRT', label: 'CRT', iconName: 'crt' },
   { value: 'METEO', label: 'Météo', iconName: 'meteo', disabled: true },
 ];
 
 /**
- * `station_id` est une clé du référentiel (UUID) — jamais un nom à afficher, et de
- * toute façon absente pour l'extensif (pas de station fixe du référentiel, cf.
- * extensive-reference.tsx). `station_nom` (intensif, référentiel) ou `station_libre`
- * (extensif, saisie libre) sont les vrais noms lisibles ; « Localité inconnue »
- * seulement quand aucun des deux n'est réellement renseigné.
- */
-function stationLabel(item: { station_nom?: string | null; station_libre?: string | null }): string {
-  return item.station_nom || item.station_libre || 'Localité inconnue';
-}
-
-/**
- * Pendant de `statutFicheAffiche` (prospection-statut.ts) pour un traitement —
+ * Pendant de `statutFicheAffiche` pour un traitement —
  * même priorité (`statut_sync` d'abord), mais le domaine traitement ne connaît
  * que `'brouillon'`/`'validee'` (pas de vérifiée/en attente/rejetée) : la case
  * par défaut de `statutFicheAffiche` retomberait donc à tort sur « En attente »
@@ -110,9 +91,7 @@ export default function FichesScreen() {
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
   const theme = useTheme();
   const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
-  const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
-  const hydrateFromDraft = useProspectionWizardStore((s) => s.hydrateFromDraft);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('TOUS');
@@ -120,8 +99,6 @@ export default function FichesScreen() {
   const { courante } = useEquipesDeTravail();
   const [toutesEquipes, setToutesEquipes] = useState(false);
   const filtreEquipe = courante && !toutesEquipes ? courante : null;
-  const [draftsRecent, setDraftsRecent] = useState<DraftProspection[]>([]);
-  const [validated, setValidated] = useState<ProspectionRead[]>([]);
   const [traitements, setTraitements] = useState<DraftTraitementRow[]>([]);
   // #zone-a-reprendre-insigne : ids des traitements déjà validés dont la
   // surface restante justifie une reprise (mêmes critères que
@@ -146,13 +123,6 @@ export default function FichesScreen() {
   const refresh = useCallback(() => {
     void (async () => {
       const lectures = await Promise.all([
-        runTask(() => loadAccueilData(), { name: 'fiches.brouillons', criticality: 'essential' }),
-        user && token
-          ? runTask(() => loadMesProspectionsServeur(token, user.id), {
-              name: 'fiches.statut-serveur',
-              criticality: 'essential',
-            })
-          : null,
         // Toute fiche de traitement créée sur cet appareil doit apparaître ici, pas
         // seulement celles où l'utilisateur connecté est déjà chef d'équipe/chef de
         // base (#crt-fiches-creees-absentes-de-mes-fiches) : `listMesTraitements`
@@ -167,24 +137,10 @@ export default function FichesScreen() {
         }),
       ]);
 
-      const [brouillons, validees, traitementsLus] = lectures;
-      if (brouillons.ok) setDraftsRecent(brouillons.value.recent);
-      if (validees?.ok) {
-        setValidated(validees.value);
-        // #liste-traitement-apres-validation : reporte le statut serveur
-        // authentique en local — cf. commentaire équivalent dans
-        // (app)/prospection.tsx, même correctif, même raison.
-        await runTask(
-          () =>
-            synchroniserStatutServeur(
-              validees.value.map((f) => ({ id: f.id, statut: f.statut, validated_at: f.validated_at ?? null }))
-            ),
-          { name: 'fiches.statut-serveur.persistance', criticality: 'best-effort' }
-        );
-      }
+      const [traitementsLus] = lectures;
       if (traitementsLus?.ok) setTraitements(traitementsLus.value);
 
-      // Une lecture ratée sur trois suffit à rendre la liste incomplète : la
+      // Une lecture ratée suffit à rendre la liste incomplète : la
       // taire ferait exactement le vide muet que ce ticket supprime.
       const ratee = lectures.find((l) => l !== null && !l.ok);
       setErreurDeLecture(ratee && !ratee.ok ? ratee.error : null);
@@ -197,7 +153,7 @@ export default function FichesScreen() {
       });
       if (reprenables.ok) setReprenableIds(new Set(reprenables.value.map((r) => r.id)));
     })();
-  }, [user, token]);
+  }, []);
 
   useFocusEffect(refresh);
 
@@ -222,37 +178,6 @@ export default function FichesScreen() {
     syncingIdRef.current = null;
     setSyncingId(null);
   };
-
-  const handleSyncProspection = useCallback(
-    (draft: DraftProspection) => {
-      if (syncingIdRef.current) return;
-      demarrerSync(draft.id);
-      void runSync(
-        async () => {
-          // Le lot résume, il ne lève pas (ADR-012 décision 9) : un lot d'une
-          // seule fiche reste le même contrat, réutilisé tel quel plutôt que
-          // réécrit (marquage échec/conflit compris, cf. sync-lot.ts).
-          const resume = await syncAllProspections([draft], token!);
-          if (resume.echouees.length > 0) {
-            Alert.alert('Échec de synchronisation', resume.echouees[0].message);
-          } else if (resume.conflits.length > 0) {
-            Alert.alert(
-              'Fiche modifiée sur le serveur',
-              `${resume.conflits[0].label} a été modifiée ou validée sur le serveur. Votre version est conservée sur l'appareil.`
-            );
-          }
-          refresh();
-        },
-        {
-          screen: 'fiches',
-          precondition: !!token,
-          preconditionMessage: 'Session expirée — reconnectez-vous pour synchroniser.',
-          context: { prospectionId: draft.id },
-        }
-      ).finally(terminerSync);
-    },
-    [runSync, token, refresh]
-  );
 
   const handleSyncTraitement = useCallback(
     (row: DraftTraitementRow) => {
@@ -296,43 +221,6 @@ export default function FichesScreen() {
   const periodeLabel = `Décade ${decade} · ${mois}`;
 
   const rows = useMemo<FicheRow[]>(() => {
-    const validatedIds = new Set(validated.map((p) => p.id));
-
-    const prospectionRows: FicheRow[] = draftsRecent
-      .filter((draft) => !validatedIds.has(draft.id))
-      .map((draft) => {
-        const cleBadge = statutFicheAffiche(draft.statut, draft.statut_sync);
-        return {
-          id: draft.id,
-          filterKey: 'PROSPECTION',
-          code: draft.n_fiche ?? 'Fiche sans numéro',
-          meta: `${stationLabel(draft)} · ${draft.date_prospection}`,
-          typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
-          subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[draft.type_prospection] ?? null,
-          statutBadge: STATUT_BADGE_CONFIG[cleBadge] ?? STATUT_BADGE_CONFIG.brouillon,
-          date: draft.date_prospection,
-          equipeId: draft.equipe_id,
-          onPress: () => navigateToProspectionDraft(router, hydrateFromDraft, draft),
-          onSyncPress: estEncoreASynchroniser(cleBadge) ? () => handleSyncProspection(draft) : null,
-        };
-      });
-
-    // Déjà connue du serveur (`statut_sync` forcé à 'synced' ici) : jamais
-    // « à synchro », donc jamais de bouton de synchro sur ces lignes.
-    const validatedRows: FicheRow[] = validated.map((prospection) => ({
-      id: prospection.id,
-      filterKey: 'PROSPECTION',
-      code: prospection.n_fiche ?? 'Fiche sans numéro',
-      meta: `${stationLabel(prospection)} · ${prospection.date_prospection}`,
-      typeBadge: TYPE_BADGE_CONFIG.PROSPECTION,
-      subTypeBadge: PROSPECTION_SUBTYPE_BADGE_CONFIG[prospection.type_prospection] ?? null,
-      statutBadge: STATUT_BADGE_CONFIG[statutFicheAffiche(prospection.statut, 'synced')],
-      date: prospection.date_prospection,
-      equipeId: prospection.equipe_id ?? null,
-      onPress: () => navigateToProspectionConsult(router, prospection),
-      onSyncPress: null,
-    }));
-
     const traitementRows: FicheRow[] = traitements.map((traitement) => {
       const cleBadge = statutTraitementAffiche(traitement);
       return {
@@ -352,8 +240,8 @@ export default function FichesScreen() {
       };
     });
 
-    return [...prospectionRows, ...validatedRows, ...traitementRows].sort((a, b) => b.date.localeCompare(a.date));
-  }, [draftsRecent, validated, traitements, reprenableIds, router, hydrateFromDraft, handleSyncProspection, handleSyncTraitement]);
+    return traitementRows.sort((a, b) => b.date.localeCompare(a.date));
+  }, [traitements, reprenableIds, router, handleSyncTraitement]);
 
   const fichesFiltrees = useMemo(() => {
     return rows.filter((row) => {

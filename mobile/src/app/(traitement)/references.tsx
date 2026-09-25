@@ -12,16 +12,7 @@ import {
   updateTraitementReference,
   genererNumeroFicheDisponible,
   getTraitement,
-  saveCible,
 } from '@/lib/traitement-repository';
-import { construireCible } from '@/lib/traitement-cible';
-import {
-  getProspection,
-  listAllProspectionPopulations,
-  listAllProspectionInfestations,
-  listAllProspectionCaptures,
-} from '@/lib/prospection-repository';
-import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateReferences } from '@/lib/traitement-validation';
@@ -36,13 +27,6 @@ import { SegmentedControl } from '@/components/traitement/SegmentedControl';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { ThemePalette } from '@/constants/theme';
-
-function formatDateFr(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const [year, month, day] = iso.split('T')[0].split('-');
-  if (!year || !month || !day) return null;
-  return `${day}/${month}/${year}`;
-}
 
 export default function ReferencesScreen() {
   const router = useRouter();
@@ -65,13 +49,6 @@ export default function ReferencesScreen() {
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
   const [dateValidation, setDateValidation] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [prospectionStatut, setProspectionStatut] = useState<string | null>(null);
-  const [prospectionUpdatedAt, setProspectionUpdatedAt] = useState<string | null>(null);
-  // Numéro métier (#numero-fiche-prospection-liee) — jamais l'UUID technique
-  // `prospectionId` affiché tel quel : dérivé de la fiche de prospection liée,
-  // même ordre de priorité que « Consulter une fiche validée »
-  // (prospection-picker.tsx : n_fiche, puis n_message).
-  const [prospectionNFiche, setProspectionNFiche] = useState<string | null>(null);
   const typeSizes = useTraitementTypeSizes();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
@@ -149,43 +126,6 @@ export default function ReferencesScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeTraitementId, signalerChargement]);
-
-  useEffect(() => {
-    if (!prospectionId) return;
-    getProspection(prospectionId)
-      .then((prospection) => {
-        if (!prospection) return;
-        setProspectionStatut(prospection.statut);
-        setProspectionUpdatedAt(prospection.updated_at);
-        setProspectionNFiche(prospection.n_fiche ?? prospection.n_message ?? null);
-        // Nouvelle fiche seulement (une fiche déjà créée garde sa date de
-        // validation enregistrée, restaurée par l'effet précédent) : la date de
-        // validation — non modifiable — est celle de la fiche de prospection liée,
-        // quel que soit l'écran d'où l'agent est arrivé (sélecteur, zones à
-        // reprendre, entrée directe par prospectionId).
-        if (!routeTraitementId) {
-          setDateValidation(prospection.date_prospection.slice(0, 10));
-          // Localité pré-remplie depuis la fiche de prospection liée, déjà
-          // validée — jamais ressaisie pour créer la fiche de traitement
-          // (#localite-traitement-conservee-prospection). `station_nom`
-          // (intensif, référentiel) ou `station_libre` (extensif, saisie
-          // libre) : même ordre de priorité, et même exclusivité mutuelle
-          // selon le type de prospection, que `stationLabel()`
-          // ((app)/prospection.tsx et fiches.tsx). Modifiable ensuite (filet
-          // de sécurité, ex. fiche sans aucun des deux champs renseigné).
-          // N'écrase jamais une saisie déjà présente : lu via getState() (pas
-          // la variable `store` de ce render, obsolète — cet effet ne dépend
-          // pas de `store` et ne se rejoue pas si l'agent a déjà tapé quelque
-          // chose pendant que cette requête était en vol).
-          const localitePreremplie = prospection.station_nom || prospection.station_libre;
-          if (localitePreremplie && !useTraitementCaptureStore.getState().ref.localite) {
-            store.updateRef({ localite: localitePreremplie });
-          }
-        }
-      })
-      .catch((error) => signalerChargement(error, { prospectionId }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prospectionId, routeTraitementId, signalerChargement]);
 
   // N° de fiche (auto) : « Prénom du chef — Type — Date ISO », suffixe en cas de
   // collision (même composition que generer_numero_fiche() côté backend). Le chef
@@ -283,35 +223,6 @@ export default function ReferencesScreen() {
                 });
           id = created.id;
           setTraitementId(id);
-
-          // Snapshot de la cible, figé à la création (jamais recalculé ensuite,
-          // cf. l'avertissement affiché sur l'écran Cibles) — dérivé de la fiche
-          // de prospection liée, même logique que construire_cible() côté backend.
-          if (prospectionId) {
-            const [prospectionLiee, populations, infestations, captures] = await Promise.all([
-              getProspection(prospectionId),
-              listAllProspectionPopulations(prospectionId),
-              listAllProspectionInfestations(prospectionId),
-              listAllProspectionCaptures(prospectionId),
-            ]);
-            if (prospectionLiee) {
-              const cible = construireCible(prospectionLiee, populations, infestations, captures);
-              // #zone-a-reprendre-surface-reste-a-traiter : la référence de
-              // surface pour CETTE fiche est le reste à traiter de l'origine,
-              // pas sa `surface_infestee_ha` (qui reste affichée telle quelle,
-              // inchangée — c'est une donnée de la prospection, pas de la
-              // reprise). L'origine peut avoir un type de traitement différent
-              // de celui choisi ici (terrestre/aérien restent libres l'un de
-              // l'autre, cf. `estReprise`), donc on lit le sous-objet
-              // réellement renseigné plutôt que de supposer lequel.
-              if (origineId) {
-                const origine = await getTraitement(origineId);
-                cible.surface_restante_origine_ha =
-                  origine?.terrestre?.surface_restante_ha ?? origine?.aerien?.surface_restante_ha ?? null;
-              }
-              await saveCible(id, cible);
-            }
-          }
         }
 
         // Filet de sécurité : l'effet de génération auto tourne en tâche de fond et
@@ -441,13 +352,8 @@ export default function ReferencesScreen() {
             <Text style={styles.label}>Fiche de prospection liée *</Text>
             {prospectionId ? (
               <Card variant="default" style={styles.prospectionCard}>
-                <Text style={styles.label}>N° fiche de prospection</Text>
-                <Text style={styles.prospectionText}>{prospectionNFiche ?? '(numéro non renseigné)'}</Text>
-                <Text style={styles.note}>
-                  {prospectionStatut === STATUT_VALIDE && prospectionUpdatedAt
-                    ? `Validée le ${formatDateFr(prospectionUpdatedAt)} · lecture seule`
-                    : 'Lecture seule'}
-                </Text>
+                <Text style={styles.prospectionText}>{prospectionId}</Text>
+                <Text style={styles.note}>Lecture seule</Text>
               </Card>
             ) : readOnly ? (
               <Card variant="default" style={styles.prospectionCard}>
@@ -456,7 +362,7 @@ export default function ReferencesScreen() {
             ) : (
               <TouchableOpacity
                 style={styles.prospectionPickerLink}
-                onPress={() => router.push('/(traitement)/prospection-picker' as any)}
+                onPress={() => router.push('/(app)/en-reconstruction' as any)}
               >
                 <Text style={styles.prospectionPickerLinkText}>Choisir une fiche de prospection ›</Text>
               </TouchableOpacity>

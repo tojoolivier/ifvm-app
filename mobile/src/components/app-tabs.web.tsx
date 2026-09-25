@@ -19,18 +19,17 @@ import { UserRole } from '@/lib/api-client';
 import { useThemeStore } from '@/lib/theme-store';
 
 const ROLE_TABS: Record<UserRole, string[]> = {
-  prospecteur: ['/', 'prospection', 'sync', 'profile'],
+  prospecteur: ['/', 'sync', 'profile'],
   chef_equipe: ['/', 'fiches', 'supervision', 'sync', 'profile'],
-  agent_encadreur: ['/', 'prospection', 'sync', 'profile'],
-  pilote: ['/', 'prospection', 'sync', 'profile'],
+  agent_encadreur: ['/', 'sync', 'profile'],
+  pilote: ['/', 'sync', 'profile'],
   mecanicien: ['/', 'sync', 'profile'],
   chef_de_base: ['/', 'fiches', 'supervision', 'sync', 'profile'],
-  admin: ['/', 'prospection', 'fiches', 'supervision', 'sync', 'profile'],
+  admin: ['/', 'fiches', 'supervision', 'sync', 'profile'],
 };
 
 const TAB_LABELS: Record<string, string> = {
   '/': 'Dashboard',
-  prospection: 'Prospection',
   fiches: 'Fiches',
   supervision: 'Supervision',
   sync: 'Sync',

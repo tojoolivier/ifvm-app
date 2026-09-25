@@ -4,7 +4,6 @@ import { getTraitement } from './traitement-repository';
 import {
   type VolEnAttenteLocal,
   type VolLocal,
-  getVolDeOperation,
   listVolsEnAttente,
   marquerVolEnEchec,
   marquerVolSynchronise,
@@ -16,8 +15,6 @@ import { type LotSync, type ResumeSync, syncAll } from './sync-lot';
  * ne double pas le vol. Trois chemins :
  * - saisie directe (convoyage, divers) : partent ici ;
  * - application : partent une fois leur traitement synchronisé, puis `PATCH /vols/{id}` les y rattache (#610) ;
- * - prospection : partent juste avant leur première fiche (`syncOneProspection`), car
- *   `prospection.vol_id` référence le vol ;
  * - mise en place : voyagent avec leur déplacement (`site-aerien-sync.ts`).
  */
 async function creerSurLeServeur(vol: VolEnAttenteLocal, token: string): Promise<void> {
@@ -63,20 +60,4 @@ const lotVol: LotSync<VolEnAttenteLocal> = {
 
 export async function synchroniserVols(token: string): Promise<ResumeSync> {
   return syncAll(await listVolsEnAttente(), token, lotVol);
-}
-
-/**
- * Le vol d'une prospection, envoyé s'il ne l'est pas encore ; rend son id pour `prospection.vol_id`
- * (`null` : la fiche n'a pas de vol). Une erreur remonte : la fiche ne peut pas partir sans son vol.
- */
-export async function assurerVolDeProspection(token: string, prospectionId: string): Promise<string | null> {
-  const vol = await getVolDeOperation('prospection', prospectionId);
-  if (!vol) return null;
-  if (vol.statut_sync !== 'synced') {
-    const [enAttente] = await listVolsEnAttente(vol.id);
-    if (!enAttente) throw new Error('Vol de la prospection introuvable dans la file d’envoi.');
-    await creerSurLeServeur(enAttente, token);
-    await marquerVolSynchronise(vol.id);
-  }
-  return vol.id;
 }
