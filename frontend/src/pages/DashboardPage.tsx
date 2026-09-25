@@ -19,6 +19,7 @@ import {
   sommeSurfaceProtegee,
   sommeSurfaceTraitee,
   sommePesticides,
+  tauxValidation,
   type DashboardPesticide,
   type DashboardProspection,
   type DashboardStation,
@@ -201,7 +202,7 @@ function KpiCard({
         </span>
       )}
 
-      {sousTitre && !meter && !segments && (
+      {sousTitre && !segments && (
         <div className="font-sans text-[11.5px] text-ifvm-text-weak">{sousTitre}</div>
       )}
 
@@ -379,6 +380,7 @@ export function DashboardPage() {
   /* ---------- Dérivés KPI ---------- */
   const nbIntensives = compteProspections(fiches, 'intensive')
   const nbInterventions = traitementsCampagne.length
+  const validation = tauxValidation(fiches)
   const tauxCouverture =
     surfaceInfestee > 0 ? Math.round((surfaceTraitee / surfaceInfestee) * 1000) / 10 : 0
   const stationsActives = stations.length
@@ -493,6 +495,26 @@ export function DashboardPage() {
           iconBg="rgba(31,110,82,0.12)"
           iconColor="var(--ifvm-green-text)"
           sousTitre={`dont ${nombreFr.format(nbIntensives)} intensives · ${perimetre}`}
+        />
+
+        <KpiCard
+          label="Taux de validation"
+          valeur={enChargement ? '…' : nombreFr.format(validation?.validation ?? 0)}
+          unite="%"
+          icon="shield"
+          iconBg="rgba(42,120,214,0.12)"
+          iconColor="#2a78d6"
+          meter={{
+            pct: validation?.validation ?? 0,
+            legende: 'Fiches validées parmi les fiches statuées',
+            valeurAffichee: `${validation?.validation ?? 0} %`,
+            couleur: '#2a78d6',
+          }}
+          sousTitre={
+            validation
+              ? `${validation.rejet} % rejetées (motif renseigné)`
+              : 'aucune fiche statuée'
+          }
         />
 
         <KpiCard
