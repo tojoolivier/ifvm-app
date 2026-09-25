@@ -30,14 +30,33 @@ export interface DashboardTraitement {
   prospection_id: string
   numero_fiche: string
   type_traitement: string
+  mode_traitement?: string | null
   date_traitement: string
   localite: string
   statut: string
   created_at: string
   updated_at: string
-  aerien: { pilote: string } | null
-  terrestre: { surface_traitee_ha: number | null } | null
+  aerien: {
+    pilote: string
+    surface_traitee_ha?: number | null
+    surface_protegee_ha?: number | null
+    total_pesticide_l?: number | null
+  } | null
+  terrestre: {
+    surface_traitee_ha?: number | null
+    surface_protegee_ha?: number | null
+    total_pesticide_l?: number | null
+    surface_atomiseur_ha?: number | null
+    surface_atomiseur_autoporte_ha?: number | null
+    surface_disque_rotatif_ha?: number | null
+    produits?: { produit_id: string; quantite_l: number }[]
+  } | null
   signatures: { role: string; signataire_nom: string }[]
+}
+
+export interface DashboardPesticide {
+  id: string
+  type_produit: string | null
 }
 
 export interface DashboardStation {
@@ -71,11 +90,104 @@ export function sommeSurfaceTraitee(traitements: DashboardTraitement[]): {
   let total = 0
   let sansSurface = 0
   for (const t of traitements) {
-    const surface = t.terrestre?.surface_traitee_ha
+    const surface = t.aerien?.surface_traitee_ha ?? t.terrestre?.surface_traitee_ha
     if (surface != null) total += surface
     else sansSurface++
   }
   return { total, sansSurface }
+}
+
+export function sommeSurfaceProtegee(traitements: DashboardTraitement[]): number {
+  return traitements.reduce(
+    (total, t) =>
+      total + (t.aerien?.surface_protegee_ha ?? t.terrestre?.surface_protegee_ha ?? 0),
+    0,
+  )
+}
+
+export function sommePesticides(traitements: DashboardTraitement[]): number {
+  return traitements.reduce(
+    (total, t) => total + (t.aerien?.total_pesticide_l ?? t.terrestre?.total_pesticide_l ?? 0),
+    0,
+  )
+}
+
+export interface RepartitionDashboard {
+  label: string
+  valeur: number
+  pct: number
+}
+
+function repartition(
+  valeurs: { label: string; valeur: number }[],
+): RepartitionDashboard[] {
+  const total = valeurs.reduce((sum, item) => sum + item.valeur, 0)
+  return valeurs.map((item) => ({
+    ...item,
+    pct: total === 0 ? 0 : Math.round((item.valeur / total) * 1000) / 10,
+  }))
+}
+
+export function repartitionVoies(traitements: DashboardTraitement[]): RepartitionDashboard[] {
+  return repartition([
+    {
+      label: 'Aérien',
+      valeur: traitements
+        .filter((t) => t.type_traitement === 'AERIEN')
+        .reduce((total, t) => total + (t.aerien?.surface_traitee_ha ?? 0) + (t.aerien?.surface_protegee_ha ?? 0), 0),
+    },
+    {
+      label: 'Terrestre',
+      valeur: traitements
+        .filter((t) => t.type_traitement === 'TERRESTRE')
+        .reduce((total, t) => total + (t.terrestre?.surface_traitee_ha ?? 0) + (t.terrestre?.surface_protegee_ha ?? 0), 0),
+    },
+  ])
+}
+
+export function repartitionModes(traitements: DashboardTraitement[]): RepartitionDashboard[] {
+  return repartition([
+    {
+      label: 'Barrière',
+      valeur: traitements
+        .filter((t) => t.mode_traitement === 'BARRIERE')
+        .reduce((total, t) => total + (t.aerien?.surface_protegee_ha ?? t.terrestre?.surface_protegee_ha ?? 0), 0),
+    },
+    {
+      label: 'Couverture totale',
+      valeur: traitements
+        .filter((t) => t.mode_traitement === 'TOTAL')
+        .reduce((total, t) => total + (t.aerien?.surface_traitee_ha ?? t.terrestre?.surface_traitee_ha ?? 0), 0),
+    },
+    {
+      label: 'Autre / non renseigné',
+      valeur: traitements
+        .filter((t) => t.mode_traitement !== 'BARRIERE' && t.mode_traitement !== 'TOTAL')
+        .reduce((total, t) => total + (t.aerien?.surface_traitee_ha ?? t.terrestre?.surface_traitee_ha ?? 0), 0),
+    },
+  ])
+}
+
+export function repartitionProduits(
+  traitements: DashboardTraitement[],
+  pesticides: DashboardPesticide[],
+): RepartitionDashboard[] {
+  const types = new Map(pesticides.map((p) => [p.id, p.type_produit]))
+  let barriere = 0
+  let choc = 0
+  let nonClasse = 0
+  for (const traitement of traitements) {
+    for (const produit of traitement.terrestre?.produits ?? []) {
+      if (types.get(produit.produit_id) === 'produit_barriere') barriere += produit.quantite_l
+      else if (types.get(produit.produit_id) === 'produit_choc') choc += produit.quantite_l
+      else nonClasse += produit.quantite_l
+    }
+  }
+  return repartition([
+    { label: 'Barrière', valeur: barriere },
+    { label: 'Choc', valeur: choc },
+    { label: 'Non classé', valeur: nonClasse },
+  ])
 }
 
 /**
