@@ -403,6 +403,8 @@ describe('enregistrerEtSynchroniser', () => {
     expect(mockCreateProspection).toHaveBeenCalledWith(
       'token-1',
       expect.objectContaining({
+        // #678 : la fiche garde son id local sur le serveur — sinon doublon et statut local figé.
+        id: 'draft-1',
         populations: [expect.objectContaining({ espece: 'LMC', categorie: 'imago', densite_diffuse: 5 })],
         infestations: [expect.objectContaining({ type_cible: 'dense', surface_totale: 5 })],
       })

@@ -3152,6 +3152,8 @@ export interface components {
         };
         /** ProspectionCreate */
         ProspectionCreate: {
+            /** Id */
+            id?: string | null;
             type_prospection: components["schemas"]["TypeProspection"];
             /**
              * Campagne Id

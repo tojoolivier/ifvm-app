@@ -536,6 +536,10 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
   );
 
   return {
+    // #678 : la fiche garde SON id sur le serveur. Sans lui l'appareil et le serveur ne se
+    // reconnaissent plus (doublon dans « Mes fiches », statut local figé) et un envoi refait après
+    // une réponse perdue créerait une seconde fiche.
+    id: draft.id,
     type_prospection: draft.type_prospection as ProspectionCreateInput['type_prospection'],
     campagne_id: draft.campagne_id,
     equipe_id: equipeId,
