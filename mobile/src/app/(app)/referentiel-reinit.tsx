@@ -42,6 +42,8 @@ export default function ReferentielReinitScreen() {
   useEffect(() => {
     const abandon = new AbortController();
     controleur.current = abandon;
+    // Une exécution abandonnée (retour système, remontage en développement) ne touche plus à l'écran.
+    const courante = () => controleur.current === abandon;
 
     let abouti = false;
     void run(
@@ -49,6 +51,7 @@ export default function ReferentielReinitScreen() {
         const resultat = await reinitialiserReferentiel(token!, {
           signal: abandon.signal,
           surProgression: (p) => {
+            if (!courante()) return;
             setPhase('ecriture');
             if (p.etat === 'en_cours') setEnCours(p);
             else {
@@ -58,7 +61,7 @@ export default function ReferentielReinitScreen() {
           },
         });
         abouti = true;
-        setPhase(resultat === 'annule' ? 'annule' : 'termine');
+        if (courante()) setPhase(resultat === 'annule' ? 'annule' : 'termine');
       },
       {
         screen: 'referentiel-reinit',
@@ -68,8 +71,11 @@ export default function ReferentielReinitScreen() {
       }
     ).then(() => {
       // `run` ne relance pas l'erreur : elle est déjà signalée, il reste à l'écran d'en tenir compte.
-      if (!abouti) setPhase('echec');
+      if (!abouti && courante()) setPhase('echec');
     });
+    // Quitter l'écran pendant le téléchargement le coupe ; une fois l'écriture commencée, elle va au bout
+    // (transaction atomique) et l'appareil n'est jamais laissé à moitié.
+    return () => abandon.abort();
     // `token` change rarement ; `essai` relance volontairement.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [essai]);

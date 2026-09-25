@@ -452,9 +452,25 @@ async function purgerSupprimes(
   }
 }
 
-export async function resetReferentielSyncCursors(): Promise<void> {
-  const db = await getReferentielDb();
-  await db.runAsync('DELETE FROM referentiel_sync_meta');
+/**
+ * File d'attente des écritures du référentiel : la synchro automatique, le bouton « Synchroniser » et la
+ * réinitialisation ne tournent jamais ensemble. Sans elle, un pull incrémental pouvait écrire dans des
+ * tables que la réinitialisation venait de recréer, et déposer des curseurs incohérents.
+ */
+let file: Promise<unknown> = Promise.resolve();
+function enFile<T>(tache: () => Promise<T>): Promise<T> {
+  const resultat = file.then(tache, tache);
+  file = resultat.catch(() => undefined);
+  return resultat;
+}
+
+export function resetReferentielSyncCursors(): Promise<void> {
+  // Dans la file : remis à zéro en plein pull ou en plein remplacement, un curseur perdait sa valeur
+  // sous les pieds de l'écriture qui venait de le déposer.
+  return enFile(async () => {
+    const db = await getReferentielDb();
+    await db.runAsync('DELETE FROM referentiel_sync_meta');
+  });
 }
 
 export interface ProgressionTable {
@@ -505,18 +521,6 @@ async function appliquerReponse(
     const lignes = (response[table].upserts as Supprimable[]).filter((l) => !l.deleted_at).length;
     surProgression?.({ ...repere, etat: 'fini', lignes });
   }
-}
-
-/**
- * File d'attente des écritures du référentiel : la synchro automatique, le bouton « Synchroniser » et la
- * réinitialisation ne tournent jamais ensemble. Sans elle, un pull incrémental pouvait écrire dans des
- * tables que la réinitialisation venait de recréer, et déposer des curseurs incohérents.
- */
-let file: Promise<unknown> = Promise.resolve();
-function enFile<T>(tache: () => Promise<T>): Promise<T> {
-  const resultat = file.then(tache, tache);
-  file = resultat.catch(() => undefined);
-  return resultat;
 }
 
 /** Tire le référentiel depuis le serveur et l'upsert localement. Lève en cas d'échec réseau/API. */

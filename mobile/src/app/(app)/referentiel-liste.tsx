@@ -15,6 +15,7 @@ import {
   type LigneGenerique,
   compterGenerique,
   configGenerique,
+  estGenerique,
   listerGenerique,
   majJourMois,
 } from '@/lib/referentiel-generique';
@@ -35,21 +36,37 @@ const STATUTS = [
 export default function ReferentielListeScreen() {
   const router = useRouter();
   const { table } = useLocalSearchParams<{ table: string }>();
-  const config = configGenerique(table);
-  const lister = useCallback((filtre: FiltreGenerique) => listerGenerique(table, filtre), [table]);
+  // Un paramètre absent ou inconnu (lien périmé) ne doit pas faire planter l'écran.
+  const config = estGenerique(table) ? configGenerique(table) : null;
+  const lister = useCallback(
+    (filtre: FiltreGenerique) => (config ? listerGenerique(table, filtre) : Promise.resolve([])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `config` ne change qu'avec `table`
+    [table]
+  );
   const { filtre, lignes, modifier, signalerChargement } = useListeFiltrable<FiltreGenerique, LigneGenerique>({
     defaut: FILTRE_DEFAUT,
     lister,
     source: `referentiel-liste-${table}`,
   });
   const [total, setTotal] = useState<CompteGenerique>({ tous: 0, actifs: 0, inactifs: 0, majLe: null });
-  const avecStatut = config.actifSql !== null;
+  const avecStatut = config?.actifSql != null;
 
   useEffect(() => {
+    if (!config) return;
     compterGenerique(table)
       .then(setTotal)
       .catch((error) => signalerChargement(error, { source: `referentiel-liste-${table}` }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `config` ne change qu'avec `table`
   }, [table, signalerChargement]);
+
+  if (!config) {
+    return (
+      <View style={styles.racine}>
+        <EquipeHeader titre="Référentiel" onRetour={() => router.back()} />
+        <EtatVide texte="Ce référentiel n’existe pas." />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.racine}>

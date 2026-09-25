@@ -58,6 +58,40 @@ describe('ReferentielReinitScreen', () => {
     expect(mockBack).toHaveBeenCalled();
   });
 
+  it('quitter l’écran pendant le téléchargement coupe la requête', async () => {
+    let options: OptionsReinitialisation = {};
+    jest.mocked(reinitialiserReferentiel).mockImplementation((_t, o) => {
+      options = o ?? {};
+      return new Promise(() => {});
+    });
+    const { unmount } = await render(<ReferentielReinitScreen />);
+    expect(options.signal?.aborted).toBe(false);
+
+    await unmount();
+
+    expect(options.signal?.aborted).toBe(true);
+  });
+
+  it('une exécution abandonnée n’écrase pas l’état de la suivante (double lancement)', async () => {
+    const options: OptionsReinitialisation[] = [];
+    const finir: ((r: 'termine' | 'annule') => void)[] = [];
+    jest.mocked(reinitialiserReferentiel).mockImplementation((_t, o) => {
+      options.push(o ?? {});
+      return new Promise((resolu) => finir.push(resolu));
+    });
+    await render(<ReferentielReinitScreen />);
+
+    // Relance après échec : la première exécution est abandonnée, la seconde devient la courante.
+    await act(async () => {
+      finir[0]('annule');
+    });
+    expect(await screen.findByText('Réinitialisation annulée — rien n’a été supprimé')).toBeTruthy();
+
+    jest.mocked(reinitialiserReferentiel).mockClear();
+    await fireEvent.press(screen.getByText('Fermer'));
+    expect(mockBack).toHaveBeenCalled();
+  });
+
   it('montre les tables terminées avec leur nombre d’entrées, la table en cours et celles qui restent', async () => {
     let options: OptionsReinitialisation = {};
     jest.mocked(reinitialiserReferentiel).mockImplementation((_t, o) => {

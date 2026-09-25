@@ -438,7 +438,7 @@ async function preparerSchema(db: SQLite.SQLiteDatabase): Promise<void> {
 
 /**
  * Remplace tout le cache du référentiel par ce qu'écrit `remplir` (« Tout réinitialiser », Figma
- * « Réinitialisation »), **dans une seule transaction** : les tables sont jetées puis recréées, les
+ * « Réinitialisation »), **dans une seule transaction exclusive** : les tables sont jetées puis recréées, les
  * curseurs `since` remis à zéro, et seuls les sites créés hors-ligne restent. Si `remplir` échoue — ou
  * que l'app est tuée en route — tout est annulé et l'ancien cache est intact : vider puis écrire hors
  * transaction laisserait l'appareil sans stades ni pesticides en plein terrain. Les tables de saisie
@@ -446,9 +446,13 @@ async function preparerSchema(db: SQLite.SQLiteDatabase): Promise<void> {
  */
 export async function remplacerReferentiel(remplir: (db: SQLite.SQLiteDatabase) => Promise<void>): Promise<void> {
   const db = await getReferentielDb();
-  await db.withTransactionAsync(async () => {
-    await viderTablesReferentiel(db);
-    await remplir(db);
+  // Transaction **exclusive** : elle ouvre sa propre connexion, tout ce qu'elle exécute passe par `txn`.
+  // Avec `withTransactionAsync`, une lecture d'un écran ouvert sur la connexion partagée pouvait tomber
+  // en plein DROP/CREATE (« no such table ») ou se retrouver happée dans la transaction. Ici, la base
+  // est en WAL : les lecteurs gardent l'ancien cache jusqu'au commit, puis voient le nouveau d'un bloc.
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await viderTablesReferentiel(txn);
+    await remplir(txn);
   });
 }
 

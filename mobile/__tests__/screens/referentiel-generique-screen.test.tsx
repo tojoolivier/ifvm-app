@@ -32,7 +32,8 @@ beforeEach(() => {
   mockPush.mockReset();
   mockParams = { table: 'aeronef' };
   jest.mocked(listerGenerique).mockReset().mockResolvedValue([ligne({}), ligne({ cle: 'a2', titre: 'F-ZBB', sousTitre: 'Airbus', actif: false })]);
-  jest.mocked(compterGenerique).mockResolvedValue({ tous: 6, actifs: 5, inactifs: 1, majLe: '2026-09-20T05:12:00.000Z' });
+  jest.mocked(getLigneGenerique).mockClear();
+  jest.mocked(compterGenerique).mockClear().mockResolvedValue({ tous: 6, actifs: 5, inactifs: 1, majLe: '2026-09-20T05:12:00.000Z' });
 });
 
 describe('ReferentielListeScreen', () => {
@@ -78,6 +79,21 @@ describe('ReferentielListeScreen', () => {
 
     expect(await screen.findByText('03')).toBeTruthy();
     expect(screen.getByText('Équipe Sud')).toBeTruthy();
+  });
+
+  it('une table inconnue (lien périmé) ne fait pas planter l’écran', async () => {
+    mockParams = { table: 'table_disparue' };
+    await render(<ReferentielListeScreen />);
+
+    expect(await screen.findByText('Ce référentiel n’existe pas.')).toBeTruthy();
+    expect(listerGenerique).not.toHaveBeenCalled();
+    expect(compterGenerique).not.toHaveBeenCalled();
+  });
+
+  it('un paramètre de table absent non plus', async () => {
+    mockParams = {};
+    await render(<ReferentielListeScreen />);
+    expect(await screen.findByText('Ce référentiel n’existe pas.')).toBeTruthy();
   });
 
   it('ouvre la fiche avec la table et la clé', async () => {
@@ -136,6 +152,14 @@ describe('ReferentielFicheScreen', () => {
     expect(await screen.findByText('Jean Rakoto')).toBeTruthy();
     expect(screen.queryByText('INFORMATIONS DE SYNCHRONISATION')).toBeNull();
     expect(screen.queryByText('Identifiant')).toBeNull();
+  });
+
+  it('une fiche d’une table inconnue ne fait pas planter l’écran', async () => {
+    mockParams = { table: 'table_disparue', cle: 'x' };
+    await render(<ReferentielFicheScreen />);
+
+    expect(await screen.findByText('Ce référentiel n’existe pas.')).toBeTruthy();
+    expect(getLigneGenerique).not.toHaveBeenCalled();
   });
 
   it('une entrée disparue du cache le dit', async () => {

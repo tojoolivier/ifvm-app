@@ -6,21 +6,32 @@ import { EquipeHeader } from '@/components/equipe/EquipeHeader';
 import { Carte, Champ, EnteteDetail, EtatVide, LigneInfo, NoteInfo, RF, TitreSection } from '@/components/referentiel/composants';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { abregerIdentifiant, formaterDateHeure } from '@/lib/referentiel-consultation';
-import { type FicheGenerique, configGenerique, getLigneGenerique } from '@/lib/referentiel-generique';
+import { type FicheGenerique, configGenerique, estGenerique, getLigneGenerique } from '@/lib/referentiel-generique';
 
 /** Fiche en lecture seule d'une entrée d'un référentiel sans écran dédié ; ses champs viennent de la configuration de la table. */
 export default function ReferentielFicheScreen() {
   const router = useRouter();
   const { table, cle } = useLocalSearchParams<{ table: string; cle: string }>();
-  const config = configGenerique(table);
+  // Un paramètre absent ou inconnu (lien périmé) ne doit pas faire planter l'écran.
+  const config = estGenerique(table) ? configGenerique(table) : null;
   const signalerChargement = useSignalerChargement('referentiel-fiche');
   const [fiche, setFiche] = useState<FicheGenerique | null | undefined>(undefined);
 
   useEffect(() => {
+    if (!estGenerique(table)) return;
     getLigneGenerique(table, cle)
       .then(setFiche)
       .catch((error) => signalerChargement(error, { source: 'referentiel-fiche', table, cle }));
   }, [table, cle, signalerChargement]);
+
+  if (!config) {
+    return (
+      <View style={styles.racine}>
+        <EquipeHeader titre="Fiche" onRetour={() => router.back()} />
+        <EtatVide texte="Ce référentiel n’existe pas." />
+      </View>
+    );
+  }
 
   const aSynchro = fiche && (config.avecIdentifiant || fiche.majLe || fiche.actif !== null);
 

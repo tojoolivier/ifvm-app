@@ -1,6 +1,6 @@
 import { apiClient } from '../src/lib/api-client';
 import { getReferentielDb, remplacerReferentiel } from '../src/lib/referentiel-db';
-import { reinitialiserReferentiel } from '../src/lib/referentiel-sync';
+import { pullReferentiel, reinitialiserReferentiel, resetReferentielSyncCursors } from '../src/lib/referentiel-sync';
 
 jest.mock('../src/lib/referentiel-db', () => ({
   getReferentielDb: jest.fn(),
@@ -11,8 +11,8 @@ jest.mock('../src/lib/api-client', () => ({
 }));
 
 const ordre: string[] = [];
-const runAsync = jest.fn(async () => {
-  ordre.push('ecriture');
+const runAsync = jest.fn(async (sql?: string) => {
+  ordre.push(typeof sql === 'string' && sql.includes('DELETE FROM referentiel_sync_meta') ? 'curseurs' : 'ecriture');
 });
 const db = { runAsync, getAllAsync: jest.fn().mockResolvedValue([]), getFirstAsync: jest.fn() } as never;
 
@@ -47,6 +47,37 @@ beforeEach(() => {
   jest.mocked(apiClient.pullReferentiel).mockImplementation(async () => {
     ordre.push('telechargement');
     return reponseVide() as never;
+  });
+});
+
+describe('file d’attente des écritures', () => {
+  it('la remise à zéro des curseurs attend le pull en cours au lieu de passer devant', async () => {
+    let finirTelechargement: () => void = () => {};
+    jest.mocked(apiClient.pullReferentiel).mockImplementation(async () => {
+      ordre.push('telechargement');
+      await new Promise<void>((resolu) => {
+        finirTelechargement = resolu;
+      });
+      return reponseVide() as never;
+    });
+
+    const pull = pullReferentiel('token-1');
+    const remiseAZero = resetReferentielSyncCursors();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(ordre).toEqual(['telechargement']);
+
+    finirTelechargement();
+    await Promise.all([pull, remiseAZero]);
+
+    expect(ordre.at(-1)).toBe('curseurs');
+  });
+
+  it('un pull en échec ne bloque pas la file', async () => {
+    jest.mocked(apiClient.pullReferentiel).mockRejectedValueOnce(new Error('réseau'));
+    await expect(pullReferentiel('token-1')).rejects.toThrow('réseau');
+
+    await expect(resetReferentielSyncCursors()).resolves.toBeUndefined();
   });
 });
 
