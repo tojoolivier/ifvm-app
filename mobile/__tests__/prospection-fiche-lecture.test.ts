@@ -96,6 +96,17 @@ function prospection(overrides: Partial<ProspectionRead> = {}): ProspectionRead 
   };
 }
 
+describe('buildFicheLecture — libellé de statut', () => {
+  it('garde « Validée ✓ » pour une fiche validée', () => {
+    expect(buildFicheLecture(prospection({ statut: 'validee' })).statutLabel).toBe('Validée ✓');
+  });
+
+  it('affiche le vrai statut d’une fiche pas encore validée, sans la faire passer pour validée', () => {
+    expect(buildFicheLecture(prospection({ statut: 'en_attente' })).statutLabel).toBe('En attente');
+    expect(buildFicheLecture(prospection({ statut: 'verifiee' })).statutLabel).toBe('Vérifiée');
+  });
+});
+
 describe('isFicheValidee', () => {
   it('est vraie uniquement pour le statut validee', () => {
     expect(isFicheValidee({ statut: 'validee' })).toBe(true);

@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient, ProspectionRead } from '@/lib/api-client';
-import { buildFicheLecture, FicheLectureViewModel, isFicheValidee } from '@/lib/prospection-fiche-lecture';
+import { buildFicheLecture, FicheLectureViewModel } from '@/lib/prospection-fiche-lecture';
 import { telechargerEtPartagerPdf } from '@/lib/pdf-partage';
 import { depsPdfPartage } from '@/lib/pdf-partage-natif';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -80,10 +80,8 @@ export default function FicheLectureScreen() {
     );
   }
 
-  if (!isFicheValidee(prospection)) {
-    return <View style={styles.root} />;
-  }
-
+  // Lecture seule de toute fiche du serveur, pas seulement des validées : « Mes fiches » ouvre cet
+  // écran pour une fiche « En attente » ou « Vérifiée », qui restait sinon un écran blanc sans erreur.
   const recap: FicheLectureViewModel = buildFicheLecture(prospection);
   const prospecteurLabel = user ? `${user.prenom} ${user.nom}` : '—';
 
