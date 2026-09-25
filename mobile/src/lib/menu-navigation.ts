@@ -22,6 +22,6 @@ export function entreesNavigation(
     ...(peutSaisirVols(role)
       ? [{ cle: 'stock', libelle: 'Stock', icone: 'referentiels' as const, onPress: () => aller('/(app)/stock') }]
       : []),
-    { cle: 'referentiels', libelle: 'Référentiels', icone: 'referentiels', onPress: () => aller('/(app)/sync') },
+    { cle: 'referentiels', libelle: 'Référentiels', icone: 'referentiels', onPress: () => aller('/(app)/referentiels') },
   ];
 }

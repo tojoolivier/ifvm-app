@@ -16,7 +16,7 @@ import {
   StationFixeSync,
   UtilisateurEquipeSync,
 } from './api-client';
-import { getReferentielDb } from './referentiel-db';
+import { getReferentielDb, remplacerReferentiel } from './referentiel-db';
 
 type EntityType = keyof ReferentielPullResponse;
 
@@ -457,29 +457,107 @@ export async function resetReferentielSyncCursors(): Promise<void> {
   await db.runAsync('DELETE FROM referentiel_sync_meta');
 }
 
-/** Tire le référentiel depuis le serveur et l'upsert localement. Lève en cas d'échec réseau/API. */
-export async function pullReferentiel(token: string, onUnauthorized?: () => void): Promise<void> {
-  const db = await getReferentielDb();
-  const cursors = await getPerEntityCursors(db);
+export interface ProgressionTable {
+  table: EntityType;
+  /** Rang de la table, de 1 à `total`. */
+  index: number;
+  total: number;
+  etat: 'en_cours' | 'fini';
+  /** Entrées écrites pour cette table ; 0 tant que l'état est `en_cours`. */
+  lignes: number;
+}
 
-  const response = await apiClient.pullReferentiel(token, cursors, onUnauthorized);
+type Base = Awaited<ReturnType<typeof getReferentielDb>>;
 
+/**
+ * Écrit une réponse du serveur dans le cache, table par table. L'ordre est libre (le DDL local n'a
+ * aucune clé étrangère) ; `surProgression` annonce le début et la fin de chaque table à l'écran de
+ * réinitialisation.
+ */
+async function appliquerReponse(
+  db: Base,
+  response: ReferentielPullResponse,
+  surProgression?: (progression: ProgressionTable) => void
+): Promise<void> {
   await purgerSupprimes(db, response);
-  await upsertPostesAcridiens(db, vivantes(response.postes_acridiens.upserts));
-  await upsertStationsFixes(db, vivantes(response.stations_fixes.upserts));
-  await upsertUtilisateursEquipe(db, response.utilisateurs_equipe.upserts);
-  await upsertPesticides(db, vivantes(response.pesticides.upserts));
-  await upsertCultures(db, vivantes(response.cultures.upserts));
-  await upsertCodesStades(db, vivantes(response.codes_stades.upserts));
-  await upsertCampagnes(db, vivantes(response.campagnes.upserts));
-  await upsertLieuxAeriens(db, vivantes(response.lieux_aeriens.upserts));
-  await upsertEquipes(db, vivantes(response.equipes.upserts));
-  await upsertEquipeMembres(db, response.equipe_membres.upserts);
-  await upsertSitesAeriens(db, vivantes(response.sites_aeriens.upserts));
-  await upsertAeronefs(db, vivantes(response.aeronefs.upserts));
-  await upsertEquipeAeronefs(db, vivantes(response.equipe_aeronefs.upserts));
 
-  for (const entityType of ENTITY_TYPES) {
-    await updateSyncCursor(db, entityType, response[entityType].server_time);
+  const etapes: [EntityType, () => Promise<void>][] = [
+    ['postes_acridiens', () => upsertPostesAcridiens(db, vivantes(response.postes_acridiens.upserts))],
+    ['stations_fixes', () => upsertStationsFixes(db, vivantes(response.stations_fixes.upserts))],
+    ['utilisateurs_equipe', () => upsertUtilisateursEquipe(db, response.utilisateurs_equipe.upserts)],
+    ['pesticides', () => upsertPesticides(db, vivantes(response.pesticides.upserts))],
+    ['cultures', () => upsertCultures(db, vivantes(response.cultures.upserts))],
+    ['codes_stades', () => upsertCodesStades(db, vivantes(response.codes_stades.upserts))],
+    ['campagnes', () => upsertCampagnes(db, vivantes(response.campagnes.upserts))],
+    ['lieux_aeriens', () => upsertLieuxAeriens(db, vivantes(response.lieux_aeriens.upserts))],
+    ['equipes', () => upsertEquipes(db, vivantes(response.equipes.upserts))],
+    ['equipe_membres', () => upsertEquipeMembres(db, response.equipe_membres.upserts)],
+    ['sites_aeriens', () => upsertSitesAeriens(db, vivantes(response.sites_aeriens.upserts))],
+    ['aeronefs', () => upsertAeronefs(db, vivantes(response.aeronefs.upserts))],
+    ['equipe_aeronefs', () => upsertEquipeAeronefs(db, vivantes(response.equipe_aeronefs.upserts))],
+  ];
+
+  for (const [i, [table, ecrire]] of etapes.entries()) {
+    const repere = { table, index: i + 1, total: etapes.length };
+    surProgression?.({ ...repere, etat: 'en_cours', lignes: 0 });
+    await ecrire();
+    await updateSyncCursor(db, table, response[table].server_time);
+    const lignes = (response[table].upserts as Supprimable[]).filter((l) => !l.deleted_at).length;
+    surProgression?.({ ...repere, etat: 'fini', lignes });
   }
+}
+
+/**
+ * File d'attente des écritures du référentiel : la synchro automatique, le bouton « Synchroniser » et la
+ * réinitialisation ne tournent jamais ensemble. Sans elle, un pull incrémental pouvait écrire dans des
+ * tables que la réinitialisation venait de recréer, et déposer des curseurs incohérents.
+ */
+let file: Promise<unknown> = Promise.resolve();
+function enFile<T>(tache: () => Promise<T>): Promise<T> {
+  const resultat = file.then(tache, tache);
+  file = resultat.catch(() => undefined);
+  return resultat;
+}
+
+/** Tire le référentiel depuis le serveur et l'upsert localement. Lève en cas d'échec réseau/API. */
+export function pullReferentiel(token: string, onUnauthorized?: () => void): Promise<void> {
+  return enFile(async () => {
+    const db = await getReferentielDb();
+    const cursors = await getPerEntityCursors(db);
+
+    const response = await apiClient.pullReferentiel(token, cursors, onUnauthorized);
+
+    await appliquerReponse(db, response);
+  });
+}
+
+export interface OptionsReinitialisation {
+  surProgression?: (progression: ProgressionTable) => void;
+  /** Consulté une fois le téléchargement fini : après le vidage, il n'y a plus de retour possible. */
+  estAnnule?: () => boolean;
+  onUnauthorized?: () => void;
+}
+
+/**
+ * « Tout réinitialiser » : jette le cache du référentiel et le retélécharge en entier.
+ *
+ * Le téléchargement passe **avant** le vidage, et le vidage et l'écriture forment une seule
+ * transaction (`remplacerReferentiel`) : un échec réseau ou d'écriture laisse l'ancien cache intact.
+ * C'est aussi ce qui rend « Annuler » sûr pendant le téléchargement.
+ */
+export function reinitialiserReferentiel(
+  token: string,
+  options: OptionsReinitialisation = {}
+): Promise<'termine' | 'annule'> {
+  return enFile(() => reinitialiser(token, options));
+}
+
+async function reinitialiser(token: string, options: OptionsReinitialisation): Promise<'termine' | 'annule'> {
+  const curseursNuls = Object.fromEntries(ENTITY_TYPES.map((entite) => [entite, null])) as ReferentielSinceCursors;
+  const response = await apiClient.pullReferentiel(token, curseursNuls, options.onUnauthorized);
+
+  if (options.estAnnule?.()) return 'annule';
+
+  await remplacerReferentiel((db) => appliquerReponse(db, response, options.surProgression));
+  return 'termine';
 }

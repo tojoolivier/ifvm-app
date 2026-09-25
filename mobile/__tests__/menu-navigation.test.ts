@@ -46,10 +46,10 @@ describe('entreesNavigation — section NAVIGATION du tiroir', () => {
     expect(sites).toMatchObject({ libelle: 'Sites', icone: 'sites' });
   });
 
-  it('« Équipes » et « Référentiels » gardent leur destination', () => {
+  it('« Équipes » et « Référentiels » gardent leur destination (l’accueil des référentiels, plus l’écran de synchronisation)', () => {
     const entrees = entreesNavigation('chef_de_base', aller);
     entrees.find((e) => e.cle === 'equipes')?.onPress();
     entrees.find((e) => e.cle === 'referentiels')?.onPress();
-    expect(aller.mock.calls).toEqual([['/(app)/equipes'], ['/(app)/sync']]);
+    expect(aller.mock.calls).toEqual([['/(app)/equipes'], ['/(app)/referentiels']]);
   });
 });

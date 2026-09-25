@@ -436,38 +436,57 @@ async function preparerSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   await reconstruireReferentiel(db);
 }
 
+/**
+ * Remplace tout le cache du référentiel par ce qu'écrit `remplir` (« Tout réinitialiser », Figma
+ * « Réinitialisation »), **dans une seule transaction** : les tables sont jetées puis recréées, les
+ * curseurs `since` remis à zéro, et seuls les sites créés hors-ligne restent. Si `remplir` échoue — ou
+ * que l'app est tuée en route — tout est annulé et l'ancien cache est intact : vider puis écrire hors
+ * transaction laisserait l'appareil sans stades ni pesticides en plein terrain. Les tables de saisie
+ * (brouillons, fiches en attente d'envoi) ne sont jamais touchées.
+ */
+export async function remplacerReferentiel(remplir: (db: SQLite.SQLiteDatabase) => Promise<void>): Promise<void> {
+  const db = await getReferentielDb();
+  await db.withTransactionAsync(async () => {
+    await viderTablesReferentiel(db);
+    await remplir(db);
+  });
+}
+
 type LigneSite = Record<string, unknown>;
 
 async function reconstruireReferentiel(db: SQLite.SQLiteDatabase): Promise<void> {
-  await db.withTransactionAsync(async () => {
-    // Un site créé hors-ligne (#643) vit dans une table de cache mais n'existe que sur l'appareil :
-    // on le met de côté avant le DROP et on le réinsère.
-    const colonnes = await db.getAllAsync<{ name: string }>('PRAGMA table_info(site_aerien)');
-    const sitesEnAttente: LigneSite[] = colonnes.some((c) => c.name === 'statut_sync')
-      ? await db.getAllAsync<LigneSite>("SELECT * FROM site_aerien WHERE statut_sync <> 'synced'")
-      : [];
+  await db.withTransactionAsync(() => viderTablesReferentiel(db));
+}
 
-    for (const table of REFERENTIEL_TABLES) {
-      await db.execAsync(`DROP TABLE IF EXISTS ${table};`);
-    }
-    await db.execAsync(REFERENTIEL_DDL);
-    await db.runAsync('DELETE FROM referentiel_sync_meta');
+/** À appeler dans une transaction : jette et recrée les tables miroir, en gardant les sites en attente. */
+async function viderTablesReferentiel(db: SQLite.SQLiteDatabase): Promise<void> {
+  // Un site créé hors-ligne (#643) vit dans une table de cache mais n'existe que sur l'appareil :
+  // on le met de côté avant le DROP et on le réinsère.
+  const colonnes = await db.getAllAsync<{ name: string }>('PRAGMA table_info(site_aerien)');
+  const sitesEnAttente: LigneSite[] = colonnes.some((c) => c.name === 'statut_sync')
+    ? await db.getAllAsync<LigneSite>("SELECT * FROM site_aerien WHERE statut_sync <> 'synced'")
+    : [];
 
-    const nouvelles = new Set(
-      (await db.getAllAsync<{ name: string }>('PRAGMA table_info(site_aerien)')).map((c) => c.name)
-    );
-    for (const site of sitesEnAttente) {
-      const cles = Object.keys(site).filter((cle) => nouvelles.has(cle));
-      await db.runAsync(
-        `INSERT INTO site_aerien (${cles.join(', ')}) VALUES (${cles.map(() => '?').join(', ')})`,
-        cles.map((cle) => site[cle] as SQLite.SQLiteBindValue)
-      );
-    }
+  for (const table of REFERENTIEL_TABLES) {
+    await db.execAsync(`DROP TABLE IF EXISTS ${table};`);
+  }
+  await db.execAsync(REFERENTIEL_DDL);
+  await db.runAsync('DELETE FROM referentiel_sync_meta');
 
+  const nouvelles = new Set(
+    (await db.getAllAsync<{ name: string }>('PRAGMA table_info(site_aerien)')).map((c) => c.name)
+  );
+  for (const site of sitesEnAttente) {
+    const cles = Object.keys(site).filter((cle) => nouvelles.has(cle));
     await db.runAsync(
-      `INSERT INTO referentiel_schema_version (id, version) VALUES (1, ?)
-       ON CONFLICT(id) DO UPDATE SET version = excluded.version`,
-      [REFERENTIEL_SCHEMA_VERSION]
+      `INSERT INTO site_aerien (${cles.join(', ')}) VALUES (${cles.map(() => '?').join(', ')})`,
+      cles.map((cle) => site[cle] as SQLite.SQLiteBindValue)
     );
-  });
+  }
+
+  await db.runAsync(
+    `INSERT INTO referentiel_schema_version (id, version) VALUES (1, ?)
+     ON CONFLICT(id) DO UPDATE SET version = excluded.version`,
+    [REFERENTIEL_SCHEMA_VERSION]
+  );
 }
