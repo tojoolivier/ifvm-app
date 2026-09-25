@@ -43,14 +43,9 @@ export interface Outbox {
 export function creerOutbox({ table, base, horodate = false }: OptionsOutbox): Outbox {
   const changerStatut = (statut: StatutSync) => async (id: string) => {
     const db = await base();
-    if (horodate) {
-      await db.runAsync(`UPDATE ${table} SET statut_sync = '${statut}', updated_at = ? WHERE id = ?`, [
-        new Date().toISOString(),
-        id,
-      ]);
-    } else {
-      await db.runAsync(`UPDATE ${table} SET statut_sync = '${statut}' WHERE id = ?`, [id]);
-    }
+    const horodatage = horodate ? ', updated_at = ?' : '';
+    const parametres = horodate ? [new Date().toISOString(), id] : [id];
+    await db.runAsync(`UPDATE ${table} SET statut_sync = '${statut}'${horodatage} WHERE id = ?`, parametres);
   };
 
   return {

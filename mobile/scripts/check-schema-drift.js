@@ -108,7 +108,13 @@ function extraireColonnesDeMigration(source) {
   return parTable;
 }
 
-/** Colonnes ajoutées par les étapes numérotées : `ALTER TABLE t ADD COLUMN c` en SQL direct. */
+/**
+ * Colonnes ajoutées par les étapes numérotées : `ALTER TABLE t ADD COLUMN c` en SQL direct.
+ *
+ * Limite assumée : une étape qui crée une table (`CREATE TABLE`), renomme une colonne ou construit
+ * son SQL par code n'est pas vue ici. Écrire les ajouts de colonnes en `ALTER TABLE … ADD COLUMN`
+ * littéral, sur une seule ligne, dans `migrations-captures.ts`.
+ */
 function extraireColonnesDesEtapes(source) {
   const parTable = {};
   for (const [, table, colonne] of source.matchAll(
