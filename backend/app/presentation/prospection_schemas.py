@@ -446,6 +446,10 @@ class OperationAerienneRead(BaseModel):
 
 
 class ProspectionCreate(BaseModel):
+    # Identifiant choisi par le client (#678) : la fiche naît sur l'appareil, son id local reste
+    # son id. Rejouer un envoi avec le même id renvoie la fiche déjà créée au lieu d'en créer une
+    # seconde ; optionnel pour les clients (web) qui laissent le serveur le générer.
+    id: uuid.UUID | None = None
     type_prospection: TypeProspection
     campagne_id: uuid.UUID
     # Équipe qui a mené la fiche (#607) — nullable en base (rétro-compatibilité),

@@ -14,6 +14,7 @@ from app.application.prospection_use_cases import (
     GetAuditLog,
     GetProspection,
     ListProspections,
+    ProspectionIdentifiantPrisError,
     UpdateProspection,
 )
 from app.auth import get_current_user
@@ -124,6 +125,7 @@ async def create_prospection(
     )
     try:
         prospection = await use_case.execute(
+            prospection_id=body.id,
             type_prospection=body.type_prospection,
             campagne_id=body.campagne_id,
             prospecteur_id=current_user.id,
@@ -227,6 +229,8 @@ async def create_prospection(
 
         return prospection
 
+    except ProspectionIdentifiantPrisError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except StationNotFoundError as e:

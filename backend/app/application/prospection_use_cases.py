@@ -77,6 +77,10 @@ def _calculer_duree_minutes(debut_heure: str, fin_heure: str) -> int:
     return fin - debut
 
 
+class ProspectionIdentifiantPrisError(ValueError):
+    """L'identifiant fourni par le client désigne déjà la fiche d'un autre agent."""
+
+
 class CreateProspection:
     def __init__(
         self,
@@ -193,7 +197,22 @@ class CreateProspection:
         # explicitement par le client.
         revalide_de_id: uuid.UUID | None = None,
         vol_id: uuid.UUID | None = None,
+        # Identifiant choisi par le client (#678) : la fiche naît sur l'appareil avant d'exister
+        # ici, et son id local doit rester SON id. Sans lui, l'appareil et le serveur ne se
+        # reconnaissent plus (doublon dans « Mes fiches », statut local figé) et un envoi refait
+        # après une réponse perdue crée une seconde fiche. Rejouer le même id renvoie la fiche
+        # déjà créée, sans rien modifier.
+        prospection_id: uuid.UUID | None = None,
     ) -> Prospection:
+        if prospection_id is not None:
+            existante = await self.repository.get_by_id(prospection_id)
+            if existante is not None:
+                if existante.prospecteur_id != prospecteur_id:
+                    raise ProspectionIdentifiantPrisError(
+                        "Cet identifiant de fiche appartient déjà à un autre agent"
+                    )
+                return existante
+
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
 
@@ -240,6 +259,7 @@ class CreateProspection:
             n_fiche = n_message
 
         prospection = Prospection(
+            **({} if prospection_id is None else {"id": prospection_id}),
             type_prospection=type_prospection,
             campagne_id=campagne_id,
             prospecteur_id=prospecteur_id,
