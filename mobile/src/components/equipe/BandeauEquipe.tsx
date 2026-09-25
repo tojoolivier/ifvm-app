@@ -39,7 +39,10 @@ export function BandeauEquipe({ equipe, onChanger }: Props) {
       <ThemedText style={styles.nom} numberOfLines={1}>
         {equipe.nom}
       </ThemedText>
-      <BadgeTypeEquipe type={equipe.type} />
+      {/* `EquipeBadge` s'aligne en haut (`alignSelf: flex-start`) : ce conteneur le recentre sur la ligne. */}
+      <View style={styles.badgeCentre}>
+        <BadgeTypeEquipe type={equipe.type} />
+      </View>
       <TouchableOpacity onPress={changer} accessibilityRole="button" accessibilityLabel="Changer d'équipe de travail" hitSlop={8}>
         <ThemedText style={styles.changer}>Changer ›</ThemedText>
       </TouchableOpacity>
@@ -51,8 +54,9 @@ const styles = StyleSheet.create({
   bandeau: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
+    gap: 10,
+    minHeight: 40,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 11,
     borderWidth: 1,
@@ -65,8 +69,9 @@ const styles = StyleSheet.create({
     borderColor: EQ.ambre,
     backgroundColor: EQ.ambreFond,
   },
+  badgeCentre: { alignSelf: 'center' },
   nom: { flex: 1, fontSize: 12, lineHeight: 16, fontWeight: '700', color: EQ.vert },
-  changer: { fontSize: 11, fontWeight: '700', color: EQ.vert },
-  videTexte: { fontSize: 12, fontWeight: '600', color: EQ.ambre },
-  videAction: { fontSize: 11, fontWeight: '700', color: EQ.ambre },
+  changer: { fontSize: 11, lineHeight: 14, fontWeight: '700', color: EQ.vert },
+  videTexte: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: EQ.ambre },
+  videAction: { fontSize: 11, lineHeight: 14, fontWeight: '700', color: EQ.ambre },
 });

@@ -478,9 +478,10 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       backgroundColor: FICHES_BG,
     },
     equipeBar: {
-      gap: 6,
+      gap: 8,
       paddingHorizontal: 16,
-      paddingBottom: 6,
+      paddingTop: 12,
+      paddingBottom: 4,
     },
     equipeToggle: {
       alignSelf: 'flex-end',
