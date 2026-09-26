@@ -21,16 +21,13 @@ const UTILISATEURS = [
 interface Options {
   role?: string
   audit?: AuditBdd[]
-  /** Réponse de `GET /equipes/eq-1` (équipe de la fiche). */
-  equipe?: unknown
 }
 
 /** Rend la page pour une fiche donnée telle que l'API la renverrait. */
-function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit = [], equipe }: Options = {}) {
+function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit = [] }: Options = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections/p1') return Promise.resolve({ data: fiche })
     if (url === '/prospections/p1/audit-log') return Promise.resolve({ data: audit })
-    if (url === '/equipes/eq-1') return Promise.resolve({ data: equipe })
     if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role } })
     if (url === '/campagnes') return Promise.resolve({ data: [{ id: 'c1', name: 'Campagne 2026' }] })
     if (url === '/users/') return Promise.resolve({ data: UTILISATEURS })
@@ -286,44 +283,35 @@ describe('ProspectionDetailPage — fiche de lecture en tableaux (comme le PDF)'
   })
 })
 
-// #602, #607 : l'équipe de la fiche est affichée, avec un lien vers l'équipe.
-describe('ProspectionDetailPage — équipe de la fiche', () => {
+// Le prospecteur remplace l'équipe : les backends plus anciens ne renvoient pas `equipe_id`,
+// la ligne affichait donc « Équipe : non renseignée » même pour une fiche qui en a une.
+describe('ProspectionDetailPage — prospecteur de la fiche', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  const EQUIPE = {
-    id: 'eq-1',
-    nom: 'Équipe Terrestre Ihosy',
-    type: 'terrestre',
-    membres: [{ user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' }],
-    actif: true,
-  }
-
-  it('affiche l’équipe avec un lien vers Administration > Équipes (profil chef)', async () => {
-    renderFiche(ficheComplete({ statut: 'en_attente', equipe_id: 'eq-1' }), { role: 'chef', equipe: EQUIPE })
+  it('affiche le nom du prospecteur porté par la fiche', async () => {
+    renderFiche(ficheComplete({ statut: 'en_attente', prospecteur_nom: 'Ma Sambalahy' }))
     await attendreFiche()
 
-    const lien = await screen.findByRole('link', { name: 'Équipe Terrestre Ihosy' })
-    expect(lien).toHaveAttribute('href', '/administration?section=equipes&equipe=eq-1')
-    expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('terrestre · chef Toky Rabe')
+    expect(screen.getByTestId('fiche-prospecteur')).toHaveTextContent('Prospecteur : Ma Sambalahy')
   })
 
-  it('affiche seulement le nom, sans lien, pour un profil sans accès à l’Administration', async () => {
-    renderFiche(ficheComplete({ statut: 'en_attente', equipe_id: 'eq-1' }), {
-      role: 'verificateur',
-      equipe: EQUIPE,
-    })
+  it('retrouve le nom dans l’annuaire quand la fiche ne le porte pas', async () => {
+    renderFiche(ficheComplete({ statut: 'en_attente', prospecteur_nom: null, prospecteur_id: 'u1' }))
     await attendreFiche()
 
-    await waitFor(() => expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('Équipe Terrestre Ihosy'))
-    expect(screen.queryByRole('link', { name: 'Équipe Terrestre Ihosy' })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByTestId('fiche-prospecteur')).toHaveTextContent('Prospecteur : Randria Jean'),
+    )
   })
 
-  it('indique « non renseignée » pour une fiche sans équipe', async () => {
-    renderFiche(ficheComplete({ statut: 'en_attente', equipe_id: null }))
+  it("ne parle plus d'équipe, même pour une fiche qui en a une", async () => {
+    renderFiche(ficheComplete({ statut: 'en_attente', equipe_id: 'eq-1', prospecteur_nom: 'Ma Sambalahy' }))
     await attendreFiche()
 
-    expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('Équipe : non renseignée')
+    expect(screen.queryByTestId('fiche-equipe')).toBeNull()
+    expect(screen.queryByText(/Équipe :/)).toBeNull()
+    expect(mockedGet.mock.calls.some(([url]) => String(url).startsWith('/equipes'))).toBe(false)
   })
 })
