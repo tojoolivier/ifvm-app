@@ -189,10 +189,6 @@ export async function enregistrerBrouillon(saisie: SaisieProspection): Promise<s
   }
 
   await ecrireFiche(db, { ...saisie, id, statut: 'brouillon' }, { statut_sync: 'local' }, new Date().toISOString());
-  if (existante) {
-    // `created_at` n'est pas celui de la reprise.
-    await db.runAsync('UPDATE prospection SET created_at = ? WHERE id = ?', [existante.created_at, id]);
-  }
   return id;
 }
 

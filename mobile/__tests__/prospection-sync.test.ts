@@ -5,7 +5,8 @@ import {
   listerEnAttenteEnvoi,
   soumettreFiche,
 } from '../src/lib/prospection-db';
-import { synchroniserProspections } from '../src/lib/prospection-sync';
+import { NetworkError } from '../src/lib/errors';
+import { chargerARevalider, synchroniserProspections } from '../src/lib/prospection-sync';
 import { creerBaseMemoire } from './test-utils/base-sqlite-memoire';
 
 let base: Awaited<ReturnType<typeof creerBaseMemoire>>;
@@ -15,7 +16,7 @@ jest.mock('../src/lib/storage', () => ({
   storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
 }));
 jest.mock('../src/lib/api-client', () => ({
-  apiClient: { createProspection: jest.fn() },
+  apiClient: { createProspection: jest.fn(), listProspections: jest.fn() },
   statutHttpDe: (error: unknown) => (error as { status?: number } | null)?.status ?? null,
   versionServeurDe: () => null,
 }));
@@ -104,5 +105,34 @@ describe('synchroniserProspections', () => {
     await synchroniserProspections('jeton');
 
     expect(await base.getFirstAsync('SELECT statut_sync FROM vol WHERE id = ?', ['vol-1'])).toEqual({ statut_sync: 'synced' });
+  });
+});
+
+describe('chargerARevalider', () => {
+  const lue = (id: string) =>
+    ({
+      id, type_prospection: 'extensive', campagne_id: 'c', equipe_id: 'e', prospecteur_id: 'u', date_prospection: '2026-09-01',
+      n_fiche: id, statut: 'validee', statut_sync: 'synced', validated_at: '2026-09-02T08:00:00Z', created_at: 'x', updated_at: 'x',
+      biotope: [], type_station: [], avertissements: [], populations: [], captures: [], infestations: [], operations_aeriennes: [],
+    }) as never;
+
+  it('en ligne : interroge a_revalider=true et garde les fiches sur l’appareil pour les cloner', async () => {
+    jest.mocked(apiClient.listProspections).mockResolvedValue([lue('srv-1')]);
+
+    const liste = await chargerARevalider('jeton');
+
+    expect(apiClient.listProspections).toHaveBeenCalledWith('jeton', { a_revalider: true });
+    expect(liste.map((f) => f.id)).toEqual(['srv-1']);
+    expect(await getFiche('srv-1')).not.toBeNull();
+  });
+
+  it('hors ligne : retombe sur la règle locale, sans échouer', async () => {
+    jest.mocked(apiClient.listProspections).mockRejectedValue(new NetworkError('hors ligne'));
+    await base.runAsync(
+      `INSERT INTO prospection (id, type_prospection, campagne_id, equipe_id, date_prospection, statut, statut_sync, validated_at, corps, created_at, updated_at)
+       VALUES ('loc-1', 'extensive', 'c', 'e', '2026-01-01', 'validee', 'synced', '2026-01-02T00:00:00Z', '{}', 'x', 'x')`
+    );
+
+    expect((await chargerARevalider('jeton')).map((f) => f.id)).toEqual(['loc-1']);
   });
 });
