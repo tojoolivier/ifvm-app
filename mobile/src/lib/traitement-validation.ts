@@ -205,6 +205,24 @@ export function computeSurfaceRestante(
 }
 
 /**
+ * Répartition de la surface couverte par la fiche entre « Surface traitée » et « Surface
+ * protégée » (#surface-protegee-champ) — miroir de `repartir_surface` côté backend :
+ * produit de barrière (mode BARRIERE) → tout est « protégé » (traitée = 0) ; couverture
+ * totale, irrégulier ou mode absent → tout est « traité » (protégée = 0). Jamais les deux à
+ * la fois. « Surface traitée et protégée » en est la somme, donc toujours égale à la surface
+ * couverte saisie — celle qui alimente cumulée et restante.
+ */
+export function repartirSurfaceCouverte(
+  surfaceCouverteHa: number,
+  modeTraitement: string | null | undefined
+): { traitee: number; protegee: number; traiteeEtProtegee: number } {
+  const estBarriere = modeTraitement === 'BARRIERE';
+  const traitee = estBarriere ? 0 : surfaceCouverteHa;
+  const protegee = estBarriere ? surfaceCouverteHa : 0;
+  return { traitee, protegee, traiteeEtProtegee: traitee + protegee };
+}
+
+/**
  * « Restante (ha) » d'UNE fiche (#zone-a-reprendre-restante-part-du-reste-origine).
  *
  * Reprise depuis « Zones à reprendre » : la référence est le reste à traiter de la fiche

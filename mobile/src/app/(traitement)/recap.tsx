@@ -29,6 +29,7 @@ import {
   computeUniteApprovisionnementAerien,
   computeTotalPesticideTerrestre,
   computePesticideStockRestant,
+  repartirSurfaceCouverte,
 } from '@/lib/traitement-validation';
 import { Card } from '@/components/traitement/Card';
 import { Toast, useTraitementToast } from '@/components/traitement/Toast';
@@ -105,6 +106,25 @@ async function validerEtVerrouillerSurServeur(draft: DraftTraitement, token: str
 function display(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return 'non renseigné';
   return String(value);
+}
+
+/**
+ * #surface-protegee-champ : « traitée » / « protégée » / leur somme. Valeurs du serveur dès qu'il
+ * en a écrit une (fiche synchronisée) ; sinon répartition locale de la surface saisie selon le mode
+ * (BARRIERE → protégée, sinon traitée), même règle que le backend.
+ */
+function surfacesTraiteeEtProtegee(
+  traiteeServeur: number | null | undefined,
+  protegeeServeur: number | null | undefined,
+  surfaceCouverteLocale: number,
+  modeTraitement: string | null | undefined
+): { traitee: number; protegee: number; traiteeEtProtegee: number } {
+  if (traiteeServeur != null || protegeeServeur != null) {
+    const traitee = traiteeServeur ?? 0;
+    const protegee = protegeeServeur ?? 0;
+    return { traitee, protegee, traiteeEtProtegee: traitee + protegee };
+  }
+  return repartirSurfaceCouverte(surfaceCouverteLocale, modeTraitement);
 }
 
 function displayBool(value: boolean | null | undefined): string {
@@ -466,6 +486,18 @@ export default function RecapScreen() {
           resteOrigineHa: draft.cible?.surface_restante_origine_ha,
         })
       : null);
+  const surfacesTerrestre = surfacesTraiteeEtProtegee(
+    draft.terrestre?.surface_traitee_ha,
+    draft.terrestre?.surface_protegee_ha,
+    surfaceTraitee,
+    draft.mode_traitement
+  );
+  const surfacesAerien = surfacesTraiteeEtProtegee(
+    draft.aerien?.surface_traitee_ha,
+    draft.aerien?.surface_protegee_ha,
+    computeSurfaceTraiteeAerien(rotationsAerien),
+    draft.mode_traitement
+  );
   const totalPesticideTerrestre = draft.terrestre ? computeTotalPesticideTerrestre(draft.terrestre.produits) : 0;
   const pesticideStockRestantTerrestre = draft.terrestre
     ? computePesticideStockRestant(draft.terrestre.pesticide_recu_l, totalPesticideTerrestre, draft.terrestre.stock_initial_l)
@@ -713,16 +745,11 @@ export default function RecapScreen() {
               <RecapLigne label="Total pesticide (l)" value={draft.aerien.total_pesticide_l != null ? String(draft.aerien.total_pesticide_l) : null} />
               <RecapLigne label="Total pesticide (kg)" value={draft.aerien.total_pesticide_kg != null ? String(draft.aerien.total_pesticide_kg) : null} />
               <Text style={styles.subsectionTitle}>Surfaces</Text>
-              {draft.mode_traitement === 'BARRIERE' ? (
-                <RecapLigne label="Surface protégée (ha)" value={draft.aerien.surface_protegee_ha != null ? String(draft.aerien.surface_protegee_ha) : null} />
-              ) : (
-                <RecapLigne label="Surface traitée (ha)" value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null} />
-              )}
-              {/* #surface-traitee-et-protegee : égale à « Surface traitée (ha) ». */}
-              <RecapLigne
-                label="Surface traitée et protégée (ha)"
-                value={draft.aerien.surface_traitee_ha != null ? String(draft.aerien.surface_traitee_ha) : null}
-              />
+              {/* #surface-protegee-champ : valeurs du serveur une fois synchronisée, sinon la même
+                  répartition calculée localement (l'une des deux vaut 0 selon le mode). */}
+              <RecapLigne label="Surface traitée (ha)" value={display(surfacesAerien.traitee)} />
+              <RecapLigne label="Surface protégée (ha)" value={display(surfacesAerien.protegee)} />
+              <RecapLigne label="Surface traitée et protégée (ha)" value={display(surfacesAerien.traiteeEtProtegee)} />
               <RecapLigne label="Surface cumulée (ha)" value={display(draft.aerien.surface_cumulee_ha)} />
               <RecapLigne label="Surface restante (ha)" value={display(surfaceRestanteAerien)} />
               {(draft.aerien.surface_restante_abandonnee != null || (surfaceRestanteAerien ?? 0) > 0) && (
@@ -762,16 +789,11 @@ export default function RecapScreen() {
               <RecapLigne label="Atomiseur à dos (ha)" value={display(draft.terrestre.surface_atomiseur_ha)} />
               <RecapLigne label="Atomiseur autoporté (ha)" value={display(draft.terrestre.surface_atomiseur_autoporte_ha)} />
               <RecapLigne label="Disque rotatif (ha)" value={display(draft.terrestre.surface_disque_rotatif_ha)} />
-              {draft.mode_traitement === 'BARRIERE' ? (
-                <RecapLigne label="Surface protégée (ha)" value={display(draft.terrestre.surface_protegee_ha)} />
-              ) : (
-                <RecapLigne label="Surface traitée (ha)" value={display(draft.terrestre.surface_traitee_ha ?? surfaceTraitee)} />
-              )}
-              {/* #surface-traitee-et-protegee : égale à « Surface traitée (ha) ». */}
-              <RecapLigne
-                label="Surface traitée et protégée (ha)"
-                value={display(draft.terrestre.surface_traitee_ha ?? surfaceTraitee)}
-              />
+              {/* #surface-protegee-champ : valeurs du serveur une fois synchronisée, sinon la même
+                  répartition calculée localement (l'une des deux vaut 0 selon le mode). */}
+              <RecapLigne label="Surface traitée (ha)" value={display(surfacesTerrestre.traitee)} />
+              <RecapLigne label="Surface protégée (ha)" value={display(surfacesTerrestre.protegee)} />
+              <RecapLigne label="Surface traitée et protégée (ha)" value={display(surfacesTerrestre.traiteeEtProtegee)} />
               <RecapLigne label="Surface cumulée (ha)" value={display(draft.terrestre.surface_cumulee_ha ?? surfaceCumulee)} />
               <RecapLigne label="Surface restante (ha)" value={display(draft.terrestre.surface_restante_ha ?? surfaceRestante)} />
               {(draft.terrestre.surface_restante_abandonnee != null || surfaceRestante > 0) && (

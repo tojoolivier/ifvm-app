@@ -200,11 +200,24 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
     expect(rendu.indexOf('Surface traitée (ha)')).toBeLessThan(rendu.indexOf('Surface traitée et protégée (ha)'));
   });
 
-  it('en mode barrière, « Surface traitée et protégée (ha) » reprend toujours la valeur de « Surface traitée »', async () => {
-    await render(<RecapScreen />); // fixture par défaut : mode BARRIERE
+  // #surface-protegee-champ : en barrière, traitée = 0, protégée = surface couverte.
+  it('en mode barrière : traitée = 0, protégée = surface couverte, traitée et protégée = la somme', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_AERIEN,
+      mode_traitement: 'BARRIERE',
+      aerien: { ...DRAFT_AERIEN.aerien, surface_traitee_ha: 0, surface_protegee_ha: 100 },
+    });
 
-    await screen.findByText('Surface traitée et protégée (ha)');
-    expect(screen.getAllByText('100').length).toBeGreaterThanOrEqual(1);
+    await render(<RecapScreen />);
+
+    await screen.findByText('Surface protégée (ha)');
+    expect(screen.getByText('Surface traitée (ha)')).toBeVisible();
+    expect(screen.getAllByText('100')).toHaveLength(2); // protégée + traitée et protégée
+    const rendu = JSON.stringify(screen.toJSON());
+    const ordre = ['Surface traitée (ha)', 'Surface protégée (ha)', 'Surface traitée et protégée (ha)'].map((t) =>
+      rendu.indexOf(t)
+    );
+    expect(ordre).toEqual([...ordre].sort((a, b) => a - b));
   });
 
   it('affiche la carte Évaluation du risque pour la population', async () => {
