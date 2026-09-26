@@ -16,9 +16,8 @@ export default function TypeChooserScreen() {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
-  // Les trois entrées seront rebranchées sur le nouveau wizard (#683) ; d'ici là, elles mènent
-  // à l'écran « En reconstruction ».
-  const versReconstruction = () => router.push('/(app)/en-reconstruction' as any);
+  const ouvrirWizard = (type: 'intensive' | 'extensive' | 'validation') => () =>
+    router.push({ pathname: '/(prospection)/wizard', params: { type } } as any);
 
   return (
     <View style={styles.root}>
@@ -33,7 +32,7 @@ export default function TypeChooserScreen() {
         <View style={styles.content}>
           <TouchableOpacity
             style={[styles.card, styles.cardIntensive]}
-            onPress={versReconstruction}
+            onPress={ouvrirWizard('intensive')}
             activeOpacity={0.85}
           >
             <Text style={styles.cardTitleIntensive}>Intensive</Text>
@@ -42,14 +41,14 @@ export default function TypeChooserScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.card} onPress={versReconstruction} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.card} onPress={ouvrirWizard('extensive')} activeOpacity={0.85}>
             <Text style={styles.cardTitle}>Extensive</Text>
             <Text style={styles.cardSubtitle}>
               Densités agrégées par phase (A1–A5 / L1–L7) — mêmes espèces LMC/NSE.
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={versReconstruction} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.card, styles.cardDashed]} onPress={ouvrirWizard('validation')} activeOpacity={0.85}>
             <Text style={styles.cardTitle}>☑ Validation</Text>
             <Text style={styles.cardSubtitle}>
               Même fiche A→D, conclue par Confirmée / Infirmée sur place.

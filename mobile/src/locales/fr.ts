@@ -20,6 +20,26 @@ export const fr = {
       resumeDetail: '{{type}} {{heure}} : {{titre}}, {{detail}}',
     },
   },
+  prospection: {
+    titre: 'Nouvelle prospection',
+    suivant: 'Suivant',
+    ficheNumero: 'Fiche {{numero}}',
+    ficheIntrouvable: 'Ce brouillon est introuvable sur cet appareil.',
+    ficheNonNumerotee: 'Fiche non numérotée',
+    types: {
+      intensive: 'Intensive',
+      extensive: 'Extensive',
+      validation: 'Validation',
+      revalidation: 'Revalidation',
+    },
+    etapes: {
+      reference: 'Référence',
+      vegetation: 'Végétation',
+      sol: 'Sol',
+      observations: 'Observations',
+      recapitulatif: 'Récapitulatif',
+    },
+  },
 } as const;
 
 export type Traductions = typeof fr;

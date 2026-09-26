@@ -1,6 +1,6 @@
 /**
  * Choix du type de prospection : seul écran conservé de l'ancien module (#726). Ses trois entrées
- * mènent à « En reconstruction » en attendant le nouveau wizard (#683).
+ * ouvrent le wizard unique (#683) avec le type choisi.
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import TypeChooserScreen from '@/app/(prospection)/type-chooser';
@@ -12,15 +12,19 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
 }));
 
-describe('TypeChooserScreen — en attente du nouveau wizard', () => {
+describe('TypeChooserScreen', () => {
   beforeEach(() => mockPush.mockClear());
 
-  it.each(['Intensive', '☑ Validation', 'Extensive'])('« %s » mène à « En reconstruction »', async (libelle) => {
+  it.each([
+    ['Intensive', 'intensive'],
+    ['☑ Validation', 'validation'],
+    ['Extensive', 'extensive'],
+  ])('« %s » ouvre le wizard avec le type %s', async (libelle, type) => {
     await render(<TypeChooserScreen />);
 
     fireEvent.press(screen.getByText(libelle));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/en-reconstruction');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/(prospection)/wizard', params: { type } });
   });
 
   it('ne propose plus la revalidation (écran supprimé)', async () => {
