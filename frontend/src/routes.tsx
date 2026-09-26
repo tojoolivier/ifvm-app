@@ -7,8 +7,7 @@ import { CampagnesPage } from './pages/CampagnesPage'
 import { ProspectionsPage } from './pages/ProspectionsPage'
 import { TraitementsPage } from './pages/TraitementsPage'
 import { TraitementDetailPage } from './pages/TraitementDetailPage'
-import { VolsPage } from './pages/VolsPage'
-import { VolDetailPage } from './pages/VolDetailPage'
+import { HeuresVolPage } from './pages/HeuresVolPage'
 import { ParcAeronefsPage } from './pages/ParcAeronefsPage'
 import { StockPesticidesPage } from './pages/StockPesticidesPage'
 import { NouvelleProspectionPage } from './pages/NouvelleProspectionPage'
@@ -67,20 +66,14 @@ export const routes: RouteObject[] = [
             handle: { crumb: 'Lutte', title: 'Fiche de traitement' },
           },
 
-          // Vols (#608, #610) : liste filtrable avec total d'heures, puis détail d'un vol. Remplace la
-          // page provisoire « Heures de vol ».
+          // Heures de vol : la fiche de vol a été supprimée (migration 0080), la
+          // page reste comme page d'attente. Le chemin `/fiches-vol` est conservé
+          // pour ne pas casser les favoris ni l'entrée de menu.
           {
-            path: '/vols',
-            element: <VolsPage />,
-            handle: { crumb: 'Lutte', title: 'Vols' },
+            path: '/fiches-vol',
+            element: <HeuresVolPage />,
+            handle: { crumb: 'Lutte', title: 'Heures de vol' },
           },
-          {
-            path: '/vols/:id',
-            element: <VolDetailPage />,
-            handle: { crumb: 'Lutte', title: 'Vol' },
-          },
-          // Ancien chemin de la page « Heures de vol », conservé en redirection pour les favoris.
-          { path: '/fiches-vol', element: <Navigate to="/vols" replace /> },
 
           // Parc aéronefs (#621, #603) : les hélicoptères, leur cycle de vie et l'historique de leurs
           // affectations aux équipes aériennes. Menu réservé aux profils admin et chef.
