@@ -9,6 +9,7 @@ import {
   computeSurfaceCumulee,
   computeSurfaceRestante,
   computeSurfaceRestanteFiche,
+  repartirSurfaceCouverte,
   computePesticideStockRestant,
   computePesticideConsommeSuggere,
   validateReferences,
@@ -957,5 +958,26 @@ describe('conditions météo (#alerte-meteo-vent-temperature)', () => {
       signatureMatrix: [],
     } as any);
     expect(errors.some((e) => e.message.includes('Rotation 1 (vent début)'))).toBe(true);
+  });
+});
+
+// #surface-protegee-champ
+describe('repartirSurfaceCouverte', () => {
+  it('couverture totale : tout est traité, protégée = 0', () => {
+    expect(repartirSurfaceCouverte(12.5, 'TOTAL')).toEqual({ traitee: 12.5, protegee: 0, traiteeEtProtegee: 12.5 });
+  });
+
+  it('barrière : traitée = 0, tout est protégé', () => {
+    expect(repartirSurfaceCouverte(12.5, 'BARRIERE')).toEqual({ traitee: 0, protegee: 12.5, traiteeEtProtegee: 12.5 });
+  });
+
+  it('irrégulier ou mode absent : traité (même règle que le backend)', () => {
+    expect(repartirSurfaceCouverte(4, 'IRREGULIER')).toEqual({ traitee: 4, protegee: 0, traiteeEtProtegee: 4 });
+    expect(repartirSurfaceCouverte(4, null)).toEqual({ traitee: 4, protegee: 0, traiteeEtProtegee: 4 });
+    expect(repartirSurfaceCouverte(4, undefined)).toEqual({ traitee: 4, protegee: 0, traiteeEtProtegee: 4 });
+  });
+
+  it('aucune surface : tout à zéro', () => {
+    expect(repartirSurfaceCouverte(0, 'BARRIERE')).toEqual({ traitee: 0, protegee: 0, traiteeEtProtegee: 0 });
   });
 });

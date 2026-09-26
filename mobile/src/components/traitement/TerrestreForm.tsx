@@ -7,6 +7,7 @@ import {
   deriveNomCommercial,
   messageTemperatureTropElevee,
   messageVentTropFort,
+  repartirSurfaceCouverte,
 } from '@/lib/traitement-validation';
 import { generateId } from '@/lib/id';
 import { Card } from '@/components/traitement/Card';
@@ -77,6 +78,7 @@ export function TerrestreForm({
 }: TerrestreFormProps) {
   const store = useTraitementCaptureStore();
   const styles = useFormStyles();
+  const repartition = repartirSurfaceCouverte(surfaceTraitee, store.ref.modeTraitement);
   // Unité pour toute la section « Produits utilisés » (#produits-unite-l-kg) —
   // un seul choix pour toute la fiche, gouverne les 5 libellés ci-dessous.
   const unite = store.terrestre.pesticideUnite ?? 'L';
@@ -306,14 +308,20 @@ export function TerrestreForm({
         onBlur={() => clearDecimalDraft('surface_disque_rotatif_ha')}
       />
 
+      {/* #surface-protegee-champ : la surface saisie ci-dessus est « traitée » (couverture
+          totale) OU « protégée » (barrière), selon le mode — l'autre vaut 0. « Traitée et
+          protégée » est leur somme. Tout est en lecture seule. */}
       <Card variant="derivee">
         <Text style={styles.label}>Traitée (ha)</Text>
-        <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
+        <Text style={styles.derivedValue}>{repartition.traitee}</Text>
       </Card>
-      {/* #surface-traitee-et-protegee : toujours égale à « Traitée (ha) », en lecture seule. */}
+      <Card variant="derivee">
+        <Text style={styles.label}>Surface protégée (ha)</Text>
+        <Text style={styles.derivedValue}>{repartition.protegee}</Text>
+      </Card>
       <Card variant="derivee">
         <Text style={styles.label}>Surface traitée et protégée (ha)</Text>
-        <Text style={styles.derivedValue}>{surfaceTraitee}</Text>
+        <Text style={styles.derivedValue}>{repartition.traiteeEtProtegee}</Text>
       </Card>
       <Card variant="derivee">
         <Text style={styles.label}>Cumulée (ha)</Text>

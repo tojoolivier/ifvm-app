@@ -26,6 +26,7 @@ import {
   messageTemperatureTropElevee,
   deriveNomCommercial,
   rotationsAerienPretesPourSynchro,
+  repartirSurfaceCouverte,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN } from '@/components/traitement/ProgressBar';
 import { Card } from '@/components/traitement/Card';
@@ -227,6 +228,7 @@ export default function RotationsScreen() {
   const nbRotations = computeNbRotations(store.aerien.rotations);
   const totauxPesticide = computeTotalPesticideAerienParUnite(store.aerien.rotations);
   const surfaceTraitee = computeSurfaceTraiteeAerien(store.aerien.rotations);
+  const repartition = repartirSurfaceCouverte(surfaceTraitee, store.ref.modeTraitement);
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.aerien.repriseTraitement, origineCumuleeHa);
   const surfaceRestante = computeSurfaceRestanteFiche({
     surfaceInfesteeHa,
@@ -596,14 +598,20 @@ export default function RotationsScreen() {
           <Text style={formStyles.label}>Total pesticide (kg)</Text>
           <Text style={formStyles.derivedValue}>{totauxPesticide.kg}</Text>
         </Card>
+        {/* #surface-protegee-champ : la surface des rotations est « traitée » (couverture totale)
+            OU « protégée » (barrière), selon le mode — l'autre vaut 0. « Traitée et protégée »
+            est leur somme. Tout est en lecture seule. */}
         <Card variant="derivee">
           <Text style={formStyles.label}>Surface traitée (ha)</Text>
-          <Text style={formStyles.derivedValue}>{surfaceTraitee}</Text>
+          <Text style={formStyles.derivedValue}>{repartition.traitee}</Text>
         </Card>
-        {/* #surface-traitee-et-protegee : toujours égale à « Surface traitée (ha) », en lecture seule. */}
+        <Card variant="derivee">
+          <Text style={formStyles.label}>Surface protégée (ha)</Text>
+          <Text style={formStyles.derivedValue}>{repartition.protegee}</Text>
+        </Card>
         <Card variant="derivee">
           <Text style={formStyles.label}>Surface traitée et protégée (ha)</Text>
-          <Text style={formStyles.derivedValue}>{surfaceTraitee}</Text>
+          <Text style={formStyles.derivedValue}>{repartition.traiteeEtProtegee}</Text>
         </Card>
         {store.aerien.repriseTraitement && (
           <Card variant="derivee">

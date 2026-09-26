@@ -138,3 +138,128 @@ describe('Aérien (écran Pesticides & rotations) — « Surface traitée et pro
     expect(screen.getAllByText('12.5').length).toBeGreaterThanOrEqual(2);
   });
 });
+
+// #surface-protegee-champ : « Surface protégée » entre « Traitée » et « Traitée et protégée ».
+describe('Terrestre (écran Équipe) — « Surface protégée (ha) » selon le mode', () => {
+  const draftTerrestre = (mode: string) =>
+    ({
+      id: 'trait-1',
+      type_traitement: 'TERRESTRE',
+      mode_traitement: mode,
+      cible: { surface_infestee_ha: 100 },
+      terrestre: {
+        chef_equipe_id: 'chef-1',
+        heure_debut: '06:00',
+        heure_fin: '09:00',
+        vitesse_vent_ms: 2,
+        temperature_c: 26,
+        reprise_traitement: false,
+        surface_atomiseur_ha: null,
+        surface_disque_rotatif_ha: null,
+        surface_atomiseur_autoporte_ha: null,
+        surface_restante_abandonnee: null,
+        motif_surface_restante_abandonnee: null,
+        produits: [],
+      },
+    }) as any;
+
+  const rendreAvecMode = async (mode: 'TOTAL' | 'BARRIERE') => {
+    useTraitementCaptureStore.setState({ ...RESET, typeTraitement: 'TERRESTRE', ref: { modeTraitement: mode } } as any);
+    jest.mocked(traitementRepository.getTraitement).mockReset().mockResolvedValue(draftTerrestre(mode));
+    await render(<TraitementScreen />);
+    await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-1'));
+  };
+
+  it('affiche les trois cartes dans l’ordre Traitée, Protégée, Traitée et protégée', async () => {
+    await rendreAvecMode('TOTAL');
+
+    const rendu = JSON.stringify(screen.toJSON());
+    const ordre = ['Traitée (ha)', 'Surface protégée (ha)', 'Surface traitée et protégée (ha)'].map((t) => rendu.indexOf(t));
+    expect(ordre.every((i) => i >= 0)).toBe(true);
+    expect(ordre).toEqual([...ordre].sort((a, b) => a - b));
+  });
+
+  it('couverture totale : la surface saisie est « traitée », « protégée » vaut 0', async () => {
+    await rendreAvecMode('TOTAL');
+
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[2], '12,5');
+    await settle();
+    // Traitée, traitée et protégée, cumulée = 12.5 (au moins : le pré-remplissage de « pesticide
+    // consommé » peut en ajouter un) ; protégée = 0.
+    await waitFor(() => expect(screen.getAllByText('12.5').length).toBeGreaterThanOrEqual(3));
+    expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('barrière : la surface saisie est « protégée », « traitée » vaut 0, « traitée et protégée » est la somme', async () => {
+    await rendreAvecMode('BARRIERE');
+
+    fireEvent.changeText(screen.getAllByPlaceholderText('0')[2], '12,5');
+    await settle();
+    // Protégée, traitée et protégée, cumulée = 12.5 ; traitée = 0 (et non 12.5).
+    await waitFor(() => expect(screen.getAllByText('12.5')).toHaveLength(3));
+    expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Aérien (écran Pesticides & rotations) — « Surface protégée (ha) » selon le mode', () => {
+  const rotation = {
+    localId: 'r1',
+    produit_id: 'p1',
+    quantite: 10,
+    unite: 'L',
+    surface_ha: 12.5,
+    heure_debut: '06:00',
+    heure_ouverture_vanne: '06:05',
+    heure_fermeture_vanne: '06:20',
+    heure_fin: '06:30',
+    temperature_debut_c: 25,
+    temperature_fin_c: 26,
+    vent_debut_ms: 2,
+    vent_fin_ms: 3,
+  };
+
+  const rendreAvecMode = async (mode: 'TOTAL' | 'BARRIERE') => {
+    useTraitementCaptureStore.setState({
+      ...RESET,
+      typeTraitement: 'AERIEN',
+      ref: { modeTraitement: mode },
+      aerien: { rotations: [rotation] },
+    } as any);
+    jest.mocked(traitementRepository.getTraitement).mockReset().mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'AERIEN',
+      mode_traitement: mode,
+      cible: { surface_infestee_ha: 100 },
+      aerien: { surface_restante_abandonnee: false, pesticide_recu_l: null, rotations: [] },
+    } as any);
+    await render(<RotationsScreen />);
+    await screen.findByTestId('rotation-numero-cuve-0');
+    await settle();
+  };
+
+  it('affiche les trois cartes dans l’ordre Traitée, Protégée, Traitée et protégée', async () => {
+    await rendreAvecMode('TOTAL');
+
+    const rendu = JSON.stringify(screen.toJSON());
+    const ordre = ['"Surface traitée (ha)"', 'Surface protégée (ha)', 'Surface traitée et protégée (ha)'].map((t) =>
+      rendu.indexOf(t)
+    );
+    expect(ordre.every((i) => i >= 0)).toBe(true);
+    expect(ordre).toEqual([...ordre].sort((a, b) => a - b));
+  });
+
+  it('couverture totale : surface des rotations « traitée », « protégée » vaut 0', async () => {
+    await rendreAvecMode('TOTAL');
+
+    // Traitée et traitée et protégée = 12.5 ; protégée = 0.
+    expect(screen.getAllByText('12.5').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('barrière : surface des rotations « protégée », « traitée » vaut 0', async () => {
+    await rendreAvecMode('BARRIERE');
+
+    // Protégée et traitée et protégée = 12.5 (deux cartes seulement, pas trois) ; traitée = 0.
+    expect(screen.getAllByText('12.5')).toHaveLength(2);
+  });
+});
