@@ -35,8 +35,13 @@ type Saisie = Partial<ProspectionCreate>;
 /** Une étape est « faite » quand ses champs clés sont renseignés ; la récap n'a pas de saisie propre. */
 const ESTIMATEURS: Record<Exclude<Etape, 'recapitulatif'>, (s: Saisie) => boolean> = {
   reference: (s) => estRenseignee(s.station_id) && estRenseignee(s.date_prospection),
-  vegetation: (s) => estRenseignee(s.vegetation),
-  sol: (s) => estRenseignee(s.sol),
+  // En extensif, la végétation n'est pas un JSON mais trois colonnes (#688).
+  vegetation: (s) =>
+    s.type_prospection === 'extensive'
+      ? estRenseignee(s.hauteur_herbe_cm) || estRenseignee(s.verdissement_pourcent) || estRenseignee(s.degats_cultures)
+      : estRenseignee(s.vegetation),
+  // En intensif, `sol` contient déjà `solNu` dès l'étape Végétation : seules humidité et texture (obligatoires) font l'étape Sol (#689).
+  sol: (s) => (s.type_prospection === 'intensive' ? estRenseignee(s.sol?.humidite) && estRenseignee(s.sol?.texture) : estRenseignee(s.sol)),
   observations: (s) => estRenseignee(s.observations) || estRenseignee(s.ennemis_naturels),
 };
 

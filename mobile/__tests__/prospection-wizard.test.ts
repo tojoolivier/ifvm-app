@@ -26,4 +26,27 @@ describe('prospection-wizard', () => {
       etapeDeReprise({ ...ref, vegetation: { a: 1 } as never, sol: { b: 1 } as never, observations: 'RAS' }),
     ).toBe(4);
   });
+
+  describe('reprise d’un brouillon (#689, #688)', () => {
+    const ref = { station_id: 's', date_prospection: '2026-09-25' };
+
+    it('intensif : sol ne contenant que solNu (écrit par la Végétation) n’est pas « fait » — la reprise s’arrête sur l’étape Sol', () => {
+      const fiche = { ...ref, type_prospection: 'intensive' as const, vegetation: { strates: { herbeuse: { recouvrement: 80 } } } as never, sol: { solNu: 20 } as never };
+      expect(etapeDeReprise(fiche)).toBe(2);
+    });
+
+    it('intensif : humidité seule ne suffit pas, humidité et texture oui', () => {
+      const base = { ...ref, type_prospection: 'intensive' as const, vegetation: { strates: { herbeuse: { recouvrement: 80 } } } as never, observations: 'RAS' };
+      expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'] } as never })).toBe(2);
+      expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'], texture: ['bloc'] } as never })).toBe(4);
+    });
+
+    it('extensif : la Végétation est « faite » dès qu’une de ses colonnes est saisie (pas de JSON vegetation)', () => {
+      const base = { ...ref, type_prospection: 'extensive' as const };
+      expect(etapeDeReprise(base)).toBe(1);
+      expect(etapeDeReprise({ ...base, hauteur_herbe_cm: 40 })).toBe(2);
+      expect(etapeDeReprise({ ...base, verdissement_pourcent: 0 })).toBe(2);
+      expect(etapeDeReprise({ ...base, degats_cultures: 'nuls' })).toBe(2);
+    });
+  });
 });

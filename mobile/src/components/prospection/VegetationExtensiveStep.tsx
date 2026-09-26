@@ -37,7 +37,8 @@ export function VegetationExtensiveStep({ brouillon, onContinuer }: Props) {
     setErreurEnregistrement(null);
     try {
       const { statut: _statut, ...saisie } = brouillon;
-      await enregistrerBrouillon({ ...saisie, ...champsDeVegetationExtensive(valeurs) });
+      // En extensif la végétation vit dans des colonnes : un JSON `vegetation` hérité d'une autre saisie ne doit pas rester.
+      await enregistrerBrouillon({ ...saisie, vegetation: null, ...champsDeVegetationExtensive(valeurs) });
       onContinuer();
     } catch (e) {
       log.failure('vegetation_extensive_enregistrement', e);
@@ -97,7 +98,7 @@ export function VegetationExtensiveStep({ brouillon, onContinuer }: Props) {
             {RACCOURCIS_VERDISSEMENT.map((n) => (
               <View key={n} style={styles.flex}>
                 <Chip
-                  label={`${n} ${t('prospection.vegetation.pourcent')}`}
+                  label={t('prospection.vegetation.extensive.raccourci', { n })}
                   selected={valeurs.verdissement === String(n)}
                   onPress={() => form.setFieldValue('verdissement', String(n))}
                   testID={`raccourci-${n}`}

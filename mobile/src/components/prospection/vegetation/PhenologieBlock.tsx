@@ -27,24 +27,30 @@ export function PhenologieBlock({ cle, form, avecAide }: Props) {
         <Text style={[UiText.subheading, { color: c.fg }]}>{t('prospection.vegetation.phenologie.titre')}</Text>
         {avecAide ? <Text style={[UiText.caption, { color: c.fg3 }]}>{t('prospection.vegetation.phenologie.aide')}</Text> : null}
       </View>
-      <View style={styles.stades}>
-        {STADES_PHENOLOGIE.map((stade) => (
-          <form.Field key={stade} name={`strates.${cle}.phenologie.${stade}`}>
-            {(field) => {
-              const nom = t(`prospection.vegetation.phenologie.${stade}`);
-              const touche = field.state.value !== 'Néant';
-              return (
-                <Chip
-                  label={touche ? t('prospection.vegetation.phenologie.stadePresent', { stade: nom }) : nom}
-                  selected={touche}
-                  onPress={() => field.handleChange(touche ? 'Néant' : 'Rare')}
-                  testID={`stade-${cle}-${stade}`}
-                />
-              );
-            }}
-          </form.Field>
-        ))}
-      </View>
+      <form.Subscribe selector={(s) => s.values.strates[cle].recouvrement > 0}>
+        {(presente) => (
+          <View style={styles.stades}>
+            {STADES_PHENOLOGIE.map((stade) => (
+              <form.Field key={stade} name={`strates.${cle}.phenologie.${stade}`}>
+                {(field) => {
+                  const nom = t(`prospection.vegetation.phenologie.${stade}`);
+                  const touche = field.state.value !== 'Néant';
+                  return (
+                    <Chip
+                      label={touche ? t('prospection.vegetation.phenologie.stadePresent', { stade: nom }) : nom}
+                      selected={touche}
+                      // Une strate à 0 % n'est pas présente : rien à observer (comme « Plus de détails »).
+                      disabled={!presente}
+                      onPress={() => field.handleChange(touche ? 'Néant' : 'Rare')}
+                      testID={`stade-${cle}-${stade}`}
+                    />
+                  );
+                }}
+              </form.Field>
+            ))}
+          </View>
+        )}
+      </form.Subscribe>
       <form.Subscribe selector={(s) => STADES_PHENOLOGIE.filter((stade) => s.values.strates[cle].phenologie[stade] !== 'Néant')}>
         {(touches) =>
           touches.length > 0 ? (

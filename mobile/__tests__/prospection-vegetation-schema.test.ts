@@ -247,3 +247,21 @@ describe('phénologie « Qu’observez-vous ? » (#686) — enregistrement', () 
     expect(vegetation.strates.arbustive).toMatchObject({ orpad: [], feuille: [], fleur: [], fruit: [], sec: [] });
   });
 });
+
+describe('phénologie (#686) — anciens brouillons à plusieurs éléments', () => {
+  const niveau = (orpad: unknown) =>
+    valeursDeVegetation({ vegetation: { strates: { herbeuse: { recouvrement: 50, orpad } } } }).strates.herbeuse.phenologie.orpad;
+
+  it('garde le niveau le plus élevé du tableau (Beaucoup > Rare > Néant) au lieu de perdre l’information', () => {
+    expect(niveau(['Néant', 'Rare'])).toBe('Rare');
+    expect(niveau(['Rare', 'Beaucoup'])).toBe('Beaucoup');
+    expect(niveau(['Beaucoup', 'Rare'])).toBe('Beaucoup');
+  });
+
+  it('tableau vide, Néant seul ou valeur inconnue : Néant', () => {
+    expect(niveau([])).toBe('Néant');
+    expect(niveau(['Néant'])).toBe('Néant');
+    expect(niveau(['inconnu'])).toBe('Néant');
+    expect(niveau('Rare')).toBe('Néant');
+  });
+});

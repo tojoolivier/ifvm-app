@@ -19,9 +19,11 @@ export interface SolValeurs {
 
 type Brouillon = Pick<ProspectionCreate, 'sol' | 'degats_cultures'>;
 
-/** Codes connus d'un tableau du JSON `sol` (libre côté serveur) : le reste est ignoré. */
-const codesConnus = <T extends string>(valeur: unknown, connus: readonly T[]): T[] =>
-  Array.isArray(valeur) ? connus.filter((c) => valeur.includes(c)) : [];
+/** Codes connus du JSON `sol` (libre côté serveur) : le reste est ignoré ; un ancien brouillon scalaire devient `[valeur]`. */
+const codesConnus = <T extends string>(valeur: unknown, connus: readonly T[]): T[] => {
+  const liste = Array.isArray(valeur) ? valeur : typeof valeur === 'string' ? [valeur] : [];
+  return connus.filter((c) => liste.includes(c));
+};
 
 /** Reprise d'un brouillon : humidité et texture vivent dans le JSON `sol`, les dégâts dans leur colonne. */
 export function valeursDeSol({ sol, degats_cultures }: Partial<Brouillon>): SolValeurs {

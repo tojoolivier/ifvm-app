@@ -34,8 +34,9 @@ export const phenologieVide = (): Phenologie => ({ orpad: 'Néant', feuille: 'N�
 
 const tableauxDePhenologie = (p: Phenologie) => Object.fromEntries(STADES_PHENOLOGIE.map((st) => [st, [p[st]]]));
 
+/** Niveau d'un stade relu du JSON : d'anciens brouillons ont plusieurs éléments, on garde le plus élevé (Beaucoup > Rare > Néant). */
 const niveauDeTableau = (valeur: unknown): NiveauPhenologie =>
-  Array.isArray(valeur) && NIVEAUX_CHOISIS.find((n) => n === valeur[0]) ? valeur[0] : 'Néant';
+  Array.isArray(valeur) ? ([...NIVEAUX_CHOISIS].reverse().find((n) => valeur.includes(n)) ?? 'Néant') : 'Néant';
 
 /** Valeurs d'une strate non ajoutée : enregistrée telle quelle pour garder les 6 clés. */
 export function defaultStrateDetail(): StrateDetail {

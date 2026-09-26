@@ -37,6 +37,7 @@ describe('VegetationExtensiveStep — contenu (maquette 02a)', () => {
 describe('VegetationExtensiveStep — raccourcis et dégâts', () => {
   it('un raccourci remplit le verdissement ; le champ libre reste modifiable', async () => {
     await render(<VegetationExtensiveStep brouillon={fiche()} onContinuer={jest.fn()} />);
+    for (const l of ['0 %', '25 %', '50 %', '75 %', '100 %']) expect(screen.getByText(l)).toBeTruthy();
     await fireEvent.press(screen.getByTestId('raccourci-75'));
     expect(screen.getByTestId('extensive-verdissement').props.value).toBe('75');
     expect(choisi('raccourci-75')).toBe(true);
@@ -68,7 +69,17 @@ describe('VegetationExtensiveStep — « Continuer »', () => {
     await waitFor(() => expect(onContinuer).toHaveBeenCalled());
     const saisie = jest.mocked(enregistrerBrouillon).mock.calls[0][0];
     expect(saisie).toMatchObject({ id: 'b-2', hauteur_herbe_cm: 40.5, verdissement_pourcent: 50, degats_cultures: 'forts' });
-    expect(saisie.vegetation).toBeUndefined();
+    expect(saisie.vegetation).toBeNull();
+  });
+
+  it('une fiche extensive rouverte avec un JSON vegetation hérité ne le garde pas : « pas de vegetation JSON en extensif »', async () => {
+    jest.mocked(enregistrerBrouillon).mockReset().mockResolvedValue('b-2');
+    const onContinuer = jest.fn();
+    await render(<VegetationExtensiveStep brouillon={fiche({ vegetation: { strates: { herbeuse: { recouvrement: 50 } } } })} onContinuer={onContinuer} />);
+    await fireEvent.press(screen.getByTestId('vegetation-extensive-continuer'));
+
+    await waitFor(() => expect(onContinuer).toHaveBeenCalled());
+    expect(jest.mocked(enregistrerBrouillon).mock.calls[0][0].vegetation).toBeNull();
   });
 
   it('un verdissement hors 0–100 affiche l’erreur et bloque « Continuer »', async () => {

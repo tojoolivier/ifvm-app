@@ -11,8 +11,14 @@ describe('valeursDeSol (reprise d’un brouillon)', () => {
   });
 
   it('ignore les codes inconnus (JSON libre côté serveur)', () => {
-    const v = valeursDeSol({ sol: { humidite: ['surface', 'profond'], texture: 'limoneuse' } });
+    const v = valeursDeSol({ sol: { humidite: ['surface', 'profond'], texture: ['inconnue'] } });
     expect(v).toEqual({ humidite: ['surface'], texture: [], degats: null });
+  });
+
+  it('brouillon ancien : une valeur scalaire connue devient [valeur] au lieu d’être perdue', () => {
+    const v = valeursDeSol({ sol: { humidite: 'surface', texture: 'limoneuse' } });
+    expect(v).toEqual({ humidite: ['surface'], texture: ['limoneuse'], degats: null });
+    expect(valeursDeSol({ sol: { humidite: 'profond' } }).humidite).toEqual([]);
   });
 });
 

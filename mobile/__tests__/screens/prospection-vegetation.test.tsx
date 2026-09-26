@@ -242,11 +242,25 @@ describe('VegetationStep — phénologie « Qu’observez-vous ? » (#686)', () 
   it('« Retirer » une strate remet ses stades à Néant : en la rajoutant, rien n’est coché', async () => {
     await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
     await fireEvent.press(screen.getByText('+ Arborée'));
+    await fireEvent.press(screen.getByLabelText('Augmenter Strate arborée'));
     await fireEvent.press(stade('arboree', 'sec'));
     expect(niveau('arboree', 'sec', 'Rare')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Retirer la Strate arborée'));
     await fireEvent.press(screen.getByText('+ Arborée'));
     expect(stade('arboree', 'sec').props.accessibilityState).toMatchObject({ selected: false });
     expect(niveau('arboree', 'sec', 'Rare')).toBeNull();
+  });
+
+  it('à 0 % la strate n’est pas présente : ses puces de stade sont désactivées, et s’activent dès qu’elle a un recouvrement', async () => {
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    await fireEvent.press(screen.getByText('+ Arborée'));
+    expect(stade('arboree', 'feuille').props.accessibilityState).toMatchObject({ disabled: true });
+    await fireEvent.press(stade('arboree', 'feuille'));
+    expect(niveau('arboree', 'feuille', 'Rare')).toBeNull();
+
+    await fireEvent.press(screen.getByLabelText('Augmenter Strate arborée'));
+    expect(stade('arboree', 'feuille').props.accessibilityState).toMatchObject({ disabled: false });
+    await fireEvent.press(stade('arboree', 'feuille'));
+    expect(niveau('arboree', 'feuille', 'Rare')).toBeTruthy();
   });
 });

@@ -81,6 +81,7 @@ export const fr = {
         hauteur: 'Hauteur moyenne',
         cm: 'cm',
         verdissementRapide: 'Verdissement rapide',
+        raccourci: '{{n}} %',
         degatsTitre: 'Dégâts sur les cultures',
         degats: { nuls: 'Nuls', faibles: 'Faibles', moyens: 'Moyens', forts: 'Forts' },
         erreurs: { hauteur: 'Saisissez une hauteur positive en cm (ex. 40).' },
