@@ -5,6 +5,7 @@ import {
   repartition,
   STRATE_KEYS,
   stratesAffichees,
+  phenologieVide,
   valeursDeVegetation,
 } from '@/lib/prospection-vegetation-schema';
 
@@ -66,8 +67,8 @@ describe('valeursDeVegetation (reprise d’un brouillon)', () => {
       sol: { humidite: 'surface', solNu: 15 },
     });
     expect(v.solNu).toBe(15);
-    expect(v.strates.arbustive).toEqual({ recouvrement: 15, hMoy: '1,8', verdissement: '40', surfRel: '', repousse: null });
-    expect(v.strates.herbeuse).toEqual({ recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null });
+    expect(v.strates.arbustive).toEqual({ recouvrement: 15, hMoy: '1,8', verdissement: '40', surfRel: '', repousse: null, phenologie: phenologieVide() });
+    expect(v.strates.herbeuse).toEqual({ recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() });
   });
 
   it('brouillon sans végétation : tout à 0, sol nu à 0', () => {
@@ -85,11 +86,20 @@ describe('champsDeVegetation (enregistrement)', () => {
 
   it('garde les 6 clés du JSON, convertit les textes en nombres et une strate non ajoutée reste par défaut', () => {
     const v = valeursDeVegetation(brouillon);
-    v.strates.arbustive = { recouvrement: 15, hMoy: '1,8', verdissement: '', surfRel: '', repousse: null };
+    v.strates.arbustive = { recouvrement: 15, hMoy: '1,8', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() };
     const { vegetation } = champsDeVegetation(brouillon, v);
     const strates = (vegetation as { strates: Record<string, unknown> }).strates;
     expect(Object.keys(strates)).toEqual([...STRATE_KEYS]);
-    expect(strates.arbustive).toEqual({ ...defaultStrateDetail(), recouvrement: 15, hMoy: 1.8 });
+    expect(strates.arbustive).toEqual({
+      ...defaultStrateDetail(),
+      recouvrement: 15,
+      hMoy: 1.8,
+      orpad: ['Néant'],
+      feuille: ['Néant'],
+      fleur: ['Néant'],
+      fruit: ['Néant'],
+      sec: ['Néant'],
+    });
     expect(strates.arboree).toEqual(defaultStrateDetail());
   });
 
@@ -106,7 +116,7 @@ describe('champsDeVegetation — strate retirée', () => {
   it('une strate à 0 %, sans hauteur ni verdissement, repasse à ses valeurs par défaut (plus d’ORPAD hérité)', () => {
     const brouillon = { vegetation: { strates: { arbustive: { ...defaultStrateDetail(), recouvrement: 15, orpad: ['Rare'], surfRel: 30 } } }, sol: null };
     const v = valeursDeVegetation(brouillon);
-    v.strates.arbustive = { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null };
+    v.strates.arbustive = { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() };
     const strates = (champsDeVegetation(brouillon, v).vegetation as { strates: Record<string, unknown> }).strates;
     expect(strates.arbustive).toEqual(defaultStrateDetail());
   });
@@ -116,7 +126,7 @@ describe('creerVegetationSchema', () => {
   const schema = creerVegetationSchema((cle) => cle);
   const valeurs = (arbustive: Partial<{ hMoy: string; verdissement: string }>) => {
     const v = valeursDeVegetation({});
-    v.strates.arbustive = { recouvrement: 15, hMoy: '', verdissement: '', surfRel: '', repousse: null, ...arbustive };
+    v.strates.arbustive = { recouvrement: 15, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide(), ...arbustive };
     return v;
   };
 
@@ -140,7 +150,7 @@ describe('creerVegetationSchema — recouvrement à 0 %', () => {
   const schema = creerVegetationSchema((cle) => cle);
   const avecRecouvrement = (recouvrement: number, champs: { hMoy?: string; verdissement?: string }) => {
     const v = valeursDeVegetation({});
-    v.strates.arboree = { recouvrement, hMoy: '', verdissement: '', surfRel: '', repousse: null, ...champs };
+    v.strates.arboree = { recouvrement, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide(), ...champs };
     return v;
   };
   const erreurs = (v: ReturnType<typeof valeursDeVegetation>) => {
@@ -171,7 +181,7 @@ describe('surface relative et repousse (#687)', () => {
   it('valeursDeVegetation relit surfRel (virgule française) et repousse depuis vegetation.strates', () => {
     const v = valeursDeVegetation(brouillon);
     expect(v.strates.herbeuse).toMatchObject({ surfRel: '70,5', repousse: false });
-    expect(v.strates.arbustive).toMatchObject({ surfRel: '', repousse: null });
+    expect(v.strates.arbustive).toMatchObject({ surfRel: '', repousse: null, phenologie: phenologieVide() });
   });
 
   it('champsDeVegetation écrit surfRel en nombre et repousse en booléen, sans changer le format', () => {
@@ -204,5 +214,35 @@ describe('validation de la surface relative (#687)', () => {
 
   it('refuse une surface relative sur une strate à 0 %', async () => {
     await expect(schema.isValid(valeurs(0, '30'))).resolves.toBe(false);
+  });
+});
+
+describe('phénologie « Qu’observez-vous ? » (#686) — reprise', () => {
+  it('relit le niveau de chaque stade (orpad = Germination) ; un stade absent ou vide vaut Néant', () => {
+    const v = valeursDeVegetation({
+      vegetation: { strates: { herbeuse: { recouvrement: 55, orpad: ['Rare'], feuille: ['Beaucoup'], fleur: [] } } },
+    });
+    expect(v.strates.herbeuse.phenologie).toEqual({ orpad: 'Rare', feuille: 'Beaucoup', fleur: 'Néant', fruit: 'Néant', sec: 'Néant' });
+  });
+});
+
+describe('phénologie « Qu’observez-vous ? » (#686) — enregistrement', () => {
+  it('écrit un tableau à un élément par stade (clé orpad), Néant pour un stade non touché', () => {
+    const v = valeursDeVegetation({});
+    v.strates.herbeuse.recouvrement = 55;
+    v.strates.herbeuse.phenologie = { ...phenologieVide(), orpad: 'Rare', fruit: 'Beaucoup' };
+    const { vegetation } = champsDeVegetation({}, v);
+    expect(vegetation.strates.herbeuse).toMatchObject({
+      orpad: ['Rare'],
+      feuille: ['Néant'],
+      fleur: ['Néant'],
+      fruit: ['Beaucoup'],
+      sec: ['Néant'],
+    });
+  });
+
+  it('une strate retirée (0 %, rien saisi) reste à [] sur les 5 stades', () => {
+    const { vegetation } = champsDeVegetation({}, valeursDeVegetation({}));
+    expect(vegetation.strates.arbustive).toMatchObject({ orpad: [], feuille: [], fleur: [], fruit: [], sec: [] });
   });
 });

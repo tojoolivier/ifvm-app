@@ -224,6 +224,8 @@ export const UiSize = {
   /** Végétation intensive : barre empilée de la répartition et pastille de couleur d'une strate. */
   barreRepartition: 14,
   pastilleStrate: 12,
+  /** Largeur d'une puce de niveau (Rare / Beaucoup) du bloc « Qu'observez-vous ? ». */
+  chipNiveau: 104,
   sheetHandleWidth: 36,
   sheetHandleHeight: 4,
   timelineTrait: 2,

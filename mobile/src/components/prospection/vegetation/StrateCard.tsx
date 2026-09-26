@@ -8,6 +8,7 @@ import type { ErreursVegetation, VegetationForm } from '@/hooks/use-vegetation-f
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { aDesDetails, type StrateKey } from '@/lib/prospection-vegetation-schema';
 import { JETON_COULEUR } from './couleurs';
+import { PhenologieBlock } from './PhenologieBlock';
 import { StrateDetailsSheet } from './StrateDetailsSheet';
 
 type Props = {
@@ -73,6 +74,7 @@ export function StrateCard({ cle, form, erreurs, onRetirer }: Props) {
         {champ('hMoy', t('prospection.vegetation.hMoy'), t('prospection.vegetation.metre'))}
         {champ('verdissement', t('prospection.vegetation.verdissement'), t('prospection.vegetation.pourcent'))}
       </View>
+      <PhenologieBlock cle={cle} form={form} avecAide={!onRetirer} />
       <form.Subscribe selector={(s) => s.values.strates[cle].recouvrement > 0}>
         {(presente) => (
           <Pressable

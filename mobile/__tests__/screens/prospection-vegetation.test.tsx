@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { VegetationStep } from '@/components/prospection/VegetationStep';
 import { enregistrerBrouillon, type ProspectionCreate } from '@/lib/prospection-db';
 import { defaultStrateDetail, STRATE_KEYS } from '@/lib/prospection-vegetation-schema';
@@ -180,5 +180,73 @@ describe('VegetationStep — « Plus de détails » (#687)', () => {
     expect(screen.getByTestId('plus-de-details-herbeuse')).toBeEnabled();
     await fireEvent.press(screen.getByTestId('plus-de-details-herbeuse'));
     expect(screen.getByText('Strate herbeuse · détails')).toBeTruthy();
+  });
+});
+
+describe('VegetationStep — phénologie « Qu’observez-vous ? » (#686)', () => {
+  const stade = (cle: string, s: string) => screen.getByTestId(`stade-${cle}-${s}`);
+  const niveau = (cle: string, s: string, n: string) => screen.queryByTestId(`niveau-${cle}-${s}-${n}`);
+
+  it('affiche les 5 stades de la maquette, tous non touchés, sans ligne de niveau', async () => {
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    expect(screen.getAllByText('Qu’observez-vous ?').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Touchez uniquement ce qui est présent. Le reste compte comme « Néant ».')).toBeTruthy();
+    for (const [s, libelle] of [['orpad', 'Germination'], ['feuille', 'Feuille'], ['fleur', 'Fleur'], ['fruit', 'Fruit'], ['sec', 'Sec']]) {
+      expect(within(stade('herbeuse', s)).getByText(libelle)).toBeTruthy();
+      expect(stade('herbeuse', s).props.accessibilityState).toMatchObject({ selected: false });
+    }
+    expect(niveau('herbeuse', 'feuille', 'Rare')).toBeNull();
+  });
+
+  it('toucher un stade le coche et présélectionne Rare ; Beaucoup remplace Rare (un seul niveau) ; retoucher le stade le remet à Néant', async () => {
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    await fireEvent.press(stade('herbeuse', 'feuille'));
+    expect(within(stade('herbeuse', 'feuille')).getByText('✓ Feuille')).toBeTruthy();
+    expect(niveau('herbeuse', 'feuille', 'Rare')!.props.accessibilityState).toMatchObject({ selected: true });
+    expect(niveau('herbeuse', 'feuille', 'Beaucoup')!.props.accessibilityState).toMatchObject({ selected: false });
+
+    await fireEvent.press(niveau('herbeuse', 'feuille', 'Beaucoup')!);
+    expect(niveau('herbeuse', 'feuille', 'Rare')!.props.accessibilityState).toMatchObject({ selected: false });
+    expect(niveau('herbeuse', 'feuille', 'Beaucoup')!.props.accessibilityState).toMatchObject({ selected: true });
+
+    await fireEvent.press(stade('herbeuse', 'feuille'));
+    expect(niveau('herbeuse', 'feuille', 'Rare')).toBeNull();
+    expect(stade('herbeuse', 'feuille').props.accessibilityState).toMatchObject({ selected: false });
+  });
+  it('« Continuer » enregistre un tableau à un élément par stade (orpad = Germination), Néant pour les stades non touchés', async () => {
+    jest.mocked(enregistrerBrouillon).mockReset().mockResolvedValue('b-1');
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    for (let i = 0; i < 3; i++) await fireEvent.press(screen.getByLabelText('Augmenter Sol nu'));
+    await fireEvent.press(stade('herbeuse', 'orpad'));
+    await fireEvent.press(stade('herbeuse', 'fruit'));
+    await fireEvent.press(niveau('herbeuse', 'fruit', 'Beaucoup')!);
+    await fireEvent.press(screen.getByTestId('vegetation-continuer'));
+
+    await waitFor(() => expect(enregistrerBrouillon).toHaveBeenCalled());
+    const strates = (jest.mocked(enregistrerBrouillon).mock.calls[0][0].vegetation as { strates: Record<string, unknown> }).strates;
+    expect(strates.herbeuse).toMatchObject({ orpad: ['Rare'], feuille: ['Néant'], fleur: ['Néant'], fruit: ['Beaucoup'], sec: ['Néant'] });
+    expect(strates.arboree).toMatchObject({ orpad: [], sec: [] });
+  });
+
+  it('rouvre une fiche avec les niveaux déjà choisis', async () => {
+    const brouillon = fiche({
+      vegetation: { strates: { herbeuse: { ...defaultStrateDetail(), recouvrement: 55, feuille: ['Beaucoup'], fleur: ['Rare'] } } },
+      sol: { solNu: 45 },
+    });
+    await render(<VegetationStep brouillon={brouillon} onContinuer={jest.fn()} />);
+    expect(niveau('herbeuse', 'feuille', 'Beaucoup')!.props.accessibilityState).toMatchObject({ selected: true });
+    expect(niveau('herbeuse', 'fleur', 'Rare')!.props.accessibilityState).toMatchObject({ selected: true });
+    expect(niveau('herbeuse', 'sec', 'Rare')).toBeNull();
+  });
+
+  it('« Retirer » une strate remet ses stades à Néant : en la rajoutant, rien n’est coché', async () => {
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    await fireEvent.press(screen.getByText('+ Arborée'));
+    await fireEvent.press(stade('arboree', 'sec'));
+    expect(niveau('arboree', 'sec', 'Rare')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Retirer la Strate arborée'));
+    await fireEvent.press(screen.getByText('+ Arborée'));
+    expect(stade('arboree', 'sec').props.accessibilityState).toMatchObject({ selected: false });
+    expect(niveau('arboree', 'sec', 'Rare')).toBeNull();
   });
 });

@@ -19,6 +19,22 @@ export interface StrateDetail {
 
 export type Strates = Record<StrateKey, StrateDetail>;
 
+/** Niveaux d'un stade phénologique, tels qu'enregistrés (un seul élément dans le tableau, #686). */
+export const PHENOLOGIE_STAGES = ['Néant', 'Rare', 'Beaucoup'] as const;
+export type NiveauPhenologie = (typeof PHENOLOGIE_STAGES)[number];
+
+/** Stades du bloc « Qu'observez-vous ? » ; `orpad` (Germination) garde son nom historique dans le JSON. */
+export const STADES_PHENOLOGIE = ['orpad', 'feuille', 'fleur', 'fruit', 'sec'] as const;
+export type StadePhenologie = (typeof STADES_PHENOLOGIE)[number];
+export type Phenologie = Record<StadePhenologie, NiveauPhenologie>;
+
+export const phenologieVide = (): Phenologie => ({ orpad: 'Néant', feuille: 'Néant', fleur: 'Néant', fruit: 'Néant', sec: 'Néant' });
+
+const tableauxDePhenologie = (p: Phenologie) => Object.fromEntries(STADES_PHENOLOGIE.map((st) => [st, [p[st]]]));
+
+const niveauDeTableau = (valeur: unknown): NiveauPhenologie =>
+  Array.isArray(valeur) && (valeur[0] === 'Rare' || valeur[0] === 'Beaucoup') ? valeur[0] : 'Néant';
+
 /** Valeurs d'une strate non ajoutée : enregistrée telle quelle pour garder les 6 clés. */
 export function defaultStrateDetail(): StrateDetail {
   return { surfRel: null, hMoy: null, recouvrement: 0, verdissement: null, repousse: null, orpad: [], feuille: [], fleur: [], fruit: [], sec: [] };
@@ -53,6 +69,7 @@ export interface StrateValeurs {
   /** Détails de la feuille « Plus de détails » (#687). */
   surfRel: string;
   repousse: boolean | null;
+  phenologie: Phenologie;
 }
 
 export interface VegetationValeurs {
@@ -91,6 +108,7 @@ export function valeursDeVegetation({ vegetation, sol }: Brouillon): VegetationV
           verdissement: versTexte(s?.verdissement),
           surfRel: versTexte(s?.surfRel),
           repousse: typeof s?.repousse === 'boolean' ? s.repousse : null,
+          phenologie: Object.fromEntries(STADES_PHENOLOGIE.map((st) => [st, niveauDeTableau(s?.[st])])) as Phenologie,
         },
       ];
     })
@@ -110,7 +128,7 @@ export function champsDeVegetation({ vegetation, sol }: Brouillon, valeurs: Vege
       // Strate retirée ou jamais renseignée : valeurs par défaut, sans rien hériter du brouillon.
       const vide = v.recouvrement === 0 && v.hMoy.trim() === '' && v.verdissement.trim() === '' && !aDesDetails(v);
       if (vide) return [k, defaultStrateDetail()];
-      return [k, { ...defaultStrateDetail(), ...enregistrees[k], recouvrement: v.recouvrement, hMoy: versNombre(v.hMoy), verdissement: versNombre(v.verdissement), surfRel: versNombre(v.surfRel), repousse: v.repousse }];
+      return [k, { ...defaultStrateDetail(), ...enregistrees[k], recouvrement: v.recouvrement, hMoy: versNombre(v.hMoy), verdissement: versNombre(v.verdissement), surfRel: versNombre(v.surfRel), repousse: v.repousse, ...tableauxDePhenologie(v.phenologie) }];
     })
   );
   return { vegetation: { ...vegetation, strates }, sol: { ...sol, solNu: valeurs.solNu } };
