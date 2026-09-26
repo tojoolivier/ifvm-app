@@ -34,6 +34,12 @@ colors:
   blue-border: "#cdddef"
   green-bg: "#eaf2ec"
   strate-herbeuse: "#6aa84f"
+  strate-sol-nu: "#c9c1ab"
+  strate-arbustive: "#3f7d4f"
+  strate-arboree: "#2c5e3f"
+  strate-buissonneuse: "#8fb573"
+  strate-cultures-seches: "#d9b64f"
+  strate-cultures-hygro: "#4f9bb0"
   green-light: "#f6faf7"
   green-border: "#cfe0d4"
   brouillon-text: "#6f6a59"
@@ -195,6 +201,30 @@ components:
     backgroundColor: "{colors.strate-herbeuse}"
     rounded: "{rounded.full}"
     height: 10px
+  ui-repartition-sol-nu:
+    backgroundColor: "{colors.strate-sol-nu}"
+    rounded: "{rounded.full}"
+    height: 14px
+  ui-repartition-arbustive:
+    backgroundColor: "{colors.strate-arbustive}"
+    rounded: "{rounded.full}"
+    height: 14px
+  ui-repartition-arboree:
+    backgroundColor: "{colors.strate-arboree}"
+    rounded: "{rounded.full}"
+    height: 14px
+  ui-repartition-buissonneuse:
+    backgroundColor: "{colors.strate-buissonneuse}"
+    rounded: "{rounded.full}"
+    height: 14px
+  ui-repartition-cultures-seches:
+    backgroundColor: "{colors.strate-cultures-seches}"
+    rounded: "{rounded.full}"
+    height: 14px
+  ui-repartition-cultures-hygro:
+    backgroundColor: "{colors.strate-cultures-hygro}"
+    rounded: "{rounded.full}"
+    height: 14px
   ui-stat-tile:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.primary}"

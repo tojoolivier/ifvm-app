@@ -28,11 +28,27 @@ jest.mock('@/components/prospection/ReferenceStep', () => {
   };
 });
 
+// L'écran Végétation a ses propres tests (prospection-vegetation.test.tsx) : ici, un double qui montre sa fiche et poursuit.
+jest.mock('@/components/prospection/VegetationStep', () => {
+  const { Text, Pressable } = require('react-native');
+  return {
+    VegetationStep: ({ brouillon, onContinuer }: { brouillon: { id: string }; onContinuer: () => void }) => (
+      <Pressable onPress={onContinuer}>
+        <Text>{`Végétation ${brouillon.id}`}</Text>
+        <Text>Continuer végétation</Text>
+      </Pressable>
+    ),
+  };
+});
+
 describe('WizardScreen', () => {
   beforeEach(() => {
     mockParams = {};
     mockBack.mockClear();
-    jest.mocked(getFiche).mockReset();
+    // Après « Continuer » de la Référence, le wizard relit la fiche enregistrée.
+    jest.mocked(getFiche).mockReset().mockResolvedValue({
+      fiche: { id: 'brouillon-1', type_prospection: 'intensive', revalide_de_id: null, n_fiche: 'FI-1', station_id: 's', date_prospection: '2026-09-25' },
+    } as never);
   });
 
   it.each([
@@ -106,8 +122,33 @@ describe('WizardScreen', () => {
     await waitFor(() => expect(screen.getByText(/introuvable/)).toBeVisible());
   });
 
-  it('s’arrête sur le récapitulatif : plus de « Suivant » après l’étape 5', async () => {
+  it('intensive : « Continuer » de la Référence relit la fiche enregistrée et ouvre l’écran Végétation dessus', async () => {
     mockParams = { type: 'intensive' };
+    jest.mocked(getFiche).mockResolvedValue({
+      fiche: { id: 'brouillon-1', type_prospection: 'intensive', revalide_de_id: null, n_fiche: 'FI-1', station_id: 's', date_prospection: '2026-09-25' },
+    } as never);
+    await render(<WizardScreen />);
+
+    await fireEvent.press(screen.getByText('Suivant'));
+
+    expect(await screen.findByText('Végétation brouillon-1')).toBeVisible();
+    expect(screen.getByText('Étape 2 sur 5')).toBeVisible();
+    expect(getFiche).toHaveBeenCalledWith('brouillon-1');
+  });
+
+  it('intensive : « Continuer » de la Végétation passe à l’étape 3', async () => {
+    mockParams = { id: 'f3' };
+    jest.mocked(getFiche).mockResolvedValue({
+      fiche: { id: 'f3', type_prospection: 'intensive', revalide_de_id: null, n_fiche: 'FI-3', station_id: 's', date_prospection: '2026-09-25' },
+    } as never);
+    await render(<WizardScreen />);
+    await fireEvent.press(await screen.findByText('Continuer végétation'));
+
+    expect(screen.getByText('Étape 3 sur 5')).toBeVisible();
+  });
+
+  it('s’arrête sur le récapitulatif : plus de « Suivant » après l’étape 5', async () => {
+    mockParams = { type: 'extensive' };
     await render(<WizardScreen />);
 
     for (let i = 0; i < 4; i++) await fireEvent.press(screen.getByText('Suivant'));

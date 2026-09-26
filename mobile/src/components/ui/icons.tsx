@@ -15,19 +15,37 @@ function IconeSvg({ size, children }: { size: number; children: ReactNode }) {
 
 const trait = { strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' } as const;
 
+/** Icônes 20×20 exportées de Figma (Stepper, Ajouter une strate) : tracés et épaisseur d'origine. */
+function IconeSvg20({ size, children }: { size: number; children: ReactNode }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none" accessibilityElementsHidden importantForAccessibility="no">
+      {children}
+    </Svg>
+  );
+}
+
 export function IconMoins({ size = 20, color }: IconProps) {
   return (
-    <IconeSvg size={size}>
-      <Path d="M5 12H19" stroke={color} {...trait} />
-    </IconeSvg>
+    <IconeSvg20 size={size}>
+      <Path d="M4.16667 10H15.8333" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </IconeSvg20>
   );
 }
 
 export function IconPlus({ size = 20, color }: IconProps) {
   return (
-    <IconeSvg size={size}>
-      <Path d="M12 5V19M5 12H19" stroke={color} {...trait} />
-    </IconeSvg>
+    <IconeSvg20 size={size}>
+      <Path d="M10 4.16667V15.8333M4.16667 10H15.8333" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </IconeSvg20>
+  );
+}
+
+/** Chevron droit (« Plus de détails ») : trait 1,833. */
+export function IconChevronDroit({ size = 20, color }: IconProps) {
+  return (
+    <IconeSvg20 size={size}>
+      <Path d="M7.5 5L12.5 10L7.5 15" stroke={color} strokeWidth={1.83333} strokeLinecap="round" strokeLinejoin="round" />
+    </IconeSvg20>
   );
 }
 

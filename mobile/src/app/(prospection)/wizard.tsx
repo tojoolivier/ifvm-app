@@ -4,11 +4,15 @@ import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ReferenceStep } from '@/components/prospection/ReferenceStep';
+import { VegetationStep } from '@/components/prospection/VegetationStep';
 import { PrimaryButton, WizardHeader } from '@/components/ui';
 import { UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
+import { logger } from '@/lib/logger';
 import { getFiche, type ProspectionCreate } from '@/lib/prospection-db';
 import { ETAPES, NB_ETAPES, estTypeWizard, etapeDeReprise, typeDeFiche, type TypeWizard } from '@/lib/prospection-wizard';
+
+const log = logger.child({ module: 'wizard' });
 
 /**
  * Wizard de prospection unique (#683) : un seul en-tête et les mêmes étapes pour tous les types.
@@ -44,6 +48,19 @@ export default function WizardScreen() {
     };
   }, [id]);
 
+  /** L'étape Référence a créé ou mis à jour la fiche : on la relit pour que l'étape suivante parte de son contenu. */
+  const apresReference = async (ficheId: string) => {
+    try {
+      const locale = await getFiche(ficheId);
+      if (!locale) return setIntrouvable(true);
+      setBrouillon(locale.fiche);
+      setIndex(1);
+    } catch (e) {
+      log.failure('wizard_relecture_fiche', e);
+      setIntrouvable(true);
+    }
+  };
+
   if (introuvable) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: c.surfaceMuted }]}>
@@ -66,9 +83,10 @@ export default function WizardScreen() {
         onBack={() => (index === 0 ? router.back() : setIndex(index - 1))}
       />
       {index === 0 && typeFiche !== 'revalidation' && (
-        <ReferenceStep type={typeFiche} brouillon={brouillon} onNumeroFiche={setNumero} onContinuer={() => setIndex(1)} />
+        <ReferenceStep type={typeFiche} brouillon={brouillon} onNumeroFiche={setNumero} onContinuer={apresReference} />
       )}
-      {index > 0 && index < NB_ETAPES - 1 && (
+      {index === 1 && typeFiche === 'intensive' && brouillon && <VegetationStep brouillon={brouillon} onContinuer={() => setIndex(2)} />}
+      {index > 0 && index < NB_ETAPES - 1 && !(index === 1 && typeFiche === 'intensive') && (
         <PrimaryButton label={t('prospection.suivant')} onPress={() => setIndex(index + 1)} testID="wizard-suivant" />
       )}
     </SafeAreaView>

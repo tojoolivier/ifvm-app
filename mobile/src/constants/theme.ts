@@ -132,6 +132,13 @@ export const UiColors = {
     greenBg: '#eaf2ec',
     /** Barre d'imbrication des surfaces (maquette `strate/herbeuse`). */
     strateHerbeuse: '#6aa84f',
+    /** Pastilles et barre de la végétation intensive : sol nu, arbustive (maquette 02b), les autres teintes sont provisoires. */
+    strateSolNu: '#c9c1ab',
+    strateArbustive: '#3f7d4f',
+    strateArboree: '#2c5e3f',
+    strateBuissonneuse: '#8fb573',
+    strateCulturesSeches: '#d9b64f',
+    strateCulturesHygro: '#4f9bb0',
     greenBorder: '#cfe0d4',
     infoText: '#3a5c43',
     warnText: '#8a6d2f',
@@ -160,6 +167,13 @@ export const UiColors = {
     amber: '#f0b34f',
     greenBg: '#1e3a22',
     strateHerbeuse: '#6aa84f',
+    /** Pastilles et barre de la végétation intensive : sol nu, arbustive (maquette 02b), les autres teintes sont provisoires. */
+    strateSolNu: '#c9c1ab',
+    strateArbustive: '#3f7d4f',
+    strateArboree: '#2c5e3f',
+    strateBuissonneuse: '#8fb573',
+    strateCulturesSeches: '#d9b64f',
+    strateCulturesHygro: '#4f9bb0',
     greenBorder: '#2f6b3f',
     infoText: '#a9d6b8',
     warnText: '#fbbf24',
@@ -202,6 +216,9 @@ export const UiSize = {
   iconeLigne: 18,
   iconeTitre: 20,
   pointLegende: 8,
+  /** Végétation intensive : barre empilée de la répartition et pastille de couleur d'une strate. */
+  barreRepartition: 14,
+  pastilleStrate: 12,
   sheetHandleWidth: 36,
   sheetHandleHeight: 4,
   timelineTrait: 2,
