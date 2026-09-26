@@ -31,7 +31,12 @@ export function Chip({ label, selected, onPress, disabled, testID }: Props) {
         },
       ]}
     >
-      <Text style={[UiText.bodyMedium, { color: selected ? c.onPrimary : c.fg2, fontFamily: InterFonts.medium }]}>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        style={[UiText.bodyMedium, { color: selected ? c.onPrimary : c.fg2, fontFamily: InterFonts.medium }]}
+      >
         {label}
       </Text>
     </Pressable>

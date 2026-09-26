@@ -117,6 +117,9 @@ export const UiColors = {
   light: {
     primary: '#235a36',
     onPrimary: '#ffffff',
+    /** Tuile / pastille translucide posée sur un fond `primary` (carte « Position GPS »). */
+    onPrimaryTile: 'rgba(255, 255, 255, 0.12)',
+    onPrimaryPill: 'rgba(255, 255, 255, 0.16)',
     surface: '#ffffff',
     surfaceMuted: '#f4efe2',
     border: '#e7e0cd',
@@ -127,12 +130,16 @@ export const UiColors = {
     fgWeak: '#9a9484',
     amber: '#e89b2b',
     greenBg: '#eaf2ec',
+    /** Barre d'imbrication des surfaces (maquette `strate/herbeuse`). */
+    strateHerbeuse: '#6aa84f',
     greenBorder: '#cfe0d4',
     infoText: '#3a5c43',
     warnText: '#8a6d2f',
     warnBg: '#fdf6e7',
     warnBorder: '#f0e2bf',
     dangerText: '#a5341c',
+    /** Part infestée de la barre des surfaces (maquette `color/danger`). */
+    danger: '#c0412b',
     dangerBg: '#fbe9e5',
     dangerBorder: '#f0c4b9',
     overlay: 'rgba(22, 32, 26, 0.45)',
@@ -140,6 +147,8 @@ export const UiColors = {
   dark: {
     primary: '#4ea36b',
     onPrimary: '#0b1a10',
+    onPrimaryTile: 'rgba(11, 26, 16, 0.12)',
+    onPrimaryPill: 'rgba(11, 26, 16, 0.16)',
     surface: '#1a1c1f',
     surfaceMuted: '#25272b',
     border: '#2e3135',
@@ -150,12 +159,14 @@ export const UiColors = {
     fgWeak: '#8a8f96',
     amber: '#f0b34f',
     greenBg: '#1e3a22',
+    strateHerbeuse: '#6aa84f',
     greenBorder: '#2f6b3f',
     infoText: '#a9d6b8',
     warnText: '#fbbf24',
     warnBg: '#3a3020',
     warnBorder: '#5a4a2a',
     dangerText: '#f87171',
+    danger: '#c0412b',
     dangerBg: '#3a1d22',
     dangerBorder: '#5a2a33',
     overlay: 'rgba(0, 0, 0, 0.6)',
@@ -165,7 +176,7 @@ export const UiColors = {
 export type UiPalette = (typeof UiColors)[keyof typeof UiColors];
 
 /** Rayons Figma : `radius/sm` (champs), `radius/md` (boutons, cartes), `radius/full` (puces). */
-export const Radius = { sm: 8, md: 12, panel: 10, sheet: 18, full: 999 } as const;
+export const Radius = { sm: 8, md: 12, lg: 16, panel: 10, sheet: 18, full: 999 } as const;
 
 /** Espacements du socle UI — la clé est la valeur en px de la maquette (`UiSpace[12]` = 12). */
 export const UiSpace = { 2: 2, 4: 4, 6: 6, 8: 8, 10: 10, 12: 12, 14: 14, 16: 16, 32: 32 } as const;
@@ -185,11 +196,15 @@ export const UiSize = {
   button: 54,
   pastille: 28,
   progressSegment: 4,
+  surfaceBar: 10,
   sheetHandleWidth: 36,
   sheetHandleHeight: 4,
   timelineTrait: 2,
   hitSlop: 10,
 } as const;
+
+/** IBM Plex Mono chargée par `lib/fonts.ts` — n° de fiche (chasse fixe). */
+export const MonoFonts = { medium: 'IBMPlexMono_500Medium' } as const;
 
 /** Polices Inter chargées par `lib/fonts.ts`. */
 export const InterFonts = {
@@ -202,6 +217,7 @@ export const InterFonts = {
 /** Styles de texte Figma (Body Medium, Numeric, Caption, Button, Heading, Micro, Eyebrow…). */
 export const UiText = {
   bodyMedium: { fontFamily: InterFonts.medium, fontSize: 15, lineHeight: 20 },
+  subheading: { fontFamily: InterFonts.semiBold, fontSize: 15, lineHeight: 20 },
   numeric: { fontFamily: InterFonts.semiBold, fontSize: 20, lineHeight: 24 },
   numericLarge: { fontFamily: InterFonts.bold, fontSize: 28, lineHeight: 32, letterSpacing: -0.3 },
   caption: { fontFamily: InterFonts.regular, fontSize: 13, lineHeight: 17 },

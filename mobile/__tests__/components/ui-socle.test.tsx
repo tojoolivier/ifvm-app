@@ -28,6 +28,13 @@ describe('Chip', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('garde son libellé sur une ligne et le réduit au lieu de le tronquer (3 puces pleine largeur)', async () => {
+    await render(<Chip label="Hygrophyle" selected={false} onPress={jest.fn()} />);
+    const libelle = screen.getByText('Hygrophyle');
+    expect(libelle.props.numberOfLines).toBe(1);
+    expect(libelle.props.adjustsFontSizeToFit).toBe(true);
+  });
+
   it('est non sélectionnée à l’état Off', async () => {
     await render(<Chip label="Dense" selected={false} onPress={jest.fn()} />);
     expect(screen.getByRole('button', { name: 'Dense' }).props.accessibilityState).toMatchObject({

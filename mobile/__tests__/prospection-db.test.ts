@@ -74,6 +74,13 @@ describe('brouillon', () => {
     expect(await listerBrouillons()).toHaveLength(1);
   });
 
+  it('crée le brouillon sous l’identifiant fourni quand on le demande (id connu avant la 1re sauvegarde)', async () => {
+    const id = await enregistrerBrouillon({ ...saisie({ n_fiche: 'FI-20260925-ABCDEF' }), id: 'id-choisi' }, { creation: true });
+
+    expect(id).toBe('id-choisi');
+    expect((await getFiche('id-choisi'))?.fiche).toMatchObject({ statut: 'brouillon', n_fiche: 'FI-20260925-ABCDEF' });
+  });
+
   it('refuse de reprendre un identifiant inconnu', async () => {
     await expect(enregistrerBrouillon({ ...saisie(), id: 'inconnu' })).rejects.toBeInstanceOf(PreconditionError);
   });

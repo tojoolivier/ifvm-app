@@ -33,6 +33,7 @@ colors:
   violet-bg: "#f1edfb"
   blue-border: "#cdddef"
   green-bg: "#eaf2ec"
+  strate-herbeuse: "#6aa84f"
   green-light: "#f6faf7"
   green-border: "#cfe0d4"
   brouillon-text: "#6f6a59"
@@ -106,6 +107,11 @@ typography:
     fontSize: 13px
     fontWeight: 400
     lineHeight: 17px
+  ui-subheading:
+    fontFamily: Inter, sans-serif
+    fontSize: 15px
+    fontWeight: 600
+    lineHeight: 20px
   ui-heading:
     fontFamily: Inter, sans-serif
     fontSize: 17px
@@ -137,6 +143,7 @@ rounded:
   full: 9999px
   ui-field: 8px
   ui-control: 12px
+  ui-panel-lg: 16px
 spacing:
   xs: 4px
   sm: 8px
@@ -179,6 +186,10 @@ components:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.foreground}"
     typography: "{typography.ui-heading}"
+  ui-surface-bar:
+    backgroundColor: "{colors.strate-herbeuse}"
+    rounded: "{rounded.full}"
+    height: 10px
   ui-stat-tile:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.primary}"

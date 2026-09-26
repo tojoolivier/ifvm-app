@@ -11,6 +11,22 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 jest.mock('@/lib/prospection-db', () => ({ getFiche: jest.fn() }));
+// L'écran Référence a ses propres tests (prospection-reference.test.tsx) : ici, un double qui publie son N° et poursuit.
+jest.mock('@/components/prospection/ReferenceStep', () => {
+  const { Text, Pressable } = require('react-native');
+  const { useEffect } = require('react');
+  return {
+    ReferenceStep: ({ type, brouillon, onContinuer, onNumeroFiche }: { type: string; brouillon?: { id: string }; onContinuer: (id: string) => void; onNumeroFiche: (n: string) => void }) => {
+      useEffect(() => onNumeroFiche('FI-20260925-ABCDEF'), [onNumeroFiche]);
+      return (
+        <Pressable onPress={() => onContinuer('brouillon-1')}>
+          <Text>{`Référence ${type}${brouillon ? ` reprise ${brouillon.id}` : ''}`}</Text>
+          <Text>Suivant</Text>
+        </Pressable>
+      );
+    },
+  };
+});
 
 describe('WizardScreen', () => {
   beforeEach(() => {
@@ -30,6 +46,14 @@ describe('WizardScreen', () => {
     expect(screen.getByText('Nouvelle prospection')).toBeVisible();
     expect(screen.getByText(badge)).toBeVisible();
     expect(screen.getByText('Étape 1 sur 5')).toBeVisible();
+  });
+
+  it('affiche l’écran Référence à l’étape 1 et reprend son N° de fiche dans l’en-tête', async () => {
+    mockParams = { type: 'extensive' };
+    await render(<WizardScreen />);
+
+    expect(screen.getByText('Référence extensive')).toBeVisible();
+    expect(screen.getByText('Fiche FI-20260925-ABCDEF')).toBeVisible();
   });
 
   it('garde le type tout au long des étapes (aucune bascule)', async () => {
@@ -59,6 +83,19 @@ describe('WizardScreen', () => {
     await waitFor(() => expect(screen.getByText('Revalidation')).toBeVisible());
     expect(screen.getByText('Étape 2 sur 5')).toBeVisible();
     expect(screen.getByText('Fiche FI-1-bis')).toBeVisible();
+  });
+
+  it('revenir à l’étape 1 sur un brouillon rouvre l’écran Référence avec sa fiche', async () => {
+    mockParams = { id: 'f2' };
+    jest.mocked(getFiche).mockResolvedValue({
+      fiche: { id: 'f2', type_prospection: 'intensive', revalide_de_id: null, n_fiche: 'FI-2', station_id: 's', date_prospection: '2026-09-25' },
+    } as never);
+    await render(<WizardScreen />);
+    await waitFor(() => expect(screen.getByText('Étape 2 sur 5')).toBeVisible());
+
+    await fireEvent.press(screen.getByLabelText('Retour'));
+
+    expect(screen.getByText('Référence intensive reprise f2')).toBeVisible();
   });
 
   it('signale un brouillon introuvable', async () => {

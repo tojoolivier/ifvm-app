@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardTypeOptions, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Radius, UiBorder, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { FieldError } from './FieldError';
@@ -13,10 +13,12 @@ type Props = {
   error?: string | null;
   onBlur?: () => void;
   testID?: string;
+  /** Clavier ; `decimal-pad` par défaut. La maquette réutilise ce champ pour du texte (N° message, station libre). */
+  clavier?: KeyboardTypeOptions;
 };
 
 /** Champ numérique décimal avec unité — maquette `NumberField`. */
-export function NumberField({ label, value, onChangeText, unit, error, onBlur, testID }: Props) {
+export function NumberField({ label, value, onChangeText, unit, error, onBlur, testID, clavier = 'decimal-pad' }: Props) {
   const c = useUiTheme();
   return (
     <View style={styles.root}>
@@ -32,7 +34,7 @@ export function NumberField({ label, value, onChangeText, unit, error, onBlur, t
           value={value}
           onChangeText={onChangeText}
           onBlur={onBlur}
-          keyboardType="decimal-pad"
+          keyboardType={clavier}
           accessibilityLabel={unit ? `${label} (${unit})` : label}
           accessibilityHint={error ?? undefined}
           placeholderTextColor={c.fgWeak}

@@ -177,13 +177,19 @@ export async function getFiche(id: string): Promise<FicheLocale | null> {
 /**
  * Crée le brouillon, ou met à jour celui qu'on reprend (`saisie.id`). Écrire hors-ligne suffit :
  * rien ne part avant `soumettreFiche`. Une fiche déjà soumise ne se modifie plus.
+ *
+ * `creation: true` : `saisie.id` est un identifiant choisi par l'appelant (nécessaire quand le n° de
+ * fiche en dérive et s'affiche avant la première sauvegarde), pas la reprise d'un brouillon existant.
  */
-export async function enregistrerBrouillon(saisie: SaisieProspection): Promise<string> {
+export async function enregistrerBrouillon(
+  saisie: SaisieProspection,
+  options: { creation?: boolean } = {}
+): Promise<string> {
   const db = await getDb();
   const id = saisie.id ?? generateId();
   const existante = saisie.id ? await ligneDe(db, id) : null;
 
-  if (saisie.id && !existante) throw new PreconditionError(`Brouillon ${id} introuvable sur cet appareil.`);
+  if (saisie.id && !existante && !options.creation) throw new PreconditionError(`Brouillon ${id} introuvable sur cet appareil.`);
   if (existante && existante.statut !== 'brouillon') {
     throw new PreconditionError('Cette fiche est déjà soumise : elle ne peut plus être modifiée.');
   }

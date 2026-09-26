@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ReferenceStep } from '@/components/prospection/ReferenceStep';
 import { PrimaryButton, WizardHeader } from '@/components/ui';
 import { UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
-import { getFiche } from '@/lib/prospection-db';
+import { getFiche, type ProspectionCreate } from '@/lib/prospection-db';
 import { ETAPES, NB_ETAPES, estTypeWizard, etapeDeReprise, typeDeFiche, type TypeWizard } from '@/lib/prospection-wizard';
 
 /**
@@ -21,6 +22,7 @@ export default function WizardScreen() {
   const { t } = useTranslation();
   const [typeFiche, setTypeFiche] = useState<TypeWizard | null>(estTypeWizard(type) ? type : null);
   const [numero, setNumero] = useState<string | null>(null);
+  const [brouillon, setBrouillon] = useState<(ProspectionCreate & { id: string }) | undefined>();
   const [index, setIndex] = useState(0);
   const [introuvable, setIntrouvable] = useState(false);
 
@@ -33,6 +35,7 @@ export default function WizardScreen() {
         if (!locale) return setIntrouvable(true);
         setTypeFiche(typeDeFiche(locale.fiche));
         setNumero(locale.fiche.n_fiche ?? null);
+        setBrouillon(locale.fiche);
         setIndex(etapeDeReprise(locale.fiche));
       })
       .catch(() => !annule && setIntrouvable(true));
@@ -62,7 +65,10 @@ export default function WizardScreen() {
         libelleEtape={t(`prospection.etapes.${ETAPES[index]}`)}
         onBack={() => (index === 0 ? router.back() : setIndex(index - 1))}
       />
-      {index < NB_ETAPES - 1 && (
+      {index === 0 && typeFiche !== 'revalidation' && (
+        <ReferenceStep type={typeFiche} brouillon={brouillon} onNumeroFiche={setNumero} onContinuer={() => setIndex(1)} />
+      )}
+      {index > 0 && index < NB_ETAPES - 1 && (
         <PrimaryButton label={t('prospection.suivant')} onPress={() => setIndex(index + 1)} testID="wizard-suivant" />
       )}
     </SafeAreaView>

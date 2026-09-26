@@ -79,6 +79,14 @@ export async function listStationsByPoste(paId: string): Promise<StationFixe[]> 
   );
 }
 
+/** Toutes les stations actives — sert à retrouver, hors ligne, la plus proche de la position GPS. */
+export async function listStationsActives(): Promise<StationFixe[]> {
+  const db = await getReferentielDb();
+  return db.getAllAsync<StationFixe>(
+    'SELECT id, code, nom, pa_id as paId, latitude, longitude, altitude, commune, district, region FROM station_fixe WHERE actif = 1 ORDER BY nom'
+  );
+}
+
 /**
  * Résout le nom d'une station par son id, active ou non — #localite-traitement-
  * poste-acridien-autre-agent : `ProspectionRead` (réponse serveur) n'expose pas
