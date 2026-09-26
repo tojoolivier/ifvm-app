@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
@@ -18,6 +19,7 @@ type Props = {
 /** Stepper de pourcentage par pas — maquette `Stepper`. */
 export function Stepper({ value, onChange, step = 5, min = 0, max = 100, unit = '%', label, testID }: Props) {
   const c = useUiTheme();
+  const { t } = useTranslation();
   const peutBaisser = value - step >= min;
   const peutMonter = value + step <= max;
   return (
@@ -27,7 +29,7 @@ export function Stepper({ value, onChange, step = 5, min = 0, max = 100, unit = 
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Diminuer ${label}`}
+        accessibilityLabel={t('ui.stepper.diminuer', { label })}
         disabled={!peutBaisser}
         onPress={() => onChange(Math.max(min, value - step))}
         style={[styles.btn, { backgroundColor: c.surfaceMuted, opacity: peutBaisser ? 1 : 0.4 }]}
@@ -46,7 +48,7 @@ export function Stepper({ value, onChange, step = 5, min = 0, max = 100, unit = 
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Augmenter ${label}`}
+        accessibilityLabel={t('ui.stepper.augmenter', { label })}
         disabled={!peutMonter}
         onPress={() => onChange(Math.min(max, value + step))}
         style={[styles.btn, { backgroundColor: c.primary, opacity: peutMonter ? 1 : 0.4 }]}

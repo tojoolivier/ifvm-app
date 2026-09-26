@@ -63,3 +63,13 @@ Composants partagés issus du cadre « Composants » de la maquette Figma (Chip,
 - Police : Inter, chargée une seule fois à la racine (`mobile/src/lib/fonts.ts`) ; ne pas rappeler `useFonts` dans un layout de module.
 - Démo : `/composants-demo` (développement uniquement, l'écran n'est pas embarqué en production).
 - Contraste connu : le bouton désactivé de la maquette (`#9a9484` sur `#e7e0cd`, 2,3:1) est sous WCAG AA ; volontairement absent de `DESIGN.md` pour que le lint reste sans avertissement, à corriger côté Figma.
+
+### Mobile : textes et i18n
+
+Aucun texte affiché ne s'écrit en dur dans un composant : il vit dans `mobile/src/locales/fr.ts` (clés typées) et se lit avec `const { t } = useTranslation()` de `react-i18next` (`t('ui.retour')`, interpolation `t('ui.etape', { etape, total })`, jamais de gabarit `` `Étape ${n}` ``).
+
+- L'app est en français ; la config est dans `mobile/src/lib/i18n.ts` (`escapeValue: false`, React échappe déjà). Ajouter le malgache = un `locales/mg.ts` de même forme, enregistré dans `resources`.
+- Une clé inconnue ne compile pas (`mobile/src/types/i18next.d.ts`) : ajouter la clé dans `fr.ts` d'abord.
+- Les libellés d'accessibilité (`accessibilityLabel`) sont des textes comme les autres.
+- Hors périmètre pour l'instant : l'écran de démo `/composants-demo` et le code existant hors `components/ui/` — à migrer au fil des réécritures (#681).
+

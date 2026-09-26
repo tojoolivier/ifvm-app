@@ -1,11 +1,7 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
-
-/** « Il manque : a, b » — libellé du bouton désactivé tant que l'étape est invalide. */
-export function libelleIlManque(manques: string[]): string {
-  return `Il manque : ${manques.join(', ')}`;
-}
 
 type Props = {
   label: string;
@@ -20,9 +16,10 @@ type Props = {
 /** Action principale du wizard — maquette `PrimaryButton` (Enabled / Disabled / Secondary). */
 export function PrimaryButton({ label, onPress, variant = 'primary', disabled, manques, testID }: Props) {
   const c = useUiTheme();
+  const { t } = useTranslation();
   const aDesManques = !!manques && manques.length > 0;
   const inactif = !!disabled || aDesManques;
-  const texte = aDesManques ? libelleIlManque(manques) : label;
+  const texte = aDesManques ? t('ui.ilManque', { champs: manques.join(', ') }) : label;
 
   const fond = inactif ? c.border : variant === 'secondary' ? c.surface : c.primary;
   const couleur = inactif ? c.fgWeak : variant === 'secondary' ? c.primary : c.onPrimary;

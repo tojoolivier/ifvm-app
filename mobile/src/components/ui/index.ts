@@ -5,7 +5,7 @@ export { Card } from './Card';
 export { Chip } from './Chip';
 export { FieldError } from './FieldError';
 export { NumberField } from './NumberField';
-export { PrimaryButton, libelleIlManque } from './PrimaryButton';
+export { PrimaryButton } from './PrimaryButton';
 export { StatTile } from './StatTile';
 export { Stepper } from './Stepper';
 export { TimelineItem, type TimelineType } from './TimelineItem';

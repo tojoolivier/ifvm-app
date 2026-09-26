@@ -13,3 +13,6 @@ jest.mock('react-native-safe-area-context', () => {
     useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
   };
 });
+
+// i18n : les composants appellent `useTranslation`, l'instance doit être initialisée.
+require('@/lib/i18n');

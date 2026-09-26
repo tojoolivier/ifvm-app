@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
@@ -15,10 +16,11 @@ type Props = {
 /** Ligne commune à `AppHeader` et `WizardHeader` : retour, titre, sous-titre, contenu à droite. */
 export function HeaderTitre({ titre, sousTitre, onBack, droite }: Props) {
   const c = useUiTheme();
+  const { t } = useTranslation();
   return (
     <View style={styles.ligne}>
       {onBack ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={onBack} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('ui.retour')} onPress={onBack} hitSlop={10}>
           <IconRetour color={c.fg} />
         </Pressable>
       ) : null}

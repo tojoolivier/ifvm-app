@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
@@ -14,11 +15,12 @@ type Props = {
 /** Feuille modale (bottom sheet) : fond assombri cliquable pour fermer. */
 export function BottomSheet({ visible, titre, onClose, children, testID }: Props) {
   const c = useUiTheme();
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Fermer"
+        accessibilityLabel={t('ui.fermer')}
         onPress={onClose}
         style={[styles.fond, { backgroundColor: c.overlay }]}
       />

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { InterFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
@@ -20,6 +21,7 @@ type Props = {
 /** En-tête unique du wizard : titre, type, « Étape N sur M » et progression — maquette `WizardHeader`. */
 export function WizardHeader({ titre, sousTitre, badge, etape, total, libelleEtape, onBack, testID }: Props) {
   const c = useUiTheme();
+  const { t } = useTranslation();
   return (
     <View testID={testID} style={[headerStyles.root, styles.root, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
       <HeaderTitre
@@ -36,7 +38,7 @@ export function WizardHeader({ titre, sousTitre, badge, etape, total, libelleEta
       />
       <View style={styles.etape}>
         <Text style={[UiText.eyebrow, { color: c.primary, textTransform: 'uppercase' }]}>
-          {`Étape ${etape} sur ${total}`}
+          {t('ui.etape', { etape, total })}
         </Text>
         <Text style={[UiText.caption, { color: c.fgWeak }]}>·</Text>
         <Text style={[UiText.captionMedium, { color: c.fg2, fontFamily: InterFonts.medium }]}>{libelleEtape}</Text>
@@ -45,7 +47,7 @@ export function WizardHeader({ titre, sousTitre, badge, etape, total, libelleEta
         style={styles.progression}
         accessible
         accessibilityRole="progressbar"
-        accessibilityLabel={`Étape ${etape} sur ${total}`}
+        accessibilityLabel={t('ui.etape', { etape, total })}
         accessibilityValue={{ min: 1, max: total, now: etape }}
       >
         {Array.from({ length: total }, (_, i) => (

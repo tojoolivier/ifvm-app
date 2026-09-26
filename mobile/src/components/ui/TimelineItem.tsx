@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { InterFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
@@ -18,13 +19,17 @@ type Props = {
 /** Étape de la chronologie d'une sortie aérienne — maquette `TimelineItem` (Vol / Poser / Base). */
 export function TimelineItem({ type, titre, detail, heure, trait = true, testID }: Props) {
   const c = useUiTheme();
+  const { t } = useTranslation();
+  const nom = t(`ui.timeline.type.${type}`);
   const fond = type === 'Vol' ? c.primary : type === 'Poser' ? c.amber : c.fg2;
   const Icone = type === 'Vol' ? IconVol : type === 'Poser' ? IconPoser : IconBase;
   return (
     <View
       testID={testID}
       accessible
-      accessibilityLabel={`${type} ${heure} : ${titre}${detail ? `, ${detail}` : ''}`}
+      accessibilityLabel={detail
+          ? t('ui.timeline.resumeDetail', { type: nom, heure, titre, detail })
+          : t('ui.timeline.resume', { type: nom, heure, titre })}
       style={styles.root}
     >
       <View style={styles.rail}>

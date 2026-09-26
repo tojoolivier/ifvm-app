@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { APP_FONTS } from '@/lib/fonts';
+import '@/lib/i18n';
 import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
