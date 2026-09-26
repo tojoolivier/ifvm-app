@@ -92,3 +92,17 @@ export function IconStation({ size = 18, color }: IconProps) {
     </Svg>
   );
 }
+
+/** Position GPS : épingle à point central plein (maquette Référence, boîte 20×20, trait 1,667). */
+export function IconPosition({ size = 20, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none" testID="icone-position" accessibilityElementsHidden importantForAccessibility="no">
+      <Path
+        d="M10 17.5C10 17.5 4.16667 12.3333 4.16667 7.91667C4.16667 6.36957 4.78125 4.88584 5.87521 3.79188C6.96917 2.69791 8.4529 2.08333 10 2.08333C11.5471 2.08333 13.0308 2.69791 14.1248 3.79188C15.2188 4.88584 15.8333 6.36957 15.8333 7.91667C15.8333 12.3333 10 17.5 10 17.5Z"
+        stroke={color}
+        strokeWidth={1.66667}
+      />
+      <Circle cx={10} cy={7.91667} r={2.08333} fill={color} />
+    </Svg>
+  );
+}

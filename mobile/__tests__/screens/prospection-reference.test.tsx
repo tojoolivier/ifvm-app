@@ -385,6 +385,6 @@ describe('ReferenceStep — icônes de la maquette', () => {
     expect(screen.getByTestId('icone-poste-acridien', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('icone-station', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('icone-heures-de-vol')).toBeTruthy();
-    expect(screen.getByTestId('icone-localisation')).toBeTruthy();
+    expect(screen.getByTestId('icone-position', { includeHiddenElements: true })).toBeTruthy();
   });
 });

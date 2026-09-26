@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { IconPosition } from '@/components/ui/icons';
 import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import type { PositionRetenue } from '@/hooks/use-position-reference';
@@ -22,7 +22,7 @@ export function PositionCard({ position, zone, children }: { position: PositionR
   return (
     <View style={[styles.carte, { backgroundColor: c.primary }]}>
       <View style={styles.titre}>
-        <AppIcon name="localisation" boite={UiSize.iconeTitre} color={c.onPrimary} />
+        <IconPosition size={UiSize.iconeTitre} color={c.onPrimary} />
         <Text style={[UiText.subheading, styles.flex, { color: c.onPrimary }]}>{t(position ? 'prospection.reference.positionAcquise' : 'prospection.reference.positionEnCours')}</Text>
         {position?.accuracy != null && (
           <Text style={[UiText.micro, styles.pastille, { color: c.onPrimary, backgroundColor: c.onPrimaryPill }]}>
