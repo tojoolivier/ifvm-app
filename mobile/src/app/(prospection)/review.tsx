@@ -102,7 +102,11 @@ export default function ReviewScreen() {
         // (#172) — le message brut ne sort plus d'ici. Le conflit compte comme
         // « non parti » : le laisser passer pour un succès rendrait muet
         // exactement ce que ce ticket rend visible.
-        router.replace({
+        // #retour-apres-creation-fiche : `dismissTo` (et non `replace`) — `replace` vers le groupe
+        // `(app)` depuis le groupe `(prospection)` en empilait une SECONDE instance sous laquelle
+        // restait la liste d'origine : deux « Retour » pour revenir à l'accueil. `dismissTo` revient
+        // à la liste « Prospection » déjà dans la pile (un seul « Retour » ensuite).
+        router.dismissTo({
           pathname: '/(app)/prospection' as any,
           params: estToutParti(resume)
             ? { justSaved: '1' }

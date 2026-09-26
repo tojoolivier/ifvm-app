@@ -331,7 +331,11 @@ export default function ExtensiveRecapScreen() {
         const draftAvecNFiche = await alignerNumeroFicheSurNumeroMessage(draft.id);
         await enregistrerEtSynchroniser(draftAvecNFiche, [], token!);
         resetWizard();
-        router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
+        // #retour-apres-creation-fiche : `dismissTo` (et non `replace`) — `replace` vers le groupe
+        // `(app)` depuis le groupe `(prospection)` en empilait une SECONDE instance sous laquelle
+        // restait la liste d'origine : deux « Retour » pour revenir à l'accueil. `dismissTo` revient
+        // à la liste « Prospection » déjà dans la pile (un seul « Retour » ensuite).
+        router.dismissTo({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
       },
       {
         screen: 'extensive-recap',
@@ -348,7 +352,7 @@ export default function ExtensiveRecapScreen() {
         const concluded = await concludeValidation(draft.id, conclusion);
         await enregistrerEtSynchroniser(concluded, [], token!);
         resetWizard();
-        router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
+        router.dismissTo({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
       },
       {
         screen: 'extensive-recap',
