@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { InterFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { InterFonts, Radius, UiBorder, UiOpacity, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 type Props = {
@@ -27,7 +27,7 @@ export function Chip({ label, selected, onPress, disabled, testID }: Props) {
         {
           backgroundColor: selected ? c.primary : c.surface,
           borderColor: selected ? c.primary : c.borderField,
-          opacity: disabled ? 0.5 : 1,
+          opacity: disabled ? UiOpacity.disabled : 1,
         },
       ]}
     >
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     height: UiSize.chip,
     paddingHorizontal: UiSpace[16],
     borderRadius: Radius.full,
-    borderWidth: 1.5,
+    borderWidth: UiBorder.field,
     alignItems: 'center',
     justifyContent: 'center',
   },

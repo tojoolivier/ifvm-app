@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { UiSpace, UiText } from '@/constants/theme';
+import { UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { IconRetour } from './icons';
 
@@ -20,7 +20,7 @@ export function HeaderTitre({ titre, sousTitre, onBack, droite }: Props) {
   return (
     <View style={styles.ligne}>
       {onBack ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={t('ui.retour')} onPress={onBack} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('ui.retour')} onPress={onBack} hitSlop={UiSize.hitSlop}>
           <IconRetour color={c.fg} />
         </Pressable>
       ) : null}

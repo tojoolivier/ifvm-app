@@ -170,6 +170,12 @@ export const Radius = { sm: 8, md: 12, panel: 10, sheet: 18, full: 999 } as cons
 /** Espacements du socle UI — la clé est la valeur en px de la maquette (`UiSpace[12]` = 12). */
 export const UiSpace = { 2: 2, 4: 4, 6: 6, 8: 8, 10: 10, 12: 12, 14: 14, 16: 16, 32: 32 } as const;
 
+/** Épaisseurs de bordure : filet (cartes, bandeaux) et champ/puce/bouton secondaire. */
+export const UiBorder = { hairline: 1, field: 1.5 } as const;
+
+/** Opacités d'état : composant désactivé, bouton de pas en butée. */
+export const UiOpacity = { disabled: 0.5, limit: 0.4 } as const;
+
 /** Hauteurs et tailles fixes des composants de la maquette. */
 export const UiSize = {
   chip: 40,
@@ -182,6 +188,7 @@ export const UiSize = {
   sheetHandleWidth: 36,
   sheetHandleHeight: 4,
   timelineTrait: 2,
+  hitSlop: 10,
 } as const;
 
 /** Polices Inter chargées par `lib/fonts.ts`. */
@@ -202,5 +209,11 @@ export const UiText = {
   button: { fontFamily: InterFonts.semiBold, fontSize: 16, lineHeight: 20 },
   heading: { fontFamily: InterFonts.semiBold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2 },
   micro: { fontFamily: InterFonts.medium, fontSize: 11, lineHeight: 13 },
-  eyebrow: { fontFamily: InterFonts.semiBold, fontSize: 11, lineHeight: 14, letterSpacing: 0.6 },
+  eyebrow: {
+    fontFamily: InterFonts.semiBold,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
 } as const;

@@ -75,6 +75,11 @@ describe('NumberField', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Valeur requise');
   });
 
+  it('lie l’erreur au champ (indication lue à la prise de focus)', async () => {
+    await render(<NumberField label="Largeur" value="" onChangeText={jest.fn()} error="Valeur requise" />);
+    expect(screen.getByLabelText('Largeur').props.accessibilityHint).toBe('Valeur requise');
+  });
+
   it('n’affiche aucune alerte sans erreur', async () => {
     await render(<NumberField label="Largeur" value="2" onChangeText={jest.fn()} />);
     expect(screen.queryByRole('alert')).toBeNull();

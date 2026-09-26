@@ -1,5 +1,5 @@
 import { Text } from 'react-native';
-import { UiText } from '@/constants/theme';
+import { UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 type Props = { message?: string | null; testID?: string };
@@ -13,7 +13,7 @@ export function FieldError({ message, testID }: Props) {
       testID={testID}
       accessibilityRole="alert"
       accessibilityLiveRegion="polite"
-      style={[UiText.caption, { color: c.dangerText, marginTop: 4 }]}
+      style={[UiText.caption, { color: c.dangerText, marginTop: UiSpace[4] }]}
     >
       {message}
     </Text>

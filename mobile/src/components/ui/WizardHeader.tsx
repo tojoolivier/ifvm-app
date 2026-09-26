@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
-import { InterFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { InterFonts, Radius, UiBorder, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { HeaderTitre, headerStyles } from './HeaderTitre';
 
@@ -37,7 +37,7 @@ export function WizardHeader({ titre, sousTitre, badge, etape, total, libelleEta
         }
       />
       <View style={styles.etape}>
-        <Text style={[UiText.eyebrow, { color: c.primary, textTransform: 'uppercase' }]}>
+        <Text style={[UiText.eyebrow, { color: c.primary }]}>
           {t('ui.etape', { etape, total })}
         </Text>
         <Text style={[UiText.caption, { color: c.fgWeak }]}>·</Text>
@@ -64,7 +64,7 @@ export function WizardHeader({ titre, sousTitre, badge, etape, total, libelleEta
 
 const styles = StyleSheet.create({
   root: { gap: UiSpace[12] },
-  badge: { paddingHorizontal: UiSpace[10], paddingVertical: UiSpace[4], borderRadius: Radius.full, borderWidth: 1 },
+  badge: { paddingHorizontal: UiSpace[10], paddingVertical: UiSpace[4], borderRadius: Radius.full, borderWidth: UiBorder.hairline },
   etape: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[6] },
   progression: { flexDirection: 'row', gap: UiSpace[4] },
   segment: { flex: 1, height: UiSize.progressSegment, borderRadius: Radius.full },

@@ -75,7 +75,7 @@ function Section({ titre, children }: { titre: string; children: React.ReactNode
   const c = useUiTheme();
   return (
     <Card style={styles.section}>
-      <Text style={[UiText.eyebrow, { color: c.primary, textTransform: 'uppercase' }]}>{titre}</Text>
+      <Text style={[UiText.eyebrow, { color: c.primary }]}>{titre}</Text>
       {children}
     </Card>
   );

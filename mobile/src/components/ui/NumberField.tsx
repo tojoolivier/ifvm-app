@@ -1,5 +1,5 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { Radius, UiBorder, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { FieldError } from './FieldError';
 
@@ -34,6 +34,7 @@ export function NumberField({ label, value, onChangeText, unit, error, onBlur, t
           onBlur={onBlur}
           keyboardType="decimal-pad"
           accessibilityLabel={unit ? `${label} (${unit})` : label}
+          accessibilityHint={error ?? undefined}
           placeholderTextColor={c.fgWeak}
           style={[UiText.bodyMedium, styles.input, { color: c.fg }]}
         />
@@ -52,7 +53,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: UiSpace[6],
     paddingHorizontal: UiSpace[14],
-    borderWidth: 1.5,
+    borderWidth: UiBorder.field,
     borderRadius: Radius.sm,
   },
   input: { flex: 1, padding: 0 },

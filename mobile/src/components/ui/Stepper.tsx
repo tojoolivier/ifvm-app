@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { Radius, UiOpacity, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { IconMoins, IconPlus } from './icons';
 
@@ -32,7 +32,7 @@ export function Stepper({ value, onChange, step = 5, min = 0, max = 100, unit = 
         accessibilityLabel={t('ui.stepper.diminuer', { label })}
         disabled={!peutBaisser}
         onPress={() => onChange(Math.max(min, value - step))}
-        style={[styles.btn, { backgroundColor: c.surfaceMuted, opacity: peutBaisser ? 1 : 0.4 }]}
+        style={[styles.btn, { backgroundColor: c.surfaceMuted, opacity: peutBaisser ? 1 : UiOpacity.limit }]}
       >
         <IconMoins color={c.fg2} />
       </Pressable>
@@ -51,7 +51,7 @@ export function Stepper({ value, onChange, step = 5, min = 0, max = 100, unit = 
         accessibilityLabel={t('ui.stepper.augmenter', { label })}
         disabled={!peutMonter}
         onPress={() => onChange(Math.min(max, value + step))}
-        style={[styles.btn, { backgroundColor: c.primary, opacity: peutMonter ? 1 : 0.4 }]}
+        style={[styles.btn, { backgroundColor: c.primary, opacity: peutMonter ? 1 : UiOpacity.limit }]}
       >
         <IconPlus color={c.onPrimary} />
       </Pressable>

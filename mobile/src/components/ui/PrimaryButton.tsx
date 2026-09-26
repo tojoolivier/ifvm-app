@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { Radius, UiBorder, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 type Props = {
@@ -35,7 +35,7 @@ export function PrimaryButton({ label, onPress, variant = 'primary', disabled, m
       style={[
         styles.bouton,
         { backgroundColor: fond },
-        variant === 'secondary' && !inactif && { borderWidth: 1.5, borderColor: c.primary },
+        variant === 'secondary' && !inactif && { borderWidth: UiBorder.field, borderColor: c.primary },
       ]}
     >
       <Text style={[UiText.button, { color: couleur }]} numberOfLines={2}>

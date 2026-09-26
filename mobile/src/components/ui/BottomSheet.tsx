@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { IconFermer } from './icons';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 type Props = {
@@ -19,16 +20,26 @@ export function BottomSheet({ visible, titre, onClose, children, testID }: Props
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('ui.fermer')}
+        accessible={false}
+        importantForAccessibility="no"
         onPress={onClose}
         style={[styles.fond, { backgroundColor: c.overlay }]}
       />
-      <View testID={testID} style={[styles.feuille, { backgroundColor: c.surface }]}>
+      <View testID={testID} accessibilityViewIsModal style={[styles.feuille, { backgroundColor: c.surface }]}>
         <View style={[styles.poignee, { backgroundColor: c.borderField }]} />
-        <Text accessibilityRole="header" style={[UiText.heading, { color: c.fg }]}>
-          {titre}
-        </Text>
+        <View style={styles.entete}>
+          <Text accessibilityRole="header" style={[UiText.heading, styles.titre, { color: c.fg }]}>
+            {titre}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('ui.fermer')}
+            onPress={onClose}
+            hitSlop={UiSize.hitSlop}
+          >
+            <IconFermer color={c.fg} />
+          </Pressable>
+        </View>
         {children}
       </View>
     </Modal>
@@ -37,6 +48,8 @@ export function BottomSheet({ visible, titre, onClose, children, testID }: Props
 
 const styles = StyleSheet.create({
   fond: { flex: 1 },
+  entete: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[10] },
+  titre: { flex: 1 },
   feuille: {
     gap: UiSpace[12],
     padding: UiSpace[16],

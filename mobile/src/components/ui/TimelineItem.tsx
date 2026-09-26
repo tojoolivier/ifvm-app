@@ -1,10 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
-import { InterFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { InterFonts, Radius, UiSize, UiSpace, UiText, type UiPalette } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { IconBase, IconPoser, IconVol } from './icons';
 
-export type TimelineType = 'Vol' | 'Poser' | 'Base';
+/** Une seule table par type : couleur de la pastille et icône (ajouter un type = une ligne ici + sa clé dans `locales/fr.ts`). */
+const TYPES = {
+  Vol: { couleur: (c: UiPalette) => c.primary, Icone: IconVol },
+  Poser: { couleur: (c: UiPalette) => c.amber, Icone: IconPoser },
+  Base: { couleur: (c: UiPalette) => c.fg2, Icone: IconBase },
+} as const;
+
+export type TimelineType = keyof typeof TYPES;
 
 type Props = {
   type: TimelineType;
@@ -21,8 +28,8 @@ export function TimelineItem({ type, titre, detail, heure, trait = true, testID 
   const c = useUiTheme();
   const { t } = useTranslation();
   const nom = t(`ui.timeline.type.${type}`);
-  const fond = type === 'Vol' ? c.primary : type === 'Poser' ? c.amber : c.fg2;
-  const Icone = type === 'Vol' ? IconVol : type === 'Poser' ? IconPoser : IconBase;
+  const { couleur, Icone } = TYPES[type];
+  const fond = couleur(c);
   return (
     <View
       testID={testID}
