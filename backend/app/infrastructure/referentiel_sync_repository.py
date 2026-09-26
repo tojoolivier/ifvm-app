@@ -1411,9 +1411,13 @@ class VolRepositoryImpl(VolRepository):
         model = result.scalar_one_or_none()
         return None if model is None else _vol_to_domain(model)
 
-    async def list_all(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
+    async def list_all(
+        self, equipe_id: uuid.UUID | None = None, traitement_id: uuid.UUID | None = None
+    ) -> list[Vol]:
         stmt = select(VolModel).order_by(VolModel.date_vol.desc(), VolModel.created_at.desc())
         if equipe_id is not None:
             stmt = stmt.where(VolModel.equipe_id == equipe_id)
+        if traitement_id is not None:
+            stmt = stmt.where(VolModel.traitement_id == traitement_id)
         result = await self.session.execute(stmt)
         return [_vol_to_domain(m) for m in result.scalars().all()]

@@ -763,5 +763,7 @@ class VolRepository(ABC):
         pass
 
     @abstractmethod
-    async def list_all(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
+    async def list_all(
+        self, equipe_id: uuid.UUID | None = None, traitement_id: uuid.UUID | None = None
+    ) -> list[Vol]:
         pass

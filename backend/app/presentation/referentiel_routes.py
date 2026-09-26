@@ -1759,8 +1759,15 @@ async def list_vols(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Utilisateur, Depends(get_current_user)],
     equipe_id: uuid.UUID | None = Query(default=None),
+    traitement_id: uuid.UUID | None = Query(
+        default=None,
+        description="Vol(s) qui portent ce traitement aérien (#610) — la fiche de traitement "
+        "retrouve ainsi son vol.",
+    ),
 ):
-    return await ListVols(VolRepositoryImpl(db)).execute(equipe_id=equipe_id)
+    return await ListVols(VolRepositoryImpl(db)).execute(
+        equipe_id=equipe_id, traitement_id=traitement_id
+    )
 
 
 def _site_sync_read(site) -> SiteAerienneSyncRead:

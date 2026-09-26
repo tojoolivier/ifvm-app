@@ -2028,5 +2028,7 @@ class ListVols:
     def __init__(self, repository: VolRepository):
         self.repository = repository
 
-    async def execute(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
-        return await self.repository.list_all(equipe_id=equipe_id)
+    async def execute(
+        self, equipe_id: uuid.UUID | None = None, traitement_id: uuid.UUID | None = None
+    ) -> list[Vol]:
+        return await self.repository.list_all(equipe_id=equipe_id, traitement_id=traitement_id)

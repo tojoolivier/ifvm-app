@@ -23,14 +23,23 @@ interface Options {
   audit?: AuditBdd[]
   /** Réponse de `GET /equipes/eq-1` (équipe de la fiche). */
   equipe?: unknown
+  /** Réponse de `GET /vols/v1` (vol lié de la fiche). */
+  vol?: unknown
 }
 
 /** Rend la page pour une fiche donnée telle que l'API la renverrait. */
-function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit = [], equipe }: Options = {}) {
+function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit = [], equipe, vol }: Options = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections/p1') return Promise.resolve({ data: fiche })
     if (url === '/prospections/p1/audit-log') return Promise.resolve({ data: audit })
     if (url === '/equipes/eq-1') return Promise.resolve({ data: equipe })
+    if (url === '/vols/v1') return Promise.resolve({ data: vol })
+    if (url === '/aeronefs') {
+      return Promise.resolve({ data: [{ id: 'a1', immatriculation: '5R-MJA', societe: 'Heli Madagascar', actif: true }] })
+    }
+    if (url === '/sites-aeriens') {
+      return Promise.resolve({ data: [{ id: 's1', numero: 'IHO01', localite: 'Ihosy', parent_site_id: null, actif: true }] })
+    }
     if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role } })
     if (url === '/campagnes') return Promise.resolve({ data: [{ id: 'c1', name: 'Campagne 2026' }] })
     if (url === '/users/') return Promise.resolve({ data: UTILISATEURS })
@@ -325,5 +334,65 @@ describe('ProspectionDetailPage — équipe de la fiche', () => {
     await attendreFiche()
 
     expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('Équipe : non renseignée')
+  })
+})
+
+// #647–#651 : site principal, aéronef et vol lié d'une prospection aérienne ; fiches antérieures lisibles.
+describe('ProspectionDetailPage — rattachements aériens', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const VOL = {
+    id: 'v1',
+    type: 'prospection',
+    equipe_id: 'eq-1',
+    aeronef_id: 'a1',
+    site_principal_id: 's1',
+    stand_id: null,
+    base_secondaire_id: null,
+    traitement_id: null,
+    date_vol: '2026-08-12',
+    heure_debut: '06:00:00',
+    heure_fin: '07:30:00',
+  }
+
+  it('prospection reliée à un vol : site et aéronef du vol, lien vers le vol', async () => {
+    renderFiche(ficheComplete({ statut: 'en_attente', vol_id: 'v1' }), { vol: VOL })
+    await attendreFiche()
+
+    const section = await screen.findByTestId('rattachements-fiche')
+    expect(await within(section).findByText('IHO01 — Ihosy')).toBeInTheDocument()
+    expect(within(section).getByText('5R-MJA — Heli Madagascar')).toBeInTheDocument()
+    const lien = await within(section).findByRole('link', { name: /12\/08\/2026 — Prospection/ })
+    expect(lien).toHaveAttribute('href', '/vols/v1')
+  })
+
+  it('fiche antérieure au vol : base et immatriculation en texte libre, signalées', async () => {
+    renderFiche(
+      ficheComplete({
+        statut: 'en_attente',
+        vol_id: null,
+        base: 'Base Betioky',
+        base_numero: 4,
+        immatricule_aeronef: '5R-OLD',
+      }),
+    )
+    await attendreFiche()
+
+    const section = await screen.findByTestId('rattachements-fiche')
+    expect(await within(section).findByText('Base Betioky (n° 4)')).toBeInTheDocument()
+    expect(within(section).getByText('5R-OLD')).toBeInTheDocument()
+    expect(within(section).getAllByText('(saisie libre)')).toHaveLength(2)
+    expect(within(section).getByText('aucun vol rattaché')).toBeInTheDocument()
+  })
+
+  it('prospection terrestre : pas de bloc de rattachements aériens', async () => {
+    renderFiche(
+      ficheComplete({ statut: 'en_attente', vol_id: null, base: null, base_numero: null, immatricule_aeronef: null }),
+    )
+    await attendreFiche()
+
+    expect(screen.queryByTestId('rattachements-fiche')).not.toBeInTheDocument()
   })
 })

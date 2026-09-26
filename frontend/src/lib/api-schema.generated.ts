@@ -1102,28 +1102,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/prospections/{prospection_id}/fiche-html": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Prospection Fiche Html
-         * @description Même gabarit HTML que `/pdf`, servi tel quel pour la lecture à l'écran (onglet
-         *     « Fiche » du web) : la mise en page en tableaux reste écrite une seule fois. Contrairement
-         *     au PDF, pas de garde « validée uniquement » — une fiche en attente ou vérifiée se lit aussi.
-         */
-        get: operations["get_prospection_fiche_html_prospections__prospection_id__fiche_html_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/prospections/{prospection_id}/statut": {
         parameters: {
             query?: never;
@@ -1243,28 +1221,6 @@ export interface paths {
         };
         /** Get Traitement Pdf */
         get: operations["get_traitement_pdf_traitements__traitement_id__pdf_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/traitements/{traitement_id}/fiche-html": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Traitement Fiche Html
-         * @description Même gabarit HTML que `/pdf`, servi tel quel pour la lecture à l'écran (onglet
-         *     « Fiche » du web). Pas de garde « validé uniquement » : un brouillon ou une fiche en
-         *     attente se lit aussi, seul le téléchargement du PDF reste réservé aux fiches validées.
-         */
-        get: operations["get_traitement_fiche_html_traitements__traitement_id__fiche_html_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7494,6 +7450,8 @@ export interface operations {
         parameters: {
             query?: {
                 equipe_id?: string | null;
+                /** @description Vol(s) qui portent ce traitement aérien (#610) — la fiche de traitement retrouve ainsi son vol. */
+                traitement_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -8205,37 +8163,6 @@ export interface operations {
             };
         };
     };
-    get_prospection_fiche_html_prospections__prospection_id__fiche_html_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                prospection_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/html": string;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     changer_statut_prospections__prospection_id__statut_patch: {
         parameters: {
             query?: never;
@@ -8487,37 +8414,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_traitement_fiche_html_traitements__traitement_id__fiche_html_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                traitement_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/html": string;
                 };
             };
             /** @description Validation Error */
