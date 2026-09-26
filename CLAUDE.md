@@ -52,3 +52,14 @@ Tout formulaire du mobile (`mobile/`) doit utiliser `@tanstack/react-form` pour 
 - Le schéma Yup vit dans `mobile/src/lib/` (ex. `prospection-sol-schema.ts`), séparé de l'écran, et est testable seul.
 - Les messages d'erreur de champ suivent la maquette Figma.
 - Consulter Context7 pour l'API à jour de TanStack Form avant d'écrire le code.
+- Yup implémente Standard Schema en **asynchrone** : brancher le schéma sur `validators: { onChangeAsync: schema }`. Avec `onChange`, TanStack lève « async function passed to sync validator ».
+- Les erreurs s'affichent via le socle UI, jamais avec `Alert.alert` : `useErreursFormulaire(form, schema, libelles)` (`mobile/src/hooks/`) fournit le message par champ (`NumberField.error`), le résumé (`Banner.items`) et la liste des champs manquants (`PrimaryButton.manques` → « Il manque : … »). Dérivation pure dans `mobile/src/lib/form-errors.ts`.
+
+### Mobile : socle UI (`mobile/src/components/ui/`)
+
+Composants partagés issus du cadre « Composants » de la maquette Figma (Chip, Stepper, NumberField, PrimaryButton, WizardHeader, AppHeader, TimelineItem, StatTile) + Card, Banner, BottomSheet, FieldError. Les réutiliser avant d'en créer un nouveau.
+
+- Jetons : uniquement ceux de `mobile/src/constants/theme.ts` (`UiColors`, `Radius`, `UiSpace`, `UiSize`, `UiText`), à garder alignés sur `DESIGN.md` — pas de couleur, espacement ou hauteur écrits en dur dans un composant. Palette lue via `useUiTheme()` (clair/sombre).
+- Police : Inter, chargée une seule fois à la racine (`mobile/src/lib/fonts.ts`) ; ne pas rappeler `useFonts` dans un layout de module.
+- Démo : `/composants-demo` (développement uniquement, l'écran n'est pas embarqué en production).
+- Contraste connu : le bouton désactivé de la maquette (`#9a9484` sur `#e7e0cd`, 2,3:1) est sous WCAG AA ; volontairement absent de `DESIGN.md` pour que le lint reste sans avertissement, à corriger côté Figma.
