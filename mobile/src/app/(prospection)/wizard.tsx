@@ -4,6 +4,7 @@ import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ReferenceStep } from '@/components/prospection/ReferenceStep';
+import { VegetationExtensiveStep } from '@/components/prospection/VegetationExtensiveStep';
 import { VegetationStep } from '@/components/prospection/VegetationStep';
 import { PrimaryButton, WizardHeader } from '@/components/ui';
 import { UiSpace, UiText } from '@/constants/theme';
@@ -86,7 +87,8 @@ export default function WizardScreen() {
         <ReferenceStep type={typeFiche} brouillon={brouillon} onNumeroFiche={setNumero} onContinuer={apresReference} />
       )}
       {index === 1 && typeFiche === 'intensive' && brouillon && <VegetationStep brouillon={brouillon} onContinuer={() => setIndex(2)} />}
-      {index > 0 && index < NB_ETAPES - 1 && !(index === 1 && typeFiche === 'intensive') && (
+      {index === 1 && typeFiche === 'extensive' && brouillon && <VegetationExtensiveStep brouillon={brouillon} onContinuer={() => setIndex(2)} />}
+      {index > 0 && index < NB_ETAPES - 1 && !(index === 1 && (typeFiche === 'intensive' || typeFiche === 'extensive')) && (
         <PrimaryButton label={t('prospection.suivant')} onPress={() => setIndex(index + 1)} testID="wizard-suivant" />
       )}
     </SafeAreaView>

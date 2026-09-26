@@ -124,3 +124,14 @@ export function IconPosition({ size = 20, color }: IconProps) {
     </Svg>
   );
 }
+
+/** Info : cercle et « i » (bandeau du relevé extensif, maquette 02a, boîte 18×18). */
+export function IconInfo({ size = 18, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none" accessibilityElementsHidden importantForAccessibility="no">
+      <Circle cx={9} cy={9} r={7.25} stroke={color} strokeWidth={1.5} />
+      <Path d="M9 8.25V12.25" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+      <Circle cx={9} cy={5.75} r={0.9} fill={color} />
+    </Svg>
+  );
+}

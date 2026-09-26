@@ -41,6 +41,19 @@ jest.mock('@/components/prospection/VegetationStep', () => {
   };
 });
 
+// Idem pour la Végétation extensive (prospection-vegetation-extensive.test.tsx).
+jest.mock('@/components/prospection/VegetationExtensiveStep', () => {
+  const { Text, Pressable } = require('react-native');
+  return {
+    VegetationExtensiveStep: ({ brouillon, onContinuer }: { brouillon: { id: string }; onContinuer: () => void }) => (
+      <Pressable onPress={onContinuer}>
+        <Text>{`Végétation extensive ${brouillon.id}`}</Text>
+        <Text>Continuer végétation extensive</Text>
+      </Pressable>
+    ),
+  };
+});
+
 describe('WizardScreen', () => {
   beforeEach(() => {
     mockParams = {};
@@ -80,6 +93,18 @@ describe('WizardScreen', () => {
 
     expect(screen.getByText('Étape 2 sur 5')).toBeVisible();
     expect(screen.getByText('Extensive')).toBeVisible();
+  });
+
+  it('à l’étape 2, l’extensif monte l’écran Végétation extensive (pas l’intensif) et n’a plus de « Suivant » générique', async () => {
+    mockParams = { type: 'extensive' };
+    await render(<WizardScreen />);
+    await fireEvent.press(screen.getByText('Suivant'));
+
+    expect(await screen.findByText('Végétation extensive brouillon-1')).toBeVisible();
+    expect(screen.queryByText('Végétation brouillon-1')).toBeNull();
+    expect(screen.queryByTestId('wizard-suivant')).toBeNull();
+    await fireEvent.press(screen.getByText('Continuer végétation extensive'));
+    expect(screen.getByText('Étape 3 sur 5')).toBeVisible();
   });
 
   it('rouvre un brouillon de revalidation sur la bonne étape', async () => {
@@ -151,7 +176,9 @@ describe('WizardScreen', () => {
     mockParams = { type: 'extensive' };
     await render(<WizardScreen />);
 
-    for (let i = 0; i < 4; i++) await fireEvent.press(screen.getByText('Suivant'));
+    await fireEvent.press(screen.getByText('Suivant'));
+    await fireEvent.press(await screen.findByText('Continuer végétation extensive'));
+    for (let i = 0; i < 2; i++) await fireEvent.press(screen.getByText('Suivant'));
 
     expect(screen.getByText('Étape 5 sur 5')).toBeVisible();
     expect(screen.getByText('Récapitulatif')).toBeVisible();

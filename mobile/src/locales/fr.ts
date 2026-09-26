@@ -50,6 +50,16 @@ export const fr = {
       continuer: 'Continuer',
       plusDeDetails: 'Plus de détails',
       plusDeDetailsResume: 'Surf. relative, Repousse',
+      extensive: {
+        info: 'Relevé extensif : seule la strate herbeuse est demandée, comme sur la fiche papier extensive. Les autres strates restent réservées à l’intensive.',
+        herbeuseDetail: 'Nourriture et site de ponte des criquets',
+        hauteur: 'Hauteur moyenne',
+        cm: 'cm',
+        verdissementRapide: 'Verdissement rapide',
+        degatsTitre: 'Dégâts sur les cultures',
+        degats: { nuls: 'Nuls', faibles: 'Faibles', moyens: 'Moyens', forts: 'Forts' },
+        erreurs: { hauteur: 'Saisissez une hauteur positive en cm (ex. 40).' },
+      },
       phenologie: {
         titre: 'Qu’observez-vous ?',
         aide: 'Touchez uniquement ce qui est présent. Le reste compte comme « Néant ».',

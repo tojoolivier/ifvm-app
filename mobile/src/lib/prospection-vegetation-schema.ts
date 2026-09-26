@@ -88,8 +88,8 @@ export const aDesDetails = ({ surfRel, repousse }: Pick<StrateValeurs, 'surfRel'
 type Json = Record<string, unknown> | null | undefined;
 type Brouillon = { vegetation?: Json; sol?: Json };
 
-const versTexte = (n: unknown) => (typeof n === 'number' ? String(n).replace('.', ',') : '');
-const versNombre = (texte: string) => {
+export const versTexte = (n: unknown) => (typeof n === 'number' ? String(n).replace('.', ',') : '');
+export const versNombre = (texte: string) => {
   const n = Number(texte.trim().replace(',', '.'));
   return texte.trim() === '' || !Number.isFinite(n) ? null : n;
 };
