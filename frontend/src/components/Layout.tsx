@@ -122,9 +122,8 @@ export function Layout() {
     ...(canTraitements
       ? [
           { to: '/traitements', label: 'Traitements', count: nbTraitements },
-          // Heures de vol : même lectorat que Traitements (aérien) ; mène à une
-          // page d'attente depuis la suppression de la fiche de vol.
-          { to: '/fiches-vol', label: 'Heures de vol' },
+          // Vols (#608, #610) : même lectorat que Traitements (aérien).
+          { to: '/vols', label: 'Vols' },
         ]
       : []),
     // Parc aéronefs (#621) : lecture et affectations pour admin et chef ; l'écriture sur les
