@@ -15,6 +15,8 @@ import {
 import { cn } from '@/lib/utils'
 import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { FicheTableau } from '@/components/FicheTableau'
+import { OngletsFiche, type OngletFiche } from '@/components/ui/onglets-fiche'
 import { buildFicheImprimable, isFicheValidee } from '@/lib/prospection-fiche-lecture'
 import {
   CATALOGUE_CAPTURE,
@@ -252,6 +254,8 @@ export function ProspectionDetailPage() {
   const queryClient = useQueryClient()
   const [activeAction, setActiveAction] = useState<ActionType>(null)
   const [showPrintView, setShowPrintView] = useState(false)
+  // « Fiche » (tableaux du PDF) à l'ouverture ; « Données BDD » garde les cartes de vérification.
+  const [onglet, setOnglet] = useState<OngletFiche>('fiche')
   const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
   const [erreurPdf, setErreurPdf] = useState<string | null>(null)
 
@@ -448,6 +452,8 @@ export function ProspectionDetailPage() {
           <p className="text-[11.5px] font-medium text-destructive">{erreurPdf}</p>
         )}
 
+        <OngletsFiche actif={onglet} onChange={setOnglet} />
+
         {/* Bandeau ambre — colonne `prospection.avertissements` (#106) */}
         {avertissements.length > 0 && (
           <div className="flex flex-col gap-[7px] rounded-[10px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-[13px]">
@@ -467,6 +473,14 @@ export function ProspectionDetailPage() {
           </div>
         )}
 
+        {onglet === 'fiche' ? (
+          <FicheTableau
+            endpoint={`/prospections/${prospection.id}/fiche-html`}
+            cleVersion={`${prospection.statut}|${prospection.updated_at}`}
+            titre={`Fiche de prospection ${prospection.n_fiche ?? ''}`.trim()}
+          />
+        ) : (
+        <>
         {/* Table `prospection` : chaque colonne, dans son groupe */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {groupes.map((groupe) => (
@@ -553,6 +567,8 @@ export function ProspectionDetailPage() {
             />
           </Carte>
         </SectionTable>
+        </>
+        )}
       </div>
 
       <aside className="flex min-w-0 flex-col gap-[14px]">

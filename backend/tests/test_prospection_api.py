@@ -899,6 +899,53 @@ async def test_get_prospection_inexistante_retourne_404(client: AsyncClient, aut
 
 
 @pytest.mark.asyncio
+async def test_fiche_html_prospection_lisible_meme_non_validee(
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
+):
+    """La lecture à l'écran (onglet « Fiche ») sert le même gabarit que le PDF, mais sans la
+    garde « validée uniquement » : le PDF, lui, reste refusé (403) pour la même fiche."""
+    create_resp = await client.post(
+        "/prospections",
+        json={
+            "equipe_id": str(equipe_terrestre_id),
+            "type_prospection": "intensive",
+            "campagne_id": str(campagne_id),
+            "station_id": str(station_id),
+            "date_prospection": "2026-06-25",
+            "biotope": ["xerophyle"],
+        },
+        headers=auth_headers,
+    )
+    prospection_id = create_resp.json()["id"]
+
+    html = await client.get(f"/prospections/{prospection_id}/fiche-html", headers=auth_headers)
+    assert html.status_code == 200, html.text
+    assert html.headers["content-type"].startswith("text/html")
+    assert "FICHE DE PROSPECTION ANTIACRIDIENNE" in html.text
+
+    pdf = await client.get(f"/prospections/{prospection_id}/pdf", headers=auth_headers)
+    assert pdf.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_fiche_html_prospection_inexistante_retourne_404(
+    client: AsyncClient, auth_headers: dict
+):
+    response = await client.get(f"/prospections/{uuid.uuid4()}/fiche-html", headers=auth_headers)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_fiche_html_prospection_exige_authentification(client: AsyncClient):
+    response = await client.get(f"/prospections/{uuid.uuid4()}/fiche-html")
+    assert response.status_code in (401, 403)
+
+
+@pytest.mark.asyncio
 async def test_update_prospection_brouillon(
     client: AsyncClient,
     auth_headers: dict,
