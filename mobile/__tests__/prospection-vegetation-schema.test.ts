@@ -135,3 +135,32 @@ describe('creerVegetationSchema', () => {
     expect(schema.isValidSync(valeurs({ verdissement: '100' }))).toBe(true);
   });
 });
+
+describe('creerVegetationSchema — recouvrement à 0 %', () => {
+  const schema = creerVegetationSchema((cle) => cle);
+  const avecRecouvrement = (recouvrement: number, champs: { hMoy?: string; verdissement?: string }) => {
+    const v = valeursDeVegetation({});
+    v.strates.arboree = { recouvrement, hMoy: '', verdissement: '', ...champs };
+    return v;
+  };
+  const erreurs = (v: ReturnType<typeof valeursDeVegetation>) => {
+    try {
+      schema.validateSync(v, { abortEarly: false });
+      return {};
+    } catch (e) {
+      return Object.fromEntries((e as { inner: { path: string; message: string }[] }).inner.map((i) => [i.path, i.message]));
+    }
+  };
+
+  it('refuse une H. moyenne ou un verdissement saisi alors que le recouvrement est à 0 %, sur le champ concerné', () => {
+    expect(erreurs(avecRecouvrement(0, { hMoy: '4' }))).toEqual({ 'strates.arboree.hMoy': 'prospection.vegetation.erreurs.recouvrementNul' });
+    expect(erreurs(avecRecouvrement(0, { verdissement: '30' }))).toEqual({
+      'strates.arboree.verdissement': 'prospection.vegetation.erreurs.recouvrementNul',
+    });
+  });
+
+  it('accepte ces valeurs dès que le recouvrement dépasse 0 %, et une strate à 0 % sans valeur', () => {
+    expect(schema.isValidSync(avecRecouvrement(5, { hMoy: '4', verdissement: '30' }))).toBe(true);
+    expect(schema.isValidSync(avecRecouvrement(0, {}))).toBe(true);
+  });
+});

@@ -113,6 +113,10 @@ export function creerVegetationSchema(t: (cle: string) => string) {
         if (!v || v.trim() === '') return true;
         const n = versNombre(v);
         return n !== null && n >= min && (max === null || n <= max);
+      })
+      // Une strate à 0 % n'est pas présente : ses autres valeurs ne seraient pas prises en compte.
+      .test('recouvrement-nul', t('prospection.vegetation.erreurs.recouvrementNul'), function (v) {
+        return !v || v.trim() === '' || this.parent.recouvrement > 0;
       });
   const strate = object({
     recouvrement: number().default(0).min(0).max(100),

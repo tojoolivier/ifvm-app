@@ -70,6 +70,7 @@ export const fr = {
       erreurs: {
         hMoy: 'Saisissez une hauteur positive (ex. 0,40).',
         verdissement: 'Saisissez un pourcentage entre 0 et 100.',
+        recouvrementNul: 'Recouvrement à 0 % : cette valeur ne serait pas prise en compte. Réglez d’abord le recouvrement.',
       },
     },
     reference: {

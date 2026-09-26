@@ -90,6 +90,20 @@ describe('VegetationStep — ajout et retrait de strates', () => {
   });
 });
 
+describe('VegetationStep — recouvrement à 0 %', () => {
+  it('une H. moyenne saisie sur une strate à 0 % affiche l’erreur et bloque « Continuer », même à 100 %', async () => {
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    for (let i = 0; i < 3; i++) await fireEvent.press(screen.getByLabelText('Augmenter Sol nu'));
+    expect(screen.getByTestId('vegetation-continuer').props.accessibilityState).toMatchObject({ disabled: false });
+
+    await fireEvent.press(screen.getByText('+ Arborée'));
+    await fireEvent.changeText(screen.getByTestId('arboree-hMoy'), '4');
+
+    expect(await screen.findByText(/Recouvrement à 0 % : cette valeur ne serait pas prise en compte/)).toBeTruthy();
+    expect(screen.getByTestId('vegetation-continuer').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
 describe('VegetationStep — « Continuer »', () => {
   it('enregistre le JSON vegetation à 6 clés (strate non ajoutée = valeurs par défaut) et solNu dans sol, puis continue', async () => {
     jest.mocked(enregistrerBrouillon).mockResolvedValue('b-1');
