@@ -1,6 +1,6 @@
 {
   "mobile/**/*.{js,jsx,ts,tsx}": ["bash -c 'cd mobile && npx expo lint --fix'"],
-  "mobile/{src/lib/{db.ts,db-baseline.ts,db-schema.ts,api-schema.generated.ts,referentiel-schema.generated.ts},scripts/referentiel-schema*.js}": ["bash -c 'cd mobile && npm run --silent check:schema-drift'"],
+  "mobile/{src/lib/{db.ts,db-baseline.ts,db-schema.ts,prospection-schema.ts,api-schema.generated.ts,referentiel-schema.generated.ts},scripts/referentiel-schema*.js}": ["bash -c 'cd mobile && npm run --silent check:schema-drift'"],
   "frontend/**/*.{js,jsx,ts,tsx}": ["bash -c 'cd frontend && npx eslint --fix'"],
   "backend/**/*.py": [
     "bash -c 'cd backend && uv run ruff check --fix .'",

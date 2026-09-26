@@ -113,17 +113,12 @@ describe("upgrade d'une ancienne base remplie de saisies non envoyées (#676)", 
     ).toEqual([{ id: 'd-local' }]);
   });
 
-  it('les tables de l’ancien module Prospection sont supprimées, sans toucher au traitement (#726)', async () => {
+  it('le nouveau stockage Prospection part de zéro : rien de l’ancien module n’est migré, le traitement reste intact (#722, #726)', async () => {
     fabriquerAncienneBase(sqlite);
 
     await getDb();
 
-    const tables = (
-      sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'prospection%'").all() as {
-        name: string;
-      }[]
-    ).map((t) => t.name);
-    expect(tables).toEqual([]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM prospection').get()).toEqual({ n: 0 });
     expect(sqlite.prepare("SELECT prospection_id FROM traitement WHERE id = 't-local'").get()).toEqual({
       prospection_id: 'p-local',
     });

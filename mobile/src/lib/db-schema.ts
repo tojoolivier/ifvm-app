@@ -1,5 +1,6 @@
 import type { Migration } from './db-migrations';
 import { appliquerBaseline } from './db-baseline';
+import { PROSPECTION_DDL } from './prospection-schema';
 
 /**
  * Schéma des données saisies sur l'appareil (#676) : traitements, vols,
@@ -32,5 +33,11 @@ export const MIGRATIONS_CAPTURES: readonly Migration[] = [
         DROP TABLE IF EXISTS prospection;
       `);
     },
+  },
+  {
+    // Stockage de la réécriture (#722) : corps JSON typé par le contrat OpenAPI, cf. `prospection-schema.ts`.
+    version: 3,
+    nom: 'stockage-prospection',
+    up: (db) => db.execAsync(PROSPECTION_DDL),
   },
 ];

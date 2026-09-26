@@ -1,3 +1,4 @@
+import { MIGRATIONS_CAPTURES } from '../src/lib/db-schema';
 import {
   DDL_JOURNAL,
   PLAFOND_LIGNES,
@@ -125,8 +126,8 @@ describe("l'écriture d'un lot", () => {
   it('écrit une ligne par entrée, dans une seule transaction', async () => {
     await creerTransportJournal().write([ligne(), ligne(), ligne()]);
 
-    // Une transaction par étape de migration (ouverture de la base : 2 étapes), une pour le lot.
-    expect(withTransactionAsync).toHaveBeenCalledTimes(3);
+    // Une transaction par étape de migration à l'ouverture de la base, une pour le lot.
+    expect(withTransactionAsync).toHaveBeenCalledTimes(MIGRATIONS_CAPTURES.length + 1);
     expect(runAsync).toHaveBeenCalledTimes(3);
   });
 

@@ -31,6 +31,11 @@ jest.mock('@/lib/site-aerien-sync', () => ({
   synchroniserSitesAeriens: (...args: unknown[]) => synchroniserSitesAeriens(...args),
 }));
 
+const synchroniserProspections = jest.fn();
+jest.mock('@/lib/prospection-sync', () => ({
+  synchroniserProspections: (...args: unknown[]) => synchroniserProspections(...args),
+}));
+
 const synchroniserStock = jest.fn();
 jest.mock('@/lib/stock-sync', () => ({
   synchroniserStock: (...args: unknown[]) => synchroniserStock(...args),
@@ -47,6 +52,7 @@ beforeEach(() => {
   listUnsyncedTraitements.mockReset().mockResolvedValue([]);
   syncAllTraitements.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   synchroniserSitesAeriens.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
+  synchroniserProspections.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   synchroniserStock.mockReset().mockResolvedValue({ reussies: [], echouees: [], conflits: [] });
   resetLoggerForTests();
 });
@@ -162,5 +168,15 @@ describe('checkAndSyncFiches — #synchronisation-automatique', () => {
 
     const echecs = lignesEnAttente().filter((l) => l.event === 'sync.auto.fiches.failed');
     expect(echecs).toHaveLength(1);
+  });
+
+  it('envoie les prospections avant les traitements, et un échec des prospections n’arrête pas les autres domaines', async () => {
+    enLigne();
+    synchroniserProspections.mockRejectedValue(new Error('SQLite indisponible'));
+
+    await checkAndSyncFiches('tok', false);
+
+    expect(synchroniserProspections).toHaveBeenCalledWith('tok');
+    expect(synchroniserSitesAeriens).toHaveBeenCalledWith('tok');
   });
 });

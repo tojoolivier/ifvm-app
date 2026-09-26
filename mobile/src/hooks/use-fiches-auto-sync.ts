@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 
+import { synchroniserProspections } from '@/lib/prospection-sync';
 import { listUnsyncedTraitements } from '@/lib/traitement-repository';
 import { syncAllTraitements } from '@/lib/traitement-sync';
 import { runTask } from '@/lib/run-task';
@@ -69,6 +70,12 @@ export async function checkAndSyncFiches(
       if (!shouldTriggerAutoSync({ wasConnected, isConnected: isConnectedObserve })) {
         return;
       }
+
+      // Prospections d'abord (#722) : un traitement référence sa fiche de prospection côté serveur.
+      await runTask(() => synchroniserProspections(token).then(() => undefined), {
+        name: 'sync.auto.prospections',
+        criticality: 'best-effort',
+      });
 
       await runTask(
         async () => {
