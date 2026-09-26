@@ -583,3 +583,60 @@ describe('TraitementScreen (Équipe) — champ "Reprise de traitement" retiré',
     );
   });
 });
+
+/**
+ * #zone-a-reprendre-restante-part-du-reste-origine : pour une fiche démarrée depuis
+ * « Zones à reprendre », « Restante (ha) » démarre au reste à traiter de l'origine
+ * (`cible.surface_restante_origine_ha`) — plus à la surface infestée.
+ */
+describe('TraitementScreen (Équipe) — Restante d’une reprise Terrestre', () => {
+  const terrestreVide = {
+    chef_equipe_id: null,
+    agent_encadreur: null,
+    consultant_international: null,
+    heure_debut: null,
+    heure_fin: null,
+    vitesse_vent_ms: null,
+    direction_vent: null,
+    temperature_c: null,
+    taux_mortalite_pourcent: null,
+    evaluation_efficacite_heures_apres: null,
+    methode_evaluation_efficacite: null,
+    reprise_traitement: false,
+    traitement_origine_id: null,
+    surface_atomiseur_ha: null,
+    surface_disque_rotatif_ha: null,
+    surface_atomiseur_autoporte_ha: null,
+    surface_restante_abandonnee: null,
+    motif_surface_restante_abandonnee: null,
+    essence_litres: null,
+    nb_piles: null,
+    pesticide_recu_l: null,
+    produits: [],
+  };
+
+  it('démarre au reste à traiter de l’origine, pas à la surface infestée', async () => {
+    mockRouteParams = { traitementId: 'trait-1', origineId: 'trait-origine' };
+    useTraitementCaptureStore.setState({ ...RESET_STATE, typeTraitement: 'TERRESTRE' });
+    jest.mocked(traitementRepository.getTraitement).mockImplementation(
+      async (id: string) =>
+        (id === 'trait-origine'
+          ? { id, type_traitement: 'TERRESTRE', terrestre: { ...terrestreVide, surface_cumulee_ha: 60, surface_restante_ha: 12 } }
+          : {
+              id,
+              type_traitement: 'TERRESTRE',
+              cible: { surface_infestee_ha: 100, surface_restante_origine_ha: 12 },
+              terrestre: terrestreVide,
+            }) as any
+    );
+
+    await render(<TraitementScreen />);
+    await screen.findByText("Chef d'équipe / zone*");
+
+    await waitFor(() => expect(screen.getByText('Restante (ha)')).toBeVisible());
+    // Le reste de l'origine (12) — ni la surface infestée (100), ni infestée − cumulée d'origine
+    // (40, qui diverge dès que le snapshot de cible n'a plus la même surface infestée que l'origine).
+    await waitFor(() => expect(screen.getByText('12')).toBeVisible());
+    expect(screen.queryByText('100')).toBeNull();
+  });
+});

@@ -18,7 +18,7 @@ import {
   computeTotalPesticideTerrestre,
   computeSurfaceTraitee,
   computeSurfaceCumulee,
-  computeSurfaceRestante,
+  computeSurfaceRestanteFiche,
   computePesticideStockRestant,
   validateTerrestreConditions,
   validateAerienEquipe,
@@ -47,6 +47,7 @@ export default function TraitementScreen() {
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
   const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
+  const [resteOrigineHa, setResteOrigineHa] = useState<number | null>(null);
   // Le store (Lot 1, non modifiable) n'expose pas de updateProduit — seulement
   // addProduit/removeProduit — donc l'édition des produits utilisés (terrestre)
   // est portée par un état local immuable propre à cet écran.
@@ -65,6 +66,7 @@ export default function TraitementScreen() {
       if (!draft) return;
       store.setTypeTraitement(draft.type_traitement);
       setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
+      setResteOrigineHa(draft.cible?.surface_restante_origine_ha ?? null);
       if (draft.type_traitement === 'AERIEN' && draft.aerien) {
         // Aéronefs de l'équipe à la date de saisie (#642) : choix rapide si plusieurs.
         if (draft.equipe_id && draft.date_traitement) {
@@ -204,7 +206,13 @@ export default function TraitementScreen() {
   const totalPesticideTerrestre = computeTotalPesticideTerrestre(produits);
   const surfaceTraitee = computeSurfaceTraitee(store.terrestre);
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.terrestre.repriseTraitement, origineCumuleeHa);
-  const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
+  const surfaceRestante = computeSurfaceRestanteFiche({
+    surfaceInfesteeHa,
+    surfaceCumuleeHa: surfaceCumulee,
+    surfaceTraiteeHa: surfaceTraitee,
+    repriseTraitement: store.terrestre.repriseTraitement,
+    resteOrigineHa,
+  });
   const pesticideStockRestantTerrestre = computePesticideStockRestant(
     store.terrestre.pesticideRecuL,
     totalPesticideTerrestre,

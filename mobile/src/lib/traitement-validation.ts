@@ -205,6 +205,32 @@ export function computeSurfaceRestante(
 }
 
 /**
+ * « Restante (ha) » d'UNE fiche (#zone-a-reprendre-restante-part-du-reste-origine).
+ *
+ * Reprise depuis « Zones à reprendre » : la référence est le reste à traiter de la fiche
+ * d'origine (`cible.surface_restante_origine_ha`, figé à la création), pas la surface
+ * infestée — la restante démarre donc à ce reste, puis diminue de la surface traitée par
+ * CETTE fiche. Même résultat que `infestée − cumulée` côté serveur (qui reste la référence
+ * à la synchronisation), mais sans dépendre du chargement asynchrone de la cumulée d'origine.
+ *
+ * Sans reste d'origine connu (fiche hors reprise, ou origine pas encore synchronisée donc
+ * `surface_restante_ha` NULL), on retombe sur `computeSurfaceRestante` : jamais de blocage.
+ */
+export function computeSurfaceRestanteFiche(params: {
+  surfaceInfesteeHa: number | null | undefined;
+  surfaceCumuleeHa: number;
+  surfaceTraiteeHa: number;
+  repriseTraitement: boolean | null | undefined;
+  resteOrigineHa: number | null | undefined;
+}): number {
+  const { surfaceInfesteeHa, surfaceCumuleeHa, surfaceTraiteeHa, repriseTraitement, resteOrigineHa } = params;
+  if (repriseTraitement && resteOrigineHa != null) {
+    return Math.max(0, resteOrigineHa - surfaceTraiteeHa);
+  }
+  return computeSurfaceRestante(surfaceInfesteeHa, surfaceCumuleeHa);
+}
+
+/**
  * Suggestion de « Pesticides consommés » (#pesticide-consomme-suggere-mode-traitement),
  * dérivée de « Cumulée (ha) » selon le mode de traitement et l'unité choisie
  * (#produits-unite-l-kg) — un simple pré-remplissage, jamais verrouillé : le

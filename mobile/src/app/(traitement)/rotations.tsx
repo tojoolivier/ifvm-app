@@ -15,7 +15,7 @@ import {
   computeTotalPesticideAerienParUnite,
   computeSurfaceTraiteeAerien,
   computeSurfaceCumulee,
-  computeSurfaceRestante,
+  computeSurfaceRestanteFiche,
   deriveUniteDepuisDoseReference,
   computeDureesRotation,
   formatDureeRotation,
@@ -86,6 +86,7 @@ export default function RotationsScreen() {
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
   const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
+  const [resteOrigineHa, setResteOrigineHa] = useState<number | null>(null);
   const [error, setError] = useState<string | undefined>();
   // Texte brut en cours de saisie pour les champs décimaux — permet de taper un
   // séparateur décimal ou un zéro de fin ("3," / "3,2") sans que le champ ne se
@@ -132,6 +133,7 @@ export default function RotationsScreen() {
       .then((draft) => {
         if (!draft) return;
         setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
+        setResteOrigineHa(draft.cible?.surface_restante_origine_ha ?? null);
         // Surface restante abandonnée : chargée ici (déplacée avec la décision de l'agent) — même garde
         // ailleurs sur cet écran : recharge à chaque montage (bornée à `traitementId`), sans écraser
         // une saisie en cours entre deux montages du même écran.
@@ -226,7 +228,13 @@ export default function RotationsScreen() {
   const totauxPesticide = computeTotalPesticideAerienParUnite(store.aerien.rotations);
   const surfaceTraitee = computeSurfaceTraiteeAerien(store.aerien.rotations);
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.aerien.repriseTraitement, origineCumuleeHa);
-  const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
+  const surfaceRestante = computeSurfaceRestanteFiche({
+    surfaceInfesteeHa,
+    surfaceCumuleeHa: surfaceCumulee,
+    surfaceTraiteeHa: surfaceTraitee,
+    repriseTraitement: store.aerien.repriseTraitement,
+    resteOrigineHa,
+  });
 
   const handleContinuer = () =>
     run(

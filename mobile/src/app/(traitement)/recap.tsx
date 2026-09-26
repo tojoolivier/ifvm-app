@@ -23,7 +23,7 @@ import {
   computeSignatureMatrix,
   computeSurfaceTraitee,
   computeSurfaceCumulee,
-  computeSurfaceRestante,
+  computeSurfaceRestanteFiche,
   computeSurfaceTraiteeAerien,
   computeTotalPesticideAerienParUnite,
   computeUniteApprovisionnementAerien,
@@ -436,7 +436,15 @@ export default function RecapScreen() {
   const surfaceCumulee = draft.terrestre
     ? computeSurfaceCumulee(surfaceTraitee, draft.terrestre.reprise_traitement, origineCumuleeHa)
     : 0;
-  const surfaceRestante = draft.terrestre ? computeSurfaceRestante(draft.cible?.surface_infestee_ha, surfaceCumulee) : 0;
+  const surfaceRestante = draft.terrestre
+    ? computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: draft.cible?.surface_infestee_ha,
+        surfaceCumuleeHa: surfaceCumulee,
+        surfaceTraiteeHa: surfaceTraitee,
+        repriseTraitement: draft.terrestre.reprise_traitement,
+        resteOrigineHa: draft.cible?.surface_restante_origine_ha,
+      })
+    : 0;
   // Aérien : mêmes estimations locales que ci-dessus, tant que la fiche n'est pas
   // synchronisée (le serveur seul renseigne alors surface restante/stock restant).
   const rotationsAerien = draft.aerien?.rotations ?? [];
@@ -449,8 +457,14 @@ export default function RecapScreen() {
   );
   const surfaceRestanteAerien =
     draft.aerien?.surface_restante_ha ??
-    (draft.aerien && !draft.aerien.reprise_traitement
-      ? computeSurfaceRestante(draft.cible?.surface_infestee_ha, computeSurfaceTraiteeAerien(rotationsAerien))
+    (draft.aerien && (!draft.aerien.reprise_traitement || draft.cible?.surface_restante_origine_ha != null)
+      ? computeSurfaceRestanteFiche({
+          surfaceInfesteeHa: draft.cible?.surface_infestee_ha,
+          surfaceCumuleeHa: computeSurfaceTraiteeAerien(rotationsAerien),
+          surfaceTraiteeHa: computeSurfaceTraiteeAerien(rotationsAerien),
+          repriseTraitement: draft.aerien.reprise_traitement,
+          resteOrigineHa: draft.cible?.surface_restante_origine_ha,
+        })
       : null);
   const totalPesticideTerrestre = draft.terrestre ? computeTotalPesticideTerrestre(draft.terrestre.produits) : 0;
   const pesticideStockRestantTerrestre = draft.terrestre
