@@ -12,14 +12,14 @@ type Props = {
   invalide: boolean;
 };
 
-/** Extensive : coordonnées saisies à la main quand le GPS est indisponible ou faux. */
+/** Extensive : coordonnées saisies à la main quand le GPS est indisponible ou faux (posé dans la carte GPS, sur fond vert). */
 export function CoordonneesManuelles({ saisie, onChange, invalide }: Props) {
   const c = useUiTheme();
   const { t } = useTranslation();
   if (!saisie) {
     return (
       <Pressable testID="saisir-coordonnees" accessibilityRole="button" onPress={() => onChange({ latitude: '', longitude: '' })}>
-        <Text style={[UiText.captionMedium, styles.lien, { color: c.primary }]}>{t('prospection.reference.saisirCoordonnees')}</Text>
+        <Text style={[UiText.captionMedium, styles.lien, { color: c.onPrimary }]}>{t('prospection.reference.saisirCoordonnees')}</Text>
       </Pressable>
     );
   }

@@ -186,6 +186,11 @@ components:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.foreground}"
     typography: "{typography.ui-heading}"
+  ui-line-icon-badge:
+    backgroundColor: "{colors.green-bg}"
+    rounded: "{rounded.full}"
+    height: 36px
+    width: 36px
   ui-surface-bar:
     backgroundColor: "{colors.strate-herbeuse}"
     rounded: "{rounded.full}"

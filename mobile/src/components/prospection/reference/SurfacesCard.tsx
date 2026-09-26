@@ -55,26 +55,49 @@ export function SurfacesCard({ form, erreurs, intensif }: { form: ReferenceForm;
         {intensif && <View style={[styles.prospectee, { width: `${parts.prospecteePct}%`, backgroundColor: c.strateHerbeuse }]} />}
         <View style={[styles.infestee, { width: `${parts.infesteePct}%`, backgroundColor: c.danger }]} />
       </View>
-      <View style={styles.rangee}>
+      <View style={styles.legende}>
         {intensif && (
-          <Text style={[UiText.micro, { color: c.fg3 }]}>{t('prospection.reference.legendeStation', { ha: texteHa(ha.station) })}</Text>
+          <Legende couleur={c.borderField} texte={t('prospection.reference.legendeStation', { ha: texteHa(ha.station) })} />
         )}
-        <Text style={[UiText.micro, { color: c.fg3 }]}>
-          {intensif
-            ? t('prospection.reference.legendeProspecteePct', { ha: texteHa(ha.prospectee), pct: parts.prospecteePct })
-            : t('prospection.reference.legendeProspectee', { ha: texteHa(ha.prospectee) })}
-        </Text>
-        <Text style={[UiText.micro, { color: c.fg3 }]}>
-          {intensif
-            ? t('prospection.reference.legendeInfestee', { ha: texteHa(ha.infestee) })
-            : t('prospection.reference.legendeInfesteePct', { ha: texteHa(ha.infestee), pct: parts.infesteePct })}
-        </Text>
+        <Legende
+          couleur={c.strateHerbeuse}
+          texte={
+            intensif
+              ? t('prospection.reference.legendeProspecteePct', { ha: texteHa(ha.prospectee), pct: parts.prospecteePct })
+              : t('prospection.reference.legendeProspectee', { ha: texteHa(ha.prospectee) })
+          }
+        />
+        <Legende
+          couleur={c.danger}
+          texte={
+            intensif
+              ? t('prospection.reference.legendeInfestee', { ha: texteHa(ha.infestee) })
+              : t('prospection.reference.legendeInfesteePct', { ha: texteHa(ha.infestee), pct: parts.infesteePct })
+          }
+        />
       </View>
+      <Text style={[UiText.caption, { color: c.fg3 }]}>
+        {t(intensif ? 'prospection.reference.surfacesAide' : 'prospection.reference.surfacesAideExtensive')}
+      </Text>
     </Card>
   );
 }
 
+/** Point de couleur + texte de la légende sous la barre. */
+function Legende({ couleur, texte }: { couleur: string; texte: string }) {
+  const c = useUiTheme();
+  return (
+    <View style={styles.legendeItem}>
+      <View style={[styles.point, { backgroundColor: couleur }]} />
+      <Text style={[UiText.micro, { color: c.fg3 }]}>{texte}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  legende: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: UiSpace[12] },
+  legendeItem: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[6] },
+  point: { width: UiSize.pointLegende, height: UiSize.pointLegende, borderRadius: Radius.full },
   rangee: { flexDirection: 'row', gap: UiSpace[8] },
   flex: { flex: 1 },
   barre: { height: UiSize.surfaceBar, borderRadius: Radius.full, overflow: 'hidden' },

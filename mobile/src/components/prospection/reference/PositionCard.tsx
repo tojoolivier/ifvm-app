@@ -1,16 +1,20 @@
 import { useTranslation } from 'react-i18next';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Radius, UiSpace, UiText } from '@/constants/theme';
+import { AppIcon } from '@/components/ui/AppIcon';
+import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import type { PositionRetenue } from '@/hooks/use-position-reference';
 
 const formaterCoord = (n: number) => n.toFixed(6).replace('.', ',');
 
-/** Carte « Position acquise » : précision, latitude, longitude, altitude. */
-export function PositionCard({ position }: { position: PositionRetenue }) {
+/** Carte « Position acquise » : précision, latitude, longitude, altitude, zone administrative. */
+export function PositionCard({ position, zone, children }: { position: PositionRetenue | null; zone?: string; children?: ReactNode }) {
   const c = useUiTheme();
   const { t } = useTranslation();
-  const tuiles = [
+  const tuiles = !position
+    ? []
+    : [
     ['latitude', formaterCoord(position.latitude)],
     ['longitude', formaterCoord(position.longitude)],
     ['altitude', t('prospection.reference.altitudeMetres', { metres: Math.round(position.altitude ?? 0) })],
@@ -18,8 +22,9 @@ export function PositionCard({ position }: { position: PositionRetenue }) {
   return (
     <View style={[styles.carte, { backgroundColor: c.primary }]}>
       <View style={styles.titre}>
-        <Text style={[UiText.subheading, styles.flex, { color: c.onPrimary }]}>{t('prospection.reference.positionAcquise')}</Text>
-        {position.accuracy != null && (
+        <AppIcon name="localisation" boite={UiSize.iconeTitre} color={c.onPrimary} />
+        <Text style={[UiText.subheading, styles.flex, { color: c.onPrimary }]}>{t(position ? 'prospection.reference.positionAcquise' : 'prospection.reference.positionEnCours')}</Text>
+        {position?.accuracy != null && (
           <Text style={[UiText.micro, styles.pastille, { color: c.onPrimary, backgroundColor: c.onPrimaryPill }]}>
             {t('prospection.reference.precision', { metres: Math.round(position.accuracy) })}
           </Text>
@@ -33,6 +38,8 @@ export function PositionCard({ position }: { position: PositionRetenue }) {
           </View>
         ))}
       </View>
+      {zone && <Text style={[UiText.caption, { color: c.greenBorder }]}>{zone}</Text>}
+      {children}
     </View>
   );
 }

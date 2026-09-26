@@ -197,6 +197,11 @@ export const UiSize = {
   pastille: 28,
   progressSegment: 4,
   surfaceBar: 10,
+  /** Pastille ronde d'une ligne « détectée » et son icône ; point de légende des surfaces. */
+  pastilleLigne: 36,
+  iconeLigne: 18,
+  iconeTitre: 20,
+  pointLegende: 8,
   sheetHandleWidth: 36,
   sheetHandleHeight: 4,
   timelineTrait: 2,

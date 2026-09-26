@@ -22,7 +22,6 @@ import {
 import type { ModeReference, ReferenceValeurs } from '@/lib/prospection-reference-schema';
 import { BiotopeCard } from './reference/BiotopeCard';
 import { CoordonneesManuelles } from './reference/CoordonneesManuelles';
-import { DateReleveCard } from './reference/DateReleveCard';
 import { FicheCard } from './reference/FicheCard';
 import { ListeChoixSheet } from './reference/ListeChoixSheet';
 import { LocalisationLibreCard } from './reference/LocalisationLibreCard';
@@ -93,6 +92,22 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
   );
   const zone = zoneDeLaPosition ?? zoneDuBrouillon;
 
+  // Ligne « zone » de la carte GPS : en intensive, calculée pour l'affichage seul (la station porte la localisation).
+  const lat = position.position?.latitude;
+  const lon = position.position?.longitude;
+  const zoneIntensive = useMemo(
+    () => (intensif && lat !== undefined && lon !== undefined ? resoudreZoneHorsLigne(lat, lon) : null),
+    [intensif, lat, lon]
+  );
+  const zoneAffichee = intensif ? zoneIntensive : zone;
+  const libelleZone = zoneAffichee
+    ? t('prospection.reference.zoneGps', {
+        region: zoneAffichee.region,
+        district: zoneAffichee.district,
+        commune: zoneAffichee.commune,
+      })
+    : undefined;
+
   // Station libre pré-remplie hors ligne, sans jamais écraser une saisie.
   useEffect(() => {
     if (zoneDeLaPosition && !form.getFieldValue('station_libre')) {
@@ -151,24 +166,31 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
     <View style={styles.racine}>
       <ScrollView contentContainerStyle={styles.contenu}>
         {position.gpsEchec && intensif && <Banner tone="warning" message={t('prospection.reference.positionIndisponible')} />}
-        {intensif && (
-          <RattachementCard
-            rattachement={rattachement.auto}
-            onChangerPa={rattachement.changerPa}
-            onChangerStation={rattachement.changerStation}
-          />
-        )}
         <FicheCard
           numeroFiche={numeroFiche}
           prospecteur={user}
           numeroMessage={type === 'extensive' ? { valeur: numeroMessage, onChange: setNumeroMessage } : undefined}
         />
-        {position.position && <PositionCard position={position.position} />}
-        {!intensif && (
-          <CoordonneesManuelles saisie={position.saisie} onChange={position.setSaisie} invalide={position.coordonneesInvalides} />
+        {(position.position || !intensif) && (
+          <PositionCard
+            position={position.position}
+            zone={libelleZone && (intensif ? libelleZone : t('prospection.reference.zoneHorsLigne', { zone: libelleZone }))}
+          >
+            {!intensif && (
+              <CoordonneesManuelles saisie={position.saisie} onChange={position.setSaisie} invalide={position.coordonneesInvalides} />
+            )}
+          </PositionCard>
         )}
-        {!intensif && <LocalisationLibreCard form={form} erreurs={erreurs} />}
-        <DateReleveCard horodatage={horodatage} />
+        {intensif ? (
+          <RattachementCard
+            rattachement={rattachement.auto}
+            horodatage={horodatage}
+            onChangerPa={rattachement.changerPa}
+            onChangerStation={rattachement.changerStation}
+          />
+        ) : (
+          <LocalisationLibreCard form={form} erreurs={erreurs} horodatage={horodatage} />
+        )}
         <SurfacesCard form={form} erreurs={erreurs} intensif={intensif} />
         <BiotopeCard form={form} />
         {erreurEnregistrement && <Banner tone="error" message={erreurEnregistrement} />}

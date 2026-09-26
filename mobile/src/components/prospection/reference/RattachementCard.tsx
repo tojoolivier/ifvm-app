@@ -1,75 +1,55 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { Card } from '@/components/ui';
-import { UiSpace, UiText } from '@/constants/theme';
+import { UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import type { Rattachement } from '@/hooks/use-rattachement';
+import { formaterDateHeure } from '@/lib/prospection-reference';
 import { formaterDistance } from '@/lib/prospection-rattachement';
+import { LigneDetectee, Separateur } from './LigneDetectee';
 
 type Props = {
   /** `null` : rien de détecté ni choisi — les deux lignes sont « À choisir ». */
   rattachement: Rattachement | null;
+  horodatage: Date;
   onChangerPa: () => void;
   onChangerStation: () => void;
 };
 
-/** Carte « Rattachement » de l'intensive : PA et station, détectés par GPS ou choisis à la main. */
-export function RattachementCard({ rattachement, onChangerPa, onChangerStation }: Props) {
+/** Carte « Rattachement — détecté par GPS » de l'intensive : PA, station et date du relevé. */
+export function RattachementCard({ rattachement, horodatage, onChangerPa, onChangerStation }: Props) {
   const c = useUiTheme();
   const { t } = useTranslation();
-  const note = (manuel?: boolean) =>
-    !rattachement
-      ? t('prospection.reference.aChoisir')
-      : manuel
-        ? t('prospection.reference.choixManuel')
-        : t('prospection.reference.autoPlusProche', { distance: formaterDistance(rattachement.distanceM) });
+  const distance = rattachement ? formaterDistance(rattachement.distanceM) : '';
+  const note = (manuel: boolean | undefined, auto: string) =>
+    !rattachement ? t('prospection.reference.aChoisir') : manuel ? t('prospection.reference.choixManuel') : auto;
   const vide = t('prospection.reference.nonRenseigne');
   return (
     <Card>
       <Text style={[UiText.eyebrow, { color: c.fg3 }]}>{t('prospection.reference.rattachement')}</Text>
-      <Ligne
+      <LigneDetectee
+        icone="sites"
         libelle={t('prospection.reference.pa')}
         valeur={rattachement?.pa?.nom ?? vide}
-        note={note(rattachement?.paManuel)}
-        onChanger={onChangerPa}
-        testID="changer-pa"
+        note={note(rattachement?.paManuel, t('prospection.reference.autoPlusProche', { distance }))}
+        action={{ onPress: onChangerPa, testID: 'changer-pa' }}
       />
-      <Ligne
+      <Separateur />
+      <LigneDetectee
+        icone="localisation"
         libelle={t('prospection.reference.station')}
         valeur={rattachement ? `${rattachement.station.code} · ${rattachement.station.nom}` : vide}
-        note={note(rattachement?.stationManuel)}
-        onChanger={onChangerStation}
-        testID="changer-station"
+        note={note(rattachement?.stationManuel, t('prospection.reference.autoStation', { distance }))}
+        action={{ onPress: onChangerStation, testID: 'changer-station' }}
+      />
+      <Separateur />
+      <LigneDetectee
+        icone="heures-de-vol"
+        libelle={t('prospection.reference.dateReleve')}
+        valeur={formaterDateHeure(horodatage)}
+        valeurTestID="date-releve"
+        note={t('prospection.reference.horodatageAuto')}
       />
     </Card>
   );
 }
-
-type LigneProps = { libelle: string; valeur: string; note: string; onChanger: () => void; testID: string };
-
-function Ligne({ libelle, valeur, note, onChanger, testID }: LigneProps) {
-  const c = useUiTheme();
-  const { t } = useTranslation();
-  return (
-    <View style={styles.ligne}>
-      <View style={styles.texte}>
-        <Text style={[UiText.micro, { color: c.fg3 }]}>{libelle}</Text>
-        <Text style={[UiText.bodyMedium, { color: c.fg }]}>{valeur}</Text>
-        <Text style={[UiText.micro, { color: c.primary }]}>{note}</Text>
-      </View>
-      <Pressable
-        onPress={onChanger}
-        testID={testID}
-        accessibilityRole="button"
-        accessibilityLabel={`${t('prospection.reference.changer')} ${libelle}`}
-      >
-        <Text style={[UiText.captionMedium, { color: c.primary }]}>{t('prospection.reference.changer')}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  ligne: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[12] },
-  texte: { flex: 1, gap: UiSpace[4] },
-});
