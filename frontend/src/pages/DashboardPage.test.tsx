@@ -34,6 +34,7 @@ function fiche(over: Record<string, unknown> = {}) {
     statut: 'validee',
     n_fiche: 'PR-2026-0148-INT',
     date_prospection: '2026-08-17',
+    surface_prospectee: 400,
     surface_infestee: 100,
     created_at: new Date('2026-08-17T09:40:00').toISOString(),
     updated_at: new Date('2026-08-17T09:40:00').toISOString(),
@@ -60,7 +61,13 @@ const PROSPECTIONS = [
     created_at: new Date('2026-08-17T09:20:00').toISOString(),
   }),
   // Autre campagne : ne doit peser sur aucun indicateur.
-  fiche({ id: 'p9', n_fiche: 'PR-2025-0001-INT', campagne_id: 'c-close', surface_infestee: 9999 }),
+  fiche({
+    id: 'p9',
+    n_fiche: 'PR-2025-0001-INT',
+    campagne_id: 'c-close',
+    surface_prospectee: 99999,
+    surface_infestee: 9999,
+  }),
 ]
 
 const TRAITEMENTS = [
@@ -125,21 +132,90 @@ afterEach(() => {
 })
 
 describe('DashboardPage — maquette §1', () => {
-  it('affiche les 4 indicateurs de la campagne en cours', async () => {
+  it('affiche les 5 indicateurs de surface et de pesticide de la campagne en cours', async () => {
     renderPage()
 
-    // 3 fiches sur c-active — même ensemble que le pipeline —, dont 2 intensives.
-    await waitFor(() => expect(within(tuile('Prospections')).getByText('3')).toBeInTheDocument())
-    expect(screen.getByText('dont 2 intensives · campagne en cours')).toBeInTheDocument()
+    // 400 × 3 : la fiche de la campagne clôturée (99 999) est exclue.
+    await waitFor(() =>
+      expect(within(tuile('Surface prospectée')).getByText('1 200')).toBeInTheDocument(),
+    )
 
-    // 100 + 100 + 100 : la fiche de la campagne clôturée (9999) est exclue.
+    // 100 × 3 = 300 ha infestés, soit 25 % des 1 200 ha prospectés.
     expect(within(tuile('Surface infestée')).getByText('300')).toBeInTheDocument()
+    expect(screen.getByText('25 % de la surface prospectée')).toBeInTheDocument()
+
+    // 150 ha traités sur 300 ha infestés ; rien de protégé dans ce jeu de données.
     expect(within(tuile('Surface traitée')).getByText('150')).toBeInTheDocument()
     expect(screen.getByText('50 % de la surface infestée')).toBeInTheDocument()
+    expect(within(tuile('Surface protégée')).getByText('0')).toBeInTheDocument()
+    expect(screen.getByText('0 % de la surface infestée')).toBeInTheDocument()
 
-    // 1 validée / 1 rejetée statuées → 50 %.
-    expect(within(tuile('Taux de validation')).getByText('50')).toBeInTheDocument()
-    expect(screen.getByText('50 % rejetées (motif renseigné)')).toBeInTheDocument()
+    // Aucun pesticide renseigné : 0 L et 0 kg, côte à côte.
+    expect(within(tuile('Pesticide consommé')).getAllByText('0')).toHaveLength(2)
+  })
+
+  it('ne montre plus les tuiles Prospections, Taux de validation ni Interventions', async () => {
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Surface prospectée')).toBeInTheDocument())
+    expect(screen.queryByText('Taux de validation')).not.toBeInTheDocument()
+    expect(screen.queryByText('Interventions réalisées')).not.toBeInTheDocument()
+  })
+
+  it('cumule surface protégée et pesticide en L et kg, aérien et terrestre confondus', async () => {
+    mockApi({
+      '/traitements': [
+        // Terrestre au sol, produit de choc, 90 L.
+        {
+          ...TRAITEMENTS[0],
+          terrestre: {
+            surface_traitee_ha: 150,
+            surface_protegee_ha: null,
+            total_pesticide_l: 90,
+            pesticide_unite: 'L',
+          },
+        },
+        // Terrestre au sol, produit de barrière, 30 kg (champ `_l` mais unité kg).
+        {
+          ...TRAITEMENTS[0],
+          id: 't2',
+          numero_fiche: 'CRT-2026-0037',
+          terrestre: {
+            surface_traitee_ha: null,
+            surface_protegee_ha: 30,
+            total_pesticide_l: 30,
+            pesticide_unite: 'kg',
+          },
+        },
+        // Aérien barrière : 60 ha protégés, 1 000 L et 40 kg déjà séparés par l'API.
+        {
+          ...TRAITEMENTS[0],
+          id: 't3',
+          numero_fiche: 'CRT-2026-0038',
+          type_traitement: 'AERIEN',
+          terrestre: null,
+          aerien: {
+            pilote: 'Rakoto A.',
+            surface_traitee_ha: 0,
+            surface_protegee_ha: 60,
+            total_pesticide_l: 1000,
+            total_pesticide_kg: 40,
+          },
+        },
+      ],
+    })
+    renderPage()
+
+    // 30 + 60 = 90 ha protégés, soit 30 % des 300 ha infestés.
+    await waitFor(() =>
+      expect(within(tuile('Surface protégée')).getByText('90')).toBeInTheDocument(),
+    )
+    expect(screen.getByText('30 % de la surface infestée')).toBeInTheDocument()
+
+    // 90 + 1 000 = 1 090 L ; 30 + 40 = 70 kg — jamais additionnés entre eux.
+    const pesticide = within(tuile('Pesticide consommé'))
+    expect(pesticide.getByText(/1\s090/)).toBeInTheDocument()
+    expect(pesticide.getByText('70')).toBeInTheDocument()
   })
 
   it('rend le pipeline de validation et son lien vers les fiches', async () => {
@@ -238,7 +314,7 @@ describe('DashboardPage — maquette §1', () => {
     renderPage()
 
     await waitFor(() =>
-      expect(screen.getByText(/intensives · toutes campagnes/)).toBeInTheDocument(),
+      expect(screen.getByText(/cumul déclaré · toutes campagnes/)).toBeInTheDocument(),
     )
   })
 })
