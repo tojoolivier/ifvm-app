@@ -106,3 +106,84 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/**
+ * Jetons du socle UI de la réécriture (#721) — variables du fichier Figma
+ * « Prototype — Prospection » (`color/*`, `radius/*`). Mêmes valeurs que les
+ * `colors` de `DESIGN.md` (source de référence pour le clair) ; le sombre
+ * est dérivé ici. Les composants de `components/ui/` ne lisent que ceci.
+ */
+export const UiColors = {
+  light: {
+    primary: '#235a36',
+    onPrimary: '#ffffff',
+    surface: '#ffffff',
+    surfaceMuted: '#f4efe2',
+    border: '#e7e0cd',
+    borderField: '#e0d9c4',
+    fg: '#16201a',
+    fg2: '#3a3a30',
+    fg3: '#6f6a59',
+    fgWeak: '#9a9484',
+    amber: '#e89b2b',
+    greenBg: '#eaf2ec',
+    greenBorder: '#cfe0d4',
+    infoText: '#3a5c43',
+    warnText: '#8a6d2f',
+    warnBg: '#fdf6e7',
+    warnBorder: '#f0e2bf',
+    dangerText: '#a5341c',
+    dangerBg: '#fbe9e5',
+    dangerBorder: '#f0c4b9',
+    overlay: 'rgba(22, 32, 26, 0.45)',
+  },
+  dark: {
+    primary: '#4ea36b',
+    onPrimary: '#0b1a10',
+    surface: '#1a1c1f',
+    surfaceMuted: '#25272b',
+    border: '#2e3135',
+    borderField: '#3a3e44',
+    fg: '#f3f1ea',
+    fg2: '#d8d5c9',
+    fg3: '#b0b4ba',
+    fgWeak: '#8a8f96',
+    amber: '#f0b34f',
+    greenBg: '#1e3a22',
+    greenBorder: '#2f6b3f',
+    infoText: '#a9d6b8',
+    warnText: '#fbbf24',
+    warnBg: '#3a3020',
+    warnBorder: '#5a4a2a',
+    dangerText: '#f87171',
+    dangerBg: '#3a1d22',
+    dangerBorder: '#5a2a33',
+    overlay: 'rgba(0, 0, 0, 0.6)',
+  },
+} as const;
+
+export type UiPalette = (typeof UiColors)[keyof typeof UiColors];
+
+/** Rayons Figma : `radius/sm` (champs), `radius/md` (boutons, cartes), `radius/full` (puces). */
+export const Radius = { sm: 8, md: 12, full: 999 } as const;
+
+/** Polices Inter chargées par `lib/fonts.ts`. */
+export const InterFonts = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semiBold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+} as const;
+
+/** Styles de texte Figma (Body Medium, Numeric, Caption, Button, Heading, Micro, Eyebrow…). */
+export const UiText = {
+  bodyMedium: { fontFamily: InterFonts.medium, fontSize: 15, lineHeight: 20 },
+  numeric: { fontFamily: InterFonts.semiBold, fontSize: 20, lineHeight: 24 },
+  numericLarge: { fontFamily: InterFonts.bold, fontSize: 28, lineHeight: 32, letterSpacing: -0.3 },
+  caption: { fontFamily: InterFonts.regular, fontSize: 13, lineHeight: 17 },
+  captionMedium: { fontFamily: InterFonts.medium, fontSize: 13, lineHeight: 17 },
+  button: { fontFamily: InterFonts.semiBold, fontSize: 16, lineHeight: 20 },
+  heading: { fontFamily: InterFonts.semiBold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2 },
+  micro: { fontFamily: InterFonts.medium, fontSize: 11, lineHeight: 13 },
+  eyebrow: { fontFamily: InterFonts.semiBold, fontSize: 11, lineHeight: 14, letterSpacing: 0.6 },
+} as const;

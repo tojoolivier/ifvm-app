@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { useFonts } from 'expo-font';
+import { APP_FONTS } from '@/lib/fonts';
 import { useAuthStore } from '@/lib/auth-store';
 import { useDebugStore } from '@/lib/debug-store';
 import { useEquipeTravailStore } from '@/lib/equipe-travail-store';
@@ -50,6 +52,8 @@ function useAuthGuard() {
 
 export default function RootLayout() {
   useAuthGuard();
+  // Polices : configuration unique (`lib/fonts.ts`). Une erreur de chargement ne bloque pas l'app.
+  const [fontsLoaded, fontError] = useFonts(APP_FONTS);
   const isInitialized = useAuthStore((s) => s.isInitialized);
   const token = useAuthStore((s) => s.token);
   const userId = useAuthStore((s) => s.user?.id);
@@ -113,7 +117,7 @@ export default function RootLayout() {
     });
   }, []);
 
-  if (!isInitialized) {
+  if (!isInitialized || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5efe3' }}>
         <ActivityIndicator size="large" color="#1f5b39" />

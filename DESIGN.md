@@ -96,6 +96,38 @@ typography:
     fontSize: 17px
     fontWeight: 800
     lineHeight: 1.25
+  ui-body:
+    fontFamily: Inter, sans-serif
+    fontSize: 15px
+    fontWeight: 500
+    lineHeight: 20px
+  ui-caption:
+    fontFamily: Inter, sans-serif
+    fontSize: 13px
+    fontWeight: 400
+    lineHeight: 17px
+  ui-heading:
+    fontFamily: Inter, sans-serif
+    fontSize: 17px
+    fontWeight: 600
+    lineHeight: 22px
+    letterSpacing: -0.2px
+  ui-button:
+    fontFamily: Inter, sans-serif
+    fontSize: 16px
+    fontWeight: 600
+    lineHeight: 20px
+  ui-numeric:
+    fontFamily: Inter, sans-serif
+    fontSize: 20px
+    fontWeight: 600
+    lineHeight: 24px
+  ui-numeric-large:
+    fontFamily: Inter, sans-serif
+    fontSize: 28px
+    fontWeight: 700
+    lineHeight: 32px
+    letterSpacing: -0.3px
 rounded:
   sm: 4px
   md: 8px
@@ -103,6 +135,8 @@ rounded:
   panel: 10px
   header: 12px
   full: 9999px
+  ui-field: 8px
+  ui-control: 12px
 spacing:
   xs: 4px
   sm: 8px
@@ -111,6 +145,53 @@ spacing:
   xl: 20px
   content: 28px
 components:
+  ui-chip:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.foreground-secondary}"
+    typography: "{typography.ui-body}"
+    rounded: "{rounded.full}"
+    height: 40px
+  ui-chip-selected:
+    backgroundColor: "{colors.primary}"
+    textColor: "#FFFFFF"
+    typography: "{typography.ui-body}"
+    rounded: "{rounded.full}"
+    height: 40px
+  ui-stepper-value:
+    textColor: "{colors.foreground}"
+    typography: "{typography.ui-numeric}"
+  ui-number-field:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.foreground}"
+    typography: "{typography.ui-body}"
+    rounded: "{rounded.ui-field}"
+    height: 48px
+  ui-caption:
+    textColor: "{colors.foreground-tertiary}"
+    typography: "{typography.ui-caption}"
+  ui-primary-button:
+    backgroundColor: "{colors.primary}"
+    textColor: "#FFFFFF"
+    typography: "{typography.ui-button}"
+    rounded: "{rounded.ui-control}"
+    height: 54px
+  ui-header:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.foreground}"
+    typography: "{typography.ui-heading}"
+  ui-stat-tile:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.primary}"
+    typography: "{typography.ui-numeric-large}"
+    rounded: "{rounded.ui-control}"
+  ui-timeline-vol:
+    backgroundColor: "{colors.primary}"
+    rounded: "{rounded.full}"
+    size: 28px
+  ui-timeline-poser:
+    backgroundColor: "{colors.amber}"
+    rounded: "{rounded.full}"
+    size: 28px
   sidebar:
     backgroundColor: "{colors.primary}"
     textColor: "#FFFFFF"
