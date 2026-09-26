@@ -207,11 +207,14 @@ describe('BottomSheet', () => {
 });
 
 describe('FieldError', () => {
-  it('annonce le message et ne rend rien sans message', async () => {
+  it('annonce le message', async () => {
     await render(<FieldError message="Valeur requise" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Valeur requise');
+  });
+
+  it('ne rend rien sans message', async () => {
     await render(<FieldError message={null} />);
-    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 
