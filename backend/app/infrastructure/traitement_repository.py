@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import Integer, and_, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,6 +19,7 @@ from app.domain.traitement import (
     TraitementOrigineDejaUtiliseeError,
     TraitementSignature,
     TraitementTerrestre,
+    motif_numero_fiche,
 )
 from app.infrastructure.prospection_model import ProspectionModel
 from app.infrastructure.traitement_model import (
@@ -169,6 +170,17 @@ class TraitementRepositoryImpl(TraitementRepository):
             row = rows.get(t.prospection_id)
             t.prospection_n_fiche = (row.n_fiche or row.n_message) if row else None
             t.prospection_date_validation = row.validated_at if row else None
+
+    async def prochain_numero_ordre_fiche(self, type_traitement: str) -> int:
+        motif = motif_numero_fiche(type_traitement)
+        # substring(texte, motif) : regex POSIX de PostgreSQL, renvoie le groupe capturé
+        # (le numéro d'ordre).
+        dernier = await self.session.scalar(
+            select(
+                func.max(cast(func.substring(TraitementModel.numero_fiche, motif), Integer))
+            ).where(TraitementModel.numero_fiche.op("~")(motif))
+        )
+        return (dernier or 0) + 1
 
     async def origine_deja_utilisee(
         self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None

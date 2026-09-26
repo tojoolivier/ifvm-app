@@ -22,6 +22,7 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/lib/traitement-repository', () => ({
   getTraitement: jest.fn(),
+  genererNumeroFicheDisponible: jest.fn().mockResolvedValue('TRT-AER-2026-08-12-001'),
   createDraftTraitementAerien: jest.fn(),
   createDraftTraitementTerrestre: jest.fn(),
   updateTraitementReference: jest.fn(),

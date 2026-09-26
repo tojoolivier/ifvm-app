@@ -82,7 +82,7 @@ async def test_create_traitement_aerien_brouillon(
     body = resp.json()
     assert body["statut"] == "brouillon"
     assert body["type_traitement"] == "AERIEN"
-    assert body["numero_fiche"] == "Hery-Aerien-2026-08-11"
+    assert body["numero_fiche"] == "TRT-AER-2026-08-11-001"
     assert body["cible"]["espece"] == "LMC"
     assert body["cible"]["surface_infestee_ha"] == 120.5
     assert body["aerien"]["pilote"] == f"{pilote.prenom} {pilote.nom}"
@@ -360,7 +360,7 @@ async def test_create_traitement_avec_observations(
 
 
 @pytest.mark.asyncio
-async def test_create_deux_fois_suffixe_incremental(
+async def test_create_deux_fois_numero_d_ordre_incremental(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
 ):
     prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
@@ -372,8 +372,9 @@ async def test_create_deux_fois_suffixe_incremental(
     )
     assert r1.status_code == 201
     assert r2.status_code == 201, r2.text
-    assert r1.json()["numero_fiche"] == "Hery-Aerien-2026-08-11"
-    assert r2.json()["numero_fiche"] == "Hery-Aerien-2026-08-11-2"
+    # Le numéro d'ordre continue (001, 002) — ce n'est pas une collision, donc aucun suffixe.
+    assert r1.json()["numero_fiche"] == "TRT-AER-2026-08-11-001"
+    assert r2.json()["numero_fiche"] == "TRT-AER-2026-08-11-002"
 
 
 @pytest.mark.asyncio
@@ -1457,7 +1458,7 @@ async def test_create_traitement_terrestre_brouillon(
     body = resp.json()
     assert body["statut"] == "brouillon"
     assert body["type_traitement"] == "TERRESTRE"
-    assert body["numero_fiche"] == "Hery-Terrestre-2026-08-11"
+    assert body["numero_fiche"] == "TRT-TERR-2026-08-11-001"
     assert body["cible"]["surface_infestee_ha"] == 100.0
     assert body["terrestre"]["surface_traitee_ha"] == 17.0
     assert body["terrestre"]["surface_restante_ha"] == 83.0
@@ -1496,7 +1497,7 @@ async def test_create_traitement_terrestre_surface_restante_positive_sans_abando
 
 
 @pytest.mark.asyncio
-async def test_create_terrestre_deux_fois_suffixe_incremental(
+async def test_create_terrestre_deux_fois_numero_d_ordre_incremental(
     client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement_terrestre
 ):
     prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
@@ -1508,8 +1509,39 @@ async def test_create_terrestre_deux_fois_suffixe_incremental(
     )
     assert r1.status_code == 201
     assert r2.status_code == 201, r2.text
-    assert r1.json()["numero_fiche"] == "Hery-Terrestre-2026-08-11"
-    assert r2.json()["numero_fiche"] == "Hery-Terrestre-2026-08-11-2"
+    assert r1.json()["numero_fiche"] == "TRT-TERR-2026-08-11-001"
+    assert r2.json()["numero_fiche"] == "TRT-TERR-2026-08-11-002"
+
+
+# #numero-fiche-traitement-trt : le numéro d'ordre continue PAR TYPE de traitement.
+@pytest.mark.asyncio
+async def test_le_numero_d_ordre_est_independant_pour_chaque_type_de_traitement(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_traitement_terrestre,
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    aer1 = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    terr1 = await client.post(
+        "/traitements", json=payload_traitement_terrestre(prospection_id), headers=auth_headers
+    )
+    aer2 = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    terr2 = await client.post(
+        "/traitements", json=payload_traitement_terrestre(prospection_id), headers=auth_headers
+    )
+    assert [r.status_code for r in (aer1, terr1, aer2, terr2)] == [201, 201, 201, 201]
+    assert aer1.json()["numero_fiche"] == "TRT-AER-2026-08-11-001"
+    assert terr1.json()["numero_fiche"] == "TRT-TERR-2026-08-11-001"
+    assert aer2.json()["numero_fiche"] == "TRT-AER-2026-08-11-002"
+    assert terr2.json()["numero_fiche"] == "TRT-TERR-2026-08-11-002"
 
 
 @pytest.mark.asyncio

@@ -25,7 +25,7 @@ jest.mock('@/lib/traitement-repository', () => ({
   createDraftTraitementAerien: jest.fn(),
   createDraftTraitementTerrestre: jest.fn(),
   updateTraitementReference: jest.fn(),
-  genererNumeroFicheDisponible: jest.fn().mockResolvedValue('Jean-AERIEN-2026-08-12-ANNEXE'),
+  genererNumeroFicheDisponible: jest.fn().mockResolvedValue('TRT-AER-2026-08-12-001'),
   saveCible: jest.fn(),
 }));
 
@@ -58,7 +58,7 @@ const RESET_STATE = {
 describe('ReferencesScreen (traitement) — reprise depuis « Zones à reprendre »', () => {
   beforeEach(() => {
     mockRouteParams = { prospectionId: 'prosp-1' };
-    jest.mocked(traitementRepository.genererNumeroFicheDisponible).mockClear().mockResolvedValue('Jean-AERIEN-2026-08-12-ANNEXE');
+    jest.mocked(traitementRepository.genererNumeroFicheDisponible).mockClear().mockResolvedValue('TRT-AER-2026-08-12-001');
     jest.mocked(prospectionRepository.getProspection).mockReset().mockResolvedValue(null);
     useTraitementCaptureStore.setState(RESET_STATE);
     useAuthStore.setState({
@@ -67,31 +67,31 @@ describe('ReferencesScreen (traitement) — reprise depuis « Zones à reprendre
     });
   });
 
-  it('génère un numéro suffixé « -ANNEXE » quand origineId est présent (fiche née de « Zones à reprendre »)', async () => {
+  // #numero-fiche-traitement-trt : le numéro est le même format pour une reprise et un traitement neuf
+  // (plus de « -ANNEXE », plus de prénom ni de sigle) — type, date et fiche seulement.
+  it('demande le même numéro TRT-… à une fiche née de « Zones à reprendre » qu’à un traitement neuf', async () => {
     mockRouteParams = { prospectionId: 'prosp-1', origineId: 'trait-origine' };
 
     render(<ReferencesScreen />);
 
     await waitFor(() =>
-      expect(traitementRepository.genererNumeroFicheDisponible).toHaveBeenCalledWith(
-        'Jean',
-        'AERIEN',
-        '2026-08-11',
-        null,
-        undefined,
-        true
-      )
+      expect(traitementRepository.genererNumeroFicheDisponible).toHaveBeenCalledWith('AERIEN', '2026-08-11', null)
     );
+    const numero = await jest.mocked(traitementRepository.genererNumeroFicheDisponible).mock.results[0].value;
+    expect(numero).not.toContain('ANNEXE');
   });
 
-  it("ne demande pas de numéro « -ANNEXE » pour un traitement neuf (pas d'origineId)", async () => {
+  it('demande le numéro sans dépendre du prénom ni du sigle de l’utilisateur connecté', async () => {
     mockRouteParams = { prospectionId: 'prosp-1' };
 
     render(<ReferencesScreen />);
 
     await waitFor(() => expect(traitementRepository.genererNumeroFicheDisponible).toHaveBeenCalled());
-    const [, , , , , estReprise] = jest.mocked(traitementRepository.genererNumeroFicheDisponible).mock.calls[0];
-    expect(estReprise).toBeFalsy();
+    expect(jest.mocked(traitementRepository.genererNumeroFicheDisponible).mock.calls[0]).toEqual([
+      'AERIEN',
+      '2026-08-11',
+      null,
+    ]);
   });
 
   /**
