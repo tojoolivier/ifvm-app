@@ -156,11 +156,6 @@ function renderPage(
   )
 }
 
-/** La fiche s'ouvre sur l'onglet « Fiche » (tableaux du PDF) : les cartes de la base sont dans « Données BDD ». */
-async function ouvrirDonneesBdd() {
-  fireEvent.click(await screen.findByRole('tab', { name: 'Données BDD' }))
-}
-
 describe('TraitementDetailPage — conformité maquette (README §7)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -249,104 +244,6 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
     expect(screen.getByRole('link', { name: 'p1' })).toHaveAttribute('href', '/prospections/p1')
-  })
-
-  it('affiche les évaluations du risque pour la population, dans leur ordre — #evaluation-risque-population', async () => {
-    renderPage(
-      traitementAerien({
-        evaluations_risque_population: [
-          { id: 'eval-1', ordre: 0, habitat_proche: 'Rizière communale', distance_km: 1.5, sensibilisation: true },
-          { id: 'eval-2', ordre: 1, habitat_proche: 'Zone humide protégée', distance_km: 0.8, sensibilisation: false },
-        ],
-      }),
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    expect(screen.getByText('Évaluation du risque pour la population')).toBeInTheDocument()
-    expect(screen.getByText(/Rizière communale/)).toBeInTheDocument()
-    expect(screen.getByText(/1.5 km/)).toBeInTheDocument()
-    expect(screen.getByText(/Zone humide protégée/)).toBeInTheDocument()
-  })
-
-  it('n’affiche pas la section quand aucune évaluation du risque pour la population n’a été saisie', async () => {
-    renderPage(traitementAerien({ evaluations_risque_population: [] }))
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-
-    expect(screen.queryByText('Évaluation du risque pour la population')).not.toBeInTheDocument()
-  })
-
-  it('affiche le tableau des rotations avec le nom du produit résolu et le total', async () => {
-    renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    expect(screen.getByText('2 rotations · 530 l')).toBeInTheDocument()
-    expect(screen.getByText('CUVE-01')).toBeInTheDocument()
-    expect(screen.getAllByText('Fenitrothion')).toHaveLength(2)
-    // Régression : `RotationRead` porte `quantite`+`unite` depuis la migration
-    // 0047, pas `quantite_l` — le web lisait un champ qui n'existe plus.
-    expect(screen.getAllByText('265 L')).toHaveLength(2)
-  })
-
-  it('affiche le tableau des produits utilisés pour une fiche terrestre', async () => {
-    renderPage(
-      traitementAerien({
-        type_traitement: 'TERRESTRE',
-        aerien: null,
-        terrestre: {
-          heure_debut: '06:00:00',
-          heure_fin: '10:00:00',
-          vitesse_vent_ms: 1.8,
-          surface_traitee_ha: 5,
-          surface_cumulee_ha: 5,
-          surface_restante_ha: 3,
-          surface_restante_abandonnee: true,
-          motif_surface_restante_abandonnee: 'Panne matériel',
-          reprise_traitement: false,
-          traitement_origine_id: null,
-          produits: [{ id: 'pu1', numero: 1, produit_id: 'pest-1', quantite_l: 180 }],
-        },
-      }),
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    expect(screen.getByText('Fenitrothion')).toBeInTheDocument()
-    expect(screen.getByText('180')).toBeInTheDocument()
-    expect(screen.getByText('Panne matériel')).toBeInTheDocument()
-  })
-
-  it('marque les EPI absents d’une pastille rouge et liste les zones exposées', async () => {
-    renderPage(
-      traitementAerien({
-        zones_exposees: { habitations: true, ruchers: true, cultures: false },
-      }),
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    // `kit_botte: 0` dans la fixture, les quatre autres à 4 : c'est l'état lu
-    // par un lecteur d'écran qui compte, pas la teinte de la pastille — et le
-    // nombre de personnes équipées est affiché à côté (migration 0040).
-    expect(screen.getByText('Botte').parentElement).toHaveTextContent('absent')
-    expect(screen.getByText('Combinaison').parentElement).toHaveTextContent('présent')
-    expect(screen.getByText('Combinaison').parentElement).toHaveTextContent('4')
-    expect(screen.getByText('Habitations, Ruchers')).toBeInTheDocument()
-  })
-
-  it('affiche les axes de risque avec un badge de niveau teinté', async () => {
-    renderPage(
-      traitementAerien({
-        evaluation_risque: { sol: 'FAIBLE', abeilles: 'ELEVE' },
-      }),
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    expect(screen.getByText('Sol')).toBeInTheDocument()
-    expect(screen.getByText('Faible').className).toMatch(/ifvm-green-bg/)
-    expect(screen.getByText('Élevé').className).toMatch(/ifvm-danger-bg/)
   })
 
   it('affiche le panneau Surfaces avec la restante détachée en ambre', async () => {
@@ -512,117 +409,6 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     )
   })
 
-  it('affiche les informations complémentaires (position GPS, strates, observations, traçabilité)', async () => {
-    renderPage(
-      traitementAerien({
-        latitude: -22.4021,
-        longitude: 44.3167,
-        altitude: 120,
-        hauteur_strate_herbeuse_m: 0.4,
-        hauteur_strate_arboree_m: 3,
-        recouvrement_percent: 65,
-        observations: 'RAS, conditions favorables.',
-        statut_sync: 'synced',
-        created_at: '2026-08-12T07:00:00Z',
-        updated_at: '2026-08-13T09:00:00Z',
-      }),
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    expect(screen.getByText('Informations complémentaires')).toBeInTheDocument()
-    expect(screen.getByText('-22,4021 · 44,3167')).toBeInTheDocument()
-    expect(screen.getByText('120 m')).toBeInTheDocument()
-    expect(screen.getByText('65 %')).toBeInTheDocument()
-    expect(screen.getByText(/RAS, conditions favorables/)).toBeInTheDocument()
-  })
-
-  it("affiche l'équipe et l'aéronef d'une fiche aérienne — chef de base résolu par nom, bases en texte libre (#traitement-aerien-base-texte-libre)", async () => {
-    renderPage(
-      traitementAerien({
-        aerien: {
-          ...traitementAerien().aerien,
-          // Valeur volontairement absente de tout référentiel — aucun appel
-          // /referentiel/lieux-aeriens n'est mocké dans ce test : la carte
-          // doit l'afficher telle quelle, sans jointure.
-          base_principale: 'Piste improvisée 12',
-        },
-      }),
-      [],
-      { utilisateurs: [{ id: 'u-chef', nom: 'Marie Rabe', role: 'chef_de_base' }] },
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    // `within` la carte : « Marie Rabe » apparaît aussi dans les Signatures
-    // (rôle CHEF_DE_BASE) — deux endroits distincts pour la même personne.
-    const carte = within(screen.getByText('Équipe & aéronef').closest('section')!)
-    expect(await carte.findByText('Marie Rabe')).toBeInTheDocument()
-    expect(await carte.findByText('Piste improvisée 12')).toBeInTheDocument()
-    expect(carte.getByText('5R-ABC')).toBeInTheDocument()
-    expect(carte.getByText('Marc Dupuis')).toBeInTheDocument()
-  })
-
-  it("affiche les dates d'installation du Stand/de la Base secondaire, indépendamment l'une de l'autre (#stand-base-secondaire-date-installation)", async () => {
-    renderPage(
-      traitementAerien({
-        aerien: {
-          ...traitementAerien().aerien,
-          stand: 'Stand Ihosy',
-          stand_date_installation: '2026-07-01',
-          // Base secondaire vide alors que sa date est renseignée : les deux
-          // couples (texte libre, date) sont indépendants l'un de l'autre.
-          base_secondaire: null,
-          base_secondaire_date_installation: '2026-07-15',
-        },
-      }),
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    const carte = within(screen.getByText('Équipe & aéronef').closest('section')!)
-    expect(await carte.findByText('Stand Ihosy')).toBeInTheDocument()
-    expect(carte.getByText('01/07/2026')).toBeInTheDocument()
-    expect(carte.getByText('15/07/2026')).toBeInTheDocument()
-  })
-
-  it("affiche l'équipe et le matériel d'une fiche terrestre", async () => {
-    renderPage(
-      traitementAerien({
-        type_traitement: 'TERRESTRE',
-        aerien: null,
-        terrestre: {
-          chef_equipe_id: 'u-chef-equipe',
-          agent_encadreur_id: null,
-          consultant_international: 'Alain Petit',
-          heure_debut: '06:00:00',
-          heure_fin: '10:00:00',
-          vitesse_vent_ms: 1.8,
-          direction_vent: 'NE',
-          reprise_traitement: false,
-          traitement_origine_id: null,
-          essence_litres: 12,
-          nb_piles: 8,
-          total_pesticide_l: 180,
-          pesticide_recu_l: 200,
-          pesticide_stock_restant_l: 20,
-          produits: [],
-        },
-      }),
-      [],
-      { utilisateurs: [{ id: 'u-chef-equipe', nom: 'Soa Lalao', role: 'chef_equipe' }] },
-    )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-    await ouvrirDonneesBdd()
-
-    expect(screen.getByText('Équipe & matériel')).toBeInTheDocument()
-    expect(await screen.findByText('Soa Lalao')).toBeInTheDocument()
-    expect(screen.getByText('Alain Petit')).toBeInTheDocument()
-    expect(screen.getByText('NE')).toBeInTheDocument()
-    expect(screen.getByText('12 l')).toBeInTheDocument()
-    expect(screen.getByText('20 l')).toBeInTheDocument()
-  })
-
   it("n'affiche pas « Demander une reprise » quand la fiche n'est pas reprenable", async () => {
     renderPage(traitementAerien())
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
@@ -660,49 +446,51 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
   })
 })
 
-describe('TraitementDetailPage — onglets « Fiche » / « Données BDD »', () => {
+describe('TraitementDetailPage — fiche de lecture en tableaux (comme le PDF)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   const HTML_CRT = '<html><body><h1>FICHE CRT</h1><table><tr><th>Rotation</th></tr></table></body></html>'
+  const TITRE = 'Fiche de traitement Jean-AERIEN-2026-08-12'
 
-  function renderAvecFicheHtml(traitement: ReturnType<typeof traitementAerien>) {
-    return renderPage(traitement, [], {}, {
+  function renderAvecFicheHtml(extra: Record<string, () => Promise<unknown>> = {}) {
+    return renderPage(traitementAerien(), [], {}, {
       '/traitements/t1/fiche-html': () => Promise.resolve({ data: HTML_CRT }),
+      ...extra,
     })
   }
 
-  it('ouvre sur « Fiche » : le gabarit du CRT est affiché dans un iframe isolé', async () => {
-    renderAvecFicheHtml(traitementAerien())
+  it('affiche directement le gabarit du CRT dans un iframe isolé, sans onglets', async () => {
+    renderAvecFicheHtml()
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
-    expect(screen.getByRole('tab', { name: 'Fiche' })).toHaveAttribute('aria-selected', 'true')
-    const cadre = await screen.findByTitle('Fiche de traitement Jean-AERIEN-2026-08-12')
+    const cadre = await screen.findByTitle(TITRE)
     expect(cadre).toHaveAttribute('srcdoc', HTML_CRT)
+    // Aucun script du document ne doit pouvoir s'exécuter.
     expect(cadre.getAttribute('sandbox')).not.toContain('allow-scripts')
     expect(mockedGet).toHaveBeenCalledWith('/traitements/t1/fiche-html', { responseType: 'text' })
-    // Les cartes de la base ne sont pas affichées par défaut.
+    // Une seule vue : ni onglets, ni cartes de la base.
+    expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.queryByText('Rotations')).toBeNull()
   })
 
-  it('« Données BDD » affiche les cartes, « Fiche » ramène au tableau', async () => {
-    renderAvecFicheHtml(traitementAerien())
+  it('garde les surfaces, les signatures et la chaîne de reprise à côté de la fiche', async () => {
+    renderAvecFicheHtml()
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Données BDD' }))
-    expect(screen.queryByTitle('Fiche de traitement Jean-AERIEN-2026-08-12')).toBeNull()
-    expect(screen.getByText('Rotations')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Fiche' }))
-    expect(await screen.findByTitle('Fiche de traitement Jean-AERIEN-2026-08-12')).toBeInTheDocument()
+    expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
+    expect(screen.getByText('Signatures')).toBeInTheDocument()
+    expect(screen.getByText('Chaîne de reprise')).toBeInTheDocument()
   })
 
-  it('garde les signatures et les surfaces visibles sous les deux onglets', async () => {
-    renderAvecFicheHtml(traitementAerien())
+  it('annonce le code HTTP quand la fiche ne peut pas être chargée', async () => {
+    renderAvecFicheHtml({
+      '/traitements/t1/fiche-html': () => Promise.reject({ response: { status: 404 } }),
+    })
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
 
-    expect(screen.getByText('Signatures')).toBeInTheDocument()
-    expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
+    expect(await screen.findByText(/erreur 404/)).toBeInTheDocument()
+    expect(screen.getByText(/le serveur est-il à jour/)).toBeInTheDocument()
   })
 })

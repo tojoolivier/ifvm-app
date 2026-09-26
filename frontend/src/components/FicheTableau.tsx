@@ -22,12 +22,12 @@ export function FicheTableau({
   endpoint: string
   /**
    * Change quand la fiche change (statut, mise à jour) : sans elle, une validation faite
-   * pendant que l'onglet est ouvert laisserait l'ancien HTML affiché.
+   * pendant que la fiche est ouverte laisserait l'ancien HTML affiché.
    */
   cleVersion?: string
   titre: string
 }) {
-  const { data, isLoading, isError } = useQuery<string>({
+  const { data, isLoading, isError, error } = useQuery<string>({
     queryKey: ['fiche-html', endpoint, cleVersion ?? null],
     queryFn: () => api.get(endpoint, { responseType: 'text' }).then((r) => (typeof r.data === 'string' ? r.data : '')),
   })
@@ -43,7 +43,7 @@ export function FicheTableau({
     return <p className="font-sans text-[12px] text-ifvm-text-weak">Chargement de la fiche…</p>
   }
   if (isError || !data) {
-    return <ErrorBanner label="Fiche" message="Impossible de charger la fiche." />
+    return <ErrorBanner label="Fiche" message={messageErreur(error)} />
   }
 
   return (
@@ -59,4 +59,16 @@ export function FicheTableau({
       />
     </div>
   )
+}
+
+/**
+ * Message d'erreur avec le code HTTP quand il existe : « Impossible de charger la fiche »
+ * seul ne dit pas si c'est une session expirée (401), une route absente d'un backend pas
+ * encore à jour (404) ou une vraie erreur du gabarit (500).
+ */
+function messageErreur(error: unknown): string {
+  const status = (error as { response?: { status?: number } } | null)?.response?.status
+  if (!status) return 'Impossible de charger la fiche.'
+  if (status === 404) return 'Impossible de charger la fiche (erreur 404) : route introuvable, le serveur est-il à jour ?'
+  return `Impossible de charger la fiche (erreur ${status}).`
 }
