@@ -43,3 +43,22 @@ export function validerGrille(
   }
   return erreurs;
 }
+
+export const PHASES = ['solitaire', 'solitaro_trans', 'transiens', 'gregaire'] as const;
+export type Phase = (typeof PHASES)[number];
+
+/** Phases qu'on peut saisir pour une grille ; NSE larve n'a pas de phase solitaro-transiens. */
+export function phenotypesFor(espece: string, categorie: CategorieGrille): Phase[] {
+  return PHASES.filter((p) => !(espece === 'NSE' && categorie === 'larve' && p === 'solitaro_trans'));
+}
+
+/** Une seule phase vue : elle reçoit toutes les captures, sans saisie (maquette K2). */
+export function repartirPhaseUnique(captures: number, phasesVues: string[]): Record<string, number> | null {
+  return phasesVues.length === 1 ? { [phasesVues[0]]: captures } : null;
+}
+
+/** L'état saisi (repos / déplacement) fixe le comportement de l'essaim : posé ou en vol (K2, K4). */
+export function comportementDeduit(etat: 'repos' | 'deplacement' | null | undefined) {
+  if (etat == null) return { essaim_pose: null, essaim_en_vol: null };
+  return { essaim_pose: etat === 'repos', essaim_en_vol: etat === 'deplacement' };
+}

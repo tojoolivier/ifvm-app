@@ -1,4 +1,9 @@
-import { validerGrille } from '../src/lib/prospection-capture-rules';
+import {
+  comportementDeduit,
+  phenotypesFor,
+  repartirPhaseUnique,
+  validerGrille,
+} from '../src/lib/prospection-capture-rules';
 
 describe('validerGrille — intensif : captures = phases = stades ♀ + ♂', () => {
   const base = { captures: 12, phases: { solitaire: 9, transiens: 3 } };
@@ -122,5 +127,50 @@ describe('validerGrille — champs obligatoires en intensif', () => {
     const erreurs = validerGrille('extensive', 'imago', { captures: 12, phases: { solitaire: 12 }, densiteDiffuse: 450 });
     expect(erreurs).not.toEqual(expect.arrayContaining(['accouplement']));
     expect(erreurs).not.toContain('etat');
+  });
+});
+
+describe('phenotypesFor', () => {
+  const tous = ['solitaire', 'solitaro_trans', 'transiens', 'gregaire'];
+
+  it('imagos : les 4 phases, quelle que soit l’espèce', () => {
+    expect(phenotypesFor('LMC', 'imago')).toEqual(tous);
+    expect(phenotypesFor('NSE', 'imago')).toEqual(tous);
+  });
+
+  it('larves LMC : les 4 phases', () => {
+    expect(phenotypesFor('LMC', 'larve')).toEqual(tous);
+  });
+
+  it('larves NSE : sans solitaro-transiens', () => {
+    expect(phenotypesFor('NSE', 'larve')).toEqual(['solitaire', 'transiens', 'gregaire']);
+  });
+});
+
+describe('repartirPhaseUnique', () => {
+  it('attribue toutes les captures à la seule phase vue', () => {
+    expect(repartirPhaseUnique(12, ['solitaire'])).toEqual({ solitaire: 12 });
+  });
+
+  it('ne répartit rien quand plusieurs phases sont vues', () => {
+    expect(repartirPhaseUnique(12, ['solitaire', 'transiens'])).toBeNull();
+  });
+
+  it('ne répartit rien sans phase vue', () => {
+    expect(repartirPhaseUnique(12, [])).toBeNull();
+  });
+});
+
+describe('comportementDeduit', () => {
+  it('repos → posé', () => {
+    expect(comportementDeduit('repos')).toEqual({ essaim_pose: true, essaim_en_vol: false });
+  });
+
+  it('déplacement → en vol', () => {
+    expect(comportementDeduit('deplacement')).toEqual({ essaim_pose: false, essaim_en_vol: true });
+  });
+
+  it('état absent → rien de déduit', () => {
+    expect(comportementDeduit(null)).toEqual({ essaim_pose: null, essaim_en_vol: null });
   });
 });

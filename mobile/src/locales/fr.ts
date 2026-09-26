@@ -22,6 +22,17 @@ export const fr = {
     },
   },
   prospection: {
+    capture: {
+      erreurs: {
+        phases: 'La somme des phases doit égaler le nombre de captures.',
+        stades: 'La somme des stades (femelles + mâles) doit égaler le nombre de captures.',
+        densiteDiffuse: 'Saisissez la densité diffuse.',
+        interdistance: 'Saisissez l’interdistance : un accouplement ou une ponte est signalé.',
+        accouplement: 'Choisissez un niveau d’accouplement.',
+        ponte: 'Choisissez un niveau de ponte.',
+        etat: 'Choisissez l’état : repos ou déplacement.',
+      },
+    },
     titre: 'Nouvelle prospection',
     suivant: 'Suivant',
     ficheNumero: 'Fiche {{numero}}',
