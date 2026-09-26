@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { Segmente } from './Segmente'
 import {
@@ -32,12 +32,33 @@ const nombreFr = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 })
 
 // Repère du dessin : le SVG est mis à l'échelle par `viewBox`, les coordonnées
 // ci-dessous ne sont donc pas des pixels d'écran.
-const L = 680
-const H = 250
+const LARGEUR_PAR_DEFAUT = 680
+const LARGEUR_MIN = 260
 const MARGE = { haut: 14, droite: 18, bas: 30, gauche: 46 }
-const LARGEUR_TRACE = L - MARGE.gauche - MARGE.droite
-const HAUTEUR_TRACE = H - MARGE.haut - MARGE.bas
-const MAX_ETIQUETTES_X = 8
+/** Une étiquette de l'axe des dates a besoin d'environ 80 px : on en pose autant que la largeur en permet. */
+const PX_PAR_ETIQUETTE_X = 80
+
+/**
+ * Largeur réelle du conteneur. Le dessin a pour viewBox sa propre largeur : les
+ * textes gardent leur taille en pixels quel que soit l'écran, au lieu d'être
+ * réduits avec l'ensemble (à 340 px de large, un texte de 11 px tombait à 5,5 px).
+ * Sans `ResizeObserver` (tests jsdom) on garde la largeur d'origine.
+ */
+function useLargeur(zone: HTMLElement | null): number {
+  const [largeur, setLargeur] = useState(LARGEUR_PAR_DEFAUT)
+  useEffect(() => {
+    if (!zone || typeof ResizeObserver === 'undefined') return
+    const mesurer = () => {
+      const w = Math.round(zone.getBoundingClientRect().width)
+      if (w > 0) setLargeur(Math.max(LARGEUR_MIN, w))
+    }
+    mesurer()
+    const observateur = new ResizeObserver(mesurer)
+    observateur.observe(zone)
+    return () => observateur.disconnect()
+  }, [zone])
+  return largeur
+}
 
 const GRANULARITES: { valeur: Granularite; label: string }[] = [
   { valeur: 'decade', label: 'Décade' },
@@ -75,13 +96,20 @@ export function EvolutionCampagne({
     [prospections, traitements, granularite, cumule, debut, fin],
   )
 
+  const [zoneGraphe, setZoneGraphe] = useState<HTMLDivElement | null>(null)
+  const L = useLargeur(zoneGraphe)
+  // Plus le dessin est étroit, plus il est haut par rapport à sa largeur : la courbe garde du relief.
+  const H = L < 420 ? 230 : 250
+  const LARGEUR_TRACE = L - MARGE.gauche - MARGE.droite
+  const HAUTEUR_TRACE = H - MARGE.haut - MARGE.bas
+
   const maxValeur = Math.max(0, ...points.flatMap((p) => SERIES.map((s) => p[s.cle])))
   const echelle = echelleY(maxValeur)
   const n = points.length
   const x = (i: number) =>
     n === 1 ? MARGE.gauche + LARGEUR_TRACE / 2 : MARGE.gauche + (i * LARGEUR_TRACE) / (n - 1)
   const y = (v: number) => MARGE.haut + HAUTEUR_TRACE * (1 - v / echelle.max)
-  const pasEtiquette = Math.max(1, Math.ceil(n / MAX_ETIQUETTES_X))
+  const pasEtiquette = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(LARGEUR_TRACE / PX_PAR_ETIQUETTE_X))))
   const dernier: PointEvolution | undefined = points[n - 1]
   const survol = actif !== null ? points[actif] : undefined
 
@@ -207,7 +235,7 @@ export function EvolutionCampagne({
             </table>
           </div>
         ) : (
-          <div className="relative">
+          <div className="relative" ref={setZoneGraphe}>
             <svg
               viewBox={`0 0 ${L} ${H}`}
               className="block h-auto w-full touch-pan-y select-none rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-ifvm-green-text"

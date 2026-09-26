@@ -394,7 +394,7 @@ export function TraitementDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="px-7 pb-10 pt-[26px]">
+      <div className="px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px]">
         <p className="font-sans text-[12px] text-ifvm-text-tertiary">Chargement…</p>
       </div>
     )
@@ -406,7 +406,7 @@ export function TraitementDetailPage() {
     const label = status ? STATUS_LABELS[status] ?? `Erreur ${status}` : 'Erreur'
     const message = detail ?? 'Impossible de charger ce traitement.'
     return (
-      <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
+      <div className="flex flex-col gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px]">
         <NavTabs
           ariaLabel="Vues des traitements"
           items={[{ label: 'Liste des fiches', to: '/traitements', active: false }]}
@@ -500,7 +500,7 @@ export function TraitementDetailPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
+    <div className="flex flex-col gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px]">
       <NavTabs
         ariaLabel="Vues des traitements"
         items={[
@@ -516,9 +516,9 @@ export function TraitementDetailPage() {
       {/* En-tête vert de la maquette — `#235a36`, rayon 12px, padding 20/22 */}
       <header
         data-testid="traitement-header"
-        className="flex items-center gap-[18px] rounded-[12px] bg-ifvm-green-text px-[22px] py-5 text-white"
+        className="flex flex-wrap items-center gap-x-[18px] gap-y-3 rounded-[12px] bg-ifvm-green-text px-4 py-4 text-white sm:px-[22px] sm:py-5"
       >
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 basis-full sm:flex-1 sm:basis-0">
           <h1 className="font-mono text-[17px] font-bold">{traitement.numero_fiche}</h1>
           <p className="mt-1 font-sans text-[12px] font-medium text-white/75">{sousTitre}</p>
         </div>
@@ -565,7 +565,7 @@ export function TraitementDetailPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           {traitement.aerien && (
             <Carte className="overflow-hidden">

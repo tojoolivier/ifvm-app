@@ -202,7 +202,7 @@ export function ProspectionsPage() {
 
   return (
     // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
-    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
+    <div className="flex flex-col gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px]">
       {/* Barre de filtres — maquette : carte blanche, items alignés en bas */}
       <div className="flex flex-wrap items-end gap-[14px] rounded-[11px] border border-[#e7e0cd] bg-card px-[18px] py-4">
         <div className="flex min-w-[180px] flex-col gap-[6px]">
@@ -226,7 +226,7 @@ export function ProspectionsPage() {
           <legend className="mb-[6px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
             Type
           </legend>
-          <div className="flex gap-[5px]">
+          <div className="flex flex-wrap gap-[5px]">
             <FilterChip
               label={TOUS}
               active={!filtreType}

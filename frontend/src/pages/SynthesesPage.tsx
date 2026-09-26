@@ -206,7 +206,7 @@ export function SynthesesPage() {
 
   return (
     // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
-    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px] print:px-0 print:pt-0">
+    <div className="flex flex-col gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px] print:px-0 print:pt-0">
       {/* Barre de filtres — maquette §9 : période, groupement, exports à droite */}
       <div className="flex flex-wrap items-end gap-[14px] rounded-[11px] border border-[#e7e0cd] bg-card px-[18px] py-4 print:hidden">
         <fieldset className="flex flex-col gap-[6px]">
@@ -280,7 +280,7 @@ export function SynthesesPage() {
       )}
 
       {/* Grille 1.4fr / 1fr de la maquette */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-card">
           <div className="border-b border-[#f1ecdd] px-5 py-[15px] font-sans text-[14px] font-bold">
             Agrégats par {def.label.toLowerCase()}

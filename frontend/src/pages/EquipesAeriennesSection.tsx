@@ -434,7 +434,7 @@ export function EquipesAeriennesSection() {
       {showCreateEquipe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
-            <div className="border-b px-6 py-4">
+            <div className="border-b px-4 py-4 sm:px-6">
               <h2 className="text-lg font-semibold">Nouvelle équipe aérienne</h2>
             </div>
             <form
@@ -467,7 +467,7 @@ export function EquipesAeriennesSection() {
                   ],
                 })
               }}
-              className="space-y-4 px-6 py-4"
+              className="space-y-4 px-4 py-4 sm:px-6"
             >
               {createEquipeError && (
                 <div className="rounded bg-red-50 p-3 text-sm text-red-700">{createEquipeError}</div>
@@ -679,7 +679,7 @@ export function EquipesAeriennesSection() {
       {showCreateBase && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
-            <div className="border-b px-6 py-4">
+            <div className="border-b px-4 py-4 sm:px-6">
               <h2 className="text-lg font-semibold">Nouvelle base aérienne principale</h2>
             </div>
             <form
@@ -692,7 +692,7 @@ export function EquipesAeriennesSection() {
                   equipe_id: equipeIdBase,
                 })
               }}
-              className="space-y-4 px-6 py-4"
+              className="space-y-4 px-4 py-4 sm:px-6"
             >
               {createBaseError && (
                 <div className="rounded bg-red-50 p-3 text-sm text-red-700">{createBaseError}</div>
@@ -776,7 +776,7 @@ export function EquipesAeriennesSection() {
       {showCreateBaseSecondaire && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
-            <div className="border-b px-6 py-4">
+            <div className="border-b px-4 py-4 sm:px-6">
               <h2 className="text-lg font-semibold">Nouvelle base aérienne secondaire</h2>
             </div>
             <form
@@ -789,7 +789,7 @@ export function EquipesAeriennesSection() {
                   parent_site_id: parentBaseId,
                 })
               }}
-              className="space-y-4 px-6 py-4"
+              className="space-y-4 px-4 py-4 sm:px-6"
             >
               {createBaseSecondaireError && (
                 <div className="rounded bg-red-50 p-3 text-sm text-red-700">

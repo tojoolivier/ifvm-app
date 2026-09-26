@@ -320,7 +320,7 @@ export function StationsSection() {
     idPrefix: string
   }) {
     return (
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${idPrefix}-code`} className={fieldLabelClass}>
             Code *
@@ -458,7 +458,7 @@ export function StationsSection() {
 
       {/* Carte Enregistrements */}
       <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-white">
-        <div className="flex items-center gap-[10px] border-b border-[#f1ecdd] px-5 py-[13px]">
+        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2 border-b border-[#f1ecdd] px-4 py-[13px] sm:px-5">
           <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
           <Label htmlFor="stations-recherche" className="sr-only">
             Rechercher parmi les stations
@@ -469,7 +469,7 @@ export function StationsSection() {
             value={search}
             onChange={(event) => updateSearch(event.target.value)}
             placeholder="Rechercher…"
-            className="h-9 w-48 rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px]"
+            className="order-last h-10 basis-full rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px] sm:order-none sm:h-9 sm:w-48 sm:basis-auto"
           />
           <button
             type="button"
@@ -542,10 +542,10 @@ export function StationsSection() {
             aria-label="Nouvelle station"
             className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
           >
-            <div className="border-b border-[#f4efe2] px-6 py-4">
+            <div className="border-b border-[#f4efe2] px-4 py-4 sm:px-6">
               <h2 className="font-sans text-[15px] font-extrabold">Nouvelle station</h2>
             </div>
-            <form onSubmit={submitCreate} className="flex flex-col gap-4 px-6 py-4">
+            <form onSubmit={submitCreate} className="flex flex-col gap-4 px-4 py-4 sm:px-6">
               {createError && <ErrorBanner label="Création impossible" message={createError} />}
               <StationFields values={createValues} onChange={setCreateValues} idPrefix="ns" />
               <div className="flex gap-3 pt-1">
@@ -578,16 +578,16 @@ export function StationsSection() {
             aria-label={`Modifier ${editingRow.code}`}
             className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
           >
-            <div className="border-b border-[#f4efe2] px-6 py-4">
+            <div className="border-b border-[#f4efe2] px-4 py-4 sm:px-6">
               <h2 className="font-sans text-[15px] font-extrabold">Modifier</h2>
               <p className="mt-0.5 font-mono text-[11px] font-medium text-ifvm-text-weak">
                 {editingRow.code}
               </p>
             </div>
-            <form onSubmit={submitEdit} className="flex flex-col gap-4 px-6 py-4">
+            <form onSubmit={submitEdit} className="flex flex-col gap-4 px-4 py-4 sm:px-6">
               {editError && <ErrorBanner label="Enregistrement impossible" message={editError} />}
               <StationFields values={editValues} onChange={setEditValues} idPrefix="es" />
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <span className={fieldLabelClass}>District</span>
                   <div className="flex min-h-9 items-center rounded-lg border border-[#e0d9c4] bg-[#f7f4ea] px-[11px] font-sans text-[12.5px] font-semibold text-ifvm-text-tertiary">

@@ -62,10 +62,10 @@ export function AdministrationPage() {
 
   return (
     // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
-    <div className="grid grid-cols-[216px_1fr] items-start gap-5 px-7 pb-10 pt-[26px]">
+    <div className="grid grid-cols-1 items-start gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px] md:grid-cols-[216px_minmax(0,1fr)] md:gap-5">
       {/* Colonne gauche */}
-      <nav aria-label="Administration" className="flex flex-col gap-[7px]">
-        <span className="px-0.5 pb-[3px] font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">
+      <nav aria-label="Administration" className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:gap-[7px] md:overflow-visible md:pb-0">
+        <span className="hidden px-0.5 pb-[3px] md:block font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">
           {navItems.length} sections
         </span>
         {navItems.map((item) => {
@@ -77,7 +77,7 @@ export function AdministrationPage() {
               aria-current={active ? 'true' : undefined}
               onClick={() => setSection(item.key)}
               className={cn(
-                'flex items-center gap-[9px] rounded-[10px] border-[1.5px] px-[13px] py-[11px] text-left transition-colors duration-[120ms]',
+                'flex w-[200px] shrink-0 items-center gap-[9px] rounded-[10px] border-[1.5px] px-[13px] py-[11px] text-left transition-colors duration-[120ms] md:w-auto md:shrink',
                 active ? 'border-[#235a36] bg-ifvm-green-bg' : 'border-[#e7e0cd] bg-white hover:bg-[#faf7ef]',
               )}
             >

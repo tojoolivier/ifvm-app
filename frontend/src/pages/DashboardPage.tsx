@@ -449,7 +449,7 @@ export function DashboardPage() {
   /*  Rendu                                                              */
   /* ------------------------------------------------------------------ */
   return (
-    <div className={`flex min-h-screen flex-col gap-[18px] ${PAGE_BG} px-7 pb-10 pt-[22px]`}>
+    <div className={`flex min-h-screen flex-col gap-[18px] ${PAGE_BG} px-4 pb-10 pt-4 sm:px-7 sm:pt-[22px]`}>
       {fichesIndisponibles && (
         <ErrorBanner
           label={
@@ -465,14 +465,14 @@ export function DashboardPage() {
       <section
         className={`${CARD} flex flex-wrap items-center gap-x-[22px] gap-y-3 bg-[#edece3] px-4 py-3`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label className="font-sans text-[11.5px] font-semibold uppercase tracking-[.05em] text-ifvm-text-weak">
             Campagne
           </label>
           <select
             value={campagne?.id ?? ''}
             onChange={(e) => setCampagneChoisieId(e.target.value)}
-            className="h-8 rounded-[8px] border border-[#d8d4c1] bg-card px-2.5 font-sans text-[13px] font-semibold text-foreground"
+            className="h-10 w-full rounded-[8px] border border-[#d8d4c1] bg-card px-2.5 font-sans text-[13px] font-semibold text-foreground sm:h-8 sm:w-auto"
           >
             {campagnes.length === 0 && <option value="">{perimetre}</option>}
             {campagnes.map((c) => (
@@ -484,16 +484,16 @@ export function DashboardPage() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label className="font-sans text-[11.5px] font-semibold uppercase tracking-[.05em] text-ifvm-text-weak">
             Période
           </label>
-          <div className="flex flex-wrap gap-1 rounded-[9px] border border-[#e7e0cd] bg-card p-[3px]">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-[9px] border border-[#e7e0cd] bg-card p-[3px]">
             {['Ce jour', 'Décade', 'Mois', 'Trimestre', 'Campagne', 'Perso.'].map((p, i) => (
               <button
                 key={p}
                 type="button"
-                className={`rounded-[6px] px-[10px] py-[5px] font-sans text-[12px] font-semibold whitespace-nowrap ${
+                className={`shrink-0 rounded-[6px] px-[10px] py-[7px] font-sans text-[12px] font-semibold whitespace-nowrap sm:py-[5px] ${
                   i === 4
                     ? 'bg-ifvm-green-text text-white'
                     : 'text-ifvm-text-tertiary hover:bg-[#edece3]'
@@ -505,10 +505,10 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-[9px] border border-ifvm-green-text bg-ifvm-green-text px-3.5 py-2 font-sans text-[12.5px] font-bold text-white hover:brightness-95"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-ifvm-green-text bg-ifvm-green-text px-3.5 py-2.5 font-sans text-[12.5px] font-bold text-white hover:brightness-95 sm:w-auto sm:py-2"
           >
             <Icon name="calendar" className="h-3.5 w-3.5" />
             Exporter
@@ -607,7 +607,7 @@ export function DashboardPage() {
       )}
 
       {/* ============== Grille principale ============== */}
-      <section className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[1.65fr_1fr]">
+      <section className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         {/* --------- Colonne gauche --------- */}
         <div className="flex min-w-0 flex-col gap-[18px]">
           {/* Pipeline */}
