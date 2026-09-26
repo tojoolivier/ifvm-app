@@ -98,6 +98,7 @@ export function VegetationExtensiveStep({ brouillon, onContinuer }: Props) {
             {RACCOURCIS_VERDISSEMENT.map((n) => (
               <View key={n} style={styles.flex}>
                 <Chip
+                  serre
                   label={t('prospection.vegetation.extensive.raccourci', { n })}
                   selected={valeurs.verdissement === String(n)}
                   onPress={() => form.setFieldValue('verdissement', String(n))}
@@ -115,6 +116,7 @@ export function VegetationExtensiveStep({ brouillon, onContinuer }: Props) {
                 {DEGATS_CULTURES.map((d) => (
                   <View key={d} style={styles.flex}>
                     <Chip
+                      serre
                       label={t(`prospection.vegetation.extensive.degats.${d}`)}
                       selected={field.state.value === d}
                       onPress={() => field.handleChange(field.state.value === d ? null : d)}

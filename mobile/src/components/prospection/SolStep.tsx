@@ -74,6 +74,7 @@ export function SolStep({ brouillon, onContinuer, onModifier }: Props) {
                 {DEGATS_CULTURES.map((d) => (
                   <View key={d} style={styles.flex}>
                     <Chip
+                      serre
                       label={t(`prospection.vegetation.extensive.degats.${d}`)}
                       selected={field.state.value === d}
                       onPress={() => field.handleChange(field.state.value === d ? null : d)}
