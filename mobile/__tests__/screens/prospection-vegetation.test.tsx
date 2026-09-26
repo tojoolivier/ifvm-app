@@ -168,4 +168,16 @@ describe('VegetationStep — « Plus de détails » (#687)', () => {
     const { vegetation } = jest.mocked(enregistrerBrouillon).mock.calls.at(-1)![0];
     expect((vegetation as { strates: Record<string, unknown> }).strates.herbeuse).toMatchObject({ surfRel: 70.5, repousse: true });
   });
+
+  it('une strate à 0 % n’ouvre pas la feuille ; dès qu’elle a du recouvrement, le lien s’ouvre', async () => {
+    await render(<VegetationStep brouillon={fiche()} onContinuer={jest.fn()} />);
+    expect(screen.getByTestId('plus-de-details-herbeuse')).toBeDisabled();
+    await fireEvent.press(screen.getByTestId('plus-de-details-herbeuse'));
+    expect(screen.queryByText('Strate herbeuse · détails')).toBeNull();
+
+    await fireEvent.press(screen.getByLabelText('Augmenter Strate herbeuse'));
+    expect(screen.getByTestId('plus-de-details-herbeuse')).toBeEnabled();
+    await fireEvent.press(screen.getByTestId('plus-de-details-herbeuse'));
+    expect(screen.getByText('Strate herbeuse · détails')).toBeTruthy();
+  });
 });
