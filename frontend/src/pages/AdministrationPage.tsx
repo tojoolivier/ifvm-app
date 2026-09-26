@@ -62,7 +62,7 @@ export function AdministrationPage() {
 
   return (
     // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
-    <div className="grid grid-cols-[216px_1fr] items-start gap-5 px-7 pb-10 pt-[26px]">
+    <div className="grid grid-cols-[216px_minmax(0,1fr)] items-start gap-5 px-7 pb-10 pt-[26px]">
       {/* Colonne gauche */}
       <nav aria-label="Administration" className="flex flex-col gap-[7px]">
         <span className="px-0.5 pb-[3px] font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">

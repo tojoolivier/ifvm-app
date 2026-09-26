@@ -1047,7 +1047,9 @@ export function ReferentielsPage() {
     // Padding de contenu du handoff (README §Design tokens, « contenu 26px 28px 40px ») :
     // les 28px latéraux alignent la colonne de gauche sur le fil d'Ariane du header,
     // lui aussi à px-[28px] dans Layout.
-    <div className="grid grid-cols-[216px_1fr] items-start gap-5 px-7 pb-10 pt-[26px]">
+    // `minmax(0,1fr)` (et non `1fr` = `minmax(auto,1fr)`) : la colonne de droite peut
+    // rétrécir sous la largeur naturelle du tableau au lieu de déborder de l'écran.
+    <div className="grid grid-cols-[216px_minmax(0,1fr)] items-start gap-5 px-7 pb-10 pt-[26px]">
       {/* Colonne gauche — cartes de navigation */}
       <nav aria-label="Référentiels" className="flex flex-col gap-[7px]">
         <SectionLabel>{`${ENTITES.length} référentiels`}</SectionLabel>
@@ -1101,10 +1103,10 @@ export function ReferentielsPage() {
       </nav>
 
       {/* Colonne droite */}
-      <div className="flex flex-col gap-[14px]">
+      <div className="flex min-w-0 flex-col gap-[14px]">
         {/* Carte d'en-tête */}
         <div className="flex flex-col gap-[9px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-4">
-          <div className="flex items-center gap-[10px]">
+          <div className="flex flex-wrap items-center gap-[10px]">
             <h2 className="flex-1 font-sans text-[17px] font-extrabold">{entity.label}</h2>
             <span className="font-mono text-[11px] font-medium text-ifvm-text-weak">{entity.table}</span>
             <span
@@ -1151,7 +1153,7 @@ export function ReferentielsPage() {
 
         {/* Carte Enregistrements */}
         <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-white">
-          <div className="flex items-center gap-[10px] border-b border-[#f1ecdd] px-5 py-[13px]">
+          <div className="flex flex-wrap items-center gap-[10px] border-b border-[#f1ecdd] px-5 py-[13px]">
             <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
             <Label htmlFor="referentiel-recherche" className="sr-only">
               Rechercher parmi {entity.label.toLowerCase()}
@@ -1267,7 +1269,7 @@ export function ReferentielsPage() {
         {entity.write ? (
           fraicheurTerrain
         ) : (
-          <div className="grid grid-cols-[1fr_320px] items-start gap-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4">
             <div className="flex flex-col gap-[13px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-[18px]">
               <div>
                 <h3 className="font-sans text-[13px] font-bold">Modifier</h3>
