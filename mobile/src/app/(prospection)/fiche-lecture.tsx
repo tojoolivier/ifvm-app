@@ -4,7 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient, ProspectionRead } from '@/lib/api-client';
-import { buildFicheLecture, FicheLectureViewModel } from '@/lib/prospection-fiche-lecture';
+import { buildFicheLecture, STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
+import { getStationById } from '@/lib/referentiel-db';
 import { telechargerEtPartagerPdf } from '@/lib/pdf-partage';
 import { depsPdfPartage } from '@/lib/pdf-partage-natif';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -12,6 +13,7 @@ import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
+import { FicheProspectionTableau } from '@/components/fiche/FicheProspectionTableau';
 import { useTheme } from '@/hooks/use-theme';
 import type { ThemePalette } from '@/constants/theme';
 
@@ -19,17 +21,18 @@ const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
 
 /**
- * Écran de lecture d'une fiche Validée (#16) : strictement lecture seule, aucune resaisie.
- * Toutes les valeurs affichées sont dérivées de la fiche telle que renvoyée par l'API.
+ * Écran de lecture d'une fiche de prospection : strictement lecture seule, aucune resaisie. La
+ * fiche est présentée en tableaux comme le PDF téléchargé, à partir de la fiche telle que
+ * renvoyée par l'API. Le bouton « Télécharger le PDF » est dans l'en-tête, visible sans défiler.
  */
 export default function FicheLectureScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
 
   const [prospection, setProspection] = useState<ProspectionRead | null>(null);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
+  const [stationLabel, setStationLabel] = useState<string | null>(null);
   const { run, isRunning: isExporting } = useAsyncAction();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
@@ -52,9 +55,27 @@ export default function FicheLectureScreen() {
     charger();
   }, [charger]);
 
-  // PDF (#494/#594) généré côté backend (WeasyPrint, #533) — même pattern que
-  // le CRT (recap.tsx) : pas de rendu HTML côté client, un fetch authentifié +
-  // partage natif.
+  // Nom de la station : la fiche ne porte que son identifiant, le nom vient du référentiel local
+  // déjà synchronisé. Un référentiel indisponible ne doit pas empêcher de lire la fiche — la
+  // station reste alors affichée par sa saisie libre ou son identifiant.
+  const stationId = prospection?.station_id ?? null;
+  useEffect(() => {
+    if (!stationId) return;
+    let annule = false;
+    getStationById(stationId)
+      .then((station) => {
+        if (!annule) setStationLabel(station ? `${station.code} ${station.nom}` : null);
+      })
+      .catch(() => {
+        if (!annule) setStationLabel(null);
+      });
+    return () => {
+      annule = true;
+    };
+  }, [stationId]);
+
+  // PDF (#494/#594) généré côté backend (WeasyPrint, #533) — même pattern que le CRT
+  // (recap.tsx) : pas de rendu HTML côté client, un fetch authentifié + partage natif.
   const handleExportPdf = () =>
     run(
       () =>
@@ -82,8 +103,9 @@ export default function FicheLectureScreen() {
 
   // Lecture seule de toute fiche du serveur, pas seulement des validées : « Mes fiches » ouvre cet
   // écran pour une fiche « En attente » ou « Vérifiée », qui restait sinon un écran blanc sans erreur.
-  const recap: FicheLectureViewModel = buildFicheLecture(prospection);
-  const prospecteurLabel = user ? `${user.prenom} ${user.nom}` : '—';
+  // Le PDF, lui, n'existe que pour une fiche validée (le backend refuse les autres en 403).
+  const statutLabel = buildFicheLecture(prospection).statutLabel;
+  const pdfDisponible = prospection.statut === STATUT_VALIDE;
 
   return (
     <View style={styles.root}>
@@ -91,74 +113,33 @@ export default function FicheLectureScreen() {
         <TouchableOpacity onPress={() => router.push('/(app)/prospection')}>
           <Text style={styles.backLink}>‹ Retour</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Fiche de lecture</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{recap.statutLabel}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTexte}>
+            <Text style={styles.headerTitle}>Fiche de lecture</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{statutLabel}</Text>
+            </View>
+          </View>
+          {pdfDisponible && (
+            <TouchableOpacity
+              style={[styles.btnPdf, isExporting && styles.btnDisabled]}
+              onPress={handleExportPdf}
+              disabled={isExporting}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Télécharger le PDF"
+            >
+              <Text style={styles.btnPdfText}>{isExporting ? 'Export…' : 'Télécharger le PDF'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
 
       <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Fiche</Text>
-          <Row label="N° fiche" value={recap.nFiche} />
-          <Row label="Station / localité" value={recap.stationLabel} />
-          <Row label="Date" value={recap.dateProspection} />
-          <Row label="Prospecteur" value={prospecteurLabel} />
+          <FicheProspectionTableau prospection={prospection} stationLabel={stationLabel} />
         </View>
-
-        {recap.infestation.hasInfestation && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Infestation</Text>
-            <Row label="Type" value={recap.infestation.typeLabel} />
-            <Row label="Surface" value={recap.infestation.surfaceTotale != null ? `${recap.infestation.surfaceTotale} ha` : '—'} />
-            <Row label="Comportement" value={recap.infestation.comportementLabel} />
-          </View>
-        )}
-
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Synthèse par espèce</Text>
-          {recap.especes.length === 0 ? (
-            <Text style={styles.summaryText}>Aucune capture enregistrée.</Text>
-          ) : (
-            recap.especes.map((e) => (
-              <View key={e.espece} style={styles.especeBlock}>
-                <Text style={styles.especeTitle}>{e.espece}</Text>
-                <Row label="Total capturé" value={String(e.totalCaptures)} />
-                <Row label="Densité diffuse /ha" value={e.densiteDiffuse != null ? String(e.densiteDiffuse) : '—'} />
-                <Row label="Densité groupée /ha" value={e.densiteGroupee != null ? String(e.densiteGroupee) : '—'} />
-                <Row label="Phénotype dominant" value={e.phenotypeDominantLabel} />
-              </View>
-            ))
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Végétation & sol</Text>
-          <Text style={styles.summaryText}>{recap.vegetationSummary}</Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.btnExport, isExporting && styles.btnDisabled]}
-          onPress={handleExportPdf}
-          disabled={isExporting}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.btnExportText}>{isExporting ? 'Export en cours…' : 'Exporter en PDF'}</Text>
-        </TouchableOpacity>
       </ScrollView>
-    </View>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  const { scale } = useFontScale();
-  const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const theme = useTheme();
-  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
     </View>
   );
 }
@@ -167,13 +148,7 @@ const BASE_TYPE_SIZES = {
   backLink: 13,
   headerTitle: 18,
   badgeText: 12,
-  cardLabel: 12,
-  especeTitle: 13,
-  rowLabel: 14,
-  rowValue: 15,
-  summaryText: 13,
-  errorText: 13,
-  btnExportText: 15,
+  btnPdfText: 13,
 } as const;
 
 function createTypeSizes(scale: number) {
@@ -182,28 +157,20 @@ function createTypeSizes(scale: number) {
 
 function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.inputBg },
-  header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
-  backLink: { color: '#FFFFFFCC', fontSize: typeSizes.backLink, marginBottom: 6 },
-  headerTitle: { color: '#FFFFFF', fontSize: typeSizes.headerTitle, fontWeight: '700' },
-  badge: { backgroundColor: theme.successBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 6 },
-  badgeText: { color: theme.success, fontSize: typeSizes.badgeText, fontWeight: '700' },
-  content: { flex: 1 },
-  card: { backgroundColor: theme.card, borderRadius: 10, padding: 14, marginBottom: 12 },
-  cardLabel: { fontSize: typeSizes.cardLabel, fontWeight: '700', color: theme.muted, marginBottom: 8, textTransform: 'uppercase' },
-  especeBlock: { marginBottom: 10 },
-  especeTitle: { fontSize: typeSizes.especeTitle, fontWeight: '700', color: theme.text, marginBottom: 4 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  // #lisibilite-terrain : libellés/valeurs agrandis (densité incluse) pour rester
-  // lisibles sur le terrain par tous les prospecteurs.
-  rowLabel: { color: '#4B5563', fontSize: typeSizes.rowLabel, fontWeight: '600' },
-  rowValue: { color: theme.text, fontSize: typeSizes.rowValue, fontWeight: '700' },
-  summaryText: { color: theme.text, fontSize: typeSizes.summaryText, lineHeight: 19 },
-  errorText: { color: theme.danger, fontSize: typeSizes.errorText, marginBottom: 8, textAlign: 'center' },
-  btnExport: { backgroundColor: IFVM_GREEN, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
-  btnDisabled: { opacity: 0.6 },
-  btnExportText: { color: '#FFFFFF', fontSize: typeSizes.btnExportText, fontWeight: '600' },
-});
+    root: { flex: 1, backgroundColor: theme.inputBg },
+    header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
+    backLink: { color: '#FFFFFFCC', fontSize: typeSizes.backLink, marginBottom: 6 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    headerTexte: { flexShrink: 1 },
+    headerTitle: { color: '#FFFFFF', fontSize: typeSizes.headerTitle, fontWeight: '700' },
+    badge: { backgroundColor: theme.successBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 6 },
+    badgeText: { color: theme.success, fontSize: typeSizes.badgeText, fontWeight: '700' },
+    content: { flex: 1 },
+    card: { backgroundColor: theme.card, borderRadius: 10, padding: 12 },
+    btnPdf: { backgroundColor: IFVM_GREEN, borderWidth: 1, borderColor: '#FFFFFF66', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 },
+    btnDisabled: { opacity: 0.6 },
+    btnPdfText: { color: '#FFFFFF', fontSize: typeSizes.btnPdfText, fontWeight: '600' },
+  });
 }
 
 /**
