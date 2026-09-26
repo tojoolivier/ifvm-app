@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
 import { FicheTableau } from '@/components/FicheTableau'
+import { EquipeLien } from '@/components/EquipeLien'
 import { buildFicheImprimable, isFicheValidee } from '@/lib/prospection-fiche-lecture'
 import {
   TIRET,
@@ -327,6 +328,9 @@ export function ProspectionDetailPage() {
         {erreurPdf && (
           <p className="text-[11.5px] font-medium text-destructive">{erreurPdf}</p>
         )}
+
+        {/* Équipe de la fiche (#602, #607) — lien vers Administration > Équipes. */}
+        <EquipeLien equipeId={prospection.equipe_id} />
 
         {/* Bandeau ambre — colonne `prospection.avertissements` (#106) */}
         {avertissements.length > 0 && (
