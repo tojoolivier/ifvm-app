@@ -366,4 +366,3 @@ async def test_pull_utilisateurs_equipe_transporte_le_sigle(
     sigles = {u["id"]: u["sigle"] for u in response.json()["utilisateurs_equipe"]["upserts"]}
     assert sigles[str(collegue_meme_pa.id)] == "RKT"
     assert sigles[str(utilisateur_avec_pa.id)] is None
-
