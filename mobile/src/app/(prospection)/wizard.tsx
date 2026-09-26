@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PrimaryButton, WizardHeader } from '@/components/ui';
 import { UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
@@ -16,6 +16,7 @@ import { ETAPES, NB_ETAPES, estTypeWizard, etapeDeReprise, typeDeFiche, type Typ
  */
 export default function WizardScreen() {
   const { type, id } = useLocalSearchParams<{ type?: string; id?: string }>();
+  const router = useRouter();
   const c = useUiTheme();
   const { t } = useTranslation();
   const [typeFiche, setTypeFiche] = useState<TypeWizard | null>(estTypeWizard(type) ? type : null);
@@ -59,6 +60,7 @@ export default function WizardScreen() {
         etape={index + 1}
         total={NB_ETAPES}
         libelleEtape={t(`prospection.etapes.${ETAPES[index]}`)}
+        onBack={() => (index === 0 ? router.back() : setIndex(index - 1))}
       />
       {index < NB_ETAPES - 1 && (
         <PrimaryButton label={t('prospection.suivant')} onPress={() => setIndex(index + 1)} testID="wizard-suivant" />

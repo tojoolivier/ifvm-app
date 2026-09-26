@@ -4,9 +4,10 @@ import WizardScreen from '@/app/(prospection)/wizard';
 import { getFiche } from '@/lib/prospection-db';
 
 let mockParams: Record<string, string> = {};
+const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   ...require('../test-utils/mock-expo-router').expoRouterMock(),
-  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
+  useRouter: () => ({ push: jest.fn(), back: mockBack, replace: jest.fn(), canGoBack: () => true }),
   useLocalSearchParams: () => mockParams,
 }));
 jest.mock('@/lib/prospection-db', () => ({ getFiche: jest.fn() }));
@@ -14,6 +15,7 @@ jest.mock('@/lib/prospection-db', () => ({ getFiche: jest.fn() }));
 describe('WizardScreen', () => {
   beforeEach(() => {
     mockParams = {};
+    mockBack.mockClear();
     jest.mocked(getFiche).mockReset();
   });
 
@@ -84,5 +86,26 @@ describe('WizardScreen', () => {
     await render(<WizardScreen />);
 
     await waitFor(() => expect(screen.getByText(/introuvable/)).toBeVisible());
+  });
+
+  it('la flèche de l’en-tête revient à l’étape précédente, en gardant le type', async () => {
+    mockParams = { type: 'validation' };
+    await render(<WizardScreen />);
+    await fireEvent.press(screen.getByText('Suivant'));
+
+    await fireEvent.press(screen.getByLabelText('Retour'));
+
+    expect(screen.getByText('Étape 1 sur 5')).toBeVisible();
+    expect(screen.getByText('Validation')).toBeVisible();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('la flèche de l’en-tête quitte le wizard depuis la première étape', async () => {
+    mockParams = { type: 'intensive' };
+    await render(<WizardScreen />);
+
+    await fireEvent.press(screen.getByLabelText('Retour'));
+
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });
