@@ -1063,7 +1063,7 @@ async def load_fixtures():
                 text("""
                     INSERT INTO zone_anti_acridien (code, nom)
                     VALUES (:code, :nom)
-                    ON CONFLICT (code) DO UPDATE SET
+                    ON CONFLICT (code) WHERE deleted_at IS NULL DO UPDATE SET
                         nom = EXCLUDED.nom,
                         updated_at = now()
                 """),
@@ -1085,7 +1085,7 @@ async def load_fixtures():
                 text("""
                     INSERT INTO poste_acridien (code, nom, za_id)
                     VALUES (:code, :nom, :za_id)
-                    ON CONFLICT (code) DO UPDATE SET
+                    ON CONFLICT (code) WHERE deleted_at IS NULL DO UPDATE SET
                         nom = EXCLUDED.nom,
                         za_id = EXCLUDED.za_id,
                         updated_at = now()
@@ -1142,7 +1142,7 @@ async def load_fixtures():
                         (code, nom, pa_id, latitude, longitude, altitude, commune_id)
                     VALUES
                         (:code, :nom, :pa_id, :latitude, :longitude, :altitude, :commune_id)
-                    ON CONFLICT (code) DO UPDATE SET
+                    ON CONFLICT (code) WHERE deleted_at IS NULL DO UPDATE SET
                         nom = EXCLUDED.nom,
                         pa_id = EXCLUDED.pa_id,
                         latitude = EXCLUDED.latitude,
@@ -1168,7 +1168,7 @@ async def load_fixtures():
                 text("""
                     INSERT INTO pesticide (code, nom)
                     VALUES (:code, :nom)
-                    ON CONFLICT (code) DO UPDATE SET
+                    ON CONFLICT (code) WHERE deleted_at IS NULL DO UPDATE SET
                         nom = EXCLUDED.nom,
                         updated_at = now()
                 """),
@@ -1181,7 +1181,7 @@ async def load_fixtures():
                 text("""
                     INSERT INTO culture (code, nom)
                     VALUES (:code, :nom)
-                    ON CONFLICT (code) DO UPDATE SET
+                    ON CONFLICT (code) WHERE deleted_at IS NULL DO UPDATE SET
                         nom = EXCLUDED.nom,
                         updated_at = now()
                 """),
@@ -1206,7 +1206,8 @@ async def load_fixtures():
                 text("""
                     INSERT INTO code_stade (code, categorie, sexe, espece, libelle, ordre)
                     VALUES (:code, :categorie, :sexe, :espece, :libelle, :ordre)
-                    ON CONFLICT (code, categorie, sexe, espece) DO UPDATE SET
+                    ON CONFLICT (code, categorie, sexe, espece)
+                    WHERE deleted_at IS NULL DO UPDATE SET
                         libelle = EXCLUDED.libelle,
                         ordre = EXCLUDED.ordre,
                         updated_at = now()

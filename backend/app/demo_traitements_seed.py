@@ -187,6 +187,8 @@ async def seed():
                 pilote=f"{pilote.prenom} {pilote.nom}",
                 mecanicien=f"{mecanicien.prenom} {mecanicien.nom}",
                 chef_de_base_id=chef_de_base.id,
+                immatricule_aeronef="5R-MHR",
+                base_principale="Base Betioky",
                 nb_rotations=4,
                 total_pesticide_l=1060,
             )
