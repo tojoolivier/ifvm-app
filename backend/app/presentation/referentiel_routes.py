@@ -42,6 +42,7 @@ from app.application.referentiel_use_cases import (
     ListCultures,
     ListEquipes,
     ListerAffectationsAeronef,
+    ListerAffectationsParAeronef,
     ListerPositionsSiteAerienne,
     ListLieuxAeriens,
     ListPesticides,
@@ -1121,6 +1122,25 @@ async def get_aeronef(
     if aeronef is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aéronef non trouvé")
     return aeronef
+
+
+@router.get("/aeronefs/{aeronef_id}/affectations", response_model=list[AffectationAeronefRead])
+async def list_affectations_par_aeronef(
+    aeronef_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Historique d'un appareil : les équipes qui l'ont utilisé (#621), en regard de
+    `GET /equipes/{id}/aeronefs` qui donne l'historique côté équipe."""
+    use_case = ListerAffectationsParAeronef(
+        AeronefRepositoryImpl(db), EquipeAeronefRepositoryImpl(db)
+    )
+    try:
+        return await use_case.execute(aeronef_id)
+    except AeronefIntrouvableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Aéronef non trouvé"
+        ) from exc
 
 
 @router.get("/aeronefs", response_model=list[AeronefRead])

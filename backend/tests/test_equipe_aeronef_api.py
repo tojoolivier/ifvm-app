@@ -387,3 +387,83 @@ async def test_recloturer_une_affectation_deja_close_409(
 
     historique = await client.get(f"/equipes/{equipe['id']}/aeronefs", headers=admin_headers)
     assert historique.json()[0]["date_fin"] == "2026-07-01"
+
+
+# --- historique côté appareil (#621) : pendant de GET /equipes/{id}/aeronefs ------------------
+
+
+@pytest.mark.asyncio
+async def test_historique_d_un_aeronef_liste_les_equipes_qui_l_ont_utilise(
+    client: AsyncClient,
+    admin_headers: dict,
+    equipe: dict,
+    autre_equipe: dict,
+    aeronef_a: dict,
+    aeronef_b: dict,
+):
+    """Un appareil passe d'une équipe à l'autre : l'historique se lit des deux côtés."""
+    premiere = await client.post(
+        f"/equipes/{equipe['id']}/aeronefs",
+        json={"aeronef_id": aeronef_a["id"], "date_debut": "2026-06-01"},
+        headers=admin_headers,
+    )
+    assert premiere.status_code == 201, premiere.text
+    await client.put(
+        f"/equipes/{equipe['id']}/aeronefs/{premiere.json()['id']}",
+        json={"date_fin": "2026-07-01"},
+        headers=admin_headers,
+    )
+    seconde = await client.post(
+        f"/equipes/{autre_equipe['id']}/aeronefs",
+        json={"aeronef_id": aeronef_a["id"], "date_debut": "2026-07-01"},
+        headers=admin_headers,
+    )
+    assert seconde.status_code == 201, seconde.text
+    # Une affectation d'un AUTRE appareil ne doit pas apparaître dans l'historique de A.
+    autre = await client.post(
+        f"/equipes/{equipe['id']}/aeronefs",
+        json={"aeronef_id": aeronef_b["id"], "date_debut": "2026-07-01"},
+        headers=admin_headers,
+    )
+    assert autre.status_code == 201, autre.text
+
+    historique = await client.get(
+        f"/aeronefs/{aeronef_a['id']}/affectations", headers=admin_headers
+    )
+
+    assert historique.status_code == 200, historique.text
+    lignes = historique.json()
+    # La plus récente d'abord : l'équipe Betroka (en cours), puis Ihosy (close).
+    assert [ligne["equipe_id"] for ligne in lignes] == [autre_equipe["id"], equipe["id"]]
+    assert [ligne["date_fin"] for ligne in lignes] == [None, "2026-07-01"]
+    assert {ligne["aeronef_id"] for ligne in lignes} == {aeronef_a["id"]}
+    assert lignes[0]["aeronef"]["immatriculation"] == "5R-MJA"
+
+
+@pytest.mark.asyncio
+async def test_historique_d_un_aeronef_jamais_affecte_est_vide(
+    client: AsyncClient, admin_headers: dict, aeronef_a: dict
+):
+    historique = await client.get(
+        f"/aeronefs/{aeronef_a['id']}/affectations", headers=admin_headers
+    )
+
+    assert historique.status_code == 200
+    assert historique.json() == []
+
+
+@pytest.mark.asyncio
+async def test_historique_d_un_aeronef_inconnu_404(client: AsyncClient, admin_headers: dict):
+    historique = await client.get(f"/aeronefs/{uuid.uuid4()}/affectations", headers=admin_headers)
+
+    assert historique.status_code == 404
+    assert historique.json()["detail"] == "Aéronef non trouvé"
+
+
+@pytest.mark.asyncio
+async def test_historique_d_un_aeronef_exige_une_authentification(
+    client: AsyncClient, aeronef_a: dict
+):
+    historique = await client.get(f"/aeronefs/{aeronef_a['id']}/affectations")
+
+    assert historique.status_code in (401, 403)

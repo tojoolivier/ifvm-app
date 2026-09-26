@@ -565,6 +565,12 @@ class EquipeAeronefRepository(ABC):
         pass
 
     @abstractmethod
+    async def list_par_aeronef(self, aeronef_id: uuid.UUID) -> list[AffectationAeronef]:
+        """Historique complet d'un appareil — les équipes qui l'ont utilisé, la plus récente
+        d'abord (`date_debut` décroissante). Pendant de `list_par_equipe` (#621)."""
+        pass
+
+    @abstractmethod
     async def get_by_id(self, affectation_id: uuid.UUID) -> AffectationAeronef | None:
         pass
 

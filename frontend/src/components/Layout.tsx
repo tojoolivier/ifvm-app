@@ -127,6 +127,9 @@ export function Layout() {
           { to: '/fiches-vol', label: 'Heures de vol' },
         ]
       : []),
+    // Parc aéronefs (#621) : lecture et affectations pour admin et chef ; l'écriture sur les
+    // appareils est réservée à l'admin dans la page elle-même.
+    ...(canAdminChef ? [{ to: '/parc-aeronefs', label: 'Parc aéronefs' }] : []),
   ]
 
   return (

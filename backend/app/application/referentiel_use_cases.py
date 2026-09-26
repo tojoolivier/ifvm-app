@@ -1354,6 +1354,20 @@ class ListerAffectationsAeronef:
         return await self.repository.list_par_equipe(equipe_id)
 
 
+class ListerAffectationsParAeronef:
+    """Historique d'un appareil — les équipes qui l'ont utilisé, la plus récente d'abord (#621).
+    Pendant de `ListerAffectationsAeronef` : l'historique se lit des deux côtés."""
+
+    def __init__(self, aeronef_repo: AeronefRepository, repository: EquipeAeronefRepository):
+        self.aeronef_repo = aeronef_repo
+        self.repository = repository
+
+    async def execute(self, aeronef_id: uuid.UUID) -> list[AffectationAeronef]:
+        if await self.aeronef_repo.get_by_id(aeronef_id) is None:
+            raise AeronefIntrouvableError(str(aeronef_id))
+        return await self.repository.list_par_aeronef(aeronef_id)
+
+
 class AffecterAeronef:
     """Affecte un appareil à une équipe à partir d'une date (#603).
 
