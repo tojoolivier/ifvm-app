@@ -84,7 +84,7 @@ function renderPage(initialPath = '/carte', data: unknown[] = prospections, trai
   )
 }
 
-describe('CartePage — carte des infestations (#17)', () => {
+describe('CartePage — Cartographie (#17)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })

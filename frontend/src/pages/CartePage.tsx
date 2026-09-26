@@ -193,7 +193,7 @@ export function CartePage() {
   return (
     <div className="px-4 py-4 sm:px-8 sm:py-6 flex flex-col h-full">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Carte des infestations</h1>
+        <h1 className="text-2xl font-bold">Cartographie</h1>
       </div>
 
       <div role="group" aria-label="Afficher sur la carte" className="mb-4 flex flex-wrap items-center gap-2">
