@@ -549,6 +549,56 @@ describe('enregistrerEtSynchroniser', () => {
     );
   });
 
+  /** #revalidation-infestations-residuelles-sync : pendant de la ligne population
+   * ci-dessus pour `prospection_infestation` — `demarrerRevalidation` clone aussi
+   * ces lignes, mais aucun écran Extensif/Signalisation ne permet de les
+   * rouvrir. `type_cible` reste renseigné (colonne jamais nulle), mais aucun
+   * autre champ ne l'est : un résidu de clonage, jamais une saisie de l'agent.
+   * Sans filtrage, elle partirait quand même et exposerait la synchro entière à
+   * n'importe quelle contrainte de `InfestationCreate` sur un champ que l'agent
+   * n'a jamais vu. */
+  it('omet du payload une ligne infestation sans aucune donnée hormis type_cible (résidu de clonage), sans échouer', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([]);
+    mockListAllInfestations.mockResolvedValue([
+      {
+        espece: null, type_cible: 'dense', taille_min: null, taille_max: null, taille_moy: null,
+        surface_totale: null, densite_min: null, densite_max: null, densite_moy: null, interdistance: null,
+        comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null,
+        pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null,
+        essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null,
+        interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null,
+        surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null,
+        taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null,
+        densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null,
+      },
+      // Celle-ci a de vraies données (surface_totale) : reste dans le payload.
+      {
+        espece: 'LMC', type_cible: 'vol_clair', taille_min: null, taille_max: null, taille_moy: null,
+        surface_totale: 8, densite_min: null, densite_max: null, densite_moy: null, interdistance: null,
+        comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null,
+        pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null,
+        essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null,
+        interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null,
+        surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null,
+        taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null,
+        densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null,
+      },
+    ] as any);
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        infestations: [expect.objectContaining({ type_cible: 'vol_clair', surface_totale: 8 })],
+      })
+    );
+  });
+
   /** #revalidation-sync-lien-perdu : `revalide_de_id` n'était jusqu'ici jamais
    * transmis à la synchronisation — le serveur ne pouvait donc ni faire
    * passer cette fiche directement à `validee` (CreateProspection.execute),
