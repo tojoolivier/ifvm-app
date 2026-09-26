@@ -8,6 +8,7 @@ export const fr = {
     retour: 'Retour',
     fermer: 'Fermer',
     ilManque: 'Il manque : {{champs}}',
+    choisi: '✓ {{libelle}}',
     etape: 'Étape {{etape}} sur {{total}}',
     stepper: {
       diminuer: 'Diminuer {{label}}',
@@ -26,6 +27,30 @@ export const fr = {
     ficheNumero: 'Fiche {{numero}}',
     ficheIntrouvable: 'Ce brouillon est introuvable sur cet appareil.',
     ficheNonNumerotee: 'Fiche non numérotée',
+    sol: {
+      rappelTitre: 'Végétation enregistrée',
+      modifier: 'Modifier',
+      humiditeTitre: 'Humidité du sol',
+      humiditeAide: 'Profondeurs où le sol est humide — plusieurs choix possibles.',
+      humidite: { surface: 'Surface', '0_5cm': '0,5 cm', '5_12cm': '5–12 cm', '12_30cm': '12–30 cm', gt_30cm: '> 30 cm' },
+      textureTitre: 'Texture du sol',
+      textureAide: 'Plusieurs choix possibles.',
+      texture: {
+        argileuse: 'Argileuse',
+        limoneuse: 'Limoneuse',
+        sable_fin: 'Sable fin',
+        sable_grossier: 'Sable grossier',
+        gravier: 'Gravier',
+        cailloux: 'Cailloux',
+        bloc: 'Bloc',
+      },
+      degatsAide: 'Un seul choix.',
+      erreurs: {
+        humidite: 'Choisissez au moins une profondeur d’humidité.',
+        texture: 'Choisissez au moins une texture.',
+      },
+      erreurEnregistrement: 'Le sol n’a pas pu être enregistré sur cet appareil. Réessayez.',
+    },
     vegetation: {
       repartition: 'Répartition de la station',
       surCent: ' / 100 %',

@@ -195,7 +195,7 @@ export const UiColors = {
 export type UiPalette = (typeof UiColors)[keyof typeof UiColors];
 
 /** Rayons Figma : `radius/sm` (champs), `radius/md` (boutons, cartes), `radius/full` (puces). */
-export const Radius = { sm: 8, md: 12, lg: 16, panel: 10, sheet: 18, full: 999 } as const;
+export const Radius = { segment: 3, sm: 8, md: 12, lg: 16, panel: 10, sheet: 18, full: 999 } as const;
 
 /** Espacements du socle UI — la clé est la valeur en px de la maquette (`UiSpace[12]` = 12). */
 export const UiSpace = { 2: 2, 4: 4, 6: 6, 8: 8, 10: 10, 12: 12, 14: 14, 16: 16, 32: 32 } as const;

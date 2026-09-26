@@ -11,15 +11,13 @@ import { logger } from '@/lib/logger';
 import { enregistrerBrouillon, type ProspectionCreate } from '@/lib/prospection-db';
 import {
   champsDeVegetationExtensive,
+  DEGATS_CULTURES,
   RACCOURCIS_VERDISSEMENT,
   valeursDeVegetationExtensive,
-  type DegatsCultures,
 } from '@/lib/prospection-vegetation-extensive-schema';
 import { JETON_COULEUR } from './vegetation/couleurs';
 
 const log = logger.child({ module: 'vegetation-extensive-step' });
-
-const DEGATS: readonly DegatsCultures[] = ['nuls', 'faibles', 'moyens', 'forts'];
 
 type Props = {
   /** Brouillon créé par l'étape Référence : l'écran rouvre ses colonnes de végétation et garde le reste. */
@@ -113,7 +111,7 @@ export function VegetationExtensiveStep({ brouillon, onContinuer }: Props) {
           <form.Field name="degats">
             {(field) => (
               <View style={styles.rangee}>
-                {DEGATS.map((d) => (
+                {DEGATS_CULTURES.map((d) => (
                   <View key={d} style={styles.flex}>
                     <Chip
                       label={t(`prospection.vegetation.extensive.degats.${d}`)}

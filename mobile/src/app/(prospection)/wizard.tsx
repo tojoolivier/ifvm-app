@@ -4,6 +4,7 @@ import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ReferenceStep } from '@/components/prospection/ReferenceStep';
+import { SolStep } from '@/components/prospection/SolStep';
 import { VegetationExtensiveStep } from '@/components/prospection/VegetationExtensiveStep';
 import { VegetationStep } from '@/components/prospection/VegetationStep';
 import { PrimaryButton, WizardHeader } from '@/components/ui';
@@ -49,18 +50,20 @@ export default function WizardScreen() {
     };
   }, [id]);
 
-  /** L'étape Référence a créé ou mis à jour la fiche : on la relit pour que l'étape suivante parte de son contenu. */
-  const apresReference = async (ficheId: string) => {
+  /** Une étape a enregistré la fiche : on la relit pour que l'étape suivante parte de son contenu, jamais d'une copie périmée. */
+  const relireFiche = async (ficheId: string, prochaine: number) => {
     try {
       const locale = await getFiche(ficheId);
       if (!locale) return setIntrouvable(true);
       setBrouillon(locale.fiche);
-      setIndex(1);
+      setIndex(prochaine);
     } catch (e) {
       log.failure('wizard_relecture_fiche', e);
       setIntrouvable(true);
     }
   };
+  const apresReference = (ficheId: string) => relireFiche(ficheId, 1);
+  const apres = (prochaine: number) => () => brouillon && relireFiche(brouillon.id, prochaine);
 
   if (introuvable) {
     return (
@@ -86,14 +89,21 @@ export default function WizardScreen() {
       {index === 0 && typeFiche !== 'revalidation' && (
         <ReferenceStep type={typeFiche} brouillon={brouillon} onNumeroFiche={setNumero} onContinuer={apresReference} />
       )}
-      {index === 1 && typeFiche === 'intensive' && brouillon && <VegetationStep brouillon={brouillon} onContinuer={() => setIndex(2)} />}
-      {index === 1 && typeFiche === 'extensive' && brouillon && <VegetationExtensiveStep brouillon={brouillon} onContinuer={() => setIndex(2)} />}
-      {index > 0 && index < NB_ETAPES - 1 && !(index === 1 && (typeFiche === 'intensive' || typeFiche === 'extensive')) && (
+      {index === 1 && typeFiche === 'intensive' && brouillon && <VegetationStep brouillon={brouillon} onContinuer={apres(2)} />}
+      {index === 1 && typeFiche === 'extensive' && brouillon && <VegetationExtensiveStep brouillon={brouillon} onContinuer={apres(2)} />}
+      {index === 2 && typeFiche === 'intensive' && brouillon && (
+        <SolStep brouillon={brouillon} onContinuer={apres(3)} onModifier={() => setIndex(1)} />
+      )}
+      {index > 0 && index < NB_ETAPES - 1 && !etapeAvecEcran(index, typeFiche) && (
         <PrimaryButton label={t('prospection.suivant')} onPress={() => setIndex(index + 1)} testID="wizard-suivant" />
       )}
     </SafeAreaView>
   );
 }
+
+/** Étapes qui ont leur propre écran (donc leur propre bouton « Continuer ») : pas de « Suivant » générique. */
+const etapeAvecEcran = (index: number, type: TypeWizard) =>
+  (index === 1 && (type === 'intensive' || type === 'extensive')) || (index === 2 && type === 'intensive');
 
 const styles = StyleSheet.create({ root: { flex: 1 }, message: { padding: UiSpace[16] } });
 

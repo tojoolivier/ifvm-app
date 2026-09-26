@@ -41,6 +41,24 @@ jest.mock('@/components/prospection/VegetationStep', () => {
   };
 });
 
+// Idem pour l'étape Sol (prospection-sol.test.tsx) : le double montre le N° de la fiche qu'il reçoit et son lien « Modifier ».
+jest.mock('@/components/prospection/SolStep', () => {
+  const { Text, Pressable } = require('react-native');
+  return {
+    SolStep: ({ brouillon, onContinuer, onModifier }: { brouillon: { n_fiche?: string }; onContinuer: () => void; onModifier: () => void }) => (
+      <>
+        <Text>{`Sol ${brouillon.n_fiche}`}</Text>
+        <Pressable onPress={onModifier}>
+          <Text>Modifier végétation</Text>
+        </Pressable>
+        <Pressable onPress={onContinuer}>
+          <Text>Continuer sol</Text>
+        </Pressable>
+      </>
+    ),
+  };
+});
+
 // Idem pour la Végétation extensive (prospection-vegetation-extensive.test.tsx).
 jest.mock('@/components/prospection/VegetationExtensiveStep', () => {
   const { Text, Pressable } = require('react-native');
@@ -105,6 +123,23 @@ describe('WizardScreen', () => {
     expect(screen.queryByTestId('wizard-suivant')).toBeNull();
     await fireEvent.press(screen.getByText('Continuer végétation extensive'));
     expect(screen.getByText('Étape 3 sur 5')).toBeVisible();
+  });
+
+  it('en intensif, l’étape 3 monte l’écran Sol avec la fiche relue après la Végétation ; « Modifier » revient à l’étape 2', async () => {
+    mockParams = { type: 'intensive' };
+    const fichePlus = (n_fiche: string) =>
+      ({ fiche: { id: 'brouillon-1', type_prospection: 'intensive', revalide_de_id: null, n_fiche, station_id: 's', date_prospection: '2026-09-25' } }) as never;
+    jest.mocked(getFiche).mockReset().mockResolvedValueOnce(fichePlus('FI-APRES-REFERENCE')).mockResolvedValueOnce(fichePlus('FI-APRES-VEGETATION'));
+    await render(<WizardScreen />);
+    await fireEvent.press(screen.getByText('Suivant'));
+    await fireEvent.press(await screen.findByText('Continuer végétation'));
+
+    expect(await screen.findByText('Sol FI-APRES-VEGETATION')).toBeVisible();
+    expect(screen.getByText('Étape 3 sur 5')).toBeVisible();
+    expect(screen.queryByTestId('wizard-suivant')).toBeNull();
+
+    await fireEvent.press(screen.getByText('Modifier végétation'));
+    expect(screen.getByText('Étape 2 sur 5')).toBeVisible();
   });
 
   it('rouvre un brouillon de revalidation sur la bonne étape', async () => {

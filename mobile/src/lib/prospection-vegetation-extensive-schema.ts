@@ -5,6 +5,9 @@ import { versNombre, versTexte } from '@/lib/prospection-vegetation-schema';
 /** Dégâts sur les cultures, tels que la colonne `degats_cultures` les accepte. */
 export type DegatsCultures = NonNullable<ProspectionCreate['degats_cultures']>;
 
+/** Les 4 niveaux de dégâts, dans l'ordre de la maquette (étapes Végétation extensive et Sol). */
+export const DEGATS_CULTURES: readonly DegatsCultures[] = ['nuls', 'faibles', 'moyens', 'forts'];
+
 /** Valeurs du formulaire : hauteur (cm) et verdissement restent du texte (virgule française). */
 export interface VegetationExtensiveValeurs {
   hauteurCm: string;
