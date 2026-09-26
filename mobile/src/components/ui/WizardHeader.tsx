@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { InterFonts, Radius, UiText } from '@/constants/theme';
+import { StyleSheet, Text, View } from 'react-native';
+import { InterFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
-import { IconRetour } from './icons';
+import { HeaderTitre, headerStyles } from './HeaderTitre';
 
 type Props = {
   titre: string;
@@ -21,25 +21,19 @@ type Props = {
 export function WizardHeader({ titre, sousTitre, badge, etape, total, libelleEtape, onBack, testID }: Props) {
   const c = useUiTheme();
   return (
-    <View testID={testID} style={[styles.root, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
-      <View style={styles.titre}>
-        {onBack ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={onBack} hitSlop={10}>
-            <IconRetour color={c.fg} />
-          </Pressable>
-        ) : null}
-        <View style={styles.textes}>
-          <Text accessibilityRole="header" style={[UiText.heading, { color: c.fg }]}>
-            {titre}
-          </Text>
-          {sousTitre ? <Text style={[UiText.caption, { color: c.fg3 }]}>{sousTitre}</Text> : null}
-        </View>
-        {badge ? (
-          <View style={[styles.badge, { backgroundColor: c.greenBg, borderColor: c.greenBorder }]}>
-            <Text style={[UiText.micro, { color: c.primary }]}>{badge}</Text>
-          </View>
-        ) : null}
-      </View>
+    <View testID={testID} style={[headerStyles.root, styles.root, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
+      <HeaderTitre
+        titre={titre}
+        sousTitre={sousTitre}
+        onBack={onBack}
+        droite={
+          badge ? (
+            <View style={[styles.badge, { backgroundColor: c.greenBg, borderColor: c.greenBorder }]}>
+              <Text style={[UiText.micro, { color: c.primary }]}>{badge}</Text>
+            </View>
+          ) : null
+        }
+      />
       <View style={styles.etape}>
         <Text style={[UiText.eyebrow, { color: c.primary, textTransform: 'uppercase' }]}>
           {`Étape ${etape} sur ${total}`}
@@ -67,11 +61,9 @@ export function WizardHeader({ titre, sousTitre, badge, etape, total, libelleEta
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 12, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14, borderBottomWidth: 1 },
-  titre: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  textes: { flex: 1, gap: 2 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1 },
-  etape: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  progression: { flexDirection: 'row', gap: 4 },
-  segment: { flex: 1, height: 4, borderRadius: Radius.full },
+  root: { gap: UiSpace[12] },
+  badge: { paddingHorizontal: UiSpace[10], paddingVertical: UiSpace[4], borderRadius: Radius.full, borderWidth: 1 },
+  etape: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[6] },
+  progression: { flexDirection: 'row', gap: UiSpace[4] },
+  segment: { flex: 1, height: UiSize.progressSegment, borderRadius: Radius.full },
 });

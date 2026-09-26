@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Radius, UiText } from '@/constants/theme';
+import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { IconMoins, IconPlus } from './icons';
 
@@ -58,7 +58,7 @@ export function Stepper({ value, onChange, step = 5, min = 0, max = 100, unit = 
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  btn: { width: 40, height: 40, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
-  valeur: { minWidth: 64, height: 40, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[4] },
+  btn: { width: UiSize.stepperButton, height: UiSize.stepperButton, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  valeur: { minWidth: UiSize.stepperValueMin, height: UiSize.stepperButton, alignItems: 'center', justifyContent: 'center' },
 });

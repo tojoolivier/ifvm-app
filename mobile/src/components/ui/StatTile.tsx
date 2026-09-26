@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Radius, UiText } from '@/constants/theme';
+import { Radius, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 type Props = { libelle: string; valeur: string; testID?: string };
@@ -21,5 +21,5 @@ export function StatTile({ libelle, valeur, testID }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 2, paddingHorizontal: 14, paddingVertical: 12, borderRadius: Radius.md, borderWidth: 1 },
+  root: { gap: UiSpace[2], paddingHorizontal: UiSpace[14], paddingVertical: UiSpace[12], borderRadius: Radius.md, borderWidth: 1 },
 });

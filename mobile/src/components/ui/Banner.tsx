@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { UiText } from '@/constants/theme';
+import { Radius, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 export type BannerTone = 'info' | 'warning' | 'error';
@@ -39,5 +39,5 @@ export function Banner({ tone, message, items, testID }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 4, padding: 12, borderRadius: 10, borderWidth: 1 },
+  root: { gap: UiSpace[4], padding: UiSpace[12], borderRadius: Radius.panel, borderWidth: 1 },
 });

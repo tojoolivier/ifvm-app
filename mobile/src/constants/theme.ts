@@ -165,7 +165,24 @@ export const UiColors = {
 export type UiPalette = (typeof UiColors)[keyof typeof UiColors];
 
 /** Rayons Figma : `radius/sm` (champs), `radius/md` (boutons, cartes), `radius/full` (puces). */
-export const Radius = { sm: 8, md: 12, full: 999 } as const;
+export const Radius = { sm: 8, md: 12, panel: 10, sheet: 18, full: 999 } as const;
+
+/** Espacements du socle UI — la clé est la valeur en px de la maquette (`UiSpace[12]` = 12). */
+export const UiSpace = { 2: 2, 4: 4, 6: 6, 8: 8, 10: 10, 12: 12, 14: 14, 16: 16, 32: 32 } as const;
+
+/** Hauteurs et tailles fixes des composants de la maquette. */
+export const UiSize = {
+  chip: 40,
+  stepperButton: 40,
+  stepperValueMin: 64,
+  field: 48,
+  button: 54,
+  pastille: 28,
+  progressSegment: 4,
+  sheetHandleWidth: 36,
+  sheetHandleHeight: 4,
+  timelineTrait: 2,
+} as const;
 
 /** Polices Inter chargées par `lib/fonts.ts`. */
 export const InterFonts = {

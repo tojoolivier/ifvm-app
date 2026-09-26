@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Radius, UiText } from '@/constants/theme';
+import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 /** « Il manque : a, b » — libellé du bouton désactivé tant que l'étape est invalide. */
@@ -50,8 +50,8 @@ export function PrimaryButton({ label, onPress, variant = 'primary', disabled, m
 
 const styles = StyleSheet.create({
   bouton: {
-    minHeight: 54,
-    paddingHorizontal: 16,
+    minHeight: UiSize.button,
+    paddingHorizontal: UiSpace[16],
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { Radius, UiText } from '@/constants/theme';
+import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { FieldError } from './FieldError';
 
@@ -45,13 +45,13 @@ export function NumberField({ label, value, onChangeText, unit, error, onBlur, t
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 6 },
+  root: { gap: UiSpace[6] },
   champ: {
-    height: 48,
+    height: UiSize.field,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
+    gap: UiSpace[6],
+    paddingHorizontal: UiSpace[14],
     borderWidth: 1.5,
     borderRadius: Radius.sm,
   },

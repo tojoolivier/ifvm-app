@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Radius, UiText } from '@/constants/theme';
+import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 type Props = {
@@ -36,11 +36,11 @@ export function BottomSheet({ visible, titre, onClose, children, testID }: Props
 const styles = StyleSheet.create({
   fond: { flex: 1 },
   feuille: {
-    gap: 12,
-    padding: 16,
-    paddingBottom: 32,
-    borderTopLeftRadius: Radius.md * 1.5,
-    borderTopRightRadius: Radius.md * 1.5,
+    gap: UiSpace[12],
+    padding: UiSpace[16],
+    paddingBottom: UiSpace[32],
+    borderTopLeftRadius: Radius.sheet,
+    borderTopRightRadius: Radius.sheet,
   },
-  poignee: { alignSelf: 'center', width: 36, height: 4, borderRadius: Radius.full },
+  poignee: { alignSelf: 'center', width: UiSize.sheetHandleWidth, height: UiSize.sheetHandleHeight, borderRadius: Radius.full },
 });

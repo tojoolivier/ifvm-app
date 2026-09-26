@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { InterFonts, Radius, UiText } from '@/constants/theme';
+import { InterFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { IconBase, IconPoser, IconVol } from './icons';
 
@@ -45,11 +45,11 @@ export function TimelineItem({ type, titre, detail, heure, trait = true, testID 
 }
 
 const styles = StyleSheet.create({
-  root: { flexDirection: 'row', gap: 12 },
+  root: { flexDirection: 'row', gap: UiSpace[12] },
   rail: { alignItems: 'center' },
-  pastille: { width: 28, height: 28, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
-  trait: { flex: 1, width: 2 },
-  contenu: { flex: 1, gap: 2, paddingBottom: 16 },
-  ligne: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pastille: { width: UiSize.pastille, height: UiSize.pastille, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  trait: { flex: 1, width: UiSize.timelineTrait },
+  contenu: { flex: 1, gap: UiSpace[2], paddingBottom: UiSpace[16] },
+  ligne: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[8] },
   titre: { flex: 1 },
 });

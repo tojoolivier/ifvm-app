@@ -151,6 +151,19 @@ describe('AppHeader', () => {
   });
 });
 
+describe('en-têtes (HeaderTitre partagé)', () => {
+  it('AppHeader et WizardHeader exposent le même retour et le même titre', async () => {
+    const onBack = jest.fn();
+    await render(<AppHeader titre="Journal" onBack={onBack} />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Retour' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    await render(<WizardHeader titre="Wizard" etape={1} total={5} libelleEtape="Référence" onBack={onBack} />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Retour' }));
+    expect(onBack).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('header')).toHaveTextContent('Wizard');
+  });
+});
+
 describe('TimelineItem', () => {
   it.each(['Vol', 'Poser', 'Base'] as const)('décrit l’étape %s pour les lecteurs d’écran', async (type) => {
     await render(<TimelineItem type={type} titre="Décollage" detail="Ivato" heure="08:15" />);
