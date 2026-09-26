@@ -8,6 +8,7 @@ import {
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
+  computeSurfaceRestanteFiche,
   computePesticideStockRestant,
   computePesticideConsommeSuggere,
   validateReferences,
@@ -264,6 +265,86 @@ describe('computeSurfaceRestante', () => {
 
   it('is zero when the infested surface is unknown', () => {
     expect(computeSurfaceRestante(null, 4)).toBe(0);
+  });
+});
+
+// #zone-a-reprendre-restante-part-du-reste-origine
+describe('computeSurfaceRestanteFiche', () => {
+  it("reprise : démarre au reste de l'origine, sans rien traité", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 6,
+        surfaceTraiteeHa: 0,
+        repriseTraitement: true,
+        resteOrigineHa: 4,
+      })
+    ).toBe(4);
+  });
+
+  it("reprise : diminue de la surface traitée par cette fiche", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 9,
+        surfaceTraiteeHa: 3,
+        repriseTraitement: true,
+        resteOrigineHa: 4,
+      })
+    ).toBe(1);
+  });
+
+  it("reprise : ne descend jamais sous zéro", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 12,
+        surfaceTraiteeHa: 6,
+        repriseTraitement: true,
+        resteOrigineHa: 4,
+      })
+    ).toBe(0);
+  });
+
+  it('coïncide avec la formule du serveur (infestée − cumulée) sur une chaîne de deux traitements', () => {
+    const infestee = 10;
+    const traiteeT1 = 6;
+    const resteT1 = computeSurfaceRestante(infestee, traiteeT1); // 4
+    const traiteeT2 = 3;
+    const cumuleeT2 = computeSurfaceCumulee(traiteeT2, true, traiteeT1); // 9
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: infestee,
+        surfaceCumuleeHa: cumuleeT2,
+        surfaceTraiteeHa: traiteeT2,
+        repriseTraitement: true,
+        resteOrigineHa: resteT1,
+      })
+    ).toBe(computeSurfaceRestante(infestee, cumuleeT2));
+  });
+
+  it("reprise sans reste d'origine connu : repli sur infestée − cumulée", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 7,
+        surfaceTraiteeHa: 1,
+        repriseTraitement: true,
+        resteOrigineHa: null,
+      })
+    ).toBe(3);
+  });
+
+  it("hors reprise : ignore le reste d'origine, infestée − cumulée", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 4,
+        surfaceTraiteeHa: 4,
+        repriseTraitement: false,
+        resteOrigineHa: 99,
+      })
+    ).toBe(6);
   });
 });
 
