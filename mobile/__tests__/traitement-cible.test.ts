@@ -394,23 +394,53 @@ describe('construireDetailPhaseStade', () => {
     ]);
   });
 
-  it("n'a pas de notion de phase pour les larves Extensif (jamais saisie) — seul le Stade est renseigné", () => {
+  // #cible-phase-larves-extensif : la phase des larves Extensif est saisie (extensive-larves.tsx,
+  // « Captures = Phases = Stades ») et persistée dans captures_sol/trans/greg de la ligne larve.
+  it('dérive la Phase ET le Stade des larves Extensif depuis captures_sol/trans/greg et densites_larve', () => {
     const groupes = construireDetailPhaseStade(
       [
         population({
           espece: 'NSE',
           categorie: 'larve',
+          captures_nombre: 13,
+          captures_sol: 3,
+          captures_trans: 0,
+          captures_greg: 10,
           densites_larve: JSON.stringify({ L1: 10, L4: 3 }),
+        }),
+        population({
+          espece: 'LMC',
+          categorie: 'larve',
+          captures_nombre: 4,
+          captures_sol: 0,
+          captures_trans: 4,
+          captures_greg: 0,
+          densites_larve: JSON.stringify({ L2: 4 }),
         }),
       ],
       []
     );
     const nseLarves = groupes.find((g) => g.label === 'NSE Larves')!;
-    expect(nseLarves.phases).toEqual([]);
+    expect(nseLarves.phases).toEqual([
+      { label: 'Solitaire', value: 3 },
+      { label: 'Grégaire', value: 10 },
+    ]);
     expect(nseLarves.stades).toEqual([
       { label: 'L1', value: 10 },
       { label: 'L4', value: 3 },
     ]);
+    const lmcLarves = groupes.find((g) => g.label === 'LMC Larves')!;
+    expect(lmcLarves.phases).toEqual([{ label: 'Transiens', value: 4 }]);
+  });
+
+  it('larves Extensif sans phase saisie (colonnes à 0/NULL) : Phase vide, Stade toujours renseigné', () => {
+    const groupes = construireDetailPhaseStade(
+      [population({ espece: 'NSE', categorie: 'larve', densites_larve: JSON.stringify({ L1: 10 }) })],
+      []
+    );
+    const nseLarves = groupes.find((g) => g.label === 'NSE Larves')!;
+    expect(nseLarves.phases).toEqual([]);
+    expect(nseLarves.stades).toEqual([{ label: 'L1', value: 10 }]);
   });
 
   it('dérive Phase ET Stade Intensif depuis des lignes CaptureRow, cumulées par code', () => {
