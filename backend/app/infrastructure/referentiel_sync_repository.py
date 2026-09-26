@@ -830,6 +830,16 @@ class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
         )
         return [_affectation_to_domain(m) for m in result.scalars().unique().all()]
 
+    async def list_par_aeronef(self, aeronef_id: uuid.UUID) -> list[AffectationAeronef]:
+        result = await self.session.execute(
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .where(EquipeAeronefModel.aeronef_id == aeronef_id)
+            .order_by(EquipeAeronefModel.date_debut.desc(), EquipeAeronefModel.created_at.desc())
+            .execution_options(populate_existing=True)
+        )
+        return [_affectation_to_domain(m) for m in result.scalars().unique().all()]
+
     async def get_by_id(self, affectation_id: uuid.UUID) -> AffectationAeronef | None:
         result = await self.session.execute(
             select(EquipeAeronefModel)

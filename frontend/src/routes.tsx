@@ -8,6 +8,7 @@ import { ProspectionsPage } from './pages/ProspectionsPage'
 import { TraitementsPage } from './pages/TraitementsPage'
 import { TraitementDetailPage } from './pages/TraitementDetailPage'
 import { HeuresVolPage } from './pages/HeuresVolPage'
+import { ParcAeronefsPage } from './pages/ParcAeronefsPage'
 import { NouvelleProspectionPage } from './pages/NouvelleProspectionPage'
 import { ProspectionDetailPage } from './pages/ProspectionDetailPage'
 import { SynthesesPage } from './pages/SynthesesPage'
@@ -71,6 +72,14 @@ export const routes: RouteObject[] = [
             path: '/fiches-vol',
             element: <HeuresVolPage />,
             handle: { crumb: 'Lutte', title: 'Heures de vol' },
+          },
+
+          // Parc aéronefs (#621, #603) : les hélicoptères, leur cycle de vie et l'historique de leurs
+          // affectations aux équipes aériennes. Menu réservé aux profils admin et chef.
+          {
+            path: '/parc-aeronefs',
+            element: <ParcAeronefsPage />,
+            handle: { crumb: 'Lutte', title: 'Parc aéronefs' },
           },
 
           // Administration (personnel, stations, équipes aériennes/terrestres —
