@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/ui/error-banner'
 import { FicheTraitementTableau } from '@/components/fiche/FicheTraitementTableau'
 import { EquipeLien } from '@/components/EquipeLien'
 import { ConsommationPesticide } from '@/components/ConsommationPesticide'
+import { RattachementsTraitement } from '@/components/RattachementsFiche'
 import { NavTabs } from '@/components/ui/nav-tabs'
 import { PILL_TONES, Pill } from '@/components/ui/pill'
 import { MODE_LABELS, ROLE_LABELS, SIGNATURE_ROLES, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
@@ -236,6 +237,8 @@ export function TraitementDetailPage() {
 
       {/* Équipe de la fiche (#602, #607) — lien vers Administration > Équipes. */}
       <EquipeLien equipeId={traitement.equipe_id} />
+      {/* Site principal, aéronef et vol lié d'un traitement aérien (#647–#651). */}
+      <RattachementsTraitement traitementId={traitement.id} aerien={traitement.aerien ?? null} />
 
       {/* Bandeau ambre : le snapshot des cibles est figé à la création */}
       {traitement.cible && (

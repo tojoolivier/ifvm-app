@@ -580,3 +580,87 @@ describe('TraitementDetailPage — consommation de pesticide (#609)', () => {
     expect(mockedGet).not.toHaveBeenCalledWith('/mouvements-pesticide', expect.anything())
   })
 })
+
+// #647–#651 : site principal, aéronef et vol lié d'un traitement aérien ; fiches antérieures lisibles.
+describe('TraitementDetailPage — rattachements aériens', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const VOL = {
+    id: 'v1',
+    type: 'application',
+    equipe_id: 'e1',
+    aeronef_id: 'a1',
+    site_principal_id: 's1',
+    stand_id: 's2',
+    base_secondaire_id: null,
+    traitement_id: 't1',
+    date_vol: '2026-08-12',
+    heure_debut: '08:00:00',
+    heure_fin: '09:30:00',
+  }
+  const referentiels = (vols: unknown[]) => ({
+    '/vols': () => Promise.resolve({ data: vols }),
+    '/aeronefs': () =>
+      Promise.resolve({ data: [{ id: 'a1', immatriculation: '5R-ABC', societe: 'Heli Madagascar', actif: true }] }),
+    '/sites-aeriens': () =>
+      Promise.resolve({ data: [{ id: 's1', numero: 'IHO01', localite: 'Ihosy', parent_site_id: null, actif: true }] }),
+  })
+
+  it('affiche le site principal, l’aéronef et le lien vers le vol lié', async () => {
+    const base = traitementAerien()
+    renderPage(
+      traitementAerien({ aerien: { ...base.aerien, site_principal_id: 's1' } }),
+      [],
+      {},
+      referentiels([VOL]),
+    )
+
+    const section = await screen.findByTestId('rattachements-fiche')
+    expect(await within(section).findByText('IHO01 — Ihosy')).toBeInTheDocument()
+    expect(within(section).getByText('5R-ABC — Heli Madagascar')).toBeInTheDocument()
+    const lien = await within(section).findByRole('link', { name: /12\/08\/2026 — Application/ })
+    expect(lien).toHaveAttribute('href', '/vols/v1')
+    expect(mockedGet).toHaveBeenCalledWith('/vols', { params: { traitement_id: 't1' } })
+  })
+
+  it('fiche antérieure (sans site rattaché, sans vol) : texte libre d’origine, signalé, et « aucun vol »', async () => {
+    const base = traitementAerien()
+    renderPage(
+      traitementAerien({ aerien: { ...base.aerien, site_principal_id: null, base_principale: 'Base Betioky' } }),
+      [],
+      {},
+      { ...referentiels([]), '/aeronefs': () => Promise.resolve({ data: [] }) },
+    )
+
+    const section = await screen.findByTestId('rattachements-fiche')
+    expect(await within(section).findByText('Base Betioky')).toBeInTheDocument()
+    expect(within(section).getByText('5R-ABC')).toBeInTheDocument() // immatriculation saisie librement
+    expect(within(section).getAllByText('(saisie libre)')).toHaveLength(2)
+    expect(await within(section).findByText('aucun vol rattaché')).toBeInTheDocument()
+  })
+
+  it('traitement terrestre : pas de bloc de rattachements aériens', async () => {
+    renderPage(
+      traitementAerien({
+        id: 't1',
+        type_traitement: 'TERRESTRE',
+        aerien: null,
+        terrestre: {
+          chef_equipe_id: 'chef-1',
+          surface_traitee_ha: 12,
+          surface_protegee_ha: 0,
+          reprise_traitement: false,
+          traitement_origine_id: null,
+          surface_cumulee_ha: 12,
+          surface_restante_ha: 0,
+          produits: [],
+        } as never,
+      } as never),
+    )
+    await screen.findByTestId('traitement-header')
+
+    expect(screen.queryByTestId('rattachements-fiche')).not.toBeInTheDocument()
+  })
+})

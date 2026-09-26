@@ -480,3 +480,90 @@ async def test_rejeu_vol_texte_vide_equivaut_a_absent(
     )
     assert premier.status_code == 201, premier.text
     assert rejeu.status_code == 201, rejeu.text
+
+
+@pytest.mark.asyncio
+async def test_lister_les_vols_d_un_traitement_aerien(
+    client: AsyncClient,
+    admin_headers: dict,
+    equipe_aerienne,
+    aeronef_affecte: dict,
+    base_aerienne,
+    stand: dict,
+    traitement_aerien_id: uuid.UUID,
+):
+    """La fiche de traitement retrouve son vol (#610) : `GET /vols?traitement_id=`."""
+    corps = _payload(
+        equipe_aerienne,
+        aeronef_affecte,
+        type="application",
+        motif=None,
+        site_principal_id=str(base_aerienne.id),
+        stand_id=stand["id"],
+    )
+    rattache = (await client.post("/vols", json=corps, headers=admin_headers)).json()["id"]
+    libre = (await client.post("/vols", json=corps, headers=admin_headers)).json()["id"]
+    await client.patch(
+        f"/vols/{rattache}",
+        json={"traitement_id": str(traitement_aerien_id)},
+        headers=admin_headers,
+    )
+
+    reponse = await client.get(f"/vols?traitement_id={traitement_aerien_id}", headers=admin_headers)
+
+    assert reponse.status_code == 200, reponse.text
+    assert [vol["id"] for vol in reponse.json()] == [rattache]
+    assert libre not in [vol["id"] for vol in reponse.json()]
+
+
+@pytest.mark.asyncio
+async def test_lister_les_vols_d_un_traitement_sans_vol_renvoie_une_liste_vide(
+    client: AsyncClient, admin_headers: dict
+):
+    reponse = await client.get(f"/vols?traitement_id={uuid.uuid4()}", headers=admin_headers)
+
+    assert reponse.status_code == 200
+    assert reponse.json() == []
+
+
+@pytest.mark.asyncio
+async def test_filtres_equipe_et_traitement_se_combinent(
+    client: AsyncClient,
+    admin_headers: dict,
+    equipe_aerienne,
+    aeronef_affecte: dict,
+    base_aerienne,
+    stand: dict,
+    traitement_aerien_id: uuid.UUID,
+):
+    vol_id = (
+        await client.post(
+            "/vols",
+            json=_payload(
+                equipe_aerienne,
+                aeronef_affecte,
+                type="application",
+                motif=None,
+                site_principal_id=str(base_aerienne.id),
+                stand_id=stand["id"],
+            ),
+            headers=admin_headers,
+        )
+    ).json()["id"]
+    await client.patch(
+        f"/vols/{vol_id}",
+        json={"traitement_id": str(traitement_aerien_id)},
+        headers=admin_headers,
+    )
+
+    bon = await client.get(
+        f"/vols?equipe_id={equipe_aerienne.id}&traitement_id={traitement_aerien_id}",
+        headers=admin_headers,
+    )
+    autre_equipe = await client.get(
+        f"/vols?equipe_id={uuid.uuid4()}&traitement_id={traitement_aerien_id}",
+        headers=admin_headers,
+    )
+
+    assert [vol["id"] for vol in bon.json()] == [vol_id]
+    assert autre_equipe.json() == []

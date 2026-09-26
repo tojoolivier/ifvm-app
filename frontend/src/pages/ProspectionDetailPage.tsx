@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
 import { FicheProspectionTableau } from '@/components/fiche/FicheProspectionTableau'
 import { EquipeLien } from '@/components/EquipeLien'
+import { RattachementsProspection } from '@/components/RattachementsFiche'
 import { buildFicheImprimable, isFicheValidee } from '@/lib/prospection-fiche-lecture'
 import {
   TIRET,
@@ -331,6 +332,8 @@ export function ProspectionDetailPage() {
 
         {/* Équipe de la fiche (#602, #607) — lien vers Administration > Équipes. */}
         <EquipeLien equipeId={prospection.equipe_id} />
+        {/* Site principal, aéronef et vol lié d'une prospection aérienne (#647–#651). */}
+        <RattachementsProspection prospection={prospection} />
 
         {/* Bandeau ambre — colonne `prospection.avertissements` (#106) */}
         {avertissements.length > 0 && (
