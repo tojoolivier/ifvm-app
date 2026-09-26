@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { ReferenceStep } from '@/components/prospection/ReferenceStep';
+import { resoudreZoneHorsLigne } from '@/lib/geo-administratif';
 import { enregistrerBrouillon } from '@/lib/prospection-db';
 import { listStationsByPoste } from '@/lib/referentiel-db';
 import type { ProspectionCreate } from '@/lib/prospection-db';
@@ -38,6 +39,7 @@ jest.mock('@/lib/equipe-travail-store', () => ({
 }));
 
 beforeEach(() => {
+  jest.mocked(resoudreZoneHorsLigne).mockReturnValue({ region: 'Toliara', district: 'Beloha', commune: 'Beloha' });
   mockPosition.mockResolvedValue({ latitude: -25, longitude: 45, altitude: 0, accuracy: 5, timestamp: Date.now() });
 });
 
@@ -307,5 +309,71 @@ describe('ReferenceStep — N° message d’un brouillon sans N° enregistré', 
     };
     await render(<ReferenceStep type="extensive" brouillon={ext as never} onContinuer={jest.fn()} />);
     expect(screen.getByTestId('numero-message').props.value).toBe('20260901-B7B7-TERR');
+  });
+});
+
+describe('ReferenceStep — intensive sans position GPS', () => {
+  it('prévient, laisse choisir PA puis station à la main, et exige une station avant de continuer', async () => {
+    mockPosition.mockRejectedValueOnce(new Error('GPS coupé'));
+    jest.mocked(listStationsByPoste).mockResolvedValue([mockStations[1]]);
+    await render(<ReferenceStep type="intensive" onContinuer={jest.fn()} />);
+
+    expect(await screen.findByText('Position indisponible : choisissez le PA et la station à la main.')).toBeTruthy();
+    await fireEvent.changeText(screen.getByTestId('surface-station'), '12');
+    await fireEvent.changeText(screen.getByTestId('surface-prospectee'), '8');
+    await fireEvent.press(screen.getByText('Mésophyle'));
+    expect(screen.getByTestId('reference-continuer').props.accessibilityState).toMatchObject({ disabled: true });
+
+    await fireEvent.press(screen.getByTestId('changer-pa'));
+    await fireEvent.press(await screen.findByTestId('choix-pa-1'));
+
+    expect(await screen.findByText('BEL-014 · Andranomanitsy')).toBeTruthy();
+    expect(screen.getByTestId('reference-continuer').props.accessibilityState).toMatchObject({ disabled: false });
+  });
+});
+
+describe('ReferenceStep — coordonnées saisies à la main (extensive)', () => {
+  it('relance le géocodage hors ligne et enregistre la nouvelle région / district / commune', async () => {
+    jest.mocked(enregistrerBrouillon).mockResolvedValue('b-geo');
+    await render(<ReferenceStep type="extensive" onContinuer={jest.fn()} />);
+    await screen.findByDisplayValue('Beloha');
+    jest.mocked(resoudreZoneHorsLigne).mockReturnValue({ region: 'Analamanga', district: 'Antananarivo', commune: 'Ambohidratrimo' });
+
+    await fireEvent.press(screen.getByTestId('saisir-coordonnees'));
+    await fireEvent.changeText(screen.getByTestId('latitude'), '-18,9');
+    await fireEvent.changeText(screen.getByTestId('longitude'), '47,5');
+    await fireEvent.changeText(screen.getByTestId('surface-prospectee'), '20');
+    await fireEvent.press(screen.getByText('Xérophyle'));
+    await fireEvent.press(screen.getByTestId('reference-continuer'));
+
+    await waitFor(() => expect(enregistrerBrouillon).toHaveBeenCalled());
+    expect(resoudreZoneHorsLigne).toHaveBeenCalledWith(-18.9, 47.5);
+    expect(jest.mocked(enregistrerBrouillon).mock.calls.at(-1)![0]).toMatchObject({
+      latitude: -18.9,
+      longitude: 47.5,
+      region: 'Analamanga',
+      district: 'Antananarivo',
+      commune: 'Ambohidratrimo',
+      station_libre: 'Beloha',
+    });
+  });
+});
+
+describe('ReferenceStep — position persistée dès la capture (extensive)', () => {
+  it('crée le brouillon avec la position au fix GPS, puis « Continuer » le met à jour', async () => {
+    jest.mocked(enregistrerBrouillon).mockReset().mockResolvedValue('b-capture');
+    await render(<ReferenceStep type="extensive" onContinuer={jest.fn()} />);
+    await screen.findByDisplayValue('Beloha');
+
+    await waitFor(() => expect(enregistrerBrouillon).toHaveBeenCalledTimes(1));
+    const [capture, optionsCapture] = jest.mocked(enregistrerBrouillon).mock.calls[0];
+    expect(capture).toMatchObject({ type_prospection: 'extensive', latitude: -25, longitude: 45, commune: 'Beloha' });
+    expect(optionsCapture).toEqual({ creation: true });
+
+    await fireEvent.changeText(screen.getByTestId('surface-prospectee'), '20');
+    await fireEvent.press(screen.getByText('Xérophyle'));
+    await fireEvent.press(screen.getByTestId('reference-continuer'));
+    await waitFor(() => expect(enregistrerBrouillon).toHaveBeenCalledTimes(2));
+    expect(jest.mocked(enregistrerBrouillon).mock.calls[1][1]).toEqual({});
   });
 });

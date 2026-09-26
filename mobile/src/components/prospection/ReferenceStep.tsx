@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useForm, useStore } from '@tanstack/react-form';
 import type { Schema } from 'yup';
 import { Banner, BottomSheet, Card, Chip, NumberField, PrimaryButton } from '@/components/ui';
-import { MonoFonts, Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
+import { MonoFonts, Radius, UiBorder, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useErreursFormulaire } from '@/hooks/use-erreurs-formulaire';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { useAuthStore } from '@/lib/auth-store';
@@ -59,6 +59,9 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
   const [horodatage] = useState(() => new Date());
   const dateFiche = brouillon?.date_prospection ?? dateLocale(horodatage);
   const [auto, setAuto] = useState<Rattachement | null>(null);
+  const [gpsEchec, setGpsEchec] = useState(false);
+  const dejaCree = useRef(!!brouillon);
+  const fileEcritures = useRef<Promise<unknown>>(Promise.resolve());
   const [position, setPosition] = useState<GpsPosition | null>(() =>
     brouillon?.latitude != null && brouillon.longitude != null
       ? { latitude: brouillon.latitude, longitude: brouillon.longitude, altitude: brouillon.altitude ?? null, accuracy: null, timestamp: 0 }
@@ -102,6 +105,114 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
   const parts = repartitionSurfaces({ total: intensif ? ha.station : ha.prospectee, prospectee: ha.prospectee, infestee: ha.infestee });
   const texteHa = (n: number | null) => String(n ?? 0).replace('.', ',');
 
+  /** Champ de surface : le message d'imbrication s'affiche dès qu'une valeur est saisie, sans attendre la soumission. */
+  const champHa = (nom: 'surface_station' | 'surface_prospectee' | 'surface_infestee', label: string) => (
+    <View style={styles.champ}>
+      <form.Field name={nom}>
+        {(field) => (
+          <NumberField
+            label={label}
+            unit={t('prospection.reference.unite')}
+            value={field.state.value}
+            onChangeText={field.handleChange}
+            onBlur={field.handleBlur}
+            error={erreurs.erreurChamp(nom) ?? (field.state.value !== '' ? erreurs.parChamp[nom] : undefined)}
+            testID={nom.replace('_', '-')}
+          />
+        )}
+      </form.Field>
+    </View>
+  );
+
+  // En intensive, la station du référentiel est obligatoire : détectée ou choisie à la main.
+  const manques = [...erreurs.manques, ...(intensif && !auto ? [t('prospection.reference.station')] : [])];
+
+  const nombre = (texte: string) => (texte.trim() === '' ? Number.NaN : Number(texte.trim().replace(',', '.')));
+  const manuelle = saisieManuelle && { latitude: nombre(saisieManuelle.latitude), longitude: nombre(saisieManuelle.longitude) };
+  const coordonneesInvalides = !!manuelle && !coordonneesValides(manuelle.latitude, manuelle.longitude);
+  const positionRetenue =
+    manuelle && !coordonneesInvalides
+      ? { latitude: manuelle.latitude, longitude: manuelle.longitude, altitude: position?.altitude ?? null, accuracy: null }
+      : position;
+  // Coordonnées saisies à la main : même géocodage hors ligne que pour un fix GPS, sans écraser la station saisie.
+  const latManuelle = manuelle?.latitude;
+  const lonManuelle = manuelle?.longitude;
+  const zoneManuelle = useMemo(
+    () =>
+      mode === 'extensive' && latManuelle !== undefined && lonManuelle !== undefined && !coordonneesInvalides
+        ? resoudreZoneHorsLigne(latManuelle, lonManuelle)
+        : null,
+    [mode, latManuelle, lonManuelle, coordonneesInvalides]
+  );
+  const zoneRetenue = zoneManuelle ?? zone;
+  useEffect(() => {
+    if (zoneManuelle && !form.getFieldValue('station_libre')) {
+      form.setFieldValue('station_libre', stationLibreDepuisZone(zoneManuelle));
+    }
+  }, [zoneManuelle, form]);
+  const formaterCoord = (n: number) => n.toFixed(6).replace('.', ',');
+
+  type Ecriture = { id: string } | { erreur: 'campagneIntrouvable' | 'equipeIntrouvable' };
+
+  /**
+   * Écrit (ou met à jour) le brouillon. Les écritures s'enchaînent une à une : la capture GPS (extensive)
+   * et « Continuer » ne se marchent pas dessus, et seule la première crée la fiche.
+   */
+  const ecrire = (capture?: { position: GpsPosition; zone: ZoneAdministrative | null }): Promise<Ecriture> => {
+    const faire = async (): Promise<Ecriture> => {
+      const campagne = (await listCampagnesLocal())[0];
+      if (!campagne) return { erreur: 'campagneIntrouvable' };
+      if (!equipeId) return { erreur: 'equipeIntrouvable' };
+      const valeurs = form.state.values;
+      const pos = capture?.position ?? positionRetenue;
+      const z = capture ? capture.zone : zoneRetenue;
+      const id = await enregistrerBrouillon(
+        {
+          ...brouillon,
+          id: brouillonId,
+          type_prospection: type,
+          campagne_id: campagne.id,
+          equipe_id: equipeId,
+          date_prospection: dateFiche,
+          n_fiche: numeroFiche,
+          n_message: type === 'extensive' ? numero : null,
+          station_id: auto?.station.id ?? null,
+          region: z?.region ?? null,
+          district: z?.district ?? null,
+          commune: z?.commune ?? null,
+          pa_code: auto?.pa?.code ?? null,
+          latitude: pos?.latitude ?? null,
+          longitude: pos?.longitude ?? null,
+          altitude: pos?.altitude ?? null,
+          avertissements: brouillon?.avertissements ?? [],
+          populations: brouillon?.populations ?? [],
+          captures: brouillon?.captures ?? [],
+          infestations: brouillon?.infestations ?? [],
+          operations_aeriennes: brouillon?.operations_aeriennes ?? [],
+          ...champsDeReference({ ...valeurs, type, biotope: valeurs.biotope as SaisieReference['biotope'] }),
+        },
+        dejaCree.current ? {} : { creation: true }
+      );
+      dejaCree.current = true;
+      return { id };
+    };
+    const suite = fileEcritures.current.then(faire);
+    fileEcritures.current = suite.catch(() => undefined);
+    return suite;
+  };
+
+  const continuer = async () => {
+    setErreurEnregistrement(null);
+    try {
+      const res = await ecrire();
+      if ('erreur' in res) return setErreurEnregistrement(t(`prospection.reference.${res.erreur}`));
+      onContinuer(res.id);
+    } catch (e) {
+      log.failure('reference_enregistrement', e);
+      setErreurEnregistrement(t('prospection.reference.erreurEnregistrement'));
+    }
+  };
+
   useEffect(() => {
     let annule = false;
     (async () => {
@@ -125,6 +236,8 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
         const z = resoudreZoneHorsLigne(fix.latitude, fix.longitude);
         setZone(z);
         if (!form.getFieldValue('station_libre')) form.setFieldValue('station_libre', stationLibreDepuisZone(z));
+        // La position est persistée dès la capture : rien n'est perdu si l'appli est tuée avant « Continuer ».
+        ecrire({ position: fix, zone: z }).catch((e) => log.failure('reference_capture_position', e));
         return;
       }
       const [stations, postes] = await Promise.all([listStationsActives(), listPostesAcridiens()]);
@@ -135,85 +248,19 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
         pa: postes.find((p) => p.id === proche.item.paId) ?? null,
         distanceM: proche.distanceM,
       });
-    })().catch((e) => log.failure('reference_rattachement_auto', e));
+    })().catch((e) => {
+      log.failure('reference_rattachement_auto', e);
+      if (!annule) setGpsEchec(true);
+    });
     return () => {
       annule = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- une seule acquisition par écran
   }, [type]);
 
-  /** Champ de surface : le message d'imbrication s'affiche dès qu'une valeur est saisie, sans attendre la soumission. */
-  const champHa = (nom: 'surface_station' | 'surface_prospectee' | 'surface_infestee', label: string) => (
-    <View style={styles.champ}>
-      <form.Field name={nom}>
-        {(field) => (
-          <NumberField
-            label={label}
-            unit={t('prospection.reference.unite')}
-            value={field.state.value}
-            onChangeText={field.handleChange}
-            onBlur={field.handleBlur}
-            error={erreurs.erreurChamp(nom) ?? (field.state.value !== '' ? erreurs.parChamp[nom] : undefined)}
-            testID={nom.replace('_', '-')}
-          />
-        )}
-      </form.Field>
-    </View>
-  );
-
-  const nombre = (texte: string) => (texte.trim() === '' ? Number.NaN : Number(texte.trim().replace(',', '.')));
-  const manuelle = saisieManuelle && { latitude: nombre(saisieManuelle.latitude), longitude: nombre(saisieManuelle.longitude) };
-  const coordonneesInvalides = !!manuelle && !coordonneesValides(manuelle.latitude, manuelle.longitude);
-  const positionRetenue =
-    manuelle && !coordonneesInvalides
-      ? { latitude: manuelle.latitude, longitude: manuelle.longitude, altitude: position?.altitude ?? null, accuracy: null }
-      : position;
-  const formaterCoord = (n: number) => n.toFixed(6).replace('.', ',');
-
-  const continuer = async () => {
-    setErreurEnregistrement(null);
-    try {
-      const campagne = (await listCampagnesLocal())[0];
-      if (!campagne) return setErreurEnregistrement(t('prospection.reference.campagneIntrouvable'));
-      if (!equipeId) return setErreurEnregistrement(t('prospection.reference.equipeIntrouvable'));
-      const valeurs = form.state.values;
-      const id = await enregistrerBrouillon(
-        {
-          ...brouillon,
-          id: brouillonId,
-          type_prospection: type,
-          campagne_id: campagne.id,
-          equipe_id: equipeId,
-          date_prospection: dateFiche,
-          n_fiche: numeroFiche,
-          n_message: type === 'extensive' ? numero : null,
-          station_id: auto?.station.id ?? null,
-          region: zone?.region ?? null,
-          district: zone?.district ?? null,
-          commune: zone?.commune ?? null,
-          pa_code: auto?.pa?.code ?? null,
-          latitude: positionRetenue?.latitude ?? null,
-          longitude: positionRetenue?.longitude ?? null,
-          altitude: positionRetenue?.altitude ?? null,
-          avertissements: brouillon?.avertissements ?? [],
-          populations: brouillon?.populations ?? [],
-          captures: brouillon?.captures ?? [],
-          infestations: brouillon?.infestations ?? [],
-          operations_aeriennes: brouillon?.operations_aeriennes ?? [],
-          ...champsDeReference({ ...valeurs, type, biotope: valeurs.biotope as SaisieReference['biotope'] }),
-        },
-        brouillon ? {} : { creation: true }
-      );
-      onContinuer(id);
-    } catch (e) {
-      log.failure('reference_enregistrement', e);
-      setErreurEnregistrement(t('prospection.reference.erreurEnregistrement'));
-    }
-  };
-
   const note = (manuel?: boolean) =>
     !auto
-      ? ''
+      ? t('prospection.reference.aChoisir')
       : manuel
         ? t('prospection.reference.choixManuel')
         : t('prospection.reference.autoPlusProche', { distance: formaterDistance(auto.distanceM) });
@@ -228,7 +275,7 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
   };
 
   const changerStation = async () => {
-    if (!auto?.pa) return;
+    if (!auto?.pa) return changerPa();
     const { pa } = auto;
     try {
       const stations = await listStationsByPoste(pa.id);
@@ -246,7 +293,6 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
   };
 
   const changerPa = async () => {
-    if (!auto) return;
     try {
       const postes = await listPostesAcridiens();
       ouvrir(
@@ -259,7 +305,7 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
             listStationsByPoste(pa.id)
               .then((stations) => {
                 const st = (position && plusProche(position, stations)?.item) || stations[0];
-                if (st) setAuto({ ...auto, station: st, pa, paManuel: true, stationManuel: true });
+                if (st) setAuto({ distanceM: 0, ...auto, station: st, pa, paManuel: true, stationManuel: true });
               })
               .catch((e) => log.failure('reference_liste_stations', e));
           }),
@@ -273,14 +319,15 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
   return (
     <View style={styles.racine}>
       <ScrollView contentContainerStyle={styles.contenu}>
-        {auto && (
+        {gpsEchec && intensif && <Banner tone="warning" message={t('prospection.reference.positionIndisponible')} />}
+        {intensif && (
           <Card>
             <Text style={[UiText.eyebrow, { color: c.fg3 }]}>{t('prospection.reference.rattachement')}</Text>
-            <Ligne libelle={t('prospection.reference.pa')} valeur={auto.pa?.nom ?? ''} note={note(auto.paManuel)} onChanger={changerPa} testID="changer-pa" />
+            <Ligne libelle={t('prospection.reference.pa')} valeur={auto?.pa?.nom ?? t('prospection.reference.nonRenseigne')} note={note(auto?.paManuel)} onChanger={changerPa} testID="changer-pa" />
             <Ligne
               libelle={t('prospection.reference.station')}
-              valeur={`${auto.station.code} · ${auto.station.nom}`}
-              note={note(auto.stationManuel)}
+              valeur={auto ? `${auto.station.code} · ${auto.station.nom}` : t('prospection.reference.nonRenseigne')}
+              note={note(auto?.stationManuel)}
               onChanger={changerStation}
               testID="changer-station"
             />
@@ -312,19 +359,19 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
               </Text>
             </View>
           )}
+          {type === 'extensive' && (
+            <View style={[styles.messageCadre, { borderColor: c.borderField }]}>
+              <NumberField
+                label={t('prospection.reference.numeroMessage')}
+                value={numero}
+                onChangeText={setNumeroMessage}
+                clavier="default"
+                testID="numero-message"
+              />
+              <Text style={[UiText.micro, { color: c.fg3 }]}>{t('prospection.reference.numeroMessageAide')}</Text>
+            </View>
+          )}
         </Card>
-        {type === 'extensive' && (
-          <Card>
-            <NumberField
-              label={t('prospection.reference.numeroMessage')}
-              value={numero}
-              onChangeText={setNumeroMessage}
-              clavier="default"
-              testID="numero-message"
-            />
-            <Text style={[UiText.micro, { color: c.fg3 }]}>{t('prospection.reference.numeroMessageAide')}</Text>
-          </Card>
-        )}
         {positionRetenue && (
           <View style={[styles.gps, { backgroundColor: c.primary }]}>
             <View style={styles.titreGps}>
@@ -483,7 +530,7 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
       <PrimaryButton
         label={t('prospection.reference.continuer')}
         onPress={continuer}
-        manques={erreurs.manques}
+        manques={manques}
         disabled={Object.keys(erreurs.parChamp).length > 0 || coordonneesInvalides}
         testID="reference-continuer"
       />
@@ -529,6 +576,7 @@ const styles = StyleSheet.create({
   ligneChanger: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[12] },
   choix: { paddingVertical: UiSpace[12] },
   flex: { flex: 1 },
+  messageCadre: { gap: UiSpace[6], padding: UiSpace[12], borderRadius: Radius.sm, borderWidth: UiBorder.field, borderStyle: 'dashed' },
   barre: { height: UiSize.surfaceBar, borderRadius: Radius.full, overflow: 'hidden' },
   infestee: { position: 'absolute', left: 0, top: 0, height: '100%' },
   gps: { padding: UiSpace[16], borderRadius: Radius.lg, gap: UiSpace[12] },
