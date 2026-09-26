@@ -316,7 +316,7 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
     mockedGet.mockImplementation((url: string) => {
       if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: postes })
       if (url.startsWith('/zones-anti-acridiennes')) return Promise.resolve({ data: [ZONE] })
-      // Sélecteur « Filtrer par équipe terrestre » (poste_acridien fait partie
+      // Sélecteur « Filtrer par équipe » (poste_acridien fait partie
       // du périmètre filtrable) : liste vide suffit, non testée ici.
       if (url.startsWith('/equipes?type=terrestre')) return Promise.resolve({ data: [] })
       return Promise.resolve(pull())
@@ -437,7 +437,7 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
   })
 })
 
-describe('ReferentielsPage — filtre par équipe terrestre (#equipe-terrestre)', () => {
+describe('ReferentielsPage — filtre par équipe (postes, équipe terrestre)', () => {
   const ZONE = { id: 'za1', code: 'ZA-ZOM', nom: 'Zombitse', created_at: SERVER_TIME }
   const EQUIPE_IHOSY = { id: 'et1', nom: 'Équipe Terrestre Ihosy', chef_equipe_id: 'u1', actif: true }
   const POSTE_RATTACHE = {
@@ -492,12 +492,28 @@ describe('ReferentielsPage — filtre par équipe terrestre (#equipe-terrestre)'
     await screen.findByText('PA-ZOM')
     expect(screen.getByText('PA-ISA')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Filtrer par équipe terrestre'), {
+    fireEvent.change(screen.getByLabelText('Filtrer par équipe'), {
       target: { value: 'et1' },
     })
 
     expect(screen.getByText('PA-ZOM')).toBeInTheDocument()
     expect(screen.queryByText('PA-ISA')).not.toBeInTheDocument()
+  })
+
+  // #602, #607 : un seul libellé « Équipe » (nom + type) pour les postes comme pour les lieux.
+  it('affiche l’équipe des postes dans une colonne « Équipe », avec son type', async () => {
+    mockGetParUrl()
+    renderPage()
+
+    await waitFor(() => expect(nav().getByText('poste_acridien')).toBeInTheDocument())
+    fireEvent.click(nav().getByText('poste_acridien'))
+    await screen.findByText('PA-ZOM')
+
+    expect(screen.getByRole('columnheader', { name: 'Équipe' })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Équipe terrestre' })).not.toBeInTheDocument()
+    const ligne = screen.getByText('PA-ZOM').closest('tr')!
+    expect(within(ligne).getByText('Équipe Terrestre Ihosy')).toBeInTheDocument()
+    expect(within(ligne).getByText('(terrestre)')).toBeInTheDocument()
   })
 
   it('revient à la liste complète sur « — Toutes — »', async () => {
@@ -508,7 +524,7 @@ describe('ReferentielsPage — filtre par équipe terrestre (#equipe-terrestre)'
     fireEvent.click(nav().getByText('poste_acridien'))
     await screen.findByText('PA-ZOM')
 
-    const select = screen.getByLabelText('Filtrer par équipe terrestre')
+    const select = screen.getByLabelText('Filtrer par équipe')
     fireEvent.change(select, { target: { value: 'et1' } })
     expect(screen.queryByText('PA-ISA')).not.toBeInTheDocument()
 
@@ -521,7 +537,7 @@ describe('ReferentielsPage — filtre par équipe terrestre (#equipe-terrestre)'
     renderPage()
 
     await waitFor(() => expect(nav().getByText('pesticide')).toBeInTheDocument())
-    expect(screen.queryByLabelText('Filtrer par équipe terrestre')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrer par équipe')).not.toBeInTheDocument()
   })
 })
 
@@ -755,7 +771,7 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
     // Les options du select sont chargées par `/equipes?type=aerien` : attendre qu'elles
     // existent, sinon jsdom ignore la valeur assignée.
     await modal.findByRole('option', { name: 'Équipe Betroka' })
-    fireEvent.change(modal.getByLabelText('Équipe aérienne *'), { target: { value: 'ea2' } })
+    fireEvent.change(modal.getByLabelText('Équipe *'), { target: { value: 'ea2' } })
     fireEvent.change(modal.getByLabelText('Latitude *'), { target: { value: '-22.4' } })
     fireEvent.change(modal.getByLabelText('Longitude *'), { target: { value: '46.12' } })
     fireEvent.click(modal.getByRole('button', { name: 'Créer' }))
@@ -774,11 +790,13 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
   it("affiche l'équipe aérienne de chaque lieu, « — » pour un lieu non rattaché", async () => {
     await ouvrirLieuxAeriens([LIEU, LIEU_SANS_EQUIPE])
 
-    expect(screen.getByRole('columnheader', { name: 'Équipe aérienne' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Équipe' })).toBeInTheDocument()
     const lignes = within(screen.getByRole('table')).getAllByRole('row')
     const ligneTuléar = lignes.find((l) => within(l).queryByText('Tuléar'))!
     const ligneAncien = lignes.find((l) => within(l).queryByText('Ancien lieu'))!
     expect(within(ligneTuléar).getByText('Équipe Ihosy')).toBeInTheDocument()
+    expect(within(ligneTuléar).getByText('(aérienne)')).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Équipe aérienne' })).not.toBeInTheDocument()
     expect(within(ligneAncien).queryByText('Équipe Ihosy')).not.toBeInTheDocument()
     expect(within(ligneAncien).getAllByText('—').length).toBeGreaterThan(0)
   })
@@ -789,7 +807,7 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
     await waitFor(() =>
       expect(mockedGet).toHaveBeenCalledWith('/equipes?type=aerien'),
     )
-    const select = screen.getByLabelText('Équipe aérienne *')
+    const select = screen.getByLabelText('Équipe *')
     expect(await within(select).findByRole('option', { name: 'Équipe Betroka' })).toBeInTheDocument()
     expect(select).toHaveValue('ea1')
   })
