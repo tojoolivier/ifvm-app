@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { ObservationStep } from '@/components/prospection/ObservationStep';
 import { ReferentialError } from '@/lib/errors';
 import { enregistrerFiltreObservation } from '@/lib/prospection-db';
@@ -47,6 +47,7 @@ describe('ObservationStep — jeux de puces par type et par espèce', () => {
 
 describe('ObservationStep — bouton « Tous » par sexe', () => {
   const choisi = (testID: string) => screen.getByTestId(testID).props.accessibilityState.selected;
+  const libelleDe = (testID: string) => screen.getByTestId(testID).props.accessibilityLabel;
 
   it('coche tous les stades de la ligne ♀ sans toucher à la ligne ♂, et un second appui les décoche', async () => {
     await render(<ObservationStep brouillonId="b-1" type="intensive" onContinuer={jest.fn()} />);
@@ -60,13 +61,27 @@ describe('ObservationStep — bouton « Tous » par sexe', () => {
     }
     expect(choisi('stade-LMC-imago-M-A234')).toBe(true);
     expect(choisi('stade-LMC-imago-M-A1')).toBe(false);
-    expect(choisi('tous-LMC-imago-F')).toBe(true);
+    expect(libelleDe('tous-LMC-imago-F')).toBe('Tout désélectionner');
+    expect(libelleDe('tous-LMC-imago-M')).toBe('Tout sélectionner');
 
     await fireEvent.press(screen.getByTestId('tous-LMC-imago-F'));
 
     expect(choisi('stade-LMC-imago-F-A4')).toBe(false);
     expect(choisi('stade-LMC-imago-M-A234')).toBe(true);
-    expect(choisi('tous-LMC-imago-F')).toBe(false);
+    expect(libelleDe('tous-LMC-imago-F')).toBe('Tout sélectionner');
+  });
+
+  it('n\'est pas une puce : il ne compte pas parmi les stades et se lit sur la ligne de l\'intitulé du sexe', async () => {
+    await render(<ObservationStep brouillonId="b-1" type="extensive" onContinuer={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('grille-LMC-imago'));
+    await screen.findByTestId('stade-LMC-imago-F-A1');
+
+    expect(screen.getByTestId('tous-LMC-imago-F').props.accessibilityRole).toBe('button');
+    expect(screen.getByTestId('tous-LMC-imago-F').props.accessibilityState?.selected).toBeUndefined();
+    const entete = within(screen.getByTestId('entete-sexe-LMC-imago-F'));
+    expect(entete.getByText('♀ Femelles')).toBeTruthy();
+    expect(entete.getByText('Tout sélectionner')).toBeTruthy();
+    expect(within(screen.getByTestId('entete-sexe-LMC-imago-F')).queryByTestId('stade-LMC-imago-F-A1')).toBeNull();
   });
 
   it('les larves, sans sexe, n\'ont pas de bouton « Tous »', async () => {

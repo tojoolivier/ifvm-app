@@ -3,7 +3,7 @@ import { useObservationForm } from '@/hooks/use-observation-form';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Banner, Card, Chip, PrimaryButton, WizardFooter } from '@/components/ui';
-import { Radius, UiBorder, UiOpacity, UiSpace, UiText } from '@/constants/theme';
+import { Radius, UiBorder, UiOpacity, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { phenotypesFor, type CategorieGrille, type TypeGrille } from '@/lib/prospection-capture-rules';
 import {
@@ -195,20 +195,27 @@ function FiltreGrille({ type, espece, categorie, filtre, appliquer }: FiltreGril
       )}
       {sexesDe(categorie).map((sexe) => {
         const ligne = stades[sexe] ?? [];
+        const libelleTous = (coches: boolean) => t(coches ? 'prospection.observation.toutDeselectionner' : 'prospection.observation.toutSelectionner');
         const tousCoches = ligne.length > 0 && ligne.every((st) => grille.stades[sexe].includes(st.code));
         return (
         <View key={sexe} style={styles.sexe}>
-          {sexe !== 'sans_sexe' && <Text style={[UiText.caption, { color: c.fg3 }]}>{t(`prospection.observation.sexe.${sexe}`)}</Text>}
+          {sexe !== 'sans_sexe' && (
+            <View style={styles.enteteSexe} testID={`entete-sexe-${espece}-${categorie}-${sexe}`}>
+              <Text style={[UiText.caption, { color: c.fg3 }]}>{t(`prospection.observation.sexe.${sexe}`)}</Text>
+              {ligne.length > 0 && (
+                <Pressable
+                  testID={`tous-${espece}-${categorie}-${sexe}`}
+                  onPress={() => appliquer((f) => basculerTousLesStades(f, espece, categorie, sexe, ligne.map((st) => st.code)))}
+                  accessibilityRole="button"
+                  accessibilityLabel={libelleTous(tousCoches)}
+                  hitSlop={UiSize.hitSlop}
+                >
+                  <Text style={[UiText.captionMedium, { color: c.primary }]}>{libelleTous(tousCoches)}</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
           <View style={styles.puces}>
-            {sexe !== 'sans_sexe' && ligne.length > 0 && (
-              <Chip
-                compact
-                label={choisi(t('prospection.observation.tous'), tousCoches)}
-                selected={tousCoches}
-                onPress={() => appliquer((f) => basculerTousLesStades(f, espece, categorie, sexe, ligne.map((st) => st.code)))}
-                testID={`tous-${espece}-${categorie}-${sexe}`}
-              />
-            )}
             {ligne.map((stade) => {
               const coche = grille.stades[sexe].includes(stade.code);
               return (
@@ -240,5 +247,6 @@ const styles = StyleSheet.create({
   sautees: { paddingHorizontal: UiSpace[14], paddingVertical: UiSpace[12], borderRadius: Radius.md },
   filtre: { padding: UiSpace[12], borderRadius: Radius.sm, gap: UiSpace[10] },
   sexe: { gap: UiSpace[6] },
+  enteteSexe: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   puces: { flexDirection: 'row', flexWrap: 'wrap', gap: UiSpace[6] },
 });
