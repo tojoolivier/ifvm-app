@@ -45,6 +45,39 @@ describe('ObservationStep — jeux de puces par type et par espèce', () => {
   });
 });
 
+describe('ObservationStep — bouton « Tous » par sexe', () => {
+  const choisi = (testID: string) => screen.getByTestId(testID).props.accessibilityState.selected;
+
+  it('coche tous les stades de la ligne ♀ sans toucher à la ligne ♂, et un second appui les décoche', async () => {
+    await render(<ObservationStep brouillonId="b-1" type="intensive" onContinuer={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('grille-LMC-imago'));
+    await fireEvent.press(await screen.findByTestId('stade-LMC-imago-M-A234'));
+
+    await fireEvent.press(screen.getByTestId('tous-LMC-imago-F'));
+
+    for (const code of ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5']) {
+      expect(choisi(`stade-LMC-imago-F-${code}`)).toBe(true);
+    }
+    expect(choisi('stade-LMC-imago-M-A234')).toBe(true);
+    expect(choisi('stade-LMC-imago-M-A1')).toBe(false);
+    expect(choisi('tous-LMC-imago-F')).toBe(true);
+
+    await fireEvent.press(screen.getByTestId('tous-LMC-imago-F'));
+
+    expect(choisi('stade-LMC-imago-F-A4')).toBe(false);
+    expect(choisi('stade-LMC-imago-M-A234')).toBe(true);
+    expect(choisi('tous-LMC-imago-F')).toBe(false);
+  });
+
+  it('les larves, sans sexe, n\'ont pas de bouton « Tous »', async () => {
+    await render(<ObservationStep brouillonId="b-1" type="extensive" onContinuer={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('grille-NSE-larve'));
+    await screen.findByTestId('stade-NSE-larve-sans_sexe-L1');
+
+    expect(screen.queryByTestId('tous-NSE-larve-sans_sexe')).toBeNull();
+  });
+});
+
 describe('ObservationStep — validation, aucun criquet (maquette K5)', () => {
   it('explique que les grilles sont sautées et que la conclusion vient à l\'étape suivante', async () => {
     await render(<ObservationStep brouillonId="b-1" type="validation" onContinuer={jest.fn()} />);

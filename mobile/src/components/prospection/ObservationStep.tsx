@@ -10,6 +10,7 @@ import {
   basculerGrille,
   basculerPhase,
   basculerStade,
+  basculerTousLesStades,
   choisirAucunCriquet,
   ESPECES,
   filtreVide,
@@ -192,11 +193,23 @@ function FiltreGrille({ type, espece, categorie, filtre, appliquer }: FiltreGril
           message={t(erreur === 'referentiel' ? 'prospection.observation.stadesIndisponibles' : 'prospection.observation.stadesIllisibles')}
         />
       )}
-      {sexesDe(categorie).map((sexe) => (
+      {sexesDe(categorie).map((sexe) => {
+        const ligne = stades[sexe] ?? [];
+        const tousCoches = ligne.length > 0 && ligne.every((st) => grille.stades[sexe].includes(st.code));
+        return (
         <View key={sexe} style={styles.sexe}>
           {sexe !== 'sans_sexe' && <Text style={[UiText.caption, { color: c.fg3 }]}>{t(`prospection.observation.sexe.${sexe}`)}</Text>}
           <View style={styles.puces}>
-            {(stades[sexe] ?? []).map((stade) => {
+            {sexe !== 'sans_sexe' && ligne.length > 0 && (
+              <Chip
+                compact
+                label={choisi(t('prospection.observation.tous'), tousCoches)}
+                selected={tousCoches}
+                onPress={() => appliquer((f) => basculerTousLesStades(f, espece, categorie, sexe, ligne.map((st) => st.code)))}
+                testID={`tous-${espece}-${categorie}-${sexe}`}
+              />
+            )}
+            {ligne.map((stade) => {
               const coche = grille.stades[sexe].includes(stade.code);
               return (
                 <Chip
@@ -211,7 +224,8 @@ function FiltreGrille({ type, espece, categorie, filtre, appliquer }: FiltreGril
             })}
           </View>
         </View>
-      ))}
+        );
+      })}
     </View>
   );
 }

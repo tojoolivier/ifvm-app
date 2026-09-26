@@ -51,6 +51,7 @@ export const fr = {
       },
       erreurEnregistrement: 'Ce que vous avez observé n’a pas pu être enregistré sur cet appareil. Réessayez.',
       sexe: { F: '♀ Femelles', M: '♂ Mâles' },
+      tous: 'Tous',
       stadesIllisibles: 'Les stades n’ont pas pu être lus sur cet appareil. Réessayez.',
       stadesIndisponibles:
         'Stades indisponibles hors ligne : synchronisez le référentiel depuis l’écran Synchronisation, puis rouvrez cette étape.',

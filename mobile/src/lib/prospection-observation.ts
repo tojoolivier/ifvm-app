@@ -62,6 +62,19 @@ export const basculerStade = (
   stade: string
 ) => modifierGrille(filtre, espece, categorie, (g) => ({ ...g, stades: { ...g.stades, [sexe]: basculer(g.stades[sexe], stade) } }));
 
+/** Bouton « Tous » d'une ligne de stades : coche tous les `codes` affichés, ou les décoche s'ils sont déjà tous cochés. */
+export const basculerTousLesStades = (
+  filtre: FiltreObservation,
+  espece: string,
+  categorie: CategorieGrille,
+  sexe: SexeVu,
+  codes: string[]
+) =>
+  modifierGrille(filtre, espece, categorie, (g) => {
+    const tousCoches = codes.every((code) => g.stades[sexe].includes(code));
+    return { ...g, stades: { ...g.stades, [sexe]: tousCoches ? [] : [...codes] } };
+  });
+
 /** « Aucun criquet observé » est exclusif : il vide toutes les grilles. */
 export const choisirAucunCriquet = (_filtre: FiltreObservation): FiltreObservation => ({
   aucunCriquet: true,

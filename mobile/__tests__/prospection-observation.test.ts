@@ -2,6 +2,7 @@ import {
   basculerGrille,
   basculerPhase,
   basculerStade,
+  basculerTousLesStades,
   choisirAucunCriquet,
   filtreVide,
   grilleVue,
@@ -59,6 +60,28 @@ describe('filtre « Qu\'avez-vous observé ? »', () => {
 
     expect(filtre.aucunCriquet).toBe(false);
     expect(nbGrilles(filtre)).toBe(1);
+  });
+
+  describe('basculerTousLesStades', () => {
+    const codes = ['A1', 'A2', 'A3', 'A4', 'A5'];
+    const grille = () => basculerGrille(filtreVide(), 'LMC', 'imago');
+    const femelles = (filtre: ReturnType<typeof filtreVide>) => grilleVue(filtre, 'LMC', 'imago')?.stades.F;
+
+    it('coche tous les stades d\'un sexe, dans l\'ordre donné, sans toucher à l\'autre sexe', () => {
+      let filtre = basculerStade(grille(), 'LMC', 'imago', 'M', 'A234');
+      filtre = basculerStade(filtre, 'LMC', 'imago', 'F', 'A4');
+
+      filtre = basculerTousLesStades(filtre, 'LMC', 'imago', 'F', codes);
+
+      expect(femelles(filtre)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5']);
+      expect(grilleVue(filtre, 'LMC', 'imago')?.stades.M).toEqual(['A234']);
+    });
+
+    it('les décoche tous quand ils sont déjà tous cochés', () => {
+      const tous = basculerTousLesStades(grille(), 'LMC', 'imago', 'F', codes);
+
+      expect(femelles(basculerTousLesStades(tous, 'LMC', 'imago', 'F', codes))).toEqual([]);
+    });
   });
 
   describe('stadesAffiches', () => {
