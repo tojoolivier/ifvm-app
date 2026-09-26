@@ -36,3 +36,19 @@ Le mobile ne doit jamais recopier à la main les colonnes/schémas du backend (O
 - Après toute migration Alembic touchant un champ envoyé/reçu par le mobile (population, capture, infestation, traitement, ...), régénérer `api-schema.generated.ts` et lancer `npm run check:schema-drift` pour vérifier que le schéma SQLite local (`prospection-db.ts`, `traitement-db.ts`) suit.
 - Le schéma SQLite local reste écrit à la main (c'est un cache offline, pas un miroir 1:1 obligatoire), mais toute divergence détectée par `check:schema-drift` doit être traitée avant de merger — c'est exactement ce type de dérive qui a causé un écran blanc silencieux (colonne `phase` ajoutée côté backend, jamais répercutée côté mobile).
 - `check:schema-drift` n'est plus un geste à mémoriser : le hook pre-commit (`.lintstagedrc.json`) le lance automatiquement dès que `mobile/src/lib/prospection-db.ts` ou `mobile/src/lib/api-schema.generated.ts` sont dans le commit, et la CI (`.github/workflows/lint.yml`, job `lint-mobile`) le rejoue.
+
+### Implémentation : vérifier la maquette Figma d'abord
+
+Avant d'implémenter tout écran, composant ou changement d'UI (web ou mobile), vérifier s'il existe une maquette Figma correspondante (lien dans l'issue/PRD, ou recherche via le MCP Figma) :
+
+- Maquette trouvée : elle fait foi. Utiliser `get_design_context` / `get_screenshot` (skill `figma:figma-design-to-code`) et réutiliser les composants partagés existants plutôt que d'en recréer.
+- Aucune maquette trouvée : le signaler à l'utilisateur avant de coder, et demander s'il faut continuer sans maquette.
+
+### Mobile : formulaires avec TanStack Form + Yup
+
+Tout formulaire du mobile (`mobile/`) doit utiliser `@tanstack/react-form` pour l'état/soumission et `yup` pour la validation (schéma Yup branché comme validator du formulaire) :
+
+- Pas de `useState` manuel par champ, ni de validation écrite à la main dans les handlers.
+- Le schéma Yup vit dans `mobile/src/lib/` (ex. `prospection-sol-schema.ts`), séparé de l'écran, et est testable seul.
+- Les messages d'erreur de champ suivent la maquette Figma.
+- Consulter Context7 pour l'API à jour de TanStack Form avant d'écrire le code.
