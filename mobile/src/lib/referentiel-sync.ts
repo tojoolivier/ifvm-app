@@ -442,7 +442,13 @@ async function purgerSupprimes(
   response: ReferentielPullResponse
 ): Promise<void> {
   for (const entity of PURGE_ENFANTS_D_ABORD) {
-    const upserts = response[entity].upserts as Supprimable[];
+    // #referentiel-pull-entite-manquante : une entité récente (ex. equipe_aeronefs) peut être
+    // absente de la réponse si le serveur interrogé n'a pas encore cette fonctionnalité —
+    // ignorée plutôt que de faire planter toute la synchro sur un "Cannot read property
+    // 'upserts' of undefined" (TypeError nue, jamais traduite par friendly-error.ts).
+    const entree = response[entity];
+    if (!entree) continue;
+    const upserts = entree.upserts as Supprimable[];
     for (const ligne of upserts.filter((l) => l.deleted_at)) {
       if (entity === 'equipes') {
         await db.runAsync('DELETE FROM equipe_membre WHERE equipe_id = ?', [ligne.id]);
@@ -516,6 +522,13 @@ async function appliquerReponse(
   for (const [i, [table, ecrire]] of etapes.entries()) {
     const repere = { table, index: i + 1, total: etapes.length };
     surProgression?.({ ...repere, etat: 'en_cours', lignes: 0 });
+    // #referentiel-pull-entite-manquante : même repli que `purgerSupprimes` — une entité absente
+    // de la réponse (serveur pas encore à jour) est sautée, son curseur n'avance pas (elle sera
+    // redemandée en entier au prochain pull), plutôt que de faire échouer toute la synchronisation.
+    if (!response[table]) {
+      surProgression?.({ ...repere, etat: 'fini', lignes: 0 });
+      continue;
+    }
     await ecrire();
     await updateSyncCursor(db, table, response[table].server_time);
     const lignes = (response[table].upserts as Supprimable[]).filter((l) => !l.deleted_at).length;
