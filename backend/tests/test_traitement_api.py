@@ -2876,6 +2876,36 @@ async def test_get_traitement_pdf_terrestre_valide_200(
 
 
 # ==========================================
+# GET /traitements/{id}/fiche-html — lecture à l'écran (onglet « Fiche » du web)
+# ==========================================
+
+
+@pytest.mark.asyncio
+async def test_get_traitement_fiche_html_inexistant_404(client, auth_headers, db_engine):
+    resp = await client.get(f"/traitements/{uuid.uuid4()}/fiche-html", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_traitement_fiche_html_brouillon_lisible(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    """Contrairement au PDF (403 tant que la fiche n'est pas validée), la lecture à l'écran
+    sert le même gabarit pour un brouillon."""
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+
+    html = await client.get(f"/traitements/{traitement_id}/fiche-html", headers=auth_headers)
+    assert html.status_code == 200, html.text
+    assert html.headers["content-type"].startswith("text/html")
+    assert "<table" in html.text
+
+    pdf = await client.get(f"/traitements/{traitement_id}/pdf", headers=auth_headers)
+    assert pdf.status_code == 403
+
+
+# ==========================================
 # #607 — équipe rattachée au traitement
 # ==========================================
 

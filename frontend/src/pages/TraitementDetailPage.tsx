@@ -3,11 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
-import type { components } from '@/lib/api-schema.generated'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ErrorBanner } from '@/components/ui/error-banner'
-import { FicheTraitementTableau } from '@/components/fiche/FicheTraitementTableau'
+import { FicheTableau } from '@/components/FicheTableau'
 import { EquipeLien } from '@/components/EquipeLien'
 import { ConsommationPesticide } from '@/components/ConsommationPesticide'
 import { NavTabs } from '@/components/ui/nav-tabs'
@@ -19,10 +18,156 @@ import {
   libelleSurfaceTraitee,
   surfaceTraiteeOuProtegee,
 } from '@/lib/traitement-fiche'
-import { useAnnuaire } from '@/lib/use-annuaire'
 
-// Contrat OpenAPI (jamais recopié à la main) : `TraitementRead` porte tous les champs de la fiche.
-type TraitementDetail = components['schemas']['TraitementRead']
+interface Rotation {
+  id: string
+  numero: number
+  numero_cuve: string
+  produit_id: string
+  quantite: number
+  unite: 'L' | 'kg'
+  surface_ha: number | null
+  temperature_debut_c: number
+  temperature_fin_c: number
+  vent_debut_ms: number
+  vent_fin_ms: number
+  heure_debut: string | null
+  heure_fin: string | null
+  heure_ouverture_vanne: string | null
+  heure_fermeture_vanne: string | null
+}
+
+interface ProduitUtilise {
+  id: string
+  numero: number
+  produit_id: string
+  quantite_l: number
+}
+
+interface Cible {
+  espece: string | null
+  repartition_population: string | null
+  surface_infestee_ha: number | string | null
+}
+
+interface TraitementAerien {
+  pilote: string
+  mecanicien: string
+  chef_de_base_id: string | null
+  consultant_international: string | null
+  base_principale: string | null
+  stand: string | null
+  // Date d'installation (migration backend 0056,
+  // #stand-base-secondaire-date-installation) — facultative et indépendante
+  // du texte libre lui-même. Rien d'équivalent pour base_principale : hors
+  // périmètre.
+  stand_date_installation: string | null
+  base_secondaire: string | null
+  base_secondaire_date_installation: string | null
+  immatricule_aeronef: string | null
+  nb_rotations: number
+  total_pesticide_l: number | null
+  total_pesticide_kg: number | null
+  // Jamais renseignées ensemble (migration 0081) : choc → traitée, barrière → protégée.
+  surface_traitee_ha: number | null
+  surface_protegee_ha: number | null
+  reprise_traitement: boolean
+  traitement_origine_id: string | null
+  surface_cumulee_ha: number | null
+  surface_restante_ha: number | null
+  pesticide_recu_l: number | null
+  pesticide_stock_restant_l: number | null
+  rotations: Rotation[]
+}
+
+interface TraitementTerrestre {
+  chef_equipe_id: string | null
+  agent_encadreur_id: string | null
+  consultant_international: string | null
+  heure_debut: string
+  heure_fin: string
+  vitesse_vent_ms: number
+  direction_vent: string | null
+  temperature_c: number | null
+  reprise_traitement: boolean
+  traitement_origine_id: string | null
+  surface_atomiseur_ha: number | null
+  surface_disque_rotatif_ha: number | null
+  surface_ulvamast_ha: number | null
+  // Jamais renseignées ensemble (migration 0083, généralise l'Aérien 0081) :
+  // choc → traitée, barrière → protégée.
+  surface_traitee_ha: number | null
+  surface_protegee_ha: number | null
+  surface_cumulee_ha: number | null
+  surface_restante_ha: number | null
+  surface_restante_abandonnee: boolean | null
+  motif_surface_restante_abandonnee: string | null
+  essence_litres: number | null
+  nb_piles: number | null
+  total_pesticide_l: number | null
+  pesticide_recu_l: number | null
+  pesticide_stock_restant_l: number | null
+  produits: ProduitUtilise[]
+}
+
+interface TraitementDetail {
+  id: string
+  prospection_id: string
+  // Équipe de la fiche (#602, #607) — null pour une fiche antérieure à l'équipe unifiée.
+  equipe_id: string | null
+  // Dérivé côté backend (#numero-fiche-prospection-liee) à partir de
+  // prospection_id — jamais une seconde relation, jamais saisi ici.
+  prospection_n_fiche: string | null
+  numero_fiche: string
+  type_traitement: 'AERIEN' | 'TERRESTRE'
+  mode_traitement: string | null
+  date_traitement: string
+  date_validation: string
+  localite: string
+  region: string | null
+  district: string | null
+  commune: string | null
+  latitude: number | null
+  longitude: number | null
+  altitude: number | null
+  statut: string
+  statut_sync: string
+  created_at: string
+  updated_at: string
+  cible: Cible | null
+  aerien: TraitementAerien | null
+  terrestre: TraitementTerrestre | null
+  kit_combinaison: number
+  kit_gants: number
+  kit_lunettes: number
+  kit_masques: number
+  kit_botte: number
+  zones_exposees: Record<string, unknown> | null
+  hauteur_strate_herbeuse_m: number | null
+  hauteur_strate_arboree_m: number | null
+  recouvrement_percent: number | null
+  empoisonnement: boolean
+  empoisonnement_type: string | null
+  empoisonnement_mode: string | null
+  empoisonnement_autre: string | null
+  evaluation_risque: Record<string, unknown> | null
+  comportement_anormal: boolean
+  comportement_non_cibles: Record<string, unknown> | null
+  mortalite: boolean
+  mortalite_familles: Record<string, unknown> | null
+  observations: string | null
+  signatures: { id: string; role: string; signataire_nom: string; horodatage: string }[]
+  // « Impact et risque → Évaluation du risque pour la population »
+  // (#evaluation-risque-population, migration backend 0055) — liste
+  // dynamique, commune à Aérien et Terrestre, déjà triée par `ordre`.
+  evaluations_risque_population: {
+    id: string
+    ordre: number
+    habitat_proche: string | null
+    distance_km: number | null
+    sensibilisation: boolean | null
+  }[]
+}
 
 /** Carte blanche de la maquette : `#fff`, bordure `#e7e0cd`, rayon `11px`. */
 function Carte({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -101,7 +246,6 @@ export function TraitementDetailPage() {
     enabled: !!traitement,
   })
   const [reprisePromptOuvert, setReprisePromptOuvert] = useState(false)
-  const { nomAgent } = useAnnuaire()
   const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
   const [erreurPdf, setErreurPdf] = useState<string | null>(null)
 
@@ -250,10 +394,11 @@ export function TraitementDetailPage() {
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
-          {/* Fiche de lecture : mêmes tableaux que le PDF, construits depuis la fiche déjà chargée. */}
-          <FicheTraitementTableau
-            traitement={traitement}
-            chefEquipeNom={traitement.terrestre ? nomAgent(traitement.terrestre.chef_equipe_id) : null}
+          {/* Fiche de lecture : le gabarit du PDF (mêmes tableaux), servi par le backend. */}
+          <FicheTableau
+            endpoint={`/traitements/${traitement.id}/fiche-html`}
+            cleVersion={`${traitement.statut}|${traitement.updated_at}`}
+            titre={`Fiche de traitement ${traitement.numero_fiche}`}
           />
         </div>
 
