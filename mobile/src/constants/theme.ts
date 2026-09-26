@@ -141,6 +141,9 @@ export const UiColors = {
     strateCulturesHygro: '#4f9bb0',
     greenBorder: '#cfe0d4',
     infoText: '#3a5c43',
+    /** Encadré pédagogique (`blue-bg` / `blue-text` de DESIGN.md). */
+    blueBg: '#eaf0f7',
+    blueText: '#31567f',
     warnText: '#8a6d2f',
     warnBg: '#fdf6e7',
     warnBorder: '#f0e2bf',
@@ -176,6 +179,8 @@ export const UiColors = {
     strateCulturesHygro: '#4f9bb0',
     greenBorder: '#2f6b3f',
     infoText: '#a9d6b8',
+    blueBg: '#1d2a3a',
+    blueText: '#a9c7ea',
     warnText: '#fbbf24',
     warnBg: '#3a3020',
     warnBorder: '#5a4a2a',

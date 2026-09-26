@@ -39,7 +39,7 @@ export function VegetationStep({ brouillon, onContinuer }: Props) {
   const affichees = stratesAffichees(valeurs.strates, ajoutees);
 
   const retirer = (cle: StrateKey) => {
-    form.setFieldValue(`strates.${cle}`, { recouvrement: 0, hMoy: '', verdissement: '' });
+    form.setFieldValue(`strates.${cle}`, { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null });
     setAjoutees((liste) => liste.filter((k) => k !== cle));
   };
 

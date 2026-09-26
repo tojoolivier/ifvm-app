@@ -1,4 +1,4 @@
-import { number, object, string } from 'yup';
+import { boolean, number, object, string } from 'yup';
 
 /** Les 6 strates du JSON `vegetation`. Sol nu n'en est pas une : c'est `solNu`, rangé dans le JSON `sol`. */
 export const STRATE_KEYS = ['arboree', 'arbustive', 'buissonneuse', 'herbeuse', 'cultures_seches', 'cultures_hygro'] as const;
@@ -50,12 +50,18 @@ export interface StrateValeurs {
   recouvrement: number;
   hMoy: string;
   verdissement: string;
+  /** Détails de la feuille « Plus de détails » (#687). */
+  surfRel: string;
+  repousse: boolean | null;
 }
 
 export interface VegetationValeurs {
   solNu: number;
   strates: Record<StrateKey, StrateValeurs>;
 }
+
+/** Vrai si la feuille « Plus de détails » renseigne quelque chose (indicateur sur la carte). */
+export const aDesDetails = ({ surfRel, repousse }: Pick<StrateValeurs, 'surfRel' | 'repousse'>) => surfRel.trim() !== '' || repousse !== null;
 
 type Json = Record<string, unknown> | null | undefined;
 type Brouillon = { vegetation?: Json; sol?: Json };
@@ -77,7 +83,16 @@ export function valeursDeVegetation({ vegetation, sol }: Brouillon): VegetationV
   const strates = Object.fromEntries(
     STRATE_KEYS.map((k) => {
       const s = enregistrees[k];
-      return [k, { recouvrement: s?.recouvrement ?? 0, hMoy: versTexte(s?.hMoy), verdissement: versTexte(s?.verdissement) }];
+      return [
+        k,
+        {
+          recouvrement: s?.recouvrement ?? 0,
+          hMoy: versTexte(s?.hMoy),
+          verdissement: versTexte(s?.verdissement),
+          surfRel: versTexte(s?.surfRel),
+          repousse: typeof s?.repousse === 'boolean' ? s.repousse : null,
+        },
+      ];
     })
   ) as Record<StrateKey, StrateValeurs>;
   return { solNu: typeof sol?.solNu === 'number' ? sol.solNu : 0, strates };
@@ -93,9 +108,9 @@ export function champsDeVegetation({ vegetation, sol }: Brouillon, valeurs: Vege
     STRATE_KEYS.map((k) => {
       const v = valeurs.strates[k];
       // Strate retirée ou jamais renseignée : valeurs par défaut, sans rien hériter du brouillon.
-      const vide = v.recouvrement === 0 && v.hMoy.trim() === '' && v.verdissement.trim() === '';
+      const vide = v.recouvrement === 0 && v.hMoy.trim() === '' && v.verdissement.trim() === '' && !aDesDetails(v);
       if (vide) return [k, defaultStrateDetail()];
-      return [k, { ...defaultStrateDetail(), ...enregistrees[k], recouvrement: v.recouvrement, hMoy: versNombre(v.hMoy), verdissement: versNombre(v.verdissement) }];
+      return [k, { ...defaultStrateDetail(), ...enregistrees[k], recouvrement: v.recouvrement, hMoy: versNombre(v.hMoy), verdissement: versNombre(v.verdissement), surfRel: versNombre(v.surfRel), repousse: v.repousse }];
     })
   );
   return { vegetation: { ...vegetation, strates }, sol: { ...sol, solNu: valeurs.solNu } };
@@ -122,6 +137,8 @@ export function creerVegetationSchema(t: (cle: string) => string) {
     recouvrement: number().default(0).min(0).max(100),
     hMoy: nombre(0, null, 'prospection.vegetation.erreurs.hMoy'),
     verdissement: nombre(0, 100, 'prospection.vegetation.erreurs.verdissement'),
+    surfRel: nombre(0, 100, 'prospection.vegetation.erreurs.surfRel'),
+    repousse: boolean().nullable().default(null),
   });
   return object({
     solNu: number().default(0).min(0).max(100),

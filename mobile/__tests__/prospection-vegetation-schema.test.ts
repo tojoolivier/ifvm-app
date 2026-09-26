@@ -66,8 +66,8 @@ describe('valeursDeVegetation (reprise d’un brouillon)', () => {
       sol: { humidite: 'surface', solNu: 15 },
     });
     expect(v.solNu).toBe(15);
-    expect(v.strates.arbustive).toEqual({ recouvrement: 15, hMoy: '1,8', verdissement: '40' });
-    expect(v.strates.herbeuse).toEqual({ recouvrement: 0, hMoy: '', verdissement: '' });
+    expect(v.strates.arbustive).toEqual({ recouvrement: 15, hMoy: '1,8', verdissement: '40', surfRel: '', repousse: null });
+    expect(v.strates.herbeuse).toEqual({ recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null });
   });
 
   it('brouillon sans végétation : tout à 0, sol nu à 0', () => {
@@ -85,7 +85,7 @@ describe('champsDeVegetation (enregistrement)', () => {
 
   it('garde les 6 clés du JSON, convertit les textes en nombres et une strate non ajoutée reste par défaut', () => {
     const v = valeursDeVegetation(brouillon);
-    v.strates.arbustive = { recouvrement: 15, hMoy: '1,8', verdissement: '' };
+    v.strates.arbustive = { recouvrement: 15, hMoy: '1,8', verdissement: '', surfRel: '', repousse: null };
     const { vegetation } = champsDeVegetation(brouillon, v);
     const strates = (vegetation as { strates: Record<string, unknown> }).strates;
     expect(Object.keys(strates)).toEqual([...STRATE_KEYS]);
@@ -106,7 +106,7 @@ describe('champsDeVegetation — strate retirée', () => {
   it('une strate à 0 %, sans hauteur ni verdissement, repasse à ses valeurs par défaut (plus d’ORPAD hérité)', () => {
     const brouillon = { vegetation: { strates: { arbustive: { ...defaultStrateDetail(), recouvrement: 15, orpad: ['Rare'], surfRel: 30 } } }, sol: null };
     const v = valeursDeVegetation(brouillon);
-    v.strates.arbustive = { recouvrement: 0, hMoy: '', verdissement: '' };
+    v.strates.arbustive = { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null };
     const strates = (champsDeVegetation(brouillon, v).vegetation as { strates: Record<string, unknown> }).strates;
     expect(strates.arbustive).toEqual(defaultStrateDetail());
   });
@@ -116,7 +116,7 @@ describe('creerVegetationSchema', () => {
   const schema = creerVegetationSchema((cle) => cle);
   const valeurs = (arbustive: Partial<{ hMoy: string; verdissement: string }>) => {
     const v = valeursDeVegetation({});
-    v.strates.arbustive = { recouvrement: 15, hMoy: '', verdissement: '', ...arbustive };
+    v.strates.arbustive = { recouvrement: 15, hMoy: '', verdissement: '', surfRel: '', repousse: null, ...arbustive };
     return v;
   };
 
@@ -140,7 +140,7 @@ describe('creerVegetationSchema — recouvrement à 0 %', () => {
   const schema = creerVegetationSchema((cle) => cle);
   const avecRecouvrement = (recouvrement: number, champs: { hMoy?: string; verdissement?: string }) => {
     const v = valeursDeVegetation({});
-    v.strates.arboree = { recouvrement, hMoy: '', verdissement: '', ...champs };
+    v.strates.arboree = { recouvrement, hMoy: '', verdissement: '', surfRel: '', repousse: null, ...champs };
     return v;
   };
   const erreurs = (v: ReturnType<typeof valeursDeVegetation>) => {
@@ -162,5 +162,47 @@ describe('creerVegetationSchema — recouvrement à 0 %', () => {
   it('accepte ces valeurs dès que le recouvrement dépasse 0 %, et une strate à 0 % sans valeur', () => {
     expect(schema.isValidSync(avecRecouvrement(5, { hMoy: '4', verdissement: '30' }))).toBe(true);
     expect(schema.isValidSync(avecRecouvrement(0, {}))).toBe(true);
+  });
+});
+
+describe('surface relative et repousse (#687)', () => {
+  const brouillon = { vegetation: { strates: { herbeuse: { recouvrement: 50, surfRel: 70.5, repousse: false } } } };
+
+  it('valeursDeVegetation relit surfRel (virgule française) et repousse depuis vegetation.strates', () => {
+    const v = valeursDeVegetation(brouillon);
+    expect(v.strates.herbeuse).toMatchObject({ surfRel: '70,5', repousse: false });
+    expect(v.strates.arbustive).toMatchObject({ surfRel: '', repousse: null });
+  });
+
+  it('champsDeVegetation écrit surfRel en nombre et repousse en booléen, sans changer le format', () => {
+    const v = valeursDeVegetation(brouillon);
+    v.strates.herbeuse.surfRel = '80,5';
+    v.strates.herbeuse.repousse = true;
+    const { vegetation } = champsDeVegetation(brouillon, v);
+    expect(vegetation.strates.herbeuse).toMatchObject({ recouvrement: 50, surfRel: 80.5, repousse: true });
+  });
+
+  it('une strate à 0 % sans autre valeur retombe sur les valeurs par défaut', () => {
+    const { vegetation } = champsDeVegetation({}, valeursDeVegetation({}));
+    expect(vegetation.strates.arbustive).toEqual(defaultStrateDetail());
+  });
+});
+
+describe('validation de la surface relative (#687)', () => {
+  const schema = creerVegetationSchema((cle) => cle);
+  const valeurs = (recouvrement: number, surfRel: string) => {
+    const v = valeursDeVegetation({});
+    v.strates.herbeuse = { ...v.strates.herbeuse, recouvrement, surfRel };
+    return v;
+  };
+
+  it('accepte 0 à 100 avec virgule, refuse au-delà ou non numérique', async () => {
+    await expect(schema.isValid(valeurs(50, '70,5'))).resolves.toBe(true);
+    await expect(schema.isValid(valeurs(50, '120'))).resolves.toBe(false);
+    await expect(schema.isValid(valeurs(50, 'abc'))).resolves.toBe(false);
+  });
+
+  it('refuse une surface relative sur une strate à 0 %', async () => {
+    await expect(schema.isValid(valeurs(0, '30'))).resolves.toBe(false);
   });
 });

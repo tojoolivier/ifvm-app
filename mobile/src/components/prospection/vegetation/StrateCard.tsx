@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, NumberField, Stepper } from '@/components/ui';
+import { IconChevronDroit } from '@/components/ui/icons';
 import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import type { ErreursVegetation, VegetationForm } from '@/hooks/use-vegetation-form';
 import { useUiTheme } from '@/hooks/use-ui-theme';
-import type { StrateKey } from '@/lib/prospection-vegetation-schema';
+import { aDesDetails, type StrateKey } from '@/lib/prospection-vegetation-schema';
 import { JETON_COULEUR } from './couleurs';
+import { StrateDetailsSheet } from './StrateDetailsSheet';
 
 type Props = {
   cle: StrateKey;
@@ -19,6 +22,7 @@ type Props = {
 export function StrateCard({ cle, form, erreurs, onRetirer }: Props) {
   const c = useUiTheme();
   const { t } = useTranslation();
+  const [feuilleOuverte, setFeuilleOuverte] = useState(false);
   const nom = t(`prospection.vegetation.strates.${cle}`);
   const champ = (sous: 'hMoy' | 'verdissement', label: string, unite: string) => {
     const chemin = `strates.${cle}.${sous}` as const;
@@ -69,6 +73,31 @@ export function StrateCard({ cle, form, erreurs, onRetirer }: Props) {
         {champ('hMoy', t('prospection.vegetation.hMoy'), t('prospection.vegetation.metre'))}
         {champ('verdissement', t('prospection.vegetation.verdissement'), t('prospection.vegetation.pourcent'))}
       </View>
+      <Pressable
+        onPress={() => setFeuilleOuverte(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`${t('prospection.vegetation.plusDeDetails')} — ${nom}`}
+        style={styles.details}
+        testID={`plus-de-details-${cle}`}
+      >
+        <View style={styles.flex}>
+          <Text style={[UiText.bodyMedium, { color: c.primary }]}>{t('prospection.vegetation.plusDeDetails')}</Text>
+          <Text style={[UiText.micro, { color: c.fg3 }]}>{t('prospection.vegetation.plusDeDetailsResume')}</Text>
+        </View>
+        <form.Subscribe selector={(s) => aDesDetails(s.values.strates[cle])}>
+          {(renseignes) =>
+            renseignes ? (
+              <View
+                accessibilityLabel={t('prospection.vegetation.detailsRenseignes')}
+                style={[styles.indicateur, { backgroundColor: c.primary }]}
+                testID={`details-renseignes-${cle}`}
+              />
+            ) : null
+          }
+        </form.Subscribe>
+        <IconChevronDroit color={c.primary} />
+      </Pressable>
+      <StrateDetailsSheet cle={cle} form={form} erreurs={erreurs} visible={feuilleOuverte} onClose={() => setFeuilleOuverte(false)} />
     </Card>
   );
 }
@@ -77,5 +106,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   entete: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[10] },
   pastille: { width: UiSize.pastilleStrate, height: UiSize.pastilleStrate, borderRadius: Radius.full },
+  details: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[8] },
+  indicateur: { width: UiSize.pastilleStrate, height: UiSize.pastilleStrate, borderRadius: Radius.full },
   champs: { flexDirection: 'row', gap: UiSpace[10] },
 });

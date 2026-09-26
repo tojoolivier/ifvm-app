@@ -132,3 +132,40 @@ describe('VegetationStep — « Continuer »', () => {
     expect(onContinuer).not.toHaveBeenCalled();
   });
 });
+
+describe('VegetationStep — « Plus de détails » (#687)', () => {
+  it('le lien de la strate herbeuse ouvre la feuille de la maquette 02c : surface relative, encadré pédagogique, Repousse', async () => {
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    expect(screen.queryByText('Strate herbeuse · détails')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('plus-de-details-herbeuse'));
+
+    expect(screen.getByText('Strate herbeuse · détails')).toBeTruthy();
+    // Libellé du champ + titre de l’encadré, comme dans la maquette.
+    expect(screen.getAllByText('Surface relative')).toHaveLength(2);
+    expect(screen.getByText('Part de la station où la strate est présente. Les strates peuvent se superposer : le total peut dépasser 100 %.')).toBeTruthy();
+    expect(screen.getByText('Recouvrement (55 %)')).toBeTruthy();
+    expect(screen.getByText('Réglé dans la liste. Avec le sol nu, le total fait exactement 100 %.')).toBeTruthy();
+    expect(screen.getByText('Présence')).toBeTruthy();
+    expect(screen.getByText('Absence')).toBeTruthy();
+  });
+
+  it('Valider ferme la feuille ; la saisie (virgule) et Présence sont enregistrées dans vegetation.strates.herbeuse, l’indicateur s’affiche', async () => {
+    jest.mocked(enregistrerBrouillon).mockReset().mockResolvedValue('b-1');
+    await render(<VegetationStep brouillon={ficheMaquette()} onContinuer={jest.fn()} />);
+    expect(screen.queryByTestId('details-renseignes-herbeuse')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('plus-de-details-herbeuse'));
+    await fireEvent.changeText(screen.getByTestId('herbeuse-surfRel'), '70,5');
+    await fireEvent.press(screen.getByLabelText('Présence'));
+    await fireEvent.press(screen.getByText('Valider'));
+    for (let i = 0; i < 3; i++) await fireEvent.press(screen.getByLabelText('Augmenter Sol nu')); // 85 → 100 %
+
+    expect(screen.queryByText('Strate herbeuse · détails')).toBeNull();
+    expect(screen.getByTestId('details-renseignes-herbeuse')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('vegetation-continuer'));
+    await waitFor(() => expect(enregistrerBrouillon).toHaveBeenCalled());
+    const { vegetation } = jest.mocked(enregistrerBrouillon).mock.calls.at(-1)![0];
+    expect((vegetation as { strates: Record<string, unknown> }).strates.herbeuse).toMatchObject({ surfRel: 70.5, repousse: true });
+  });
+});
