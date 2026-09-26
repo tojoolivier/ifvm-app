@@ -1,4 +1,5 @@
-import { Outlet, NavLink, useNavigate, useMatches } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Outlet, NavLink, useLocation, useNavigate, useMatches } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { api } from '../api/client'
@@ -51,6 +52,18 @@ export function Layout() {
   const matches = useMatches()
   const handle = matches[matches.length - 1]?.handle as RouteHandle | undefined
   const title = handle?.title ?? ''
+
+  // Sous 1024 px le menu est un tiroir : il s'ouvre par le bouton de l'en-tête et se
+  // referme dès qu'on navigue, qu'on touche le fond ou qu'on appuie sur Échap.
+  const { pathname } = useLocation()
+  const [menuOuvert, setMenuOuvert] = useState(false)
+  useEffect(() => setMenuOuvert(false), [pathname])
+  useEffect(() => {
+    if (!menuOuvert) return
+    const fermerSurEchap = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOuvert(false)
+    window.addEventListener('keydown', fermerSurEchap)
+    return () => window.removeEventListener('keydown', fermerSurEchap)
+  }, [menuOuvert])
 
   function logout() {
     localStorage.removeItem('access_token')
@@ -117,19 +130,43 @@ export function Layout() {
   ]
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    // `h-dvh` : la hauteur visible réelle sur mobile (la barre d'adresse mange `100vh`).
+    <div className="flex h-screen h-dvh bg-gray-50">
+      {/* Fond du tiroir : toucher hors du menu le referme. */}
+      {menuOuvert && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden print:hidden"
+          aria-hidden
+          onClick={() => setMenuOuvert(false)}
+        />
+      )}
       {/* `print:hidden` : la navigation n'a pas de sens sur un rapport imprimé. */}
-      <aside className="w-[236px] shrink-0 bg-[#235a36] text-white flex flex-col print:hidden">
+      <aside
+        id="menu-principal"
+        className={`fixed inset-y-0 left-0 z-40 flex w-[236px] max-w-[85vw] shrink-0 flex-col overflow-y-auto bg-[#235a36] text-white transition-transform duration-200 lg:static lg:visible lg:translate-x-0 print:hidden ${
+          menuOuvert ? 'translate-x-0' : '-translate-x-full invisible'
+        }`}
+      >
         <div className="px-[18px] py-5 flex items-center gap-2.5 border-b border-white/[.14]">
           <div className="h-[38px] w-[38px] shrink-0 rounded-[10px] bg-white flex items-center justify-center overflow-hidden">
             <img src="/logo.png" alt="IFVM" className="h-full w-full object-cover" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-extrabold text-sm leading-tight truncate">IFVM · Supervision</p>
             <p className="text-[10.5px] font-medium text-white/62 leading-tight truncate">
               Lutte antiacridienne
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setMenuOuvert(false)}
+            aria-label="Fermer le menu"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-white/80 hover:bg-white/10 lg:hidden"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
         <nav className="flex-1 py-3 space-y-[3px] px-2.5">
           {navItems.map(({ to, label, count }) => (
@@ -138,7 +175,7 @@ export function Layout() {
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-[8px] px-[11px] py-[9px] text-sm ${
+                `flex items-center gap-2.5 rounded-[8px] px-[11px] py-[11px] text-sm lg:py-[9px] ${
                   isActive
                     ? 'bg-white/[.14] font-bold text-white'
                     : 'font-medium text-white/72 hover:bg-white/10'
@@ -181,9 +218,21 @@ export function Layout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto flex flex-col">
-        <header className="h-[66px] shrink-0 flex items-center justify-between gap-[18px] px-[28px] bg-[#fffdf8] border-b border-[#e7e0cd]">
-          <div className="min-w-0">
+      <main className="flex min-w-0 flex-1 flex-col overflow-auto">
+        <header className="h-[66px] shrink-0 flex items-center justify-between gap-3 px-4 sm:gap-[18px] sm:px-[28px] bg-[#fffdf8] border-b border-[#e7e0cd]">
+          <button
+            type="button"
+            onClick={() => setMenuOuvert((o) => !o)}
+            aria-label="Ouvrir le menu"
+            aria-expanded={menuOuvert}
+            aria-controls="menu-principal"
+            className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[#16201a] hover:bg-[#edece3] lg:hidden print:hidden"
+          >
+            <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+          <div className="min-w-0 flex-1">
             <p className="text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak truncate">
               {handle?.crumb ?? (handle?.parent ? `${handle.parent} / ${title}` : title || 'IFVM')}
             </p>
@@ -193,14 +242,15 @@ export function Layout() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {campagne && (
-              <span className="rounded-[20px] bg-ifvm-green-bg border border-ifvm-green-border px-[9px] py-[3px] text-[10.5px] font-semibold text-ifvm-green-text truncate max-w-[220px]">
+              <span className="hidden rounded-[20px] bg-ifvm-green-bg border border-ifvm-green-border px-[9px] py-[3px] text-[10.5px] font-semibold text-ifvm-green-text truncate max-w-[220px] md:inline">
                 {campagne.name}
               </span>
             )}
             {nbEnAttente > 0 && (
               <span className="flex items-center gap-1.5 rounded-[20px] bg-ifvm-amber-bg border border-ifvm-amber-border px-[9px] py-[3px] text-[10.5px] font-semibold text-ifvm-amber-text">
                 <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-ifvm-amber" />
-                {nbEnAttente} fiches en attente
+                <span className="sm:hidden">{nbEnAttente} en attente</span>
+                <span className="hidden sm:inline">{nbEnAttente} fiches en attente</span>
               </span>
             )}
           </div>

@@ -1047,10 +1047,12 @@ export function ReferentielsPage() {
     // Padding de contenu du handoff (README §Design tokens, « contenu 26px 28px 40px ») :
     // les 28px latéraux alignent la colonne de gauche sur le fil d'Ariane du header,
     // lui aussi à px-[28px] dans Layout.
-    <div className="grid grid-cols-[216px_1fr] items-start gap-5 px-7 pb-10 pt-[26px]">
+    <div className="grid grid-cols-1 items-start gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px] md:grid-cols-[216px_minmax(0,1fr)] md:gap-5">
       {/* Colonne gauche — cartes de navigation */}
-      <nav aria-label="Référentiels" className="flex flex-col gap-[7px]">
-        <SectionLabel>{`${ENTITES.length} référentiels`}</SectionLabel>
+      <nav aria-label="Référentiels" className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:gap-[7px] md:overflow-visible md:pb-0">
+        <div className="hidden md:block">
+          <SectionLabel>{`${ENTITES.length} référentiels`}</SectionLabel>
+        </div>
         {ENTITES.map((e) => {
           const active = e.key === selectedKey
           const count = e.pullKey ? (data?.[e.pullKey]?.upserts.length ?? 0) : null
@@ -1061,7 +1063,7 @@ export function ReferentielsPage() {
               aria-current={active ? 'true' : undefined}
               onClick={() => selectEntity(e.key)}
               className={cn(
-                'flex items-center gap-[9px] rounded-[10px] border-[1.5px] px-[13px] py-[11px] text-left transition-colors duration-[120ms]',
+                'flex w-[200px] shrink-0 items-center gap-[9px] rounded-[10px] border-[1.5px] px-[13px] py-[11px] text-left transition-colors duration-[120ms] md:w-auto md:shrink',
                 active
                   ? 'border-[#235a36] bg-ifvm-green-bg'
                   : 'border-[#e7e0cd] bg-white hover:bg-[#faf7ef]',
@@ -1151,7 +1153,7 @@ export function ReferentielsPage() {
 
         {/* Carte Enregistrements */}
         <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-white">
-          <div className="flex items-center gap-[10px] border-b border-[#f1ecdd] px-5 py-[13px]">
+          <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2 border-b border-[#f1ecdd] px-4 py-[13px] sm:px-5">
             <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
             <Label htmlFor="referentiel-recherche" className="sr-only">
               Rechercher parmi {entity.label.toLowerCase()}
@@ -1162,7 +1164,7 @@ export function ReferentielsPage() {
               value={search}
               onChange={(event) => updateSearch(event.target.value)}
               placeholder="Rechercher…"
-              className="h-9 w-48 rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px]"
+              className="order-last h-10 basis-full rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px] sm:order-none sm:h-9 sm:w-48 sm:basis-auto"
             />
             <button
               type="button"
@@ -1267,7 +1269,7 @@ export function ReferentielsPage() {
         {entity.write ? (
           fraicheurTerrain
         ) : (
-          <div className="grid grid-cols-[1fr_320px] items-start gap-4">
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="flex flex-col gap-[13px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-[18px]">
               <div>
                 <h3 className="font-sans text-[13px] font-bold">Modifier</h3>
@@ -1276,7 +1278,7 @@ export function ReferentielsPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                 {entity.fields.map((field) => (
                   <div key={field.label} className="flex flex-col gap-1.5">
                     <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak">
@@ -1351,16 +1353,16 @@ export function ReferentielsPage() {
             aria-label={`Modifier ${entity.rowLabel(editingRow)}`}
             className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
           >
-            <div className="border-b border-[#f4efe2] px-6 py-4">
+            <div className="border-b border-[#f4efe2] px-4 py-4 sm:px-6">
               <h2 className="font-sans text-[15px] font-extrabold">Modifier</h2>
               <p className="mt-0.5 font-mono text-[11px] font-medium text-ifvm-text-weak">
                 {entity.rowLabel(editingRow)}
               </p>
             </div>
-            <form onSubmit={submitEdit} className="flex flex-col gap-4 px-6 py-4">
+            <form onSubmit={submitEdit} className="flex flex-col gap-4 px-4 py-4 sm:px-6">
               {editError && <ErrorBanner label="Enregistrement impossible" message={editError} />}
 
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                 {entity.write.fields.map((field) => (
                   <EditableInput
                     key={field.name}
@@ -1427,13 +1429,13 @@ export function ReferentielsPage() {
             aria-label={entity.write.createTitle}
             className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
           >
-            <div className="border-b border-[#f4efe2] px-6 py-4">
+            <div className="border-b border-[#f4efe2] px-4 py-4 sm:px-6">
               <h2 className="font-sans text-[15px] font-extrabold">{entity.write.createTitle}</h2>
             </div>
-            <form onSubmit={submitCreate} className="flex flex-col gap-4 px-6 py-4">
+            <form onSubmit={submitCreate} className="flex flex-col gap-4 px-4 py-4 sm:px-6">
               {createError && <ErrorBanner label="Création impossible" message={createError} />}
 
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                 {entity.write.fields.map((field) => (
                   <EditableInput
                     key={field.name}

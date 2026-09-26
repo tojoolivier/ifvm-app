@@ -191,7 +191,7 @@ export function CartePage() {
   const hasFiltres = filtreStatut || filtreCampagne || filtreStationId
 
   return (
-    <div className="px-8 py-6 flex flex-col h-full">
+    <div className="px-4 py-4 sm:px-8 sm:py-6 flex flex-col h-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Carte des infestations</h1>
       </div>
@@ -313,7 +313,7 @@ export function CartePage() {
             )}
           </div>
 
-          <div className="flex items-center gap-4 ml-auto text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground sm:ml-auto">
             {(Object.keys(SEVERITE_LABELS) as SeveriteNiveau[]).map((s) => (
               <span key={s} className="flex items-center gap-1.5">
                 <span

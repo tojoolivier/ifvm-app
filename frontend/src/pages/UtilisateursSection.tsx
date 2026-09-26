@@ -317,7 +317,7 @@ export function UtilisateursSection({ showCreate, onShowCreateChange }: Utilisat
 
       {/* Carte Enregistrements */}
       <div className="overflow-hidden rounded-[11px] border border-[#e7e0cd] bg-white">
-        <div className="flex items-center gap-[10px] border-b border-[#f1ecdd] px-5 py-[13px]">
+        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2 border-b border-[#f1ecdd] px-4 py-[13px] sm:px-5">
           <h3 className="flex-1 font-sans text-[13px] font-bold">Enregistrements</h3>
           <Label htmlFor="utilisateurs-recherche" className="sr-only">
             Rechercher parmi les utilisateurs
@@ -328,7 +328,7 @@ export function UtilisateursSection({ showCreate, onShowCreateChange }: Utilisat
             value={search}
             onChange={(event) => updateSearch(event.target.value)}
             placeholder="Rechercher…"
-            className="h-9 w-48 rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px]"
+            className="order-last h-10 basis-full rounded-[8px] border-[#e0d9c4] bg-[#fffdf8] text-[12px] sm:order-none sm:h-9 sm:w-48 sm:basis-auto"
           />
           <button
             type="button"
@@ -401,12 +401,12 @@ export function UtilisateursSection({ showCreate, onShowCreateChange }: Utilisat
             aria-label="Nouvel utilisateur"
             className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-white shadow-xl"
           >
-            <div className="border-b border-[#f4efe2] px-6 py-4">
+            <div className="border-b border-[#f4efe2] px-4 py-4 sm:px-6">
               <h2 className="font-sans text-[15px] font-extrabold">Nouvel utilisateur</h2>
             </div>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-4 py-4 sm:px-6">
               {createError && <ErrorBanner label="Création impossible" message={createError} />}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="nu-prenom" className={fieldLabelClass}>
                     Prénom *

@@ -188,8 +188,8 @@ export function TraitementsPage() {
 
   return (
     // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
-    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
         <NavTabs
           ariaLabel="Sections des fiches de traitement"
           items={[

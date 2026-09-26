@@ -149,7 +149,7 @@ export function RepartitionProspections({
             </div>
 
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full border-collapse font-sans text-[12px]">
+              <table className="w-full min-w-[300px] border-collapse font-sans text-[12px]">
                 <caption className="sr-only">
                   Prospections par type — {mesure === 'fiches' ? 'en nombre de fiches' : 'en surface prospectée'}
                 </caption>
@@ -190,13 +190,13 @@ export function RepartitionProspections({
                           {p.label}
                         </span>
                       </th>
-                      <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums">
                         {nombreFr.format(p.nFiches)}
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums">
                         {nombreFr.format(p.surfaceHa)} ha
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums">
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono font-bold tabular-nums">
                         {nombreFr.format(p.pct)} %
                       </td>
                     </tr>
