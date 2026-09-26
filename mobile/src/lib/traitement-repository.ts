@@ -1,7 +1,7 @@
 import { getDb } from './prospection-db';
 import { creerOutbox } from './outbox';
 import { generateId } from './id';
-import { composerNumeroFiche } from './traitement-numero-fiche';
+import { codeTypeNumeroFiche, composerNumeroFiche, extraireSequenceNumeroFiche } from './traitement-numero-fiche';
 import { PreconditionError } from './errors';
 import { estAerienPretPourSynchro, estTerrestrePretPourSynchro } from './traitement-validation';
 
@@ -473,25 +473,39 @@ export async function createDraftTraitementTerrestre(
 const MAX_TENTATIVES_NUMERO_FICHE = 50;
 
 /**
- * Numéro de fiche lisible, unique en local, composé via `composerNumeroFiche`
- * (prénom du chef, type, date ISO) — même patron que `_persister_avec_numero_fiche_unique`
- * côté backend (backend/app/application/traitement_use_cases.py) : essaie d'abord le
- * numéro sans suffixe, puis incrémente (2, 3, …) tant qu'une autre fiche locale le porte
- * déjà. `excludeId` écarte la fiche elle-même (regénération d'un brouillon existant).
+ * Numéro de fiche unique en local (#numero-fiche-traitement-trt) : « TRT-[TERR|AER]-[Date]-[NNN] »,
+ * composé via `composerNumeroFiche`.
+ *
+ * Le numéro d'ordre NNN (001, 002, …) ne dépend pas de la date : il continue, PAR TYPE de
+ * traitement, à partir du plus grand numéro déjà porté sur cet appareil par une fiche de ce type
+ * (au nouveau format ; les fiches à l'ancien format « Prénom-Type-Date » ne comptent pas et
+ * gardent leur numéro). Premier numéro d'un type : 001. Le compteur est propre à l'appareil : deux
+ * téléphones peuvent produire le même numéro, le serveur ajoute alors un suffixe (« -2 ») à la
+ * synchronisation (`_persister_avec_numero_fiche_unique`, backend).
+ *
+ * Par sécurité, si le numéro d'ordre choisi est malgré tout déjà pris localement, un suffixe
+ * (2, 3, …) est ajouté. `excludeId` écarte la fiche elle-même (regénération d'un brouillon existant).
  */
 export async function genererNumeroFicheDisponible(
-  prenomChef: string,
   typeTraitement: TypeTraitement,
   dateTraitementIso: string,
-  excludeId?: string | null,
-  sigle?: string | null,
-  estReprise?: boolean
+  excludeId?: string | null
 ): Promise<string> {
   const db = await getDb();
-  let suffixe: number | null = null;
+  const prefixe = `TRT-${codeTypeNumeroFiche(typeTraitement)}-`;
+  const existants = await db.getAllAsync<{ numero_fiche: string }>(
+    'SELECT numero_fiche FROM traitement WHERE numero_fiche LIKE ? AND (? IS NULL OR id != ?)',
+    [`${prefixe}%`, excludeId ?? null, excludeId ?? null]
+  );
+  const dernier = existants.reduce(
+    (max, ligne) => Math.max(max, extraireSequenceNumeroFiche(typeTraitement, ligne.numero_fiche) ?? 0),
+    0
+  );
+  const sequence = dernier + 1;
 
+  let suffixe: number | null = null;
   for (let tentative = 0; tentative < MAX_TENTATIVES_NUMERO_FICHE; tentative++) {
-    const candidat = composerNumeroFiche(prenomChef, typeTraitement, dateTraitementIso, suffixe, sigle, estReprise);
+    const candidat = composerNumeroFiche(typeTraitement, dateTraitementIso, sequence, suffixe);
     const existant = await db.getFirstAsync<{ id: string }>(
       'SELECT id FROM traitement WHERE numero_fiche = ? AND (? IS NULL OR id != ?)',
       [candidat, excludeId ?? null, excludeId ?? null]
@@ -500,7 +514,7 @@ export async function genererNumeroFicheDisponible(
     suffixe = (suffixe ?? 1) + 1;
   }
 
-  throw new Error(`Impossible de générer un numero_fiche unique à partir de '${prenomChef}'`);
+  throw new Error(`Impossible de générer un numero_fiche unique de type '${typeTraitement}'`);
 }
 
 export async function updateTraitementReference(

@@ -1,64 +1,68 @@
-import { composerNumeroFiche } from '../src/lib/traitement-numero-fiche';
+import {
+  PREFIXE_NUMERO_FICHE,
+  codeTypeNumeroFiche,
+  composerNumeroFiche,
+  extraireSequenceNumeroFiche,
+} from '../src/lib/traitement-numero-fiche';
 
+// #numero-fiche-traitement-trt : « TRT-[TERR|AER]-[Date ISO]-[NNN] ».
 describe('composerNumeroFiche', () => {
-  it('composes prénom-Type-DateISO for AERIEN', () => {
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11')).toBe('Hery-Aerien-2026-08-11');
+  it('compose TRT-TERR-date-NNN pour un traitement terrestre', () => {
+    expect(composerNumeroFiche('TERRESTRE', '2026-09-26', 1)).toBe('TRT-TERR-2026-09-26-001');
   });
 
-  it('composes prénom-Type-DateISO for TERRESTRE', () => {
-    expect(composerNumeroFiche('Hery', 'TERRESTRE', '2026-08-11')).toBe('Hery-Terrestre-2026-08-11');
+  it('compose TRT-AER-date-NNN pour un traitement aérien', () => {
+    expect(composerNumeroFiche('AERIEN', '2026-09-26', 1)).toBe('TRT-AER-2026-09-26-001');
   });
 
-  it('truncates a full ISO timestamp to the date part', () => {
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11T10:30:00.000Z')).toBe('Hery-Aerien-2026-08-11');
+  it('complète le numéro d’ordre à trois chiffres, et grandit naturellement au-delà de 999', () => {
+    expect(composerNumeroFiche('TERRESTRE', '2026-09-26', 7)).toBe('TRT-TERR-2026-09-26-007');
+    expect(composerNumeroFiche('TERRESTRE', '2026-09-26', 42)).toBe('TRT-TERR-2026-09-26-042');
+    expect(composerNumeroFiche('TERRESTRE', '2026-09-26', 999)).toBe('TRT-TERR-2026-09-26-999');
+    expect(composerNumeroFiche('TERRESTRE', '2026-09-26', 1000)).toBe('TRT-TERR-2026-09-26-1000');
   });
 
-  it('appends the suffix when one is given (collision)', () => {
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', 2)).toBe('Hery-Aerien-2026-08-11-2');
+  it('ne garde que la date d’un horodatage ISO complet', () => {
+    expect(composerNumeroFiche('AERIEN', '2026-09-26T10:30:00.000Z', 3)).toBe('TRT-AER-2026-09-26-003');
   });
 
-  it('omits the suffix when null or undefined', () => {
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null)).toBe('Hery-Aerien-2026-08-11');
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', undefined)).toBe('Hery-Aerien-2026-08-11');
+  it('ajoute un suffixe seulement en cas de collision', () => {
+    expect(composerNumeroFiche('AERIEN', '2026-09-26', 3, 2)).toBe('TRT-AER-2026-09-26-003-2');
+    expect(composerNumeroFiche('AERIEN', '2026-09-26', 3, null)).toBe('TRT-AER-2026-09-26-003');
+    expect(composerNumeroFiche('AERIEN', '2026-09-26', 3, undefined)).toBe('TRT-AER-2026-09-26-003');
   });
 
-  // #sigle-utilisateur-numero-fiche
-  it('insère le sigle de l’utilisateur connecté juste avant le suffixe de collision', () => {
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, 'ADM')).toBe('Hery-Aerien-2026-08-11-ADM');
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', 2, 'ADM')).toBe('Hery-Aerien-2026-08-11-ADM-2');
+  it('ne contient plus ni prénom, ni sigle, ni « ANNEXE »', () => {
+    const numero = composerNumeroFiche('TERRESTRE', '2026-09-26', 5);
+    expect(numero.startsWith(`${PREFIXE_NUMERO_FICHE}-`)).toBe(true);
+    expect(numero).not.toMatch(/ANNEXE|Hery|Terrestre|Aerien/);
+  });
+});
+
+describe('codeTypeNumeroFiche', () => {
+  it('TERR pour le terrestre, AER pour l’aérien', () => {
+    expect(codeTypeNumeroFiche('TERRESTRE')).toBe('TERR');
+    expect(codeTypeNumeroFiche('AERIEN')).toBe('AER');
+  });
+});
+
+describe('extraireSequenceNumeroFiche', () => {
+  it('lit le numéro d’ordre d’un numéro du bon type', () => {
+    expect(extraireSequenceNumeroFiche('TERRESTRE', 'TRT-TERR-2026-09-26-007')).toBe(7);
+    expect(extraireSequenceNumeroFiche('AERIEN', 'TRT-AER-2026-01-02-1000')).toBe(1000);
   });
 
-  it('n’insère aucun tiret orphelin quand le sigle est absent, null ou vide', () => {
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, undefined)).toBe('Hery-Aerien-2026-08-11');
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, null)).toBe('Hery-Aerien-2026-08-11');
-    expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, '')).toBe('Hery-Aerien-2026-08-11');
+  it('ignore l’autre type de traitement', () => {
+    expect(extraireSequenceNumeroFiche('TERRESTRE', 'TRT-AER-2026-09-26-007')).toBeNull();
+    expect(extraireSequenceNumeroFiche('AERIEN', 'TRT-TERR-2026-09-26-007')).toBeNull();
   });
 
-  // #zone-a-reprendre-numero-annexe
-  describe('estReprise (#zone-a-reprendre-numero-annexe)', () => {
-    it('ajoute « -ANNEXE » quand la fiche est une reprise', () => {
-      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, null, true)).toBe(
-        'Hery-Aerien-2026-08-11-ANNEXE'
-      );
-    });
+  it('ignore l’ancien format « Prénom-Type-Date » (les anciennes fiches ne font pas avancer le compteur)', () => {
+    expect(extraireSequenceNumeroFiche('TERRESTRE', 'Hery-Terrestre-2026-09-26')).toBeNull();
+    expect(extraireSequenceNumeroFiche('TERRESTRE', 'Hery-Terrestre-2026-09-26-ADM-2')).toBeNull();
+  });
 
-    it('place « -ANNEXE » avant le suffixe de collision, jamais après', () => {
-      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', 2, null, true)).toBe(
-        'Hery-Aerien-2026-08-11-ANNEXE-2'
-      );
-    });
-
-    it('combine sigle et « -ANNEXE » sans tiret orphelin', () => {
-      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, 'ADM', true)).toBe(
-        'Hery-Aerien-2026-08-11-ADM-ANNEXE'
-      );
-    });
-
-    it('omet « -ANNEXE » quand estReprise est absent, false ou undefined', () => {
-      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11', null, null, false)).toBe(
-        'Hery-Aerien-2026-08-11'
-      );
-      expect(composerNumeroFiche('Hery', 'AERIEN', '2026-08-11')).toBe('Hery-Aerien-2026-08-11');
-    });
+  it('ignore un numéro suffixé par une collision : seul le numéro de base compte', () => {
+    expect(extraireSequenceNumeroFiche('TERRESTRE', 'TRT-TERR-2026-09-26-007-2')).toBeNull();
   });
 });

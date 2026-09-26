@@ -25,7 +25,6 @@ import { STATUT_VALIDE } from '@/lib/prospection-fiche-lecture';
 import { generateId } from '@/lib/id';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
 import { validateReferences } from '@/lib/traitement-validation';
-import { useAuthStore } from '@/lib/auth-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
@@ -60,7 +59,6 @@ export default function ReferencesScreen() {
 
   const store = useTraitementCaptureStore();
   const typeTraitement = store.typeTraitement;
-  const utilisateurConnecte = useAuthStore((s) => s.user);
   const [traitementId, setTraitementId] = useState<string | null>(routeTraitementId ?? null);
   const [prospectionId, setProspectionId] = useState<string | null>(routeProspectionId ?? null);
   const [dateValidation, setDateValidation] = useState<string | null>(null);
@@ -77,11 +75,6 @@ export default function ReferencesScreen() {
   const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const readOnly = isValidationView === '1';
-  // #zone-a-reprendre-numero-annexe : présence d'`origineId` = fiche démarrée
-  // depuis « Zones à reprendre » (cf. zones-a-reprendre.tsx) — son numéro
-  // porte alors « -ANNEXE », pour la distinguer au premier coup d'œil sur
-  // « Mes fiches »/« Zones à reprendre » d'un traitement neuf sans lien.
-  const estReprise = !!origineId;
   const hasGps = store.ref.latitude != null && store.ref.longitude != null;
   const { run: runGps, isRunning: isGpsLoading } = useAsyncAction();
   const { run, isRunning: isSaving } = useAsyncAction();
@@ -187,24 +180,15 @@ export default function ReferencesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prospectionId, routeTraitementId, signalerChargement]);
 
-  // N° de fiche (auto) : « Prénom du chef — Type — Date ISO », suffixe en cas de
-  // collision (même composition que generer_numero_fiche() côté backend). Le chef
-  // n'est choisi qu'à l'écran suivant (traitement.tsx) — on utilise donc le prénom
-  // de l'utilisateur connecté sur ce téléphone, celui qui fait la saisie (même
-  // convention que le chef de base par défaut sur l'écran Traitement). Ne recalcule
-  // jamais un numéro déjà présent (brouillon relu, ou déjà généré) : c'est le
-  // changement de type ci-dessous qui le remet à zéro pour forcer une régénération.
+  // N° de fiche (auto) : « TRT-[TERR|AER]-[Date ISO]-[NNN] » (#numero-fiche-traitement-trt), le
+  // numéro d'ordre continuant par type de traitement (même composition que
+  // generer_numero_fiche() côté backend). Ne recalcule jamais un numéro déjà présent
+  // (brouillon relu, ou déjà généré) : c'est le changement de type ci-dessous qui le remet à
+  // zéro pour forcer une régénération.
   useEffect(() => {
-    if (readOnly || store.ref.numeroFiche || !utilisateurConnecte || !typeTraitement || !store.ref.dateTraitement) return;
+    if (readOnly || store.ref.numeroFiche || !typeTraitement || !store.ref.dateTraitement) return;
     let cancelled = false;
-    genererNumeroFicheDisponible(
-      utilisateurConnecte.prenom,
-      typeTraitement,
-      store.ref.dateTraitement,
-      traitementId,
-      utilisateurConnecte.sigle,
-      estReprise
-    )
+    genererNumeroFicheDisponible(typeTraitement, store.ref.dateTraitement, traitementId)
       .then((numero) => {
         if (!cancelled) store.updateRef({ numeroFiche: numero });
       })
@@ -213,7 +197,7 @@ export default function ReferencesScreen() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readOnly, store.ref.numeroFiche, utilisateurConnecte, typeTraitement, store.ref.dateTraitement, traitementId, estReprise]);
+  }, [readOnly, store.ref.numeroFiche, typeTraitement, store.ref.dateTraitement, traitementId]);
 
   const handleContinuer = () =>
     run(
@@ -318,15 +302,8 @@ export default function ReferencesScreen() {
         // peut ne pas avoir résolu si l'agent enchaîne vite — on ne part jamais avec
         // numeroFiche encore null ici.
         let numeroFiche = store.ref.numeroFiche ?? null;
-        if (!numeroFiche && utilisateurConnecte && typeTraitement && store.ref.dateTraitement) {
-          numeroFiche = await genererNumeroFicheDisponible(
-            utilisateurConnecte.prenom,
-            typeTraitement,
-            store.ref.dateTraitement,
-            id,
-            utilisateurConnecte.sigle,
-            estReprise
-          );
+        if (!numeroFiche && typeTraitement && store.ref.dateTraitement) {
+          numeroFiche = await genererNumeroFicheDisponible(typeTraitement, store.ref.dateTraitement, id);
           store.updateRef({ numeroFiche });
         }
 
@@ -416,7 +393,7 @@ export default function ReferencesScreen() {
             <Text style={styles.label}>N° de fiche (auto)</Text>
             <Card variant="default" style={styles.ficheCard}>
               <Text style={styles.monoReadonly}>{store.ref.numeroFiche ?? '(généré à la saisie)'}</Text>
-              <Text style={styles.note}>Prénom du chef — Type — Date ISO, suffixe en cas de collision.</Text>
+              <Text style={styles.note}>TRT — Type (TERR ou AER) — Date — N° d’ordre (001, 002…) continu par type.</Text>
             </Card>
           </View>
 

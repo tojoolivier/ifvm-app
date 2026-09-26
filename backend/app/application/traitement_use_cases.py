@@ -48,18 +48,17 @@ async def _persister_avec_numero_fiche_unique(
     repository: TraitementRepository,
     traitement: Traitement,
     base_numero: str,
-    prenom_chef: str,
-    date_traitement: date,
-    type_libelle: str,
 ) -> Traitement:
-    """Réessaie la création avec un suffixe incrémental tant que numero_fiche est en conflit."""
+    """Réessaie la création avec un suffixe incrémental tant que numero_fiche est en conflit.
+
+    Le suffixe (« -2 », « -3 », …) s'ajoute au numéro de base tel quel — qu'il vienne du mobile
+    ou du serveur : il ne reconstruit jamais un numéro d'un autre format
+    (#numero-fiche-traitement-trt)."""
     for suffixe in range(2, _MAX_TENTATIVES_NUMERO_FICHE + 2):
         try:
             return await repository.create(traitement)
         except NumeroFicheConflitError:
-            candidat = generer_numero_fiche(
-                prenom_chef, date_traitement, suffixe=suffixe, type_traitement=type_libelle
-            )
+            candidat = f"{base_numero}-{suffixe}"
             if len(candidat) > _NUMERO_FICHE_MAX_LENGTH:
                 raise ValueError(
                     f"numero_fiche '{candidat}' dépasse {_NUMERO_FICHE_MAX_LENGTH} caractères"
@@ -106,11 +105,25 @@ async def _valider_site_principal(
         )
 
 
-def _generer_et_valider_numero_fiche(
-    numero_fiche: str | None, prenom_chef: str, date_traitement: date, type_libelle: str
+async def _generer_et_valider_numero_fiche(
+    repository: TraitementRepository,
+    numero_fiche: str | None,
+    date_traitement: date,
+    type_libelle: str,
+    numero_existant: str | None = None,
 ) -> str:
-    base_numero = numero_fiche or generer_numero_fiche(
-        prenom_chef, date_traitement, type_traitement=type_libelle
+    """Le numéro fourni par le mobile est repris tel quel ; à défaut, celui de la fiche déjà
+    persistée (une resynchronisation sans numéro ne doit ni en consommer un nouveau ni provoquer
+    un faux conflit) ; à défaut encore, le serveur en génère un
+    (« TRT-[TERR|AER]-[Date]-[NNN] », numéro d'ordre continué par type)."""
+    base_numero = (
+        numero_fiche
+        or numero_existant
+        or generer_numero_fiche(
+            date_traitement,
+            await repository.prochain_numero_ordre_fiche(type_libelle),
+            type_traitement=type_libelle,
+        )
     )
     if len(base_numero) > _NUMERO_FICHE_MAX_LENGTH:
         raise ValueError(
@@ -344,8 +357,8 @@ class CreateTraitementAerien:
         await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
         await _valider_equipe(self.equipe_repository, equipe_id, "aerien")
 
-        base_numero = _generer_et_valider_numero_fiche(
-            numero_fiche, chef.prenom, date_traitement, "Aerien"
+        base_numero = await _generer_et_valider_numero_fiche(
+            self.traitement_repository, numero_fiche, date_traitement, "Aerien"
         )
 
         traitement = _construire_traitement_base(
@@ -426,9 +439,6 @@ class CreateTraitementAerien:
             self.traitement_repository,
             traitement,
             base_numero,
-            chef.prenom,
-            date_traitement,
-            "Aerien",
         )
 
 
@@ -553,8 +563,8 @@ class CreateTraitementTerrestre:
 
         await _valider_equipe(self.equipe_repository, equipe_id, "terrestre")
 
-        base_numero = _generer_et_valider_numero_fiche(
-            numero_fiche, chef.prenom, date_traitement, "Terrestre"
+        base_numero = await _generer_et_valider_numero_fiche(
+            self.traitement_repository, numero_fiche, date_traitement, "Terrestre"
         )
 
         traitement = _construire_traitement_base(
@@ -648,9 +658,6 @@ class CreateTraitementTerrestre:
             self.traitement_repository,
             traitement,
             base_numero,
-            chef.prenom,
-            date_traitement,
-            "Terrestre",
         )
 
 
@@ -1312,8 +1319,12 @@ class SyncPushTraitementAerien:
         await _valider_site_principal(self.site_aerienne_repository, site_principal_id)
         await _valider_equipe(self.equipe_repository, equipe_id, "aerien")
 
-        base_numero = _generer_et_valider_numero_fiche(
-            numero_fiche, chef.prenom, date_traitement, "Aerien"
+        base_numero = await _generer_et_valider_numero_fiche(
+            self.traitement_repository,
+            numero_fiche,
+            date_traitement,
+            "Aerien",
+            numero_existant=existant.numero_fiche if existant is not None else None,
         )
 
         candidat = _construire_traitement_base(
@@ -1397,9 +1408,6 @@ class SyncPushTraitementAerien:
                 self.traitement_repository,
                 candidat,
                 base_numero,
-                chef.prenom,
-                date_traitement,
-                "Aerien",
             )
             return cree, True
 
@@ -1562,8 +1570,12 @@ class SyncPushTraitementTerrestre:
 
         await _valider_equipe(self.equipe_repository, equipe_id, "terrestre")
 
-        base_numero = _generer_et_valider_numero_fiche(
-            numero_fiche, chef.prenom, date_traitement, "Terrestre"
+        base_numero = await _generer_et_valider_numero_fiche(
+            self.traitement_repository,
+            numero_fiche,
+            date_traitement,
+            "Terrestre",
+            numero_existant=existant.numero_fiche if existant is not None else None,
         )
 
         candidat = _construire_traitement_base(
@@ -1662,9 +1674,6 @@ class SyncPushTraitementTerrestre:
                 self.traitement_repository,
                 candidat,
                 base_numero,
-                chef.prenom,
-                date_traitement,
-                "Terrestre",
             )
             return cree, True
 

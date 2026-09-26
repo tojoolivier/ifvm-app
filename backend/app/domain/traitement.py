@@ -883,14 +883,38 @@ def contenu_diverge(existant: "Traitement", entrant: "Traitement") -> bool:
     )
 
 
+PREFIXE_NUMERO_FICHE = "TRT"
+_CODE_TYPE_NUMERO_FICHE = {"Terrestre": "TERR", "Aerien": "AER"}
+
+
+def code_type_numero_fiche(type_traitement: str) -> str:
+    """« TERR » (Terrestre) ou « AER » (Aerien) — le code du type dans le numéro de fiche."""
+    return _CODE_TYPE_NUMERO_FICHE[type_traitement]
+
+
+def motif_numero_fiche(type_traitement: str) -> str:
+    """Expression régulière (POSIX/PCRE) d'un numéro de base de ce type ; le groupe 1 est le
+    numéro d'ordre. Un numéro suffixé par une collision (`…-001-2`) ou à l'ancien format ne
+    correspond pas."""
+    code = code_type_numero_fiche(type_traitement)
+    return rf"^{PREFIXE_NUMERO_FICHE}-{code}-\d{{4}}-\d{{2}}-\d{{2}}-(\d{{3,}})$"
+
+
 def generer_numero_fiche(
-    prenom_chef: str,
     date_traitement: date,
-    suffixe: int | None = None,
+    numero_ordre: int,
     type_traitement: str = "Aerien",
+    suffixe: int | None = None,
 ) -> str:
-    """Numéro de fiche lisible: [Prénom du chef]-[Aerien|Terrestre]-[Date], suffixe si collision."""
-    base = f"{prenom_chef}-{type_traitement}-{date_traitement.isoformat()}"
+    """Numéro de fiche : TRT-[TERR|AER]-[Date ISO]-[Numéro d'ordre sur 3 chiffres]
+    (#numero-fiche-traitement-trt), ex. `TRT-TERR-2026-09-26-001`.
+
+    Le numéro d'ordre ne dépend pas de la date : il continue, par type de traitement
+    (`TraitementRepository.prochain_numero_ordre_fiche`). Trois chiffres au minimum, plus au-delà de
+    999. `suffixe` (2, 3, …) n'est ajouté qu'en cas de collision.
+    """
+    code = code_type_numero_fiche(type_traitement)
+    base = f"{PREFIXE_NUMERO_FICHE}-{code}-{date_traitement.isoformat()}-{numero_ordre:03d}"
     if suffixe is None:
         return base
     return f"{base}-{suffixe}"

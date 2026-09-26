@@ -499,16 +499,43 @@ describe('updateTraitementReference', () => {
 });
 
 describe('genererNumeroFicheDisponible', () => {
-  it('returns the base number when no local fiche already carries it', async () => {
+  // #numero-fiche-traitement-trt : « TRT-[TERR|AER]-[Date]-[NNN] », le numéro d'ordre continue par type.
+  beforeEach(() => {
+    getAllAsync.mockReset().mockResolvedValue([]);
+    getFirstAsync.mockReset();
+  });
+
+  it('commence à 001 quand aucune fiche de ce type n’existe encore', async () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
-    const numero = await genererNumeroFicheDisponible('Hery', 'AERIEN', '2026-08-11');
+    const numero = await genererNumeroFicheDisponible('AERIEN', '2026-08-11');
 
-    expect(numero).toBe('Hery-Aerien-2026-08-11');
-    expect(getFirstAsync).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT id FROM traitement WHERE numero_fiche = ?'),
-      ['Hery-Aerien-2026-08-11', null, null]
-    );
+    expect(numero).toBe('TRT-AER-2026-08-11-001');
+    expect(getAllAsync).toHaveBeenCalledWith(expect.stringContaining('numero_fiche LIKE ?'), ['TRT-AER-%', null, null]);
+  });
+
+  it('continue le numéro d’ordre du type, quelle que soit la date des fiches existantes', async () => {
+    getAllAsync.mockResolvedValueOnce([
+      { numero_fiche: 'TRT-TERR-2026-01-05-001' },
+      { numero_fiche: 'TRT-TERR-2026-03-20-002' },
+      { numero_fiche: 'TRT-TERR-2026-02-11-007' },
+    ]);
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    const numero = await genererNumeroFicheDisponible('TERRESTRE', '2026-08-11');
+
+    expect(numero).toBe('TRT-TERR-2026-08-11-008');
+  });
+
+  it('ignore les anciennes fiches (ancien format) et les numéros suffixés pour le compteur', async () => {
+    getAllAsync.mockResolvedValueOnce([
+      { numero_fiche: 'TRT-TERR-2026-01-05-003' },
+      { numero_fiche: 'TRT-TERR-2026-01-05-003-2' },
+      { numero_fiche: 'TRT-TERR-mal-forme' },
+    ]);
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    expect(await genererNumeroFicheDisponible('TERRESTRE', '2026-08-11')).toBe('TRT-TERR-2026-08-11-004');
   });
 
   it('appends an incremental suffix while the candidate collides locally', async () => {
@@ -517,18 +544,19 @@ describe('genererNumeroFicheDisponible', () => {
       .mockResolvedValueOnce({ id: 'autre-fiche' }) // suffixe 2
       .mockResolvedValueOnce(null); // suffixe 3 libre
 
-    const numero = await genererNumeroFicheDisponible('Hery', 'TERRESTRE', '2026-08-11');
+    const numero = await genererNumeroFicheDisponible('TERRESTRE', '2026-08-11');
 
-    expect(numero).toBe('Hery-Terrestre-2026-08-11-3');
+    expect(numero).toBe('TRT-TERR-2026-08-11-001-3');
   });
 
   it('excludes the fiche itself so regenerating an existing draft does not collide with its own row', async () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
-    await genererNumeroFicheDisponible('Hery', 'AERIEN', '2026-08-11', AERIEN_INPUT.id);
+    await genererNumeroFicheDisponible('AERIEN', '2026-08-11', AERIEN_INPUT.id);
 
+    expect(getAllAsync).toHaveBeenCalledWith(expect.any(String), ['TRT-AER-%', AERIEN_INPUT.id, AERIEN_INPUT.id]);
     expect(getFirstAsync).toHaveBeenCalledWith(expect.any(String), [
-      'Hery-Aerien-2026-08-11',
+      'TRT-AER-2026-08-11-001',
       AERIEN_INPUT.id,
       AERIEN_INPUT.id,
     ]);
@@ -537,8 +565,8 @@ describe('genererNumeroFicheDisponible', () => {
   it('throws once every attempt up to the retry cap collides', async () => {
     getFirstAsync.mockResolvedValue({ id: 'toujours-pris' });
 
-    await expect(genererNumeroFicheDisponible('Hery', 'AERIEN', '2026-08-11')).rejects.toThrow(
-      "Impossible de générer un numero_fiche unique à partir de 'Hery'"
+    await expect(genererNumeroFicheDisponible('AERIEN', '2026-08-11')).rejects.toThrow(
+      "Impossible de générer un numero_fiche unique de type 'AERIEN'"
     );
   });
 });
