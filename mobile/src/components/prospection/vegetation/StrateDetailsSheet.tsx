@@ -5,6 +5,7 @@ import { Radius, UiSpace, UiText } from '@/constants/theme';
 import type { ErreursVegetation, VegetationForm } from '@/hooks/use-vegetation-form';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import type { StrateKey } from '@/lib/prospection-vegetation-schema';
+import { JETON_COULEUR } from './couleurs';
 
 type Props = {
   cle: StrateKey;
@@ -21,7 +22,8 @@ export function StrateDetailsSheet({ cle, form, erreurs, visible, onClose }: Pro
   const nom = t(`prospection.vegetation.strates.${cle}`);
   const chemin = `strates.${cle}.surfRel` as const;
   return (
-    <BottomSheet visible={visible} onClose={onClose} titre={t('prospection.vegetation.detailsTitre', { strate: nom })} testID={`details-${cle}`}>
+    <BottomSheet visible={visible} onClose={onClose} titre={t('prospection.vegetation.detailsTitre', { strate: nom })}
+      pastille={c[JETON_COULEUR[cle]] as string} testID={`details-${cle}`}>
       <form.Field name={chemin}>
         {(field) => (
           <NumberField

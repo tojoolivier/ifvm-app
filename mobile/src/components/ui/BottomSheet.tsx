@@ -8,13 +8,15 @@ import { useUiTheme } from '@/hooks/use-ui-theme';
 type Props = {
   visible: boolean;
   titre: string;
+  /** Couleur d'une pastille affichée devant le titre (ex. strate de végétation). */
+  pastille?: string;
   onClose: () => void;
   children: ReactNode;
   testID?: string;
 };
 
 /** Feuille modale (bottom sheet) : fond assombri cliquable pour fermer. */
-export function BottomSheet({ visible, titre, onClose, children, testID }: Props) {
+export function BottomSheet({ visible, titre, pastille, onClose, children, testID }: Props) {
   const c = useUiTheme();
   const { t } = useTranslation();
   return (
@@ -28,6 +30,7 @@ export function BottomSheet({ visible, titre, onClose, children, testID }: Props
       <View testID={testID} accessibilityViewIsModal style={[styles.feuille, { backgroundColor: c.surface }]}>
         <View style={[styles.poignee, { backgroundColor: c.borderField }]} />
         <View style={styles.entete}>
+          {pastille ? <View testID="bottom-sheet-pastille" style={[styles.pastille, { backgroundColor: pastille }]} /> : null}
           <Text accessibilityRole="header" style={[UiText.heading, styles.titre, { color: c.fg }]}>
             {titre}
           </Text>
@@ -50,6 +53,7 @@ const styles = StyleSheet.create({
   fond: { flex: 1 },
   entete: { flexDirection: 'row', alignItems: 'center', gap: UiSpace[10] },
   titre: { flex: 1 },
+  pastille: { width: UiSize.pastilleStrate, height: UiSize.pastilleStrate, borderRadius: Radius.full },
   feuille: {
     gap: UiSpace[12],
     padding: UiSpace[16],

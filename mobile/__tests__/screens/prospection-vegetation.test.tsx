@@ -141,6 +141,7 @@ describe('VegetationStep — « Plus de détails » (#687)', () => {
     await fireEvent.press(screen.getByTestId('plus-de-details-herbeuse'));
 
     expect(screen.getByText('Strate herbeuse · détails')).toBeTruthy();
+    expect(screen.getByTestId('bottom-sheet-pastille')).toHaveStyle({ backgroundColor: '#6aa84f' }); // strate/herbeuse
     // Libellé du champ + titre de l’encadré, comme dans la maquette.
     expect(screen.getAllByText('Surface relative')).toHaveLength(2);
     expect(screen.getByText('Part de la station où la strate est présente. Les strates peuvent se superposer : le total peut dépasser 100 %.')).toBeTruthy();

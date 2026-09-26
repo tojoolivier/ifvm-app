@@ -221,6 +221,24 @@ describe('BottomSheet', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('affiche une pastille de couleur devant le titre quand on la fournit', async () => {
+    await render(
+      <BottomSheet visible titre="Strate herbeuse · détails" pastille="#6aa84f" onClose={jest.fn()}>
+        <StatTile libelle="a" valeur="b" />
+      </BottomSheet>
+    );
+    expect(screen.getByTestId('bottom-sheet-pastille')).toHaveStyle({ backgroundColor: '#6aa84f' });
+  });
+
+  it('n’affiche pas de pastille par défaut', async () => {
+    await render(
+      <BottomSheet visible titre="Équipe" onClose={jest.fn()}>
+        <StatTile libelle="a" valeur="b" />
+      </BottomSheet>
+    );
+    expect(screen.queryByTestId('bottom-sheet-pastille')).toBeNull();
+  });
+
   it('ne rend rien quand masquée', async () => {
     await render(
       <BottomSheet visible={false} titre="Équipe" onClose={jest.fn()}>
