@@ -64,8 +64,6 @@ function traitementAerien(overrides: Record<string, unknown> = {}) {
       reprise_traitement: false,
       traitement_origine_id: null,
       surface_cumulee_ha: 320,
-      pesticide_recu_l: 600,
-      pesticide_stock_restant_l: 70,
       rotations: [
         {
           id: 'r1',
@@ -506,5 +504,79 @@ describe('TraitementDetailPage — équipe de la fiche', () => {
     renderPage(traitementAerien({ equipe_id: null }))
 
     await waitFor(() => expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('Équipe : non renseignée'))
+  })
+})
+
+// #609 : « Pesticide reçu » / « Stock restant » sont remplacés par la consommation générée.
+describe('TraitementDetailPage — consommation de pesticide (#609)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const CONSOMMATION = {
+    id: 'm1',
+    type: 'consommation',
+    pesticide_id: 'pest-1',
+    site_id: 's1',
+    site_destination_id: null,
+    quantite: 530,
+    unite: 'L',
+    date_mouvement: '2026-08-12',
+    created_at: '2026-08-12T10:00:00Z',
+    traitement_id: 't1',
+  }
+
+  it('fiche aérienne : affiche la consommation générée, lue dans le journal du stock', async () => {
+    renderPage(traitementAerien(), [], {}, {
+      '/mouvements-pesticide': () => Promise.resolve({ data: [CONSOMMATION] }),
+      '/pesticides': () =>
+        Promise.resolve({ data: [{ id: 'pest-1', code: 'PEST-FEN', nom: 'Fenitrothion', actif: true }] }),
+      '/sites-aeriens': () =>
+        Promise.resolve({ data: [{ id: 's1', numero: 'IHO01', localite: 'Ihosy', parent_site_id: null, actif: true }] }),
+    })
+
+    const section = await screen.findByRole('region', { name: 'Consommation de pesticide' })
+    expect(await within(section).findByText('PEST-FEN — Fenitrothion')).toBeInTheDocument()
+    expect(within(section).getByText('530 L')).toBeInTheDocument()
+    expect(within(section).getByRole('link', { name: 'Voir le stock' })).toHaveAttribute('href', '/stock-pesticides')
+    expect(mockedGet).toHaveBeenCalledWith('/mouvements-pesticide', { params: { traitement_id: 't1' } })
+  })
+
+  it('fiche aérienne : plus de « Pesticide reçu » ni de « Stock restant »', async () => {
+    renderPage(traitementAerien())
+    await screen.findByTestId('traitement-header')
+
+    expect(screen.queryByText(/Pesticide reçu/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Stock restant/i)).not.toBeInTheDocument()
+  })
+
+  it('fiche aérienne sans consommation : le dit clairement', async () => {
+    renderPage(traitementAerien())
+
+    expect(await screen.findByText(/Aucune consommation générée/)).toBeInTheDocument()
+  })
+
+  it('fiche terrestre : pas de panneau de consommation (le stock terrestre reste sur la fiche)', async () => {
+    renderPage(
+      traitementAerien({
+        id: 't1',
+        type_traitement: 'TERRESTRE',
+        aerien: null,
+        terrestre: {
+          chef_equipe_id: 'chef-1',
+          surface_traitee_ha: 12,
+          surface_protegee_ha: 0,
+          reprise_traitement: false,
+          traitement_origine_id: null,
+          surface_cumulee_ha: 12,
+          surface_restante_ha: 0,
+          produits: [],
+        } as never,
+      } as never),
+    )
+    await screen.findByTestId('traitement-header')
+
+    expect(screen.queryByRole('region', { name: 'Consommation de pesticide' })).not.toBeInTheDocument()
+    expect(mockedGet).not.toHaveBeenCalledWith('/mouvements-pesticide', expect.anything())
   })
 })

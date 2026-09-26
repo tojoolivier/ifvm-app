@@ -129,6 +129,8 @@ export function Layout() {
     // Parc aéronefs (#621) : lecture et affectations pour admin et chef ; l'écriture sur les
     // appareils est réservée à l'admin dans la page elle-même.
     ...(canAdminChef ? [{ to: '/parc-aeronefs', label: 'Parc aéronefs' }] : []),
+    // Stock de pesticides (#606, #609) : consultation pour admin et chef.
+    ...(canAdminChef ? [{ to: '/stock-pesticides', label: 'Stock pesticides' }] : []),
   ]
 
   return (
