@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { StatusBadge, type Statut } from '@/components/ui/status-badge'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { ErrorBanner } from '@/components/ui/error-banner'
+import { EvolutionCampagne } from '@/components/dashboard/EvolutionCampagne'
 import { campagneActive, type CampagneDatee } from '@/lib/campagne-active'
 import { useAnnuaire } from '@/lib/use-annuaire'
 import {
@@ -354,13 +355,27 @@ export function DashboardPage() {
   )
 
   /* ---------- Dérivés ---------- */
-  const campagne = campagneActive(campagnes)
+  // La liste déroulante du haut choisit la campagne affichée ; sans choix (ou si
+  // la campagne choisie a disparu), on retombe sur la campagne en cours.
+  const [campagneChoisieId, setCampagneChoisieId] = useState<string | null>(null)
+  const campagneEnCours = campagneActive(campagnes)
+  const campagne =
+    campagnes.find((c) => c.id === campagneChoisieId) ?? campagneEnCours
   const fiches = useMemo(
     () => (campagne ? prospections.filter((p) => p.campagne_id === campagne.id) : prospections),
     [prospections, campagne],
   )
-  const perimetre = campagne ? 'campagne en cours' : 'toutes campagnes'
+  const perimetre = !campagne
+    ? 'toutes campagnes'
+    : campagne.id === campagneEnCours?.id
+      ? 'campagne en cours'
+      : campagne.name
   const enChargement = fichesEnCours
+  // L'axe du graphique s'arrête à aujourd'hui pour une campagne encore ouverte
+  // ou dont la fin est planifiée : on ne trace pas de futur.
+  const aujourdhui = new Date().toISOString().slice(0, 10)
+  const finAxe =
+    campagne?.end_date && campagne.end_date < aujourdhui ? campagne.end_date : aujourdhui
 
   const traitementsCampagne = useMemo(() => {
     if (!campagne) return traitements
@@ -453,12 +468,16 @@ export function DashboardPage() {
           <label className="font-sans text-[11.5px] font-semibold uppercase tracking-[.05em] text-ifvm-text-weak">
             Campagne
           </label>
-          <select className="h-8 rounded-[8px] border border-[#d8d4c1] bg-card px-2.5 font-sans text-[13px] font-semibold text-foreground">
-            {campagnes.length === 0 && <option>{perimetre}</option>}
+          <select
+            value={campagne?.id ?? ''}
+            onChange={(e) => setCampagneChoisieId(e.target.value)}
+            className="h-8 rounded-[8px] border border-[#d8d4c1] bg-card px-2.5 font-sans text-[13px] font-semibold text-foreground"
+          >
+            {campagnes.length === 0 && <option value="">{perimetre}</option>}
             {campagnes.map((c) => (
-              <option key={c.id}>
+              <option key={c.id} value={c.id}>
                 {libelleCampagne(c)}
-                {c.id === campagne?.id ? ' (en cours)' : ''}
+                {c.id === campagneEnCours?.id ? ' (en cours)' : ''}
               </option>
             ))}
           </select>
@@ -636,41 +655,15 @@ export function DashboardPage() {
           </section>
 
           {/* Évolution */}
-          <section className={`${CARD} px-5 py-[18px]`}>
-            <div className="mb-3.5 flex items-baseline justify-between gap-2.5">
-              <div>
-                <h2 className="font-sans text-[14.5px] font-bold">Évolution de la campagne</h2>
-                <p className="mt-0.5 font-sans text-[12px] text-ifvm-text-weak">
-                  Superficies infestées, traitées et protégées — {perimetre}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-[7px] border border-[#d8d4c1] px-2.5 py-[5px] font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary hover:bg-[#edece3]"
-              >
-                Voir en tableau
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-x-[14px] gap-y-2 pb-2">
-              <span className="inline-flex items-center gap-1.5 font-sans text-[12px] font-semibold text-ifvm-text-tertiary">
-                <span className="h-[3px] w-[14px] rounded-[2px] bg-[#eb6834]" />
-                Infestée
-              </span>
-              <span className="inline-flex items-center gap-1.5 font-sans text-[12px] font-semibold text-ifvm-text-tertiary">
-                <span className="h-[3px] w-[14px] rounded-[2px] bg-[#1baf7a]" />
-                Traitée
-              </span>
-              <span className="inline-flex items-center gap-1.5 font-sans text-[12px] font-semibold text-ifvm-text-tertiary">
-                <span className="h-[3px] w-[14px] rounded-[2px] bg-[#2a78d6]" />
-                Protégée
-              </span>
-            </div>
-            <div className="relative h-[220px] w-full rounded-[10px] border border-dashed border-[#e7e0cd] bg-[#fafaf5]">
-              <div className="absolute inset-0 flex items-center justify-center font-sans text-[12px] text-ifvm-text-weak">
-                Graphique d’évolution — à brancher
-              </div>
-            </div>
-          </section>
+          <EvolutionCampagne
+            className={`${CARD} px-5 py-[18px]`}
+            prospections={fiches}
+            traitements={traitementsCampagne}
+            debut={campagne?.start_date}
+            fin={finAxe}
+            perimetre={perimetre}
+            enChargement={enChargement}
+          />
 
           {/* Carte */}
           <section className={`${CARD} px-5 py-[18px]`}>
