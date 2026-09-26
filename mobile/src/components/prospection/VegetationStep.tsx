@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useStore } from '@tanstack/react-form';
-import { Banner, PrimaryButton } from '@/components/ui';
+import { Banner, PrimaryButton, WizardFooter } from '@/components/ui';
 import { UiSpace } from '@/constants/theme';
 import { useVegetationForm } from '@/hooks/use-vegetation-form';
 import { logger } from '@/lib/logger';
 import { enregistrerBrouillon, type ProspectionCreate } from '@/lib/prospection-db';
 import {
   champsDeVegetation,
+  phenologieVide,
   repartition,
   STRATE_KEYS,
   stratesAffichees,
@@ -39,7 +40,7 @@ export function VegetationStep({ brouillon, onContinuer }: Props) {
   const affichees = stratesAffichees(valeurs.strates, ajoutees);
 
   const retirer = (cle: StrateKey) => {
-    form.setFieldValue(`strates.${cle}`, { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null });
+    form.setFieldValue(`strates.${cle}`, { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() });
     setAjoutees((liste) => liste.filter((k) => k !== cle));
   };
 
@@ -75,12 +76,14 @@ export function VegetationStep({ brouillon, onContinuer }: Props) {
         />
         {erreurEnregistrement && <Banner tone="error" message={erreurEnregistrement} />}
       </ScrollView>
-      <PrimaryButton
-        label={label}
-        disabled={!complete || Object.keys(erreurs.parChamp).length > 0}
-        onPress={continuer}
-        testID="vegetation-continuer"
-      />
+      <WizardFooter>
+        <PrimaryButton
+          label={label}
+          disabled={!complete || Object.keys(erreurs.parChamp).length > 0}
+          onPress={continuer}
+          testID="vegetation-continuer"
+        />
+      </WizardFooter>
     </View>
   );
 }

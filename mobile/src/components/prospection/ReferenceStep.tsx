@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Banner, PrimaryButton } from '@/components/ui';
+import { Banner, PrimaryButton, WizardFooter } from '@/components/ui';
 import { UiSpace } from '@/constants/theme';
 import { useEcritureBrouillon } from '@/hooks/use-ecriture-brouillon';
 import { usePositionReference, type PositionRetenue } from '@/hooks/use-position-reference';
@@ -201,13 +201,15 @@ export function ReferenceStep({ type, onContinuer, onNumeroFiche, brouillon }: P
         onRecherche={rattachement.setRecherche}
         onClose={rattachement.fermerFeuille}
       />
-      <PrimaryButton
-        label={t('prospection.reference.continuer')}
-        onPress={continuer}
-        manques={manques}
-        disabled={Object.keys(erreurs.parChamp).length > 0 || position.coordonneesInvalides}
-        testID="reference-continuer"
-      />
+      <WizardFooter>
+        <PrimaryButton
+          label={t('prospection.reference.continuer')}
+          onPress={continuer}
+          manques={manques}
+          disabled={Object.keys(erreurs.parChamp).length > 0 || position.coordonneesInvalides}
+          testID="reference-continuer"
+        />
+      </WizardFooter>
     </View>
   );
 }

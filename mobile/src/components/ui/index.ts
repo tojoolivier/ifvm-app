@@ -10,3 +10,4 @@ export { StatTile } from './StatTile';
 export { Stepper } from './Stepper';
 export { TimelineItem, type TimelineType } from './TimelineItem';
 export { WizardHeader } from './WizardHeader';
+export { WizardFooter } from './WizardFooter';
