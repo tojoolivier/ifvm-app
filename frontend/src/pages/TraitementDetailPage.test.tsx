@@ -143,7 +143,8 @@ function renderPage(
     return Promise.resolve({ data: [] })
   })
 
-  const queryClient = new QueryClient()
+  // Pas de nouvel essai : une erreur de chargement doit s'afficher tout de suite dans les tests.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/traitements/t1']}>
@@ -153,6 +154,11 @@ function renderPage(
       </MemoryRouter>
     </QueryClientProvider>,
   )
+}
+
+/** La fiche s'ouvre sur l'onglet « Fiche » (tableaux du PDF) : les cartes de la base sont dans « Données BDD ». */
+async function ouvrirDonneesBdd() {
+  fireEvent.click(await screen.findByRole('tab', { name: 'Données BDD' }))
 }
 
 describe('TraitementDetailPage — conformité maquette (README §7)', () => {
@@ -255,6 +261,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       }),
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     expect(screen.getByText('Évaluation du risque pour la population')).toBeInTheDocument()
     expect(screen.getByText(/Rizière communale/)).toBeInTheDocument()
@@ -272,6 +279,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
   it('affiche le tableau des rotations avec le nom du produit résolu et le total', async () => {
     renderPage(traitementAerien())
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     expect(screen.getByText('2 rotations · 530 l')).toBeInTheDocument()
     expect(screen.getByText('CUVE-01')).toBeInTheDocument()
@@ -302,6 +310,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       }),
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     expect(screen.getByText('Fenitrothion')).toBeInTheDocument()
     expect(screen.getByText('180')).toBeInTheDocument()
@@ -315,6 +324,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       }),
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     // `kit_botte: 0` dans la fixture, les quatre autres à 4 : c'est l'état lu
     // par un lecteur d'écran qui compte, pas la teinte de la pastille — et le
@@ -332,6 +342,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       }),
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     expect(screen.getByText('Sol')).toBeInTheDocument()
     expect(screen.getByText('Faible').className).toMatch(/ifvm-green-bg/)
@@ -517,6 +528,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       }),
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     expect(screen.getByText('Informations complémentaires')).toBeInTheDocument()
     expect(screen.getByText('-22,4021 · 44,3167')).toBeInTheDocument()
@@ -540,6 +552,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       { utilisateurs: [{ id: 'u-chef', nom: 'Marie Rabe', role: 'chef_de_base' }] },
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     // `within` la carte : « Marie Rabe » apparaît aussi dans les Signatures
     // (rôle CHEF_DE_BASE) — deux endroits distincts pour la même personne.
@@ -565,6 +578,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       }),
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     const carte = within(screen.getByText('Équipe & aéronef').closest('section')!)
     expect(await carte.findByText('Stand Ihosy')).toBeInTheDocument()
@@ -599,6 +613,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       { utilisateurs: [{ id: 'u-chef-equipe', nom: 'Soa Lalao', role: 'chef_equipe' }] },
     )
     await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await ouvrirDonneesBdd()
 
     expect(screen.getByText('Équipe & matériel')).toBeInTheDocument()
     expect(await screen.findByText('Soa Lalao')).toBeInTheDocument()
@@ -642,5 +657,52 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
     fireEvent.click(modale.getByRole('button', { name: 'Fermer' }))
     expect(screen.queryByRole('dialog', { name: 'Demander une reprise' })).not.toBeInTheDocument()
+  })
+})
+
+describe('TraitementDetailPage — onglets « Fiche » / « Données BDD »', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const HTML_CRT = '<html><body><h1>FICHE CRT</h1><table><tr><th>Rotation</th></tr></table></body></html>'
+
+  function renderAvecFicheHtml(traitement: ReturnType<typeof traitementAerien>) {
+    return renderPage(traitement, [], {}, {
+      '/traitements/t1/fiche-html': () => Promise.resolve({ data: HTML_CRT }),
+    })
+  }
+
+  it('ouvre sur « Fiche » : le gabarit du CRT est affiché dans un iframe isolé', async () => {
+    renderAvecFicheHtml(traitementAerien())
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByRole('tab', { name: 'Fiche' })).toHaveAttribute('aria-selected', 'true')
+    const cadre = await screen.findByTitle('Fiche de traitement Jean-AERIEN-2026-08-12')
+    expect(cadre).toHaveAttribute('srcdoc', HTML_CRT)
+    expect(cadre.getAttribute('sandbox')).not.toContain('allow-scripts')
+    expect(mockedGet).toHaveBeenCalledWith('/traitements/t1/fiche-html', { responseType: 'text' })
+    // Les cartes de la base ne sont pas affichées par défaut.
+    expect(screen.queryByText('Rotations')).toBeNull()
+  })
+
+  it('« Données BDD » affiche les cartes, « Fiche » ramène au tableau', async () => {
+    renderAvecFicheHtml(traitementAerien())
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Données BDD' }))
+    expect(screen.queryByTitle('Fiche de traitement Jean-AERIEN-2026-08-12')).toBeNull()
+    expect(screen.getByText('Rotations')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Fiche' }))
+    expect(await screen.findByTitle('Fiche de traitement Jean-AERIEN-2026-08-12')).toBeInTheDocument()
+  })
+
+  it('garde les signatures et les surfaces visibles sous les deux onglets', async () => {
+    renderAvecFicheHtml(traitementAerien())
+    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+
+    expect(screen.getByText('Signatures')).toBeInTheDocument()
+    expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
   })
 })

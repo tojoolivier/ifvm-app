@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { api } from '../api/client'
@@ -12,6 +12,9 @@ vi.mock('../api/client', () => ({
 }))
 
 const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>
+
+/** Gabarit HTML du PDF tel que le backend le sert sur `GET /prospections/{id}/fiche-html`. */
+const FICHE_HTML = '<html><body><h1>FICHE DE PROSPECTION ANTIACRIDIENNE</h1><table><tr><th>Sexe</th></tr></table></body></html>'
 
 const UTILISATEURS = [
   { id: 'u1', nom: 'Randria Jean', role: 'prospecteur' },
@@ -28,6 +31,7 @@ function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit 
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections/p1') return Promise.resolve({ data: fiche })
     if (url === '/prospections/p1/audit-log') return Promise.resolve({ data: audit })
+    if (url === '/prospections/p1/fiche-html') return Promise.resolve({ data: FICHE_HTML })
     if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role } })
     if (url === '/campagnes') return Promise.resolve({ data: [{ id: 'c1', name: 'Campagne 2026' }] })
     if (url === '/users/') return Promise.resolve({ data: UTILISATEURS })
@@ -38,7 +42,8 @@ function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit 
     return Promise.resolve({ data: [] })
   })
 
-  const queryClient = new QueryClient()
+  // Pas de nouvel essai : une erreur de chargement doit s'afficher tout de suite dans les tests.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/prospections/p1']}>
@@ -54,8 +59,13 @@ function renderPage(statut: ProspectionBdd['statut'], overrides: Partial<Prospec
   return renderFiche(ficheComplete({ statut, ...overrides }), { role })
 }
 
+/**
+ * Attend la fiche puis ouvre « Données BDD » : la fiche s'ouvre sur l'onglet « Fiche »
+ * (tableaux du PDF), alors que ces tests vérifient les cartes, une par colonne de la base.
+ */
 async function attendreFiche() {
   await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('tab', { name: 'Données BDD' }))
 }
 
 /** Ligne d'une colonne de la base, repérée par son nom de colonne. */
@@ -473,5 +483,57 @@ describe('ProspectionDetailPage — journal d’audit (table audit_log)', () => 
     await attendreFiche()
 
     expect(screen.getByText("Aucune entrée dans le journal d'audit.")).toBeInTheDocument()
+  })
+})
+
+describe('ProspectionDetailPage — onglets « Fiche » / « Données BDD »', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('ouvre sur « Fiche » : le gabarit du PDF est affiché dans un iframe isolé', async () => {
+    renderPage('verifiee')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+
+    expect(screen.getByRole('tab', { name: 'Fiche' })).toHaveAttribute('aria-selected', 'true')
+    const cadre = await screen.findByTitle('Fiche de prospection F-001')
+    expect(cadre).toHaveAttribute('srcdoc', FICHE_HTML)
+    // Aucun script du document ne doit pouvoir s'exécuter.
+    expect(cadre.getAttribute('sandbox')).not.toContain('allow-scripts')
+    expect(mockedGet).toHaveBeenCalledWith('/prospections/p1/fiche-html', { responseType: 'text' })
+    // Les cartes de la base ne sont pas affichées par défaut.
+    expect(document.querySelector('[data-colonne="statut"]')).toBeNull()
+  })
+
+  it('« Données BDD » affiche les cartes de la base, « Fiche » ramène au tableau', async () => {
+    renderPage('verifiee')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Données BDD' }))
+    expect(screen.queryByTitle('Fiche de prospection F-001')).toBeNull()
+    expect(colonne('statut')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Fiche' }))
+    expect(await screen.findByTitle('Fiche de prospection F-001')).toBeInTheDocument()
+  })
+
+  it('garde les actions et le journal visibles sous les deux onglets', async () => {
+    renderPage('verifiee')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: 'Valider la fiche' })).toBeInTheDocument()
+    expect(screen.getByText('Journal de validation')).toBeInTheDocument()
+  })
+
+  it("signale une erreur claire quand la fiche ne peut pas être chargée", async () => {
+    renderPage('verifiee')
+    mockedGet.mockImplementation((url: string) =>
+      url === '/prospections/p1/fiche-html'
+        ? Promise.reject(new Error('500'))
+        : Promise.resolve({ data: url === '/prospections/p1' ? ficheComplete({ statut: 'verifiee' }) : [] }),
+    )
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+
+    expect(await screen.findByText('Impossible de charger la fiche.')).toBeInTheDocument()
   })
 })

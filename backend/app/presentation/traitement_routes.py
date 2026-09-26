@@ -3,7 +3,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.traitement_use_cases import (
@@ -381,6 +381,21 @@ async def get_traitement_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nom_fichier}"'},
     )
+
+
+@router.get("/{traitement_id}/fiche-html", response_class=HTMLResponse)
+async def get_traitement_fiche_html(
+    traitement_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+):
+    """Même gabarit HTML que `/pdf`, servi tel quel pour la lecture à l'écran (onglet
+    « Fiche » du web). Pas de garde « validé uniquement » : un brouillon ou une fiche en
+    attente se lit aussi, seul le téléchargement du PDF reste réservé aux fiches validées."""
+    traitement = await GetTraitement(get_repository(db)).execute(traitement_id)
+    if traitement is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Traitement non trouvé")
+    return HTMLResponse(build_crt_html(TraitementRead.model_validate(traitement)))
 
 
 @router.post("/{traitement_id}/rotations", response_model=TraitementRead, status_code=201)
