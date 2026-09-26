@@ -11,15 +11,15 @@ import {
   buildActiviteRecente,
   buildPipeline,
   buildTopStations,
-  compteProspections,
+  pourcentage,
   repartitionModes,
   repartitionProduits,
   repartitionVoies,
+  sommePesticide,
   sommeSurfaceInfestee,
+  sommeSurfaceProspectee,
   sommeSurfaceProtegee,
   sommeSurfaceTraitee,
-  sommePesticides,
-  tauxValidation,
   type DashboardPesticide,
   type DashboardProspection,
   type DashboardStation,
@@ -150,6 +150,8 @@ interface KpiProps {
   label: string
   valeur: string
   unite?: string
+  /** Seconde mesure sur la même ligne (pesticide : litres puis kilogrammes). */
+  secondaire?: { valeur: string; unite: string }
   icon: string
   iconBg: string
   iconColor: string
@@ -163,6 +165,7 @@ function KpiCard({
   label,
   valeur,
   unite,
+  secondaire,
   icon,
   iconBg,
   iconColor,
@@ -183,6 +186,14 @@ function KpiCard({
             {unite && (
               <span className="ml-[3px] text-[13px] font-semibold text-ifvm-text-tertiary">
                 {unite}
+              </span>
+            )}
+            {secondaire && (
+              <span className="ml-3">
+                {secondaire.valeur}
+                <span className="ml-[3px] text-[13px] font-semibold text-ifvm-text-tertiary">
+                  {secondaire.unite}
+                </span>
               </span>
             )}
           </div>
@@ -357,10 +368,11 @@ export function DashboardPage() {
     return traitements.filter((t) => idsFiches.has(t.prospection_id))
   }, [traitements, fiches, campagne])
 
+  const surfaceProspectee = sommeSurfaceProspectee(fiches)
   const surfaceInfestee = sommeSurfaceInfestee(fiches)
   const { total: surfaceTraitee, sansSurface } = sommeSurfaceTraitee(traitementsCampagne)
   const surfaceProtegee = sommeSurfaceProtegee(traitementsCampagne)
-  const volumePesticides = sommePesticides(traitementsCampagne)
+  const pesticide = sommePesticide(traitementsCampagne)
   const voies = repartitionVoies(traitementsCampagne)
   const modes = repartitionModes(traitementsCampagne)
   const produits = repartitionProduits(traitementsCampagne, pesticidesData)
@@ -378,11 +390,9 @@ export function DashboardPage() {
   )
 
   /* ---------- Dérivés KPI ---------- */
-  const nbIntensives = compteProspections(fiches, 'intensive')
-  const nbInterventions = traitementsCampagne.length
-  const validation = tauxValidation(fiches)
-  const tauxCouverture =
-    surfaceInfestee > 0 ? Math.round((surfaceTraitee / surfaceInfestee) * 1000) / 10 : 0
+  const partInfestee = pourcentage(surfaceInfestee, surfaceProspectee)
+  const partTraitee = pourcentage(surfaceTraitee, surfaceInfestee)
+  const partProtegee = pourcentage(surfaceProtegee, surfaceInfestee)
   const stationsActives = stations.length
 
   /* ---------- Colonnes tableau ---------- */
@@ -487,43 +497,33 @@ export function DashboardPage() {
       </section>
 
       {/* ============== KPI ============== */}
-      <section className="grid grid-cols-1 gap-[14px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <section className="grid grid-cols-1 gap-[14px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard
-          label="Prospections"
-          valeur={enChargement ? '…' : nombreFr.format(fiches.length)}
+          label="Surface prospectée"
+          valeur={enChargement ? '…' : nombreFr.format(Math.round(surfaceProspectee))}
+          unite="ha"
           icon="search"
           iconBg="rgba(31,110,82,0.12)"
           iconColor="var(--ifvm-green-text)"
-          sousTitre={`dont ${nombreFr.format(nbIntensives)} intensives · ${perimetre}`}
+          sousTitre={`cumul déclaré · ${perimetre}`}
         />
 
         <KpiCard
-          label="Taux de validation"
-          valeur={enChargement ? '…' : nombreFr.format(validation?.validation ?? 0)}
-          unite="%"
-          icon="shield"
-          iconBg="rgba(42,120,214,0.12)"
-          iconColor="#2a78d6"
-          meter={{
-            pct: validation?.validation ?? 0,
-            legende: 'Fiches validées parmi les fiches statuées',
-            valeurAffichee: `${validation?.validation ?? 0} %`,
-            couleur: '#2a78d6',
-          }}
-          sousTitre={
-            validation
-              ? `${validation.rejet} % rejetées (motif renseigné)`
-              : 'aucune fiche statuée'
-          }
-        />
-
-        <KpiCard
-            label="Surface infestée"
+          label="Surface infestée"
           valeur={enChargement ? '…' : nombreFr.format(Math.round(surfaceInfestee))}
           unite="ha"
           icon="locust"
           iconBg="rgba(209,102,60,0.15)"
           iconColor="#d1663c"
+          meter={{
+            pct: partInfestee ?? 0,
+            legende:
+              partInfestee !== null
+                ? `${nombreFr.format(partInfestee)} % de la surface prospectée`
+                : 'aucune surface prospectée déclarée',
+            valeurAffichee: `${nombreFr.format(Math.round(surfaceInfestee))} ha`,
+            couleur: '#d1663c',
+          }}
         />
 
         <KpiCard
@@ -534,8 +534,11 @@ export function DashboardPage() {
           iconBg="rgba(31,110,82,0.12)"
           iconColor="var(--ifvm-green-text)"
           meter={{
-            pct: tauxCouverture,
-            legende: `${tauxCouverture.toLocaleString('fr-FR')} % de la surface infestée`,
+            pct: partTraitee ?? 0,
+            legende:
+              partTraitee !== null
+                ? `${nombreFr.format(partTraitee)} % de la surface infestée`
+                : 'aucune surface infestée déclarée',
             valeurAffichee: `${nombreFr.format(Math.round(surfaceTraitee))} ha`,
             couleur: 'var(--ifvm-green-text)',
           }}
@@ -543,38 +546,36 @@ export function DashboardPage() {
 
         <KpiCard
           label="Surface protégée"
-            valeur={enChargement ? '…' : nombreFr.format(Math.round(surfaceProtegee))}
+          valeur={enChargement ? '…' : nombreFr.format(Math.round(surfaceProtegee))}
           unite="ha"
           icon="shield"
           iconBg="rgba(42,120,214,0.12)"
           iconColor="#2a78d6"
-            sousTitre="Surface couverte par un traitement de barrière"
+          meter={{
+            pct: partProtegee ?? 0,
+            legende:
+              partProtegee !== null
+                ? `${nombreFr.format(partProtegee)} % de la surface infestée`
+                : 'aucune surface infestée déclarée',
+            valeurAffichee: `${nombreFr.format(Math.round(surfaceProtegee))} ha`,
+            couleur: '#2a78d6',
+          }}
         />
 
+        {/* Litres et kilogrammes restent deux totaux distincts : ils ne
+            s'additionnent pas, la densité dépend du produit. */}
         <KpiCard
-          label="Pesticides utilisés"
-            valeur={enChargement ? '…' : nombreFr.format(Math.round(volumePesticides))}
+          label="Pesticide consommé"
+          valeur={enChargement ? '…' : nombreFr.format(Math.round(pesticide.litres))}
           unite="L"
+          secondaire={{
+            valeur: enChargement ? '…' : nombreFr.format(Math.round(pesticide.kilos)),
+            unite: 'kg',
+          }}
           icon="flask"
           iconBg="rgba(74,58,167,0.13)"
           iconColor="#4a3aa7"
-            segments={produits.map((produit, index) => ({
-              pct: produit.pct,
-              couleur: ['#4a3aa7', '#e34948', '#7d8578'][index],
-            }))}
-        />
-
-        <KpiCard
-          label="Interventions réalisées"
-          valeur={enChargement ? '…' : nombreFr.format(nbInterventions)}
-          icon="target"
-          iconBg="rgba(181,101,45,0.14)"
-          iconColor="#b5652d"
-          sousTitre={
-            nbInterventions > 0
-              ? `≈ ${nombreFr.format(Math.round(surfaceTraitee / nbInterventions))} ha / intervention`
-              : 'aucune intervention enregistrée'
-          }
+          sousTitre="aérien + terrestre · L et kg non convertis"
         />
       </section>
 
