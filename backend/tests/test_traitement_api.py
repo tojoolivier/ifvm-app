@@ -2949,3 +2949,24 @@ async def test_create_traitement_expose_equipe_id(
     relu = await client.get(f"/traitements/{resp.json()['id']}", headers=auth_headers)
     assert relu.status_code == 200
     assert relu.json()["equipe_id"] == str(equipe_terrestre_id)
+
+
+# #numero-fiche-traitement-trt : le compteur (requête SQL sur le numéro d'ordre) reconnaît un
+# numéro portant le sigle du chef entre la date et le numéro d'ordre.
+@pytest.mark.asyncio
+async def test_le_compteur_continue_apres_un_numero_avec_sigle(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    r1 = await client.post(
+        "/traitements",
+        json=payload_traitement(prospection_id, numero_fiche="TRT-AER-2026-08-11-ABC-005"),
+        headers=auth_headers,
+    )
+    assert r1.status_code == 201, r1.text
+    assert r1.json()["numero_fiche"] == "TRT-AER-2026-08-11-ABC-005"
+    r2 = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert r2.status_code == 201, r2.text
+    assert r2.json()["numero_fiche"] == "TRT-AER-2026-08-11-006"

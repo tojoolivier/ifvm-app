@@ -348,3 +348,22 @@ async def test_pull_utilisateurs_equipe_inclut_les_comptes_inactifs(
     assert response.status_code == 200
     equipe = {u["id"]: u["actif"] for u in response.json()["utilisateurs_equipe"]["upserts"]}
     assert equipe[str(collegue_meme_pa.id)] is False
+
+
+@pytest.mark.asyncio
+async def test_pull_utilisateurs_equipe_transporte_le_sigle(
+    client: AsyncClient, utilisateur_avec_pa, collegue_meme_pa, db_session: AsyncSession
+):
+    """#numero-fiche-traitement-trt : le numéro d'une fiche de traitement porte le sigle de son
+    chef, que le mobile doit connaître hors ligne — il descend avec la liste des utilisateurs."""
+    collegue_meme_pa.sigle = "RKT"
+    db_session.add(collegue_meme_pa)
+    await db_session.commit()
+
+    token = create_access_token(utilisateur_avec_pa.id)
+    response = await client.get("/referentiel/pull", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    sigles = {u["id"]: u["sigle"] for u in response.json()["utilisateurs_equipe"]["upserts"]}
+    assert sigles[str(collegue_meme_pa.id)] == "RKT"
+    assert sigles[str(utilisateur_avec_pa.id)] is None
+

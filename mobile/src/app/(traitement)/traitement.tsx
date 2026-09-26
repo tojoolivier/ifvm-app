@@ -6,6 +6,7 @@ import {
   getTraitement,
   updateTraitementAerien,
   updateTraitementTerrestre,
+  appliquerSigleChefAuNumeroFiche,
   addProduitUtilise,
   deleteAllProduitsForTraitementTerrestre,
 } from '@/lib/traitement-repository';
@@ -219,6 +220,14 @@ export default function TraitementScreen() {
     store.terrestre.stockInitialL
   );
 
+  // #numero-fiche-traitement-trt : le numéro (créé à l'écran Références) porte le sigle du chef
+  // choisi ici — mis à jour en base ET dans le store, sans quoi un retour à l'écran Références le
+  // réécrirait sans sigle.
+  const completerNumeroAvecSigleDuChef = async (sigle: string | null | undefined) => {
+    const numero = await appliquerSigleChefAuNumeroFiche(traitementId, sigle);
+    if (numero) store.updateRef({ numeroFiche: numero });
+  };
+
   const handleContinuer = () =>
     run(
       async () => {
@@ -251,6 +260,7 @@ export default function TraitementScreen() {
             repriseTraitement: store.aerien.repriseTraitement,
             traitementOrigineId: store.aerien.traitementOrigineId,
           });
+          await completerNumeroAvecSigleDuChef(chefDeBase?.sigle);
         } else {
           const conditionErrors = validateTerrestreConditions({
             heureDebut: store.terrestre.heureDebut ?? null,
@@ -278,6 +288,7 @@ export default function TraitementScreen() {
             setErrors(byField);
             return;
           }
+          const chefEquipe = chefsEquipe.find((c) => c.id === store.terrestre.chefEquipeId);
           await updateTraitementTerrestre(traitementId, {
             chefEquipeId: store.terrestre.chefEquipeId,
             agentEncadreur: store.terrestre.agentEncadreur,
@@ -309,6 +320,7 @@ export default function TraitementScreen() {
             evaluation_efficacite_heures_apres: store.terrestre.evaluation_efficacite_heures_apres,
             methode_evaluation_efficacite: store.terrestre.methode_evaluation_efficacite,
           });
+          await completerNumeroAvecSigleDuChef(chefEquipe?.sigle);
           // Purge avant re-création (#persistance-fiches-traitement) : même
           // raison que côté Aérien (rotations.tsx) — le store ne porte pas
           // d'id stable côté DB, sans quoi ré-enregistrer une fiche déjà

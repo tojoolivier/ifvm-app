@@ -4961,6 +4961,8 @@ export interface components {
             prenom: string;
             /** Role */
             role: string;
+            /** Sigle */
+            sigle?: string | null;
             /** Pa Id */
             pa_id: string | null;
             /** Actif */

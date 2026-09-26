@@ -217,6 +217,8 @@ export interface UtilisateurEquipe {
   id: string;
   nom: string;
   prenom: string;
+  /** Sigle de l'agent (#numero-fiche-traitement-trt) — absent pour un compte sans sigle. */
+  sigle?: string | null;
 }
 
 export type RoleUtilisateurEquipe =
@@ -232,7 +234,7 @@ export type RoleUtilisateurEquipe =
 export async function listUtilisateursByRole(role: RoleUtilisateurEquipe): Promise<UtilisateurEquipe[]> {
   const db = await getReferentielDb();
   return db.getAllAsync<UtilisateurEquipe>(
-    'SELECT id, nom, prenom FROM utilisateur_equipe WHERE actif = 1 AND role = ? ORDER BY nom',
+    'SELECT id, nom, prenom, sigle FROM utilisateur_equipe WHERE actif = 1 AND role = ? ORDER BY nom',
     [role]
   );
 }

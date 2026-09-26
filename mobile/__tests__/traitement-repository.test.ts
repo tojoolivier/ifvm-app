@@ -3,6 +3,7 @@ import {
   createDraftTraitementTerrestre,
   updateTraitementReference,
   genererNumeroFicheDisponible,
+  appliquerSigleChefAuNumeroFiche,
   updateTraitementAerien,
   updateTraitementTerrestre,
   updateTraitementMoyens,
@@ -536,6 +537,17 @@ describe('genererNumeroFicheDisponible', () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
     expect(await genererNumeroFicheDisponible('TERRESTRE', '2026-08-11')).toBe('TRT-TERR-2026-08-11-004');
+  });
+
+  it('compte aussi les numéros qui portent déjà le sigle d’un chef', async () => {
+    getAllAsync.mockResolvedValueOnce([
+      { numero_fiche: 'TRT-TERR-2026-01-05-ABC-004' },
+      { numero_fiche: 'TRT-TERR-2026-03-20-XY-009' },
+      { numero_fiche: 'TRT-TERR-2026-03-21-XY-009-2' },
+    ]);
+    getFirstAsync.mockResolvedValueOnce(null);
+
+    expect(await genererNumeroFicheDisponible('TERRESTRE', '2026-08-11')).toBe('TRT-TERR-2026-08-11-010');
   });
 
   it('appends an incremental suffix while the candidate collides locally', async () => {
@@ -1191,5 +1203,75 @@ describe('marquerTraitementEnregistre', () => {
     expect(sql).toContain("SET statut_sync = 'local'");
     expect(sql).toContain("AND statut_sync = 'brouillon'");
     expect(params).toEqual([expect.any(String), 'trait-1']);
+  });
+});
+
+// #numero-fiche-traitement-trt : le numéro (créé avant le choix du chef) reçoit le sigle du chef choisi.
+describe('appliquerSigleChefAuNumeroFiche', () => {
+  const fiche = (over: Record<string, unknown> = {}) => ({
+    numero_fiche: 'TRT-TERR-2026-09-26-001',
+    type_traitement: 'TERRESTRE',
+    statut_sync: 'brouillon',
+    ...over,
+  });
+
+  beforeEach(() => {
+    getFirstAsync.mockReset();
+    runAsync.mockClear();
+  });
+
+  it('insère le sigle du chef, met à jour la base et renvoie le nouveau numéro', async () => {
+    getFirstAsync.mockResolvedValueOnce(fiche()).mockResolvedValueOnce(null);
+
+    const numero = await appliquerSigleChefAuNumeroFiche('trait-1', 'ABC');
+
+    expect(numero).toBe('TRT-TERR-2026-09-26-ABC-001');
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE traitement SET numero_fiche = ?'),
+      ['TRT-TERR-2026-09-26-ABC-001', expect.any(String), 'trait-1']
+    );
+  });
+
+  it('retire le sigle quand le nouveau chef n’en a pas', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce(fiche({ numero_fiche: 'TRT-TERR-2026-09-26-ABC-001', statut_sync: 'local' }))
+      .mockResolvedValueOnce(null);
+
+    expect(await appliquerSigleChefAuNumeroFiche('trait-1', null)).toBe('TRT-TERR-2026-09-26-001');
+  });
+
+  it('n’écrit rien quand le numéro est déjà à jour', async () => {
+    getFirstAsync.mockResolvedValueOnce(fiche({ numero_fiche: 'TRT-TERR-2026-09-26-ABC-001' }));
+
+    expect(await appliquerSigleChefAuNumeroFiche('trait-1', 'ABC')).toBe('TRT-TERR-2026-09-26-ABC-001');
+    expect(runAsync).not.toHaveBeenCalled();
+  });
+
+  it('ne touche pas au numéro d’une fiche déjà envoyée au serveur (faux conflit à la resynchronisation)', async () => {
+    getFirstAsync.mockResolvedValueOnce(fiche({ statut_sync: 'synced' }));
+
+    expect(await appliquerSigleChefAuNumeroFiche('trait-1', 'ABC')).toBe('TRT-TERR-2026-09-26-001');
+    expect(runAsync).not.toHaveBeenCalled();
+  });
+
+  it('ne réécrit jamais un ancien numéro', async () => {
+    getFirstAsync.mockResolvedValueOnce(fiche({ numero_fiche: 'Hery-Terrestre-2026-09-26' }));
+
+    expect(await appliquerSigleChefAuNumeroFiche('trait-1', 'ABC')).toBe('Hery-Terrestre-2026-09-26');
+    expect(runAsync).not.toHaveBeenCalled();
+  });
+
+  it('garde le numéro courant si le numéro recomposé est déjà porté par une autre fiche', async () => {
+    getFirstAsync.mockResolvedValueOnce(fiche()).mockResolvedValueOnce({ id: 'autre-fiche' });
+
+    expect(await appliquerSigleChefAuNumeroFiche('trait-1', 'ABC')).toBe('TRT-TERR-2026-09-26-001');
+    expect(runAsync).not.toHaveBeenCalled();
+  });
+
+  it('renvoie null pour une fiche inconnue ou sans numéro', async () => {
+    getFirstAsync.mockResolvedValueOnce(null);
+    expect(await appliquerSigleChefAuNumeroFiche('absente', 'ABC')).toBeNull();
+    getFirstAsync.mockResolvedValueOnce(fiche({ numero_fiche: null }));
+    expect(await appliquerSigleChefAuNumeroFiche('sans-numero', 'ABC')).toBeNull();
   });
 });

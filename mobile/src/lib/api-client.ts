@@ -324,6 +324,8 @@ export interface UtilisateurEquipeSync {
   nom: string;
   prenom: string;
   role: string;
+  /** Sigle de l'agent (#numero-fiche-traitement-trt) — porté par le numéro des fiches de son équipe. */
+  sigle?: string | null;
   pa_id: string | null;
   actif: boolean;
   updated_at: string;

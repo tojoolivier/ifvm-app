@@ -19,7 +19,7 @@ export const REFERENTIEL_TABLES = [
 ] as const;
 
 /** Empreinte du DDL : change dès que le contrat ou la couche locale change. */
-export const REFERENTIEL_SCHEMA_VERSION = '3cf02c32640c';
+export const REFERENTIEL_SCHEMA_VERSION = '7ad79cb27f01';
 
 export const REFERENTIEL_DDL = `
 CREATE TABLE IF NOT EXISTS poste_acridien (
@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS utilisateur_equipe (
   nom TEXT NOT NULL,
   prenom TEXT NOT NULL,
   role TEXT NOT NULL,
+  sigle TEXT,
   pa_id TEXT,
   actif INTEGER NOT NULL,
   updated_at TEXT NOT NULL
