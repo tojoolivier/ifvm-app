@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { api } from '../api/client'
@@ -12,9 +12,6 @@ vi.mock('../api/client', () => ({
 }))
 
 const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>
-
-/** Gabarit HTML du PDF tel que le backend le sert sur `GET /prospections/{id}/fiche-html`. */
-const FICHE_HTML = '<html><body><h1>FICHE DE PROSPECTION ANTIACRIDIENNE</h1><table><tr><th>Sexe</th></tr></table></body></html>'
 
 const UTILISATEURS = [
   { id: 'u1', nom: 'Randria Jean', role: 'prospecteur' },
@@ -33,7 +30,6 @@ function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit 
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections/p1') return Promise.resolve({ data: fiche })
     if (url === '/prospections/p1/audit-log') return Promise.resolve({ data: audit })
-    if (url === '/prospections/p1/fiche-html') return Promise.resolve({ data: FICHE_HTML })
     if (url === '/equipes/eq-1') return Promise.resolve({ data: equipe })
     if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role } })
     if (url === '/campagnes') return Promise.resolve({ data: [{ id: 'c1', name: 'Campagne 2026' }] })
@@ -259,18 +255,26 @@ describe('ProspectionDetailPage — fiche de lecture en tableaux (comme le PDF)'
     vi.restoreAllMocks()
   })
 
-  it('affiche directement le gabarit du PDF dans un iframe isolé, sans onglets', async () => {
+  it('affiche directement la fiche en tableaux, construite depuis la fiche déjà chargée', async () => {
     renderPage('verifiee')
     await attendreFiche()
 
-    const cadre = await screen.findByTitle('Fiche de prospection F-001')
-    expect(cadre).toHaveAttribute('srcdoc', FICHE_HTML)
-    // Aucun script du document ne doit pouvoir s'exécuter.
-    expect(cadre.getAttribute('sandbox')).not.toContain('allow-scripts')
-    expect(mockedGet).toHaveBeenCalledWith('/prospections/p1/fiche-html', { responseType: 'text' })
-    // Une seule vue : ni onglets, ni cartes « une par colonne de la base ».
+    const feuille = screen.getByRole('article', { name: 'Fiche de prospection F-001' })
+    // Gabarit extensif du PDF : blocs A à D.
+    expect(within(feuille).getByRole('heading', { name: 'A. Références' })).toBeInTheDocument()
+    expect(within(feuille).getByRole('heading', { name: 'B. Imagos' })).toBeInTheDocument()
+    // Une seule vue : ni onglets, ni iframe, et aucune route dédiée à appeler.
     expect(screen.queryByRole('tab')).toBeNull()
-    expect(document.querySelector('[data-colonne]')).toBeNull()
+    expect(document.querySelector('iframe')).toBeNull()
+    expect(mockedGet.mock.calls.some(([url]) => String(url).includes('fiche-html'))).toBe(false)
+  })
+
+  it('nomme la station par son code et son nom plutôt que par son identifiant', async () => {
+    renderPage('verifiee')
+    await attendreFiche()
+
+    const feuille = screen.getByRole('article', { name: 'Fiche de prospection F-001' })
+    await waitFor(() => expect(within(feuille).getByText(/ST-014 Ankazoabo/)).toBeInTheDocument())
   })
 
   it('garde les actions du rôle et le journal à côté de la fiche', async () => {
@@ -279,31 +283,6 @@ describe('ProspectionDetailPage — fiche de lecture en tableaux (comme le PDF)'
 
     expect(screen.getByRole('button', { name: 'Valider la fiche' })).toBeInTheDocument()
     expect(screen.getByText('Journal de validation')).toBeInTheDocument()
-  })
-
-  it('annonce le code HTTP quand la fiche ne peut pas être chargée', async () => {
-    renderPage('verifiee')
-    mockedGet.mockImplementation((url: string) =>
-      url === '/prospections/p1/fiche-html'
-        ? Promise.reject({ response: { status: 404 } })
-        : Promise.resolve({ data: url === '/prospections/p1' ? ficheComplete({ statut: 'verifiee' }) : [] }),
-    )
-    await attendreFiche()
-
-    expect(await screen.findByText(/erreur 404/)).toBeInTheDocument()
-    expect(screen.getByText(/le serveur est-il à jour/)).toBeInTheDocument()
-  })
-
-  it("reste explicite sans code HTTP (réseau coupé)", async () => {
-    renderPage('verifiee')
-    mockedGet.mockImplementation((url: string) =>
-      url === '/prospections/p1/fiche-html'
-        ? Promise.reject(new Error('Network Error'))
-        : Promise.resolve({ data: url === '/prospections/p1' ? ficheComplete({ statut: 'verifiee' }) : [] }),
-    )
-    await attendreFiche()
-
-    expect(await screen.findByText('Impossible de charger la fiche.')).toBeInTheDocument()
   })
 })
 
