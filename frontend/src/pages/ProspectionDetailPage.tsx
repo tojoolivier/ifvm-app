@@ -14,26 +14,13 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { FicheTableau } from '@/components/FicheTableau'
-import { OngletsFiche, type OngletFiche } from '@/components/ui/onglets-fiche'
 import { buildFicheImprimable, isFicheValidee } from '@/lib/prospection-fiche-lecture'
 import {
-  CATALOGUE_CAPTURE,
-  CATALOGUE_OPERATION,
   TIRET,
-  colonnesTable,
   entreesAudit,
-  groupesInfestation,
-  groupesPopulation,
-  groupesProspection,
   humaniser,
   type AuditBdd,
-  type CaptureBdd,
-  type ContexteFiche,
-  type GroupeBdd,
-  type LigneBdd,
-  type OperationBdd,
   type ProspectionBdd,
 } from '@/lib/prospection-fiche-bdd'
 import { shortId, useAnnuaire } from '@/lib/use-annuaire'
@@ -86,90 +73,6 @@ function Carte({ className, children }: { className?: string; children: React.Re
       {children}
     </section>
   )
-}
-
-/** Sur-titre de bloc : `600 9.5px` uppercase, interlettrage 1px. */
-function BlocLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">
-      {children}
-    </span>
-  )
-}
-
-/** Une colonne de la base : libellé, valeur ; l'infobulle donne `table.colonne`. */
-function LigneDonnee({ ligne }: { ligne: LigneBdd }) {
-  return (
-    <div className="flex items-baseline gap-[10px]" title={ligne.origine} data-colonne={ligne.colonne}>
-      <span className="w-[168px] shrink-0 font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">
-        {ligne.label}
-      </span>
-      <span
-        className={cn(
-          'min-w-0 break-words font-mono text-[12px] font-semibold',
-          ligne.vide ? 'text-[#bdb6a2]' : 'text-foreground',
-        )}
-      >
-        {ligne.valeur}
-      </span>
-    </div>
-  )
-}
-
-/** Carte d'un groupe de colonnes ; la légende dit de quelle table elles viennent. */
-function CarteGroupe({ groupe, table }: { groupe: GroupeBdd; table: string }) {
-  return (
-    <Carte className="px-5 py-[18px]">
-      <div className="mb-3 flex items-baseline gap-[10px]">
-        <BlocLabel>{groupe.titre}</BlocLabel>
-        <span className="font-mono text-[10px] font-medium text-ifvm-text-weak">{table}</span>
-      </div>
-      <div className="flex flex-col gap-[9px]">
-        {groupe.lignes.map((l, i) => (
-          <LigneDonnee key={`${l.colonne}-${i}`} ligne={l} />
-        ))}
-      </div>
-    </Carte>
-  )
-}
-
-/** Section d'une table enfant : titre, table d'origine, nombre de lignes. */
-function SectionTable({
-  titre,
-  table,
-  nombre,
-  children,
-}: {
-  titre: string
-  table: string
-  nombre: number
-  children: React.ReactNode
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-baseline gap-[10px]">
-        <h2 className="font-sans text-[14px] font-bold">{titre}</h2>
-        <span className="font-mono text-[10.5px] font-medium text-ifvm-text-weak">
-          {table} · {nombre} ligne{nombre > 1 ? 's' : ''}
-        </span>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-/** Colonnes d'un tableau : une colonne par colonne de la table, valeurs brutes. */
-function colonnesDataTable<R>(
-  colonnes: ReturnType<typeof colonnesTable<R>>,
-  alignerADroite: string[] = [],
-): DataTableColumn<R>[] {
-  return colonnes.map((c) => ({
-    key: c.cle,
-    header: c.label,
-    mono: true,
-    align: alignerADroite.includes(c.cle) ? ('right' as const) : undefined,
-    render: (rec: R) => c.fmt(rec),
-  }))
 }
 
 // ---------------------------------------------------------------------------
@@ -254,8 +157,6 @@ export function ProspectionDetailPage() {
   const queryClient = useQueryClient()
   const [activeAction, setActiveAction] = useState<ActionType>(null)
   const [showPrintView, setShowPrintView] = useState(false)
-  // « Fiche » (tableaux du PDF) à l'ouverture ; « Données BDD » garde les cartes de vérification.
-  const [onglet, setOnglet] = useState<OngletFiche>('fiche')
   const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
   const [erreurPdf, setErreurPdf] = useState<string | null>(null)
 
@@ -283,14 +184,7 @@ export function ProspectionDetailPage() {
     enabled: !!prospection?.station_id,
   })
 
-  const { data: campagnes = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ['campagnes'],
-    queryFn: () => api.get('/campagnes').then((r) => r.data),
-  })
-
   const { nomAgent } = useAnnuaire()
-
-  const campagneName = campagnes.find((c) => c.id === prospection?.campagne_id)?.name
 
   const mutation = useMutation({
     mutationFn: ({ statut, commentaire }: { statut: string; commentaire?: string }) =>
@@ -374,25 +268,7 @@ export function ProspectionDetailPage() {
     )
   }
 
-  // Tout ce qui suit lit la base telle quelle : aucune valeur calculée, aucun regroupement inventé.
-  const ctx: ContexteFiche = {
-    nomAgent,
-    campagneNom: campagneName ?? null,
-    station: station ? { code: station.code, nom: station.nom, pa_nom: station.pa_nom } : null,
-  }
-  const { groupes, sansDonnees } = groupesProspection(prospection, ctx)
-  const colonnesCaptures = colonnesDataTable(colonnesTable<CaptureBdd>(CATALOGUE_CAPTURE, ctx), [
-    'effectif',
-  ])
-  const colonnesOperations = colonnesDataTable(
-    colonnesTable<OperationBdd>(CATALOGUE_OPERATION, ctx),
-    ['numero', 'duree_minutes'],
-  )
   const journal = entreesAudit(auditLog, nomAgent)
-  const populations = prospection.populations ?? []
-  const captures = prospection.captures ?? []
-  const infestations = prospection.infestations ?? []
-  const operations = prospection.operations_aeriennes ?? []
   const avertissements = prospection.avertissements ?? []
 
   const sousTitre = [
@@ -452,8 +328,6 @@ export function ProspectionDetailPage() {
           <p className="text-[11.5px] font-medium text-destructive">{erreurPdf}</p>
         )}
 
-        <OngletsFiche actif={onglet} onChange={setOnglet} />
-
         {/* Bandeau ambre — colonne `prospection.avertissements` (#106) */}
         {avertissements.length > 0 && (
           <div className="flex flex-col gap-[7px] rounded-[10px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-[13px]">
@@ -473,102 +347,12 @@ export function ProspectionDetailPage() {
           </div>
         )}
 
-        {onglet === 'fiche' ? (
-          <FicheTableau
-            endpoint={`/prospections/${prospection.id}/fiche-html`}
-            cleVersion={`${prospection.statut}|${prospection.updated_at}`}
-            titre={`Fiche de prospection ${prospection.n_fiche ?? ''}`.trim()}
-          />
-        ) : (
-        <>
-        {/* Table `prospection` : chaque colonne, dans son groupe */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {groupes.map((groupe) => (
-            <CarteGroupe key={groupe.titre} groupe={groupe} table="prospection" />
-          ))}
-        </div>
-        {sansDonnees.length > 0 && (
-          <p className="font-sans text-[11px] font-medium text-ifvm-text-weak">
-            Colonnes sans valeur et propres à un autre type de fiche : {sansDonnees.join(' · ')}.
-          </p>
-        )}
-
-        {/* Table `prospection_population` */}
-        <SectionTable titre="Populations" table="prospection_population" nombre={populations.length}>
-          {populations.length === 0 && (
-            <p className="font-sans text-[11.5px] text-ifvm-text-weak">
-              Aucune ligne enregistrée pour cette fiche.
-            </p>
-          )}
-          {populations.map((population) => (
-            <div key={population.id} className="flex flex-col gap-3">
-              <h3 className="font-sans text-[12.5px] font-bold text-ifvm-green-text">
-                {population.espece} · {humaniser(population.categorie)}
-              </h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {groupesPopulation(population, ctx).groupes.map((g) => (
-                  <CarteGroupe key={g.titre} groupe={g} table="prospection_population" />
-                ))}
-              </div>
-            </div>
-          ))}
-        </SectionTable>
-
-        {/* Tables `prospection_infestation` (+ `_imago` / `_larve`) */}
-        <SectionTable
-          titre="Infestations"
-          table="prospection_infestation"
-          nombre={infestations.length}
-        >
-          {infestations.length === 0 && (
-            <p className="font-sans text-[11.5px] text-ifvm-text-weak">
-              Aucune ligne enregistrée pour cette fiche.
-            </p>
-          )}
-          {infestations.map((infestation) => (
-            <div key={infestation.id} className="flex flex-col gap-3">
-              <h3 className="font-sans text-[12.5px] font-bold text-ifvm-green-text">
-                {humaniser(infestation.type_cible)}
-                {infestation.espece ? ` · ${infestation.espece}` : ''}
-              </h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {groupesInfestation(infestation, ctx).groupes.map((g) => (
-                  <CarteGroupe key={g.titre} groupe={g} table="prospection_infestation" />
-                ))}
-              </div>
-            </div>
-          ))}
-        </SectionTable>
-
-        {/* Table `prospection_capture` : une ligne du tableau par ligne de la table */}
-        <SectionTable titre="Captures" table="prospection_capture" nombre={captures.length}>
-          <Carte className="overflow-x-auto">
-            <DataTable
-              columns={colonnesCaptures}
-              rows={captures}
-              getRowKey={(c) => c.id}
-              emptyMessage="Aucune ligne enregistrée pour cette fiche."
-            />
-          </Carte>
-        </SectionTable>
-
-        {/* Table `prospection_operation_aerienne` */}
-        <SectionTable
-          titre="Opérations aériennes"
-          table="prospection_operation_aerienne"
-          nombre={operations.length}
-        >
-          <Carte className="overflow-x-auto">
-            <DataTable
-              columns={colonnesOperations}
-              rows={operations}
-              getRowKey={(o) => o.id}
-              emptyMessage="Aucune ligne enregistrée pour cette fiche."
-            />
-          </Carte>
-        </SectionTable>
-        </>
-        )}
+        {/* Fiche de lecture : le gabarit du PDF (mêmes tableaux), servi par le backend. */}
+        <FicheTableau
+          endpoint={`/prospections/${prospection.id}/fiche-html`}
+          cleVersion={`${prospection.statut}|${prospection.updated_at}`}
+          titre={`Fiche de prospection ${prospection.n_fiche ?? ''}`.trim()}
+        />
       </div>
 
       <aside className="flex min-w-0 flex-col gap-[14px]">
