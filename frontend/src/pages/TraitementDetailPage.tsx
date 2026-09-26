@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { ErrorBanner } from '@/components/ui/error-banner'
 import { FicheTraitementTableau } from '@/components/fiche/FicheTraitementTableau'
 import { EquipeLien } from '@/components/EquipeLien'
+import { ConsommationPesticide } from '@/components/ConsommationPesticide'
 import { NavTabs } from '@/components/ui/nav-tabs'
 import { PILL_TONES, Pill } from '@/components/ui/pill'
 import { MODE_LABELS, ROLE_LABELS, SIGNATURE_ROLES, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
@@ -281,6 +282,9 @@ export function TraitementDetailPage() {
               </p>
             )}
           </section>
+
+          {/* Consommation générée par les rotations (#609) — remplace « Pesticide reçu » / « Stock restant ». */}
+          {traitement.type_traitement === 'AERIEN' && <ConsommationPesticide traitementId={traitement.id} />}
 
           <Carte className="px-5 py-[18px]">
             <h2 className="mb-3 font-sans text-[13px] font-bold">Signatures</h2>

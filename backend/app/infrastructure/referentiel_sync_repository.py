@@ -1218,6 +1218,34 @@ class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
         model = result.scalar_one_or_none()
         return None if model is None else self._to_domain(model)
 
+    async def list_filtre(
+        self,
+        type: str | None = None,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+        traitement_id: uuid.UUID | None = None,
+        date_debut: date | None = None,
+        date_fin: date | None = None,
+    ) -> list[MouvementPesticide]:
+        m = MouvementPesticideModel
+        stmt = select(m)
+        if type is not None:
+            stmt = stmt.where(m.type == type)
+        if site_id is not None:
+            stmt = stmt.where(or_(m.site_id == site_id, m.site_destination_id == site_id))
+        if pesticide_id is not None:
+            stmt = stmt.where(m.pesticide_id == pesticide_id)
+        if traitement_id is not None:
+            stmt = stmt.where(m.traitement_id == traitement_id)
+        if date_debut is not None:
+            stmt = stmt.where(m.date_mouvement >= date_debut)
+        if date_fin is not None:
+            stmt = stmt.where(m.date_mouvement <= date_fin)
+        result = await self.session.execute(
+            stmt.order_by(m.date_mouvement.desc(), m.created_at.desc())
+        )
+        return [self._to_domain(model) for model in result.scalars().all()]
+
     async def regenerer_consommation(
         self,
         traitement_id: uuid.UUID,
