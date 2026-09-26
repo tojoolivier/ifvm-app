@@ -163,7 +163,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it('affiche un en-tête vert avec le sous-titre type/mode/localité/validation et la pilule lecture seule', async () => {
     renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByTestId('traitement-header')).toHaveClass('bg-ifvm-green-text')
     expect(screen.getByText(/Aérien · mode Barrière · Beroroha · validée le 2026-08-13/)).toBeInTheDocument()
@@ -172,19 +172,19 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it("n'affiche pas la pilule lecture seule pour une fiche en brouillon", async () => {
     renderPage(traitementAerien({ statut: 'brouillon' }))
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
     expect(screen.queryByText('🔒 Lecture seule')).not.toBeInTheDocument()
   })
 
   it("n'affiche pas le bouton de téléchargement du PDF pour une fiche en brouillon (#495)", async () => {
     renderPage(traitementAerien({ statut: 'brouillon' }))
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Télécharger le PDF' })).not.toBeInTheDocument()
   })
 
   it('affiche le bouton de téléchargement du PDF pour une fiche validée (#495)', async () => {
     renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Télécharger le PDF' })).toBeInTheDocument()
   })
 
@@ -196,7 +196,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     const pdfBlob = new Blob(['%PDF-1.4'], { type: 'application/pdf' })
 
     renderPage(traitementAerien(), [], {}, { '/traitements/t1/pdf': () => Promise.resolve({ data: pdfBlob }) })
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Télécharger le PDF' }))
 
@@ -213,7 +213,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it('affiche une erreur si le téléchargement du PDF échoue (#495)', async () => {
     renderPage(traitementAerien(), [], {}, { '/traitements/t1/pdf': () => Promise.reject(new Error('boom')) })
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Télécharger le PDF' }))
 
@@ -222,7 +222,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it('affiche le bandeau cible (snapshot figé) avec le lien vers la prospection', async () => {
     renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByText(/3,2 ha/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /la fiche de prospection/ })).toHaveAttribute(
@@ -233,7 +233,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it('affiche le numéro métier de la fiche de prospection liée (pas son UUID) — #numero-fiche-prospection-liee', async () => {
     renderPage(traitementAerien({ prospection_n_fiche: 'EXT-2026-00125' }))
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     const lien = screen.getByRole('link', { name: 'EXT-2026-00125' })
     expect(lien).toHaveAttribute('href', '/prospections/p1')
@@ -241,7 +241,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it('retombe sur l’UUID technique si le backend ne renvoie pas encore le numéro métier', async () => {
     renderPage(traitementAerien({ prospection_n_fiche: null }))
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByRole('link', { name: 'p1' })).toHaveAttribute('href', '/prospections/p1')
   })
@@ -266,7 +266,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
         },
       }),
     )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
     // `toLocaleString('fr-FR')` sépare les milliers par une espace insécable
@@ -279,7 +279,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
     // La fiche détaillée de la maquette est aérienne et porte pourtant les deux
     // panneaux : ils ne doivent pas être conditionnés au bloc terrestre.
     renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
     expect(screen.getByText('Chaîne de reprise')).toBeInTheDocument()
@@ -290,7 +290,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
   /** Choc → la surface est traitée ; barrière → elle est protégée (même chiffre, autre libellé). */
   it('nomme « Protégée » la surface d’un aérien en produit de barrière, « Traitée » en produit de choc', async () => {
     const { unmount } = renderPage(traitementAerien({ mode_traitement: 'BARRIERE' }))
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
     expect(screen.getByText('Protégée').parentElement?.textContent).toMatch(/320/)
     expect(screen.queryByText('Traitée')).not.toBeInTheDocument()
     unmount()
@@ -301,7 +301,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
         aerien: { ...traitementAerien().aerien, surface_traitee_ha: 320, surface_protegee_ha: 0 },
       }),
     )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
     expect(screen.getByText('Traitée').parentElement?.textContent).toMatch(/320/)
     expect(screen.queryByText('Protégée')).not.toBeInTheDocument()
   })
@@ -314,14 +314,14 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
         ],
       }),
     )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByText('2026-08-12 17:04')).toBeInTheDocument()
   })
 
   it('propose un onglet de retour vers la liste des fiches', async () => {
     renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByRole('link', { name: 'Liste des fiches' })).toHaveAttribute(
       'href',
@@ -334,7 +334,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it('la matrice de signatures affiche « ne signe pas » pour les rôles non renseignés', async () => {
     renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getAllByText('ne signe pas')).toHaveLength(2)
   })
@@ -359,7 +359,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
         },
       }),
     )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     // Maquette : « Origine : <lien> → cette fiche. Une seule reprise possible
     // par fiche d'origine. »
@@ -401,7 +401,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
         },
       }),
     )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.getByRole('link', { name: "fiche d'origine" })).toHaveAttribute(
       'href',
@@ -411,7 +411,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
 
   it("n'affiche pas « Demander une reprise » quand la fiche n'est pas reprenable", async () => {
     renderPage(traitementAerien())
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     expect(screen.queryByRole('button', { name: 'Demander une reprise' })).not.toBeInTheDocument()
   })
@@ -430,7 +430,7 @@ describe('TraitementDetailPage — conformité maquette (README §7)', () => {
       }),
       [{ id: 't1' }],
     )
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
     const bouton = await screen.findByRole('button', { name: 'Demander une reprise' })
     const appelsAvantClic = mockedGet.mock.calls.length
@@ -451,47 +451,29 @@ describe('TraitementDetailPage — fiche de lecture en tableaux (comme le PDF)',
     vi.restoreAllMocks()
   })
 
-  const HTML_CRT = '<html><body><h1>FICHE CRT</h1><table><tr><th>Rotation</th></tr></table></body></html>'
   const TITRE = 'Fiche de traitement Jean-AERIEN-2026-08-12'
 
-  function renderAvecFicheHtml(extra: Record<string, () => Promise<unknown>> = {}) {
-    return renderPage(traitementAerien(), [], {}, {
-      '/traitements/t1/fiche-html': () => Promise.resolve({ data: HTML_CRT }),
-      ...extra,
-    })
-  }
+  it('affiche directement le compte-rendu en tableaux, construit depuis la fiche déjà chargée', async () => {
+    renderPage(traitementAerien())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
-  it('affiche directement le gabarit du CRT dans un iframe isolé, sans onglets', async () => {
-    renderAvecFicheHtml()
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-
-    const cadre = await screen.findByTitle(TITRE)
-    expect(cadre).toHaveAttribute('srcdoc', HTML_CRT)
-    // Aucun script du document ne doit pouvoir s'exécuter.
-    expect(cadre.getAttribute('sandbox')).not.toContain('allow-scripts')
-    expect(mockedGet).toHaveBeenCalledWith('/traitements/t1/fiche-html', { responseType: 'text' })
-    // Une seule vue : ni onglets, ni cartes de la base.
+    const feuille = screen.getByRole('article', { name: TITRE })
+    // Les 12 sections du formulaire papier.
+    expect(within(feuille).getByRole('heading', { name: '1. Références' })).toBeInTheDocument()
+    expect(within(feuille).getByRole('heading', { name: '12. Observation générale' })).toBeInTheDocument()
+    // Une seule vue : ni onglets, ni iframe, et aucune route dédiée à appeler.
     expect(screen.queryByRole('tab')).toBeNull()
-    expect(screen.queryByText('Rotations')).toBeNull()
+    expect(document.querySelector('iframe')).toBeNull()
+    expect(mockedGet.mock.calls.some(([url]) => String(url).includes('fiche-html'))).toBe(false)
   })
 
   it('garde les surfaces, les signatures et la chaîne de reprise à côté de la fiche', async () => {
-    renderAvecFicheHtml()
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
+    renderPage(traitementAerien())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Jean-AERIEN-2026-08-12' })).toBeInTheDocument())
 
-    expect(screen.getByText('Surfaces (ha)')).toBeInTheDocument()
-    expect(screen.getByText('Signatures')).toBeInTheDocument()
-    expect(screen.getByText('Chaîne de reprise')).toBeInTheDocument()
-  })
-
-  it('annonce le code HTTP quand la fiche ne peut pas être chargée', async () => {
-    renderAvecFicheHtml({
-      '/traitements/t1/fiche-html': () => Promise.reject({ response: { status: 404 } }),
-    })
-    await waitFor(() => expect(screen.getByText('Jean-AERIEN-2026-08-12')).toBeInTheDocument())
-
-    expect(await screen.findByText(/erreur 404/)).toBeInTheDocument()
-    expect(screen.getByText(/le serveur est-il à jour/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Surfaces (ha)' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Signatures' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Chaîne de reprise' })).toBeInTheDocument()
   })
 })
 

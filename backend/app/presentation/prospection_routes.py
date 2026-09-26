@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.prospection_use_cases import (
@@ -316,22 +315,6 @@ async def get_prospection_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nom_fichier}"'},
     )
-
-
-@router.get("/{prospection_id}/fiche-html", response_class=HTMLResponse)
-async def get_prospection_fiche_html(
-    prospection_id: uuid.UUID,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Utilisateur, Depends(get_current_user)],
-):
-    """Même gabarit HTML que `/pdf`, servi tel quel pour la lecture à l'écran (onglet
-    « Fiche » du web) : la mise en page en tableaux reste écrite une seule fois. Contrairement
-    au PDF, pas de garde « validée uniquement » — une fiche en attente ou vérifiée se lit aussi."""
-    repository = get_repository(db)
-    prospection = await GetProspection(repository).execute(prospection_id)
-    if prospection is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prospection non trouvée")
-    return HTMLResponse(build_prospection_html(ProspectionRead.model_validate(prospection)))
 
 
 @router.put("/{prospection_id}", response_model=ProspectionRead)

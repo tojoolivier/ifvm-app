@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
-import { FicheTableau } from '@/components/FicheTableau'
+import { FicheProspectionTableau } from '@/components/fiche/FicheProspectionTableau'
 import { EquipeLien } from '@/components/EquipeLien'
 import { buildFicheImprimable, isFicheValidee } from '@/lib/prospection-fiche-lecture'
 import {
@@ -351,11 +351,10 @@ export function ProspectionDetailPage() {
           </div>
         )}
 
-        {/* Fiche de lecture : le gabarit du PDF (mêmes tableaux), servi par le backend. */}
-        <FicheTableau
-          endpoint={`/prospections/${prospection.id}/fiche-html`}
-          cleVersion={`${prospection.statut}|${prospection.updated_at}`}
-          titre={`Fiche de prospection ${prospection.n_fiche ?? ''}`.trim()}
+        {/* Fiche de lecture : mêmes tableaux que le PDF, construits depuis la fiche déjà chargée. */}
+        <FicheProspectionTableau
+          prospection={prospection}
+          stationLabel={station ? `${station.code} ${station.nom}` : null}
         />
       </div>
 
