@@ -106,12 +106,22 @@ export function sommeSurfaceTraitee(traitements: DashboardTraitement[]): {
   return { total, sansSurface }
 }
 
+/**
+ * Surface traitée / protégée d'une seule fiche. Un traitement ne renseigne
+ * qu'une des deux colonnes selon son mode (choc → traitée, barrière →
+ * protégée). Partagé avec le graphique d'évolution pour que son dernier point
+ * égale toujours le cumul des tuiles.
+ */
+export function surfaceTraiteeDe(t: DashboardTraitement): number {
+  return t.aerien?.surface_traitee_ha ?? t.terrestre?.surface_traitee_ha ?? 0
+}
+
+export function surfaceProtegeeDe(t: DashboardTraitement): number {
+  return t.aerien?.surface_protegee_ha ?? t.terrestre?.surface_protegee_ha ?? 0
+}
+
 export function sommeSurfaceProtegee(traitements: DashboardTraitement[]): number {
-  return traitements.reduce(
-    (total, t) =>
-      total + (t.aerien?.surface_protegee_ha ?? t.terrestre?.surface_protegee_ha ?? 0),
-    0,
-  )
+  return traitements.reduce((total, t) => total + surfaceProtegeeDe(t), 0)
 }
 
 /**

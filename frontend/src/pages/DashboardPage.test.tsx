@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { api } from '../api/client'
@@ -316,5 +316,31 @@ describe('DashboardPage — maquette §1', () => {
     await waitFor(() =>
       expect(screen.getByText(/cumul déclaré · toutes campagnes/)).toBeInTheDocument(),
     )
+  })
+
+  it('trace l’évolution de la campagne et la recale quand on change de campagne', async () => {
+    renderPage()
+
+    // Le placeholder a laissé place au graphique : 3 fiches × 100 ha infestés.
+    await waitFor(() =>
+      expect(
+        within(screen.getByText('Infestée', { selector: 'li' })).getByText('300 ha'),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.queryByText(/Graphique d’évolution — à brancher/)).not.toBeInTheDocument()
+
+    // Campagne clôturée : ses 9 999 ha remplacent ceux de la campagne en cours,
+    // et le sous-titre nomme la campagne choisie.
+    fireEvent.change(screen.getByDisplayValue(/Campagne 2025-2026/), {
+      target: { value: 'c-close' },
+    })
+    await waitFor(() =>
+      expect(
+        within(screen.getByText('Infestée', { selector: 'li' })).getByText(/9\s999 ha/),
+      ).toBeInTheDocument(),
+    )
+    expect(
+      screen.getByText('Superficies infestées, traitées et protégées — Campagne 2024-2025'),
+    ).toBeInTheDocument()
   })
 })
