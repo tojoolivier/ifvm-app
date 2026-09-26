@@ -15,7 +15,6 @@ import {
 import { cn } from '@/lib/utils'
 import { STATUT_LABELS, type Statut } from '@/components/ui/status-badge'
 import { FicheProspectionTableau } from '@/components/fiche/FicheProspectionTableau'
-import { EquipeLien } from '@/components/EquipeLien'
 import { buildFicheImprimable, isFicheValidee } from '@/lib/prospection-fiche-lecture'
 import {
   TIRET,
@@ -329,8 +328,14 @@ export function ProspectionDetailPage() {
           <p className="text-[11.5px] font-medium text-destructive">{erreurPdf}</p>
         )}
 
-        {/* Équipe de la fiche (#602, #607) — lien vers Administration > Équipes. */}
-        <EquipeLien equipeId={prospection.equipe_id} />
+        {/* Prospecteur de la fiche : son nom vient de la fiche elle-même (jamais de l'équipe, que
+            les backends plus anciens ne renvoient pas), à défaut de l'annuaire. */}
+        <p data-testid="fiche-prospecteur" className="font-sans text-[12px] text-ifvm-text-tertiary">
+          Prospecteur :{' '}
+          <span className="font-semibold">
+            {prospection.prospecteur_nom || nomAgent(prospection.prospecteur_id)}
+          </span>
+        </p>
 
         {/* Bandeau ambre — colonne `prospection.avertissements` (#106) */}
         {avertissements.length > 0 && (
