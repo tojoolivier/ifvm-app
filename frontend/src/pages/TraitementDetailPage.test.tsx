@@ -494,3 +494,35 @@ describe('TraitementDetailPage — fiche de lecture en tableaux (comme le PDF)',
     expect(screen.getByText(/le serveur est-il à jour/)).toBeInTheDocument()
   })
 })
+
+// #602, #607 : l'équipe de la fiche est affichée, avec un lien vers l'équipe.
+describe('TraitementDetailPage — équipe de la fiche', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const EQUIPE = {
+    id: 'eq-1',
+    nom: 'Équipe Aérienne Toliara',
+    type: 'aerien',
+    membres: [{ user_id: 'cb-1', fonction: 'chef', nom: 'Rakoto', prenom: 'Zo' }],
+    actif: true,
+  }
+
+  it('affiche l’équipe avec un lien vers Administration > Équipes', async () => {
+    renderPage(traitementAerien({ equipe_id: 'eq-1' }), [], {}, {
+      '/equipes/eq-1': () => Promise.resolve({ data: EQUIPE }),
+      '/users/me': () => Promise.resolve({ data: { id: 'u1', nom: 'Admin', role: 'admin' } }),
+    })
+
+    const lien = await screen.findByRole('link', { name: 'Équipe Aérienne Toliara' })
+    expect(lien).toHaveAttribute('href', '/administration?section=equipes&equipe=eq-1')
+    expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('aérienne · chef Zo Rakoto')
+  })
+
+  it('indique « non renseignée » pour une fiche antérieure à l’équipe unifiée', async () => {
+    renderPage(traitementAerien({ equipe_id: null }))
+
+    await waitFor(() => expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('Équipe : non renseignée'))
+  })
+})

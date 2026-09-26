@@ -1,31 +1,39 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
 import { UtilisateursSection } from './UtilisateursSection'
 import { StationsSection } from './StationsSection'
-import { EquipesAeriennesSection } from './EquipesAeriennesSection'
-import { EquipesTerrestresSection } from './EquipesTerrestresSection'
+import { EquipesSection } from './EquipesSection'
+import type { Equipe } from '@/lib/equipes'
 
 /**
  * Écran Administration — même présentation que ReferentielsPage.tsx (§11 du
  * handoff) : nav de gauche (216px, une carte par section avec libellé, nom de
  * table, pastille API et compteur) + colonne de droite pleine largeur pour la
- * section active. Chaque section est auto-portante — même patron que
- * `EquipesAeriennesSection`/`EquipesTerrestresSection` côté Référentiels.
+ * section active. Chaque section est auto-portante (requêtes et formulaires dans son composant).
  *
  * Regroupe ici tout ce qui concerne le personnel et les équipes : Utilisateurs,
- * Stations, Équipes aériennes, Équipes terrestres — auparavant réparties entre
+ * Stations, Équipes (terrestres et aériennes dans une seule section filtrable, #602/#607) —
+ * auparavant réparties entre
  * cet écran et ReferentielsPage.tsx (qui garde les référentiels « purs » :
  * pesticide, culture, code_stade, zone_acridien, poste_acridien, lieu_aerien).
  */
-type Section = 'utilisateurs' | 'stations' | 'equipe_aerienne' | 'equipe_terrestre'
+type Section = 'utilisateurs' | 'stations' | 'equipes'
 
 export function AdministrationPage() {
   const location = useLocation()
+  // Lien depuis une fiche de prospection ou de traitement : `?section=equipes&equipe=<id>`.
+  const [searchParams] = useSearchParams()
+  const equipeSelectionneeId = searchParams.get('equipe')
+  const tab = (location.state as { tab?: string } | null)?.tab
   const initialSection: Section =
-    (location.state as { tab?: string } | null)?.tab === 'stations' ? 'stations' : 'utilisateurs'
+    searchParams.get('section') === 'equipes' || equipeSelectionneeId
+      ? 'equipes'
+      : tab === 'stations'
+        ? 'stations'
+        : 'utilisateurs'
   const [section, setSection] = useState<Section>(initialSection)
   const [showCreateUser, setShowCreateUser] = useState(false)
 
@@ -39,13 +47,11 @@ export function AdministrationPage() {
     queryKey: ['stations', 'administration'],
     queryFn: () => api.get('/stations', { params: { inclure_inactifs: true } }).then((r) => r.data),
   })
-  const { data: equipesAeriennes = [] } = useQuery<unknown[]>({
-    queryKey: ['equipes-aeriennes'],
-    queryFn: () => api.get('/equipes?type=aerien').then((r) => r.data),
-  })
-  const { data: equipesTerrestres = [] } = useQuery<unknown[]>({
-    queryKey: ['equipes-terrestres'],
-    queryFn: () => api.get('/equipes?type=terrestre').then((r) => r.data),
+  // Même clé et mêmes paramètres qu'EquipesSection : le compteur de nav et le tableau partagent
+  // une seule requête (équipes actives et inactives, tous types).
+  const { data: equipes = [] } = useQuery<Equipe[]>({
+    queryKey: ['equipes'],
+    queryFn: () => api.get('/equipes', { params: { inclure_inactifs: true } }).then((r) => r.data),
   })
 
   const navItems: {
@@ -56,8 +62,7 @@ export function AdministrationPage() {
   }[] = [
     { key: 'utilisateurs', label: 'Utilisateurs', table: 'utilisateur', count: users.length },
     { key: 'stations', label: 'Stations', table: 'station_fixe', count: stations.length },
-    { key: 'equipe_aerienne', label: 'Équipes aériennes', table: 'equipe (aerien)', count: equipesAeriennes.length },
-    { key: 'equipe_terrestre', label: 'Équipes terrestres', table: 'equipe (terrestre)', count: equipesTerrestres.length },
+    { key: 'equipes', label: 'Équipes', table: 'equipe', count: equipes.length },
   ]
 
   return (
@@ -108,10 +113,8 @@ export function AdministrationPage() {
         <UtilisateursSection showCreate={showCreateUser} onShowCreateChange={setShowCreateUser} />
       ) : section === 'stations' ? (
         <StationsSection />
-      ) : section === 'equipe_aerienne' ? (
-        <EquipesAeriennesSection />
       ) : (
-        <EquipesTerrestresSection />
+        <EquipesSection equipeSelectionneeId={equipeSelectionneeId} />
       )}
     </div>
   )

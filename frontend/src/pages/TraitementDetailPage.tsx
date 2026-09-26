@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ErrorBanner } from '@/components/ui/error-banner'
 import { FicheTableau } from '@/components/FicheTableau'
+import { EquipeLien } from '@/components/EquipeLien'
 import { NavTabs } from '@/components/ui/nav-tabs'
 import { PILL_TONES, Pill } from '@/components/ui/pill'
 import { MODE_LABELS, ROLE_LABELS, SIGNATURE_ROLES, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
@@ -111,6 +112,8 @@ interface TraitementTerrestre {
 interface TraitementDetail {
   id: string
   prospection_id: string
+  // Équipe de la fiche (#602, #607) — null pour une fiche antérieure à l'équipe unifiée.
+  equipe_id: string | null
   // Dérivé côté backend (#numero-fiche-prospection-liee) à partir de
   // prospection_id — jamais une seconde relation, jamais saisi ici.
   prospection_n_fiche: string | null
@@ -373,6 +376,9 @@ export function TraitementDetailPage() {
           {traitement.prospection_n_fiche ?? traitement.prospection_id}
         </Link>
       </p>
+
+      {/* Équipe de la fiche (#602, #607) — lien vers Administration > Équipes. */}
+      <EquipeLien equipeId={traitement.equipe_id} />
 
       {/* Bandeau ambre : le snapshot des cibles est figé à la création */}
       {traitement.cible && (

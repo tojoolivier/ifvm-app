@@ -189,6 +189,18 @@ function noop(event: React.MouseEvent) {
   event.preventDefault()
 }
 
+/** Cellule « Équipe » unifiée (#602, #607) : le nom de l'équipe, suivi de son type — un seul libellé
+ * pour les postes (équipe terrestre) et les lieux (équipe aérienne). « — » sans équipe. */
+function celluleEquipe(row: Row, key: string, type: 'terrestre' | 'aérienne') {
+  const nom = text(row, key)
+  if (nom === '—') return nom
+  return (
+    <span>
+      {nom} <span className="text-ifvm-text-weak">({type})</span>
+    </span>
+  )
+}
+
 function text(row: Row, key: string): string {
   const value = row[key]
   return value === null || value === undefined || value === '' ? '—' : String(value)
@@ -224,7 +236,7 @@ function codeColumn(header = 'Code'): DataTableColumn<Row> {
 }
 
 /**
- * Entités administrables où le filtre « par équipe terrestre » a du sens.
+ * Entités administrables où le filtre « par équipe » a du sens (les postes, rattachés à une équipe terrestre).
  * `station_fixe`/`utilisateur` ont rejoint l'écran Administration (même
  * présentation, gestion complète) — seul `poste_acridien` reste ici et porte
  * le champ `equipe_terrestre_id`. Au module plutôt qu'en render : référence
@@ -478,8 +490,8 @@ const ENTITES: EntitySpec[] = [
       },
       {
         key: 'equipe_terrestre_nom',
-        header: 'Équipe terrestre',
-        render: (row) => text(row, 'equipe_terrestre_nom'),
+        header: 'Équipe',
+        render: (row) => celluleEquipe(row, 'equipe_terrestre_nom', 'terrestre'),
         sortValue: (row) => text(row, 'equipe_terrestre_nom'),
       },
       {
@@ -516,10 +528,10 @@ const ENTITES: EntitySpec[] = [
         },
         {
           name: 'equipe_terrestre_id',
-          label: 'Équipe terrestre',
+          label: 'Équipe',
           kind: 'foreign-key',
           nullable: true,
-          hint: 'Plusieurs postes peuvent partager la même équipe.',
+          hint: 'Équipe terrestre. Plusieurs postes peuvent partager la même équipe.',
           optionsFrom: {
             path: '/equipes?type=terrestre',
             queryKey: 'equipes-terrestres',
@@ -565,8 +577,8 @@ const ENTITES: EntitySpec[] = [
       {
         // « — » pour un lieu créé avant la migration 0074, pas encore rattaché.
         key: 'equipe_aerienne_nom',
-        header: 'Équipe aérienne',
-        render: (row) => text(row, 'equipe_aerienne_nom'),
+        header: 'Équipe',
+        render: (row) => celluleEquipe(row, 'equipe_aerienne_nom', 'aérienne'),
         sortValue: (row) => text(row, 'equipe_aerienne_nom'),
       },
       {
@@ -609,10 +621,10 @@ const ENTITES: EntitySpec[] = [
           // Obligatoire : l'équipe doit exister avant ses lieux (#lieu-aerien-equipe-aerienne).
           // Une équipe peut posséder plusieurs lieux (bases principales, secondaires, stands).
           name: 'equipe_aerienne_id',
-          label: 'Équipe aérienne',
+          label: 'Équipe',
           kind: 'foreign-key',
           required: true,
-          hint: 'Une équipe peut posséder plusieurs lieux.',
+          hint: 'Équipe aérienne. Une équipe peut posséder plusieurs lieux.',
           optionsFrom: {
             path: '/equipes?type=aerien',
             queryKey: 'equipes-aeriennes',
@@ -794,7 +806,7 @@ export function ReferentielsPage() {
   }, [data, entity, writeListData])
   const rowsLoading = entity.write?.listPath ? writeListLoading : isLoading
 
-  // --- Filtre transversal « par équipe terrestre » ----------------------------
+  // --- Filtre transversal « par équipe » ----------------------------
   //
   // Limité à poste_acridien (seule entité de ce périmètre restée ici) : voir
   // ENTITES_FILTRABLES_PAR_EQUIPE.
@@ -1129,7 +1141,7 @@ export function ReferentielsPage() {
           {filtreEquipeVisible && (
             <div className="flex items-center gap-[10px]">
               <Label htmlFor="filtre-equipe-terrestre" className="font-sans text-[11.5px] font-semibold text-[#3a3a30]">
-                Filtrer par équipe terrestre
+                Filtrer par équipe
               </Label>
               <select
                 id="filtre-equipe-terrestre"

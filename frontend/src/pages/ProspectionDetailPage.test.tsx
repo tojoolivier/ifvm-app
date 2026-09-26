@@ -24,14 +24,17 @@ const UTILISATEURS = [
 interface Options {
   role?: string
   audit?: AuditBdd[]
+  /** Réponse de `GET /equipes/eq-1` (équipe de la fiche). */
+  equipe?: unknown
 }
 
 /** Rend la page pour une fiche donnée telle que l'API la renverrait. */
-function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit = [] }: Options = {}) {
+function renderFiche(fiche: ProspectionBdd, { role = 'validation_finale', audit = [], equipe }: Options = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/prospections/p1') return Promise.resolve({ data: fiche })
     if (url === '/prospections/p1/audit-log') return Promise.resolve({ data: audit })
     if (url === '/prospections/p1/fiche-html') return Promise.resolve({ data: FICHE_HTML })
+    if (url === '/equipes/eq-1') return Promise.resolve({ data: equipe })
     if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', nom: 'Test', role } })
     if (url === '/campagnes') return Promise.resolve({ data: [{ id: 'c1', name: 'Campagne 2026' }] })
     if (url === '/users/') return Promise.resolve({ data: UTILISATEURS })
@@ -301,5 +304,47 @@ describe('ProspectionDetailPage — fiche de lecture en tableaux (comme le PDF)'
     await attendreFiche()
 
     expect(await screen.findByText('Impossible de charger la fiche.')).toBeInTheDocument()
+  })
+})
+
+// #602, #607 : l'équipe de la fiche est affichée, avec un lien vers l'équipe.
+describe('ProspectionDetailPage — équipe de la fiche', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const EQUIPE = {
+    id: 'eq-1',
+    nom: 'Équipe Terrestre Ihosy',
+    type: 'terrestre',
+    membres: [{ user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' }],
+    actif: true,
+  }
+
+  it('affiche l’équipe avec un lien vers Administration > Équipes (profil chef)', async () => {
+    renderFiche(ficheComplete({ statut: 'en_attente', equipe_id: 'eq-1' }), { role: 'chef', equipe: EQUIPE })
+    await attendreFiche()
+
+    const lien = await screen.findByRole('link', { name: 'Équipe Terrestre Ihosy' })
+    expect(lien).toHaveAttribute('href', '/administration?section=equipes&equipe=eq-1')
+    expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('terrestre · chef Toky Rabe')
+  })
+
+  it('affiche seulement le nom, sans lien, pour un profil sans accès à l’Administration', async () => {
+    renderFiche(ficheComplete({ statut: 'en_attente', equipe_id: 'eq-1' }), {
+      role: 'verificateur',
+      equipe: EQUIPE,
+    })
+    await attendreFiche()
+
+    await waitFor(() => expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('Équipe Terrestre Ihosy'))
+    expect(screen.queryByRole('link', { name: 'Équipe Terrestre Ihosy' })).not.toBeInTheDocument()
+  })
+
+  it('indique « non renseignée » pour une fiche sans équipe', async () => {
+    renderFiche(ficheComplete({ statut: 'en_attente', equipe_id: null }))
+    await attendreFiche()
+
+    expect(screen.getByTestId('fiche-equipe')).toHaveTextContent('Équipe : non renseignée')
   })
 })
