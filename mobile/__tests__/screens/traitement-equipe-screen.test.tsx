@@ -26,6 +26,7 @@ jest.mock('@/lib/traitement-repository', () => ({
   updateTraitementTerrestre: jest.fn().mockResolvedValue({}),
   addProduitUtilise: jest.fn().mockResolvedValue({}),
   deleteAllProduitsForTraitementTerrestre: jest.fn().mockResolvedValue(undefined),
+  appliquerSigleChefAuNumeroFiche: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('@/lib/referentiel-db', () => ({
@@ -69,12 +70,17 @@ const RESET_STATE = {
   stamps: {},
 };
 
-const CHEF_DE_BASE = { id: 'chef-1', nom: 'Ravelo', prenom: 'Sarah' };
+const CHEF_DE_BASE = { id: 'chef-1', nom: 'Ravelo', prenom: 'Sarah', sigle: 'SRV' };
+const CHEF_EQUIPE = { id: 'chef-equipe-1', nom: 'Andria', prenom: 'Lova', sigle: 'LAN' };
 
-function mockReferentiel({ chefsDeBase = [CHEF_DE_BASE] }: Partial<{ chefsDeBase: typeof CHEF_DE_BASE[] }> = {}) {
+function mockReferentiel({
+  chefsDeBase = [CHEF_DE_BASE],
+  chefsEquipe = [],
+}: Partial<{ chefsDeBase: (typeof CHEF_DE_BASE)[]; chefsEquipe: (typeof CHEF_EQUIPE)[] }> = {}) {
   const referentielDb = require('@/lib/referentiel-db');
   jest.mocked(referentielDb.listUtilisateursByRole).mockImplementation((role: string) => {
     if (role === 'chef_de_base') return Promise.resolve(chefsDeBase);
+    if (role === 'chef_equipe') return Promise.resolve(chefsEquipe);
     return Promise.resolve([]);
   });
 }
@@ -638,5 +644,92 @@ describe('TraitementScreen (Équipe) — Restante d’une reprise Terrestre', ()
     // (40, qui diverge dès que le snapshot de cible n'a plus la même surface infestée que l'origine).
     await waitFor(() => expect(screen.getByText('12')).toBeVisible());
     expect(screen.queryByText('100')).toBeNull();
+  });
+});
+
+/**
+ * #numero-fiche-traitement-trt : le numéro (créé à l'écran Références, avant que le chef soit connu)
+ * reçoit le SIGLE du chef choisi à l'écran Équipe — chef de base en aérien, chef d'équipe en terrestre.
+ */
+describe('TraitementScreen (Équipe) — sigle du chef dans le numéro de fiche', () => {
+  beforeEach(() => {
+    jest.mocked(traitementRepository.appliquerSigleChefAuNumeroFiche).mockReset().mockResolvedValue(null);
+  });
+
+  it('Aérien : complète le numéro avec le sigle du chef de base choisi, en base et dans le store', async () => {
+    jest.mocked(traitementRepository.appliquerSigleChefAuNumeroFiche).mockResolvedValue('TRT-AER-2026-09-26-SRV-001');
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      ref: { numeroFiche: 'TRT-AER-2026-09-26-001' },
+    } as any);
+
+    await render(<TraitementScreen />);
+    await screen.findByText('Sarah Ravelo');
+    fireEvent.changeText(screen.getByPlaceholderText('Nom de la base principale'), 'Base Betioky');
+    await settle();
+    fireEvent.press(screen.getByText('Sarah Ravelo'));
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du pilote'), 'Jean Dupont');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Nom du mécanicien'), 'Marc Rabe');
+    await settle();
+    fireEvent.changeText(screen.getByPlaceholderText('Ex. 5R-ABC'), '5R-XYZ');
+    await settle();
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.appliquerSigleChefAuNumeroFiche).toHaveBeenCalledWith('trait-1', 'SRV')
+    );
+    await waitFor(() =>
+      expect(useTraitementCaptureStore.getState().ref.numeroFiche).toBe('TRT-AER-2026-09-26-SRV-001')
+    );
+  });
+
+  it('Terrestre : complète le numéro avec le sigle du chef d’équipe choisi', async () => {
+    mockReferentiel({ chefsEquipe: [CHEF_EQUIPE] });
+    jest.mocked(traitementRepository.appliquerSigleChefAuNumeroFiche).mockResolvedValue('TRT-TERR-2026-09-26-LAN-001');
+    mockRouteParams = { traitementId: 'trait-1' };
+    jest.mocked(traitementRepository.getTraitement).mockReset().mockResolvedValue({
+      id: 'trait-1',
+      type_traitement: 'TERRESTRE',
+      cible: { surface_infestee_ha: 0 },
+      terrestre: {
+        chef_equipe_id: 'chef-equipe-1',
+        agent_encadreur: null,
+        consultant_international: null,
+        heure_debut: '06:00',
+        heure_fin: '09:00',
+        vitesse_vent_ms: 2.5,
+        direction_vent: null,
+        temperature_c: 26,
+        reprise_traitement: false,
+        traitement_origine_id: null,
+        surface_atomiseur_ha: null,
+        surface_disque_rotatif_ha: null,
+        surface_atomiseur_autoporte_ha: null,
+        surface_restante_abandonnee: null,
+        motif_surface_restante_abandonnee: null,
+        essence_litres: null,
+        nb_piles: null,
+        pesticide_recu_l: null,
+        produits: [{ produit_id: 'prod-1', quantite_l: 5, nom_commercial: 'Fyfanon' }],
+      },
+    } as any);
+    useTraitementCaptureStore.setState({
+      ...RESET_STATE,
+      typeTraitement: 'TERRESTRE',
+      ref: { numeroFiche: 'TRT-TERR-2026-09-26-001' },
+    } as any);
+
+    await render(<TraitementScreen />);
+    await waitFor(() => expect(useTraitementCaptureStore.getState().terrestre.chefEquipeId).toBe('chef-equipe-1'));
+    fireEvent.press(screen.getByText('Continuer  ›'));
+
+    await waitFor(() =>
+      expect(traitementRepository.appliquerSigleChefAuNumeroFiche).toHaveBeenCalledWith('trait-1', 'LAN')
+    );
+    await waitFor(() =>
+      expect(useTraitementCaptureStore.getState().ref.numeroFiche).toBe('TRT-TERR-2026-09-26-LAN-001')
+    );
   });
 });

@@ -110,6 +110,14 @@ class TraitementRepository(ABC):
         pass
 
     @abstractmethod
+    async def prochain_numero_ordre_fiche(self, type_traitement: str) -> int:
+        """Prochain numéro d'ordre (1, 2, …) des numéros de fiche de ce type
+        (« Terrestre » / « Aerien », #numero-fiche-traitement-trt) : le plus grand numéro d'ordre
+        déjà porté par une fiche de ce type au nouveau format + 1, ou 1 s'il n'y en a aucune. Les
+        fiches à l'ancien format « Prénom-Type-Date » et les numéros suffixés ne comptent pas."""
+        pass
+
+    @abstractmethod
     async def origine_deja_utilisee(
         self, traitement_origine_id: uuid.UUID, exclude_traitement_id: uuid.UUID | None = None
     ) -> bool:

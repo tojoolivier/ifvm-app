@@ -39,7 +39,9 @@ class UtilisateurRepositoryImpl(UtilisateurRepository):
         user = result.scalar_one_or_none()
         if user is None:
             return None
-        return UtilisateurRef(id=user.id, prenom=user.prenom, nom=user.nom, role=user.role)
+        return UtilisateurRef(
+            id=user.id, prenom=user.prenom, nom=user.nom, role=user.role, sigle=user.sigle
+        )
 
     async def creer_a_la_volee(self, nom: str, prenom: str, role: str) -> UtilisateurRef:
         """`flush` et non `commit` : le compte doit vivre ou mourir avec l'équipe dont

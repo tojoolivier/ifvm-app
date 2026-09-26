@@ -46,6 +46,8 @@ from app.domain.traitement import (
     construire_cible,
     contenu_diverge,
     generer_numero_fiche,
+    motif_numero_fiche,
+    normaliser_sigle,
     valider_surfaces_bloc,
 )
 from app.domain.utilisateur import UtilisateurRef
@@ -55,19 +57,79 @@ from app.domain.utilisateur import UtilisateurRef
 # ==========================================
 
 
+# #numero-fiche-traitement-trt : TRT-[TERR|AER]-[Date ISO]-[Numéro d'ordre sur 3 chiffres]
+
+
 def test_numero_fiche_format():
-    assert generer_numero_fiche("Hery", date(2026, 8, 11)) == "Hery-Aerien-2026-08-11"
+    assert generer_numero_fiche(date(2026, 8, 11), 1) == "TRT-AER-2026-08-11-001"
 
 
 def test_numero_fiche_avec_suffixe():
-    assert generer_numero_fiche("Hery", date(2026, 8, 11), suffixe=2) == "Hery-Aerien-2026-08-11-2"
+    assert generer_numero_fiche(date(2026, 8, 11), 1, suffixe=2) == "TRT-AER-2026-08-11-001-2"
 
 
 def test_numero_fiche_terrestre():
     assert (
-        generer_numero_fiche("Hery", date(2026, 8, 11), type_traitement="Terrestre")
-        == "Hery-Terrestre-2026-08-11"
+        generer_numero_fiche(date(2026, 8, 11), 1, type_traitement="Terrestre")
+        == "TRT-TERR-2026-08-11-001"
     )
+
+
+def test_numero_fiche_numero_ordre_sur_trois_chiffres_et_au_dela_de_999():
+    assert generer_numero_fiche(date(2026, 8, 11), 7) == "TRT-AER-2026-08-11-007"
+    assert generer_numero_fiche(date(2026, 8, 11), 42) == "TRT-AER-2026-08-11-042"
+    assert generer_numero_fiche(date(2026, 8, 11), 999) == "TRT-AER-2026-08-11-999"
+    assert generer_numero_fiche(date(2026, 8, 11), 1000) == "TRT-AER-2026-08-11-1000"
+
+
+def test_numero_fiche_ne_contient_ni_prenom_ni_annexe():
+    numero = generer_numero_fiche(date(2026, 8, 11), 5, type_traitement="Terrestre")
+    assert numero.startswith("TRT-TERR-")
+    assert "Hery" not in numero and "ANNEXE" not in numero
+
+
+def test_numero_fiche_avec_sigle_du_chef_entre_la_date_et_le_numero_d_ordre():
+    assert (
+        generer_numero_fiche(date(2026, 8, 11), 1, type_traitement="Terrestre", sigle="ABC")
+        == "TRT-TERR-2026-08-11-ABC-001"
+    )
+    assert generer_numero_fiche(date(2026, 8, 11), 12, sigle="RH") == "TRT-AER-2026-08-11-RH-012"
+
+
+def test_numero_fiche_avec_sigle_et_suffixe():
+    assert (
+        generer_numero_fiche(date(2026, 8, 11), 1, suffixe=2, sigle="ABC")
+        == "TRT-AER-2026-08-11-ABC-001-2"
+    )
+
+
+def test_numero_fiche_sans_sigle_omet_le_segment():
+    for absent in (None, "", "   ", "-- "):
+        assert generer_numero_fiche(date(2026, 8, 11), 1, sigle=absent) == "TRT-AER-2026-08-11-001"
+
+
+def test_normaliser_sigle_garde_lettres_et_chiffres_seulement():
+    assert normaliser_sigle("ABC") == "ABC"
+    assert normaliser_sigle(" a-b c ") == "abc"
+    assert normaliser_sigle("R.H") == "RH"
+    assert normaliser_sigle("é1") == "1"
+    assert normaliser_sigle(None) == ""
+
+
+def test_motif_numero_fiche_reconnait_le_numero_de_base_du_bon_type_seulement():
+    import re
+
+    motif = re.compile(motif_numero_fiche("Terrestre"))
+    assert motif.match("TRT-TERR-2026-08-11-007").group(1) == "007"
+    assert motif.match("TRT-TERR-2026-08-11-1000").group(1) == "1000"
+    # avec le sigle du chef entre la date et le numéro d'ordre
+    assert motif.match("TRT-TERR-2026-08-11-ABC-007").group(1) == "007"
+    assert motif.match("TRT-TERR-2026-08-11-ABC-1000").group(1) == "1000"
+    # autre type, ancien format, numéro suffixé par une collision : ne comptent pas
+    assert motif.match("TRT-AER-2026-08-11-007") is None
+    assert motif.match("Hery-Terrestre-2026-08-11") is None
+    assert motif.match("TRT-TERR-2026-08-11-007-2") is None
+    assert motif.match("TRT-TERR-2026-08-11-ABC-007-2") is None
 
 
 # ==========================================
@@ -401,6 +463,7 @@ class FakeTraitementRepo:
         origines_deja_utilisees: set | None = None,
     ):
         self.conflits = conflits
+        self.prochains_ordres: dict[str, int] = {}
         self.crees: list[Traitement] = []
         self.traitements_par_id = traitements_par_id or {}
         self.origines_deja_utilisees = origines_deja_utilisees or set()
@@ -411,6 +474,10 @@ class FakeTraitementRepo:
             raise NumeroFicheConflitError(traitement.numero_fiche)
         self.crees.append(traitement)
         return traitement
+
+    async def prochain_numero_ordre_fiche(self, type_traitement: str) -> int:
+        # Compteur par type (#numero-fiche-traitement-trt), 1 par défaut.
+        return self.prochains_ordres.get(type_traitement, 1)
 
     async def get_by_id(self, traitement_id):
         return self.traitements_par_id.get(traitement_id)
@@ -518,7 +585,7 @@ async def test_creation_genere_numero_fiche_et_snapshot():
     use_case, repo = _use_case(prospection=prospection, chef=_CHEF)
     traitement = await use_case.execute(**_args())
 
-    assert traitement.numero_fiche == "Hery-Aerien-2026-08-11"
+    assert traitement.numero_fiche == "TRT-AER-2026-08-11-001"
     assert traitement.statut == "brouillon"
     assert traitement.type_traitement == "AERIEN"
     assert traitement.cible is not None
@@ -569,7 +636,8 @@ async def test_creation_aerien_transmet_efficacite():
 async def test_conflit_numero_fiche_ajoute_suffixe_incremental():
     use_case, repo = _use_case(prospection=_prospection(), chef=_CHEF, conflits=2)
     traitement = await use_case.execute(**_args())
-    assert traitement.numero_fiche == "Hery-Aerien-2026-08-11-3"
+    # Le suffixe s'ajoute au numéro de base (jamais un autre format).
+    assert traitement.numero_fiche == "TRT-AER-2026-08-11-001-3"
 
 
 @pytest.mark.asyncio
@@ -636,10 +704,42 @@ async def test_rejette_prospection_inexistante():
 
 @pytest.mark.asyncio
 async def test_rejette_numero_fiche_trop_long():
-    chef_nom_long = UtilisateurRef(id=uuid.uuid4(), prenom="X" * 45, role="chef_de_base")
-    use_case, _ = _use_case(prospection=_prospection(), chef=chef_nom_long)
+    use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF)
     with pytest.raises(ValueError):
-        await use_case.execute(**_args(chef_de_base_id=chef_nom_long.id))
+        await use_case.execute(**_args(numero_fiche="TRT-AER-2026-08-11-001-" + "9" * 40))
+
+
+@pytest.mark.asyncio
+async def test_le_numero_du_mobile_est_repris_tel_quel():
+    use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF)
+    traitement = await use_case.execute(**_args(numero_fiche="TRT-AER-2026-08-11-017"))
+    assert traitement.numero_fiche == "TRT-AER-2026-08-11-017"
+
+
+@pytest.mark.asyncio
+async def test_le_numero_genere_par_le_serveur_continue_le_numero_d_ordre_du_type():
+    use_case, repo = _use_case(prospection=_prospection(), chef=_CHEF)
+    repo.prochains_ordres["Aerien"] = 8
+    traitement = await use_case.execute(**_args())
+    assert traitement.numero_fiche == "TRT-AER-2026-08-11-008"
+
+
+@pytest.mark.asyncio
+async def test_le_numero_genere_par_le_serveur_porte_le_sigle_du_chef_de_base():
+    chef = UtilisateurRef(
+        id=uuid.uuid4(), prenom="Hery", nom="Rakoto", role="chef_de_base", sigle="HRK"
+    )
+    use_case, _ = _use_case(prospection=_prospection(), chef=chef)
+    traitement = await use_case.execute(**_args(chef_de_base_id=chef.id))
+    assert traitement.numero_fiche == "TRT-AER-2026-08-11-HRK-001"
+
+
+@pytest.mark.asyncio
+async def test_conflit_sur_un_numero_du_mobile_garde_son_prefixe():
+    """Le suffixe s'ajoute au numéro fourni, sans jamais reconstruire un autre format."""
+    use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF, conflits=1)
+    traitement = await use_case.execute(**_args(numero_fiche="TRT-AER-2026-08-11-017"))
+    assert traitement.numero_fiche == "TRT-AER-2026-08-11-017-2"
 
 
 @pytest.mark.asyncio
@@ -1356,7 +1456,7 @@ async def test_creation_terrestre_genere_numero_fiche_et_recalcule_surfaces():
         )
     )
 
-    assert traitement.numero_fiche == "Hery-Terrestre-2026-08-11"
+    assert traitement.numero_fiche == "TRT-TERR-2026-08-11-001"
     assert traitement.statut == "brouillon"
     assert traitement.type_traitement == "TERRESTRE"
     assert traitement.terrestre is not None
@@ -1448,7 +1548,7 @@ async def test_creation_terrestre_efficacite_facultative():
 async def test_terrestre_conflit_numero_fiche_ajoute_suffixe_incremental():
     use_case, repo = _use_case_terrestre(prospection=_prospection(), chef=_CHEF_EQUIPE, conflits=2)
     traitement = await use_case.execute(**_args_terrestre())
-    assert traitement.numero_fiche == "Hery-Terrestre-2026-08-11-3"
+    assert traitement.numero_fiche == "TRT-TERR-2026-08-11-001-3"
 
 
 @pytest.mark.asyncio
@@ -2152,7 +2252,7 @@ def _traitement_terrestre_sync(**overrides) -> Traitement:
     args = dict(
         id=uuid.uuid4(),
         prospection_id=uuid.uuid4(),
-        numero_fiche="Hery-Terrestre-2026-08-11",
+        numero_fiche="TRT-TERR-2026-08-11-001",
         mode_traitement=None,
         date_traitement=date(2026, 8, 11),
         date_validation=date(2026, 8, 10),
@@ -2383,7 +2483,7 @@ def _sync_terrestre_args(fiche_id, base_updated_at, **overrides):
         equipe_id=_EQUIPE_TERRESTRE_ID,
         surface_atomiseur_ha=10.0,
         surface_restante_abandonnee=False,
-        numero_fiche="Hery-Terrestre-2026-08-11",
+        numero_fiche="TRT-TERR-2026-08-11-001",
     )
     args.update(overrides)
     return args
@@ -2420,9 +2520,9 @@ async def test_sync_push_terrestre_creation_id_inconnu():
 
 @pytest.mark.asyncio
 async def test_sync_push_terrestre_resync_sans_numero_fiche_regenere_a_l_identique():
-    """Une resync sans `numero_fiche` fourni le régénère de façon déterministe
-    (prénom+date+type, sans suffixe) — ne doit jamais provoquer un faux conflit tant que
-    chef_equipe_id/date_traitement n'ont pas changé."""
+    """Une resync sans `numero_fiche` fourni reprend celui de la fiche déjà persistée — elle ne
+    consomme pas un nouveau numéro d'ordre (#numero-fiche-traitement-trt) et ne provoque jamais un
+    faux conflit tant que chef_equipe_id/date_traitement n'ont pas changé."""
     fiche_id = uuid.uuid4()
     ancien_updated_at = datetime(2026, 8, 11, 8, 0)
     updated_at_serveur = datetime(2026, 8, 11, 9, 0)
@@ -2432,7 +2532,7 @@ async def test_sync_push_terrestre_resync_sans_numero_fiche_regenere_a_l_identiq
     existant = _traitement_terrestre_sync(
         id=fiche_id,
         prospection_id=args["prospection_id"],
-        numero_fiche="Hery-Terrestre-2026-08-11",
+        numero_fiche="TRT-TERR-2026-08-11-001",
         localite=args["localite"],
         chef_equipe_id=args["chef_equipe_id"],
         surface_atomiseur_ha=args["surface_atomiseur_ha"],
@@ -2591,3 +2691,13 @@ async def test_sync_push_terrestre_fiche_validee_rejetee_sans_comparaison():
 
     assert repo.conflicts_marques == []
     assert existant.statut_sync == "synced"
+
+
+@pytest.mark.asyncio
+async def test_le_numero_genere_par_le_serveur_porte_le_sigle_du_chef_d_equipe():
+    chef = UtilisateurRef(
+        id=uuid.uuid4(), prenom="Hery", nom="Rakoto", role="chef_equipe", sigle="HRK"
+    )
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=chef)
+    traitement = await use_case.execute(**_args_terrestre(chef_equipe_id=chef.id))
+    assert traitement.numero_fiche == "TRT-TERR-2026-08-11-HRK-001"
