@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { api } from '../api/client'
 import type { AuditBdd, ProspectionBdd } from '@/lib/prospection-fiche-bdd'
-import { ficheComplete, ficheVide } from '@/test/prospection-fixtures'
+import { ficheComplete } from '@/test/prospection-fixtures'
 import { ProspectionDetailPage } from './ProspectionDetailPage'
 
 vi.mock('../api/client', () => ({
@@ -59,20 +59,8 @@ function renderPage(statut: ProspectionBdd['statut'], overrides: Partial<Prospec
   return renderFiche(ficheComplete({ statut, ...overrides }), { role })
 }
 
-/**
- * Attend la fiche puis ouvre « Données BDD » : la fiche s'ouvre sur l'onglet « Fiche »
- * (tableaux du PDF), alors que ces tests vérifient les cartes, une par colonne de la base.
- */
 async function attendreFiche() {
   await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
-  fireEvent.click(screen.getByRole('tab', { name: 'Données BDD' }))
-}
-
-/** Ligne d'une colonne de la base, repérée par son nom de colonne. */
-function colonne(nom: string): HTMLElement {
-  const el = document.querySelector<HTMLElement>(`[data-colonne="${nom}"]`)
-  if (!el) throw new Error(`Colonne « ${nom} » absente de la page`)
-  return el
 }
 
 function audit(id: string, action: AuditBdd['action'], created_at: string, auteur_id = 'u1', details: AuditBdd['details'] = null): AuditBdd {
@@ -157,8 +145,7 @@ describe('ProspectionDetailPage — en-tête et actions', () => {
     await attendreFiche()
 
     expect(screen.getByText(/Intensive · Beroroha · 2026-07-10/)).toBeInTheDocument()
-    // Le statut figure dans la pastille d'en-tête ET dans la colonne `prospection.statut`.
-    expect(screen.getAllByText('Vérifiée')).toHaveLength(2)
+    expect(screen.getByText('Vérifiée')).toBeInTheDocument()
   })
 
   it('propose les actions du rôle et la création de traitement', async () => {
@@ -222,228 +209,6 @@ describe('ProspectionDetailPage — en-tête et actions', () => {
   })
 })
 
-describe('ProspectionDetailPage — chaque colonne de la base est affichée', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  /** Colonnes reprises par un autre élément (bandeau, tableaux, cartes enfants, jointures). */
-  const AILLEURS = new Set([
-    'populations',
-    'captures',
-    'infestations',
-    'operations_aeriennes',
-    'avertissements',
-    'prospecteur_nom',
-    'verified_by_nom',
-    'validated_by_nom',
-  ])
-
-  it('rend une ligne pour chacune des colonnes de la table prospection', async () => {
-    const fiche = ficheComplete()
-    renderFiche(fiche)
-    await attendreFiche()
-
-    const manquantes = Object.keys(fiche).filter(
-      (cle) => !AILLEURS.has(cle) && !document.querySelector(`[data-colonne="${cle}"]`),
-    )
-    expect(manquantes).toEqual([])
-  })
-
-  it('indique la table et la colonne d’origine en infobulle', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    expect(colonne('surface_infestee')).toHaveAttribute('title', 'prospection.surface_infestee')
-  })
-
-  it('montre les valeurs stockées, sans conversion : hauteur d’herbe en cm, verdissement et verdissement %', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    expect(colonne('hauteur_herbe_cm')).toHaveTextContent('35 cm')
-    expect(colonne('verdissement')).toHaveTextContent('30')
-    expect(colonne('verdissement_pourcent')).toHaveTextContent('40 %')
-    expect(colonne('surface_infestee')).toHaveTextContent('12,5 ha')
-    expect(colonne('altitude')).toHaveTextContent('812 m')
-  })
-
-  it('résout les références par leur nom : campagne, station, prospecteur, vérificateur, validateur', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    await waitFor(() => expect(colonne('station_id')).toHaveTextContent('ST-014 Ankazoabo (PA-01)'))
-    expect(colonne('campagne_id')).toHaveTextContent('Campagne 2026')
-    expect(colonne('prospecteur_id')).toHaveTextContent('Randria Jean')
-    expect(colonne('verified_by')).toHaveTextContent('Andria Paul')
-    expect(colonne('validated_by')).toHaveTextContent('Rakoto Marie')
-  })
-
-  it('affiche la base principale et secondaire par leurs colonnes (et non un identifiant de lieu inexistant)', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    expect(colonne('base')).toHaveTextContent('Base Betioky')
-    expect(colonne('base_numero')).toHaveTextContent('3')
-    expect(colonne('base_date_installation')).toHaveTextContent('2026-06-01')
-    expect(colonne('base_latitude')).toHaveTextContent('-23,7')
-    expect(colonne('base_secondaire')).toHaveTextContent('Base Ampanihy')
-    expect(colonne('base_secondaire_longitude')).toHaveTextContent('44,7')
-  })
-
-  it('développe les JSONB `vegetation` et `sol` en entier', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    const lignesVeg = Array.from(document.querySelectorAll('[data-colonne="vegetation"]')).map(
-      (el) => el.textContent,
-    )
-    expect(lignesVeg.join(' | ')).toContain('Végétation › strates › herbacee › recouvrement')
-    expect(lignesVeg.join(' | ')).toContain('40')
-    expect(lignesVeg.join(' | ')).toContain('Végétation › sol nu')
-    const lignesSol = Array.from(document.querySelectorAll('[data-colonne="sol"]')).map((el) => el.textContent)
-    expect(lignesSol.join(' | ')).toContain('sableux, argileux')
-    expect(lignesSol.join(' | ')).toContain('Sol › humidite')
-  })
-
-  it('atteste les tracés de signature enregistrés sans afficher le SVG brut', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    expect(colonne('signature_pilote_image')).toHaveTextContent('Tracé enregistré (')
-    expect(screen.queryByText('M0 0 L20 20')).not.toBeInTheDocument()
-  })
-
-  it('n’affiche aucun élément calculé ni aucun libellé de maquette absent de la base', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    for (const invente of [
-      /synthèse par phase/i,
-      /Durée de comptage/i,
-      /tables imago \/ larve distinctes/i,
-      /Niveau d.alerte/i,
-      'Répartition',
-      'Vols clairs',
-      'Essaims',
-      'Localité',
-      'Recouvrement',
-      'Strate herbeuse',
-      'Strate arborée',
-    ]) {
-      expect(screen.queryByText(invente), String(invente)).not.toBeInTheDocument()
-    }
-  })
-
-  it('pour une fiche intensive, annonce les groupes propres à un autre type sans les afficher', async () => {
-    renderFiche(ficheVide({ type_prospection: 'intensive', n_fiche: 'F-001' }))
-    await attendreFiche()
-
-    expect(screen.queryByText('Extensif aérien — équipe & aéronef')).not.toBeInTheDocument()
-    expect(screen.getByText(/Colonnes sans valeur et propres à un autre type de fiche/)).toHaveTextContent(
-      'Extensif aérien — équipe & aéronef',
-    )
-  })
-
-  it('n’écarte jamais une donnée : une base renseignée sur une fiche intensive reste visible', async () => {
-    renderFiche(ficheVide({ type_prospection: 'intensive', n_fiche: 'F-001', base: 'Base orpheline' }))
-    await attendreFiche()
-
-    expect(screen.getByText('Extensif aérien — base principale')).toBeInTheDocument()
-    expect(colonne('base')).toHaveTextContent('Base orpheline')
-  })
-})
-
-describe('ProspectionDetailPage — tables enfants', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('populations : une carte par ligne de prospection_population, avec toutes ses colonnes', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    expect(screen.getByText('prospection_population · 2 lignes')).toBeInTheDocument()
-    expect(screen.getByText('LMC · Imago')).toBeInTheDocument()
-    expect(screen.getByText('NSE · Larve')).toBeInTheDocument()
-
-    // Les colonnes de l'autre catégorie, toutes NULL, n'apparaissent pas ; celles de la catégorie oui.
-    expect(screen.getAllByText('Imagos')).toHaveLength(1)
-    expect(screen.getAllByText('Larves')).toHaveLength(1)
-
-    const lignesStades = Array.from(document.querySelectorAll('[data-colonne="stades_imago"]')).map(
-      (el) => el.textContent ?? '',
-    )
-    // Les stades à 0 sont des valeurs stockées : ils restent affichés.
-    expect(lignesStades.some((t) => t.includes('femelleA1') && t.includes('3'))).toBe(true)
-    expect(lignesStades.some((t) => t.includes('maleA1') && t.includes('0'))).toBe(true)
-    expect(document.querySelectorAll('[data-colonne="temps_capture"]')).toHaveLength(2)
-    expect(document.querySelectorAll('[data-colonne="essaim_observe"]')).toHaveLength(1)
-  })
-
-  it('infestations : toutes les lignes, chacune avec son sous-type', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    expect(screen.getByText('prospection_infestation · 2 lignes')).toBeInTheDocument()
-    expect(screen.getByText('Tache larvaire · LMC')).toBeInTheDocument()
-    expect(screen.getByText('Vol clair · NSE')).toBeInTheDocument()
-    expect(screen.getAllByText('Larve (tache / bande larvaire)')).toHaveLength(1)
-    expect(screen.getAllByText('Imago (vol clair / essaim)')).toHaveLength(1)
-    // Colonnes du socle commun + des deux sous-tables, présentes une fois par infestation concernée.
-    expect(document.querySelectorAll('[data-colonne="vent_vitesse"]')).toHaveLength(2)
-    expect(document.querySelectorAll('[data-colonne="front_longueur_m"]')).toHaveLength(1)
-    expect(document.querySelectorAll('[data-colonne="densite_en_vol"]')).toHaveLength(1)
-  })
-
-  it('captures : les lignes brutes de prospection_capture, y compris un sexe NULL', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    const section = screen.getByText('prospection_capture · 3 lignes').closest('section')!
-    const lignes = within(section).getAllByRole('row')
-    expect(lignes).toHaveLength(4) // en-tête + 3 lignes
-    expect(within(section).getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
-      'Identifiant',
-      'Espèce',
-      'Catégorie',
-      'Sexe',
-      'Phase',
-      'Stade',
-      'Effectif',
-    ])
-    // La ligne « larve » n'a pas de sexe : elle doit rester visible avec un tiret.
-    const larve = within(section).getByText('cap-3').closest('tr')!
-    expect(within(larve).getAllByRole('cell')[3]).toHaveTextContent('—')
-    expect(within(larve).getAllByRole('cell')[6]).toHaveTextContent('9')
-  })
-
-  it('opérations aériennes : une colonne par colonne de la table', async () => {
-    renderFiche(ficheComplete())
-    await attendreFiche()
-
-    const section = screen.getByText('prospection_operation_aerienne · 1 ligne').closest('section')!
-    const entetes = within(section).getAllByRole('columnheader').map((h) => h.textContent)
-    expect(entetes).toContain('Début — température')
-    expect(entetes).toContain('Fin — vent')
-    expect(entetes).toContain('Durée')
-    const ligne = within(section).getAllByRole('row')[1]
-    expect(ligne).toHaveTextContent('Convoyage vers la base')
-    expect(ligne).toHaveTextContent('21,5 °C')
-    expect(ligne).toHaveTextContent('45 min')
-  })
-
-  it('annonce une table sans ligne au lieu de la masquer', async () => {
-    renderFiche(ficheVide({ n_fiche: 'F-001' }))
-    await attendreFiche()
-
-    expect(screen.getByText('prospection_population · 0 ligne')).toBeInTheDocument()
-    expect(screen.getByText('prospection_infestation · 0 ligne')).toBeInTheDocument()
-    expect(screen.getByText('prospection_capture · 0 ligne')).toBeInTheDocument()
-    expect(screen.getByText('prospection_operation_aerienne · 0 ligne')).toBeInTheDocument()
-  })
-})
-
 describe('ProspectionDetailPage — journal d’audit (table audit_log)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -486,53 +251,54 @@ describe('ProspectionDetailPage — journal d’audit (table audit_log)', () => 
   })
 })
 
-describe('ProspectionDetailPage — onglets « Fiche » / « Données BDD »', () => {
+describe('ProspectionDetailPage — fiche de lecture en tableaux (comme le PDF)', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('ouvre sur « Fiche » : le gabarit du PDF est affiché dans un iframe isolé', async () => {
+  it('affiche directement le gabarit du PDF dans un iframe isolé, sans onglets', async () => {
     renderPage('verifiee')
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+    await attendreFiche()
 
-    expect(screen.getByRole('tab', { name: 'Fiche' })).toHaveAttribute('aria-selected', 'true')
     const cadre = await screen.findByTitle('Fiche de prospection F-001')
     expect(cadre).toHaveAttribute('srcdoc', FICHE_HTML)
     // Aucun script du document ne doit pouvoir s'exécuter.
     expect(cadre.getAttribute('sandbox')).not.toContain('allow-scripts')
     expect(mockedGet).toHaveBeenCalledWith('/prospections/p1/fiche-html', { responseType: 'text' })
-    // Les cartes de la base ne sont pas affichées par défaut.
-    expect(document.querySelector('[data-colonne="statut"]')).toBeNull()
+    // Une seule vue : ni onglets, ni cartes « une par colonne de la base ».
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(document.querySelector('[data-colonne]')).toBeNull()
   })
 
-  it('« Données BDD » affiche les cartes de la base, « Fiche » ramène au tableau', async () => {
+  it('garde les actions du rôle et le journal à côté de la fiche', async () => {
     renderPage('verifiee')
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Données BDD' }))
-    expect(screen.queryByTitle('Fiche de prospection F-001')).toBeNull()
-    expect(colonne('statut')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Fiche' }))
-    expect(await screen.findByTitle('Fiche de prospection F-001')).toBeInTheDocument()
-  })
-
-  it('garde les actions et le journal visibles sous les deux onglets', async () => {
-    renderPage('verifiee')
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+    await attendreFiche()
 
     expect(screen.getByRole('button', { name: 'Valider la fiche' })).toBeInTheDocument()
     expect(screen.getByText('Journal de validation')).toBeInTheDocument()
   })
 
-  it("signale une erreur claire quand la fiche ne peut pas être chargée", async () => {
+  it('annonce le code HTTP quand la fiche ne peut pas être chargée', async () => {
     renderPage('verifiee')
     mockedGet.mockImplementation((url: string) =>
       url === '/prospections/p1/fiche-html'
-        ? Promise.reject(new Error('500'))
+        ? Promise.reject({ response: { status: 404 } })
         : Promise.resolve({ data: url === '/prospections/p1' ? ficheComplete({ statut: 'verifiee' }) : [] }),
     )
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'F-001' })).toBeInTheDocument())
+    await attendreFiche()
+
+    expect(await screen.findByText(/erreur 404/)).toBeInTheDocument()
+    expect(screen.getByText(/le serveur est-il à jour/)).toBeInTheDocument()
+  })
+
+  it("reste explicite sans code HTTP (réseau coupé)", async () => {
+    renderPage('verifiee')
+    mockedGet.mockImplementation((url: string) =>
+      url === '/prospections/p1/fiche-html'
+        ? Promise.reject(new Error('Network Error'))
+        : Promise.resolve({ data: url === '/prospections/p1' ? ficheComplete({ statut: 'verifiee' }) : [] }),
+    )
+    await attendreFiche()
 
     expect(await screen.findByText('Impossible de charger la fiche.')).toBeInTheDocument()
   })
