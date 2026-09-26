@@ -3,6 +3,8 @@ import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 /**
  * Écran 0 — point d'entrée du module traitement. `prospectionId` reste accepté
@@ -14,7 +16,8 @@ export default function TraitementSelectScreen() {
   const router = useRouter();
   const { prospectionId } = useLocalSearchParams<{ prospectionId?: string }>();
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const handleNouvelleFiche = () => {
     if (prospectionId) {
@@ -60,7 +63,7 @@ export default function TraitementSelectScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
     title: {
@@ -77,7 +80,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
     },
     primaryCardText: { fontFamily: traitementFonts.uiBold, color: '#fff', fontSize: typeSizes.corps + 2 },
     secondaryCard: {
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
       borderWidth: 1.5,
       borderColor: traitementColors.bordure,
       borderRadius: traitementRadii.carteAccueil,

@@ -14,18 +14,27 @@ const mockedPost = api.post as unknown as ReturnType<typeof vi.fn>
 const CHEF_TOKY = { id: 'chef-1', nom: 'Rabe', prenom: 'Toky' }
 const CHEF_LALA = { id: 'chef-2', nom: 'Rasoa', prenom: 'Lala' }
 
+// Référentiel unifié (ADR-018) : le chef est un membre `fonction: 'chef'`, les
+// autres membres portent leur propre fonction — plus de colonne `chef_equipe_id`.
+type Membre = { user_id: string; fonction: string; nom: string | null; prenom: string | null }
+
 const EQUIPE_IHOSY = {
   id: 'equipe-1',
   nom: 'Équipe Terrestre Ihosy',
-  chef_equipe_id: 'chef-1',
-  membres: [] as { id: string; nom: string }[],
+  type: 'terrestre',
+  membres: [
+    { user_id: 'chef-1', fonction: 'chef', nom: 'Rabe', prenom: 'Toky' },
+  ] as Membre[],
   actif: true,
 }
 const EQUIPE_LIBRE = {
   id: 'equipe-2',
   nom: 'Équipe Terrestre Toliara',
-  chef_equipe_id: 'chef-2',
-  membres: [{ id: 'm-1', nom: 'Voahangy' }],
+  type: 'terrestre',
+  membres: [
+    { user_id: 'chef-2', fonction: 'chef', nom: 'Rasoa', prenom: 'Lala' },
+    { user_id: 'u-1', fonction: 'membre', nom: 'Voahangy', prenom: '' },
+  ] as Membre[],
   actif: true,
 }
 
@@ -38,7 +47,7 @@ function mockApi({
 } = {}) {
   mockedGet.mockImplementation((url: string) => {
     if (url === '/users/chefs-equipe') return Promise.resolve({ data: chefs })
-    if (url === '/equipes-terrestres') return Promise.resolve({ data: equipes })
+    if (url === '/equipes?type=terrestre') return Promise.resolve({ data: equipes })
     return Promise.resolve({ data: [] })
   })
 }
@@ -72,7 +81,7 @@ describe('EquipesTerrestresSection — équipes terrestres (migration 0072)', ()
     // Chef-2 (Lala Rasoa) libre : équipe Toliara (qui le dirige) exclue du mock.
     mockApi({ equipes: [EQUIPE_IHOSY] })
     mockedPost.mockResolvedValue({
-      data: { id: 'equipe-3', nom: 'Équipe Terrestre Betroka', chef_equipe_id: 'chef-2', actif: true },
+      data: { id: 'equipe-3', nom: 'Équipe Terrestre Betroka', type: 'terrestre', actif: true },
     })
     renderSection()
 
@@ -84,10 +93,10 @@ describe('EquipesTerrestresSection — équipes terrestres (migration 0072)', ()
     fireEvent.click(screen.getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
-      expect(mockedPost).toHaveBeenCalledWith('/equipes-terrestres', {
+      expect(mockedPost).toHaveBeenCalledWith('/equipes', {
         nom: 'Équipe Terrestre Betroka',
-        chef_equipe_id: 'chef-2',
-        membres: [],
+        type: 'terrestre',
+        membres: [{ user_id: 'chef-2', fonction: 'chef' }],
       }),
     )
   })
@@ -132,15 +141,20 @@ describe('EquipesTerrestresSection — équipes terrestres (migration 0072)', ()
 
     await waitFor(() =>
       expect(mockedPost).toHaveBeenCalledWith(
-        '/equipes-terrestres',
-        expect.objectContaining({ membres: [{ nom: 'Tovo Randria' }] }),
+        '/equipes',
+        expect.objectContaining({
+          membres: [
+            { user_id: 'chef-2', fonction: 'chef' },
+            { nom: 'Tovo Randria', fonction: 'membre' },
+          ],
+        }),
       ),
     )
   })
 
   it('affiche une bannière d’erreur si les équipes terrestres ne peuvent pas être chargées', async () => {
     mockedGet.mockImplementation((url: string) => {
-      if (url === '/equipes-terrestres') {
+      if (url === '/equipes?type=terrestre') {
         const err = new Error('500') as Error & { response: { status: number; data: { detail: string } } }
         err.response = { status: 500, data: { detail: 'panne serveur' } }
         return Promise.reject(err)

@@ -32,7 +32,7 @@ jest.mock('@/lib/location', () => ({
 describe('ExtensiveReferenceScreen — surface infestée facultative', () => {
   beforeEach(() => {
     useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25' } as any,
+      draft: { id: 'draft-123', surface_station: 1000, type_prospection: 'extensive', date_prospection: '2026-08-25' } as any,
       captures: [],
     });
   });

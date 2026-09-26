@@ -30,10 +30,13 @@ async def _creer_prospection(
     station_id: uuid.UUID | None = None,
     revalide_de_id: str | None = None,
     statut: str | None = None,
+    *,
+    equipe_id: uuid.UUID,
 ) -> str:
     payload: dict = {
         "type_prospection": type_prospection,
         "campagne_id": str(campagne_id),
+        "equipe_id": str(equipe_id),
         "date_prospection": "2026-08-01",
     }
     if type_prospection == "intensive":
@@ -64,8 +67,12 @@ async def _valider_extensive(
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    *,
+    equipe_id: uuid.UUID,
 ) -> str:
-    pid = await _creer_prospection(client, auth_headers, campagne_id, "extensive")
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, "extensive", equipe_id=equipe_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     await _changer_statut(client, pid, "validee", _headers(validateur))
@@ -79,8 +86,12 @@ async def _valider_intensive(
     station_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    *,
+    equipe_id: uuid.UUID,
 ) -> str:
-    pid = await _creer_prospection(client, auth_headers, campagne_id, "intensive", station_id)
+    pid = await _creer_prospection(
+        client, auth_headers, campagne_id, "intensive", station_id, equipe_id=equipe_id
+    )
     await _changer_statut(client, pid, "en_attente", auth_headers)
     await _changer_statut(client, pid, "verifiee", _headers(verificateur))
     await _changer_statut(client, pid, "validee", _headers(validateur))
@@ -100,7 +111,10 @@ async def _reculer_validated_at(db_session: AsyncSession, prospection_id: str, j
 
 @pytest.mark.asyncio
 async def test_validated_at_stampe_a_la_creation_pour_type_validation(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """`validation` (signalement) est auto-validée à la création, sans passer
     par `apply_transition` — `validated_at` doit quand même être stampé (sinon
@@ -110,6 +124,7 @@ async def test_validated_at_stampe_a_la_creation_pour_type_validation(
         json={
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
+            "equipe_id": str(equipe_terrestre_id),
             "date_prospection": "2026-08-01",
             "n_message": "MSG-001",
         },
@@ -129,6 +144,7 @@ async def test_revalidation_suit_desormais_la_chaine_de_verification_comme_une_f
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#revalidation-verification-standard : revirement du comportement
     historique (#revalidation-immediate) — une fiche qui revalide une
@@ -139,7 +155,7 @@ async def test_revalidation_suit_desormais_la_chaine_de_verification_comme_une_f
     doit être revue comme n'importe quelle fiche neuve, quitte à rester
     temporairement invisible du sélecteur de traitement pendant la revue."""
     pid_origine = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
 
@@ -148,6 +164,7 @@ async def test_revalidation_suit_desormais_la_chaine_de_verification_comme_une_f
         json={
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
+            "equipe_id": str(equipe_terrestre_id),
             "date_prospection": "2026-08-01",
             "revalide_de_id": pid_origine,
             "statut": "en_attente",
@@ -162,7 +179,7 @@ async def test_revalidation_suit_desormais_la_chaine_de_verification_comme_une_f
 
 @pytest.mark.asyncio
 async def test_revalidation_d_une_fiche_validation_suit_aussi_la_chaine_de_verification(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_terrestre_id: uuid.UUID
 ):
     """Une fiche de Validation NEUVE (jamais une revalidation) reste validée
     immédiatement (#nouvelle-fiche-validation-immediate, inchangé) — mais SA
@@ -173,6 +190,7 @@ async def test_revalidation_d_une_fiche_validation_suit_aussi_la_chaine_de_verif
     resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-01",
@@ -186,6 +204,7 @@ async def test_revalidation_d_une_fiche_validation_suit_aussi_la_chaine_de_verif
     resp = await client.post(
         "/prospections",
         json={
+            "equipe_id": str(equipe_terrestre_id),
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
             "date_prospection": "2026-08-01",
@@ -210,6 +229,7 @@ async def test_revalidation_recoit_une_date_de_validation_fraiche_une_fois_verif
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """La fiche d'origine est périmée (`validated_at` reculé de plus de 5
     jours) précisément parce que sa date de validation est trop ancienne —
@@ -218,7 +238,7 @@ async def test_revalidation_recoit_une_date_de_validation_fraiche_une_fois_verif
     celle de la source (`apply_transition` la stampe à chaque passage à
     'validee', quel que soit le type ou l'origine de la fiche)."""
     pid_origine = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
 
@@ -229,6 +249,7 @@ async def test_revalidation_recoit_une_date_de_validation_fraiche_une_fois_verif
         "extensive",
         revalide_de_id=pid_origine,
         statut="en_attente",
+        equipe_id=equipe_terrestre_id,
     )
     await _changer_statut(client, pid_enfant, "verifiee", _headers(verificateur))
     await _changer_statut(client, pid_enfant, "validee", _headers(validateur))
@@ -249,6 +270,7 @@ async def test_disponible_pour_traitement_exclut_revalidation_pas_encore_validee
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Conséquence directe de #revalidation-verification-standard : une fiche
     de revalidation fraîchement créée est `en_attente`, donc absente de
@@ -256,7 +278,7 @@ async def test_disponible_pour_traitement_exclut_revalidation_pas_encore_validee
     comme n'importe quelle fiche extensive neuve, revirement du comportement
     historique (#revalidation-immediate)."""
     pid_origine = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
 
@@ -267,6 +289,7 @@ async def test_disponible_pour_traitement_exclut_revalidation_pas_encore_validee
         "extensive",
         revalide_de_id=pid_origine,
         statut="en_attente",
+        equipe_id=equipe_terrestre_id,
     )
 
     resp = await client.get(
@@ -286,11 +309,12 @@ async def test_disponible_pour_traitement_inclut_la_fiche_revalidee_une_fois_ver
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """... et redevient disponible normalement, une fois passée par la même
     chaîne de vérification que n'importe quelle fiche."""
     pid_origine = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
 
@@ -301,6 +325,7 @@ async def test_disponible_pour_traitement_inclut_la_fiche_revalidee_une_fois_ver
         "extensive",
         revalide_de_id=pid_origine,
         statut="en_attente",
+        equipe_id=equipe_terrestre_id,
     )
     await _changer_statut(client, pid_enfant, "verifiee", _headers(verificateur))
     await _changer_statut(client, pid_enfant, "validee", _headers(validateur))
@@ -316,7 +341,10 @@ async def test_disponible_pour_traitement_inclut_la_fiche_revalidee_une_fois_ver
 
 @pytest.mark.asyncio
 async def test_disponible_pour_traitement_inclut_immediatement_une_fiche_validation_fraiche(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """#nouvelle-fiche-validation-immediate : une fiche `validation` (« Vérifier
     un signalement ») vient d'être créée (`validated_at` = maintenant, loin des
@@ -327,6 +355,7 @@ async def test_disponible_pour_traitement_inclut_immediatement_une_fiche_validat
         json={
             "type_prospection": "validation",
             "campagne_id": str(campagne_id),
+            "equipe_id": str(equipe_terrestre_id),
             "date_prospection": "2026-08-01",
             "n_message": "MSG-002",
         },
@@ -352,12 +381,13 @@ async def test_disponible_pour_traitement_exclut_fiche_extensive_perimee(
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     pid_recente = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     pid_perimee = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_perimee, DELAI_REVALIDATION_JOURS + 1)
 
@@ -381,11 +411,18 @@ async def test_disponible_pour_traitement_n_exclut_pas_intensive_perimee(
     station_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """La règle des 5 jours est propre à extensive/validation — l'intensive
     n'est jamais concernée, même très ancienne."""
     pid = await _valider_intensive(
-        client, auth_headers, campagne_id, station_id, verificateur, validateur
+        client,
+        auth_headers,
+        campagne_id,
+        station_id,
+        verificateur,
+        validateur,
+        equipe_id=equipe_terrestre_id,
     )
     await _reculer_validated_at(db_session, pid, DELAI_REVALIDATION_JOURS + 30)
 
@@ -406,16 +443,17 @@ async def test_disponible_pour_traitement_n_exclut_pas_la_fiche_de_revalidation(
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """Une fiche périmée revalidée (a un enfant `revalide_de_id`) reste
     exclue ; l'enfant, lui, est frais (`validated_at` récent) et normalement
     disponible."""
     pid_origine = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
     pid_enfant = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     # La revalidation elle-même se ferait en pratique via le payload de
     # création (revalide_de_id) — ici on simule directement en base pour ne
@@ -447,26 +485,28 @@ async def test_a_revalider_retourne_exactement_les_fiches_perimees(
     verificateur: Utilisateur,
     validateur: Utilisateur,
     chef_equipe: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     pid_recente = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
 
     pid_a_revalider = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_a_revalider, DELAI_REVALIDATION_JOURS + 1)
 
     # Périmée mais déjà traitée : ne doit apparaître ni ici, ni dans
     # disponible_pour_traitement (déjà couvert par ailleurs).
     pid_perimee_traitee = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_perimee_traitee, DELAI_REVALIDATION_JOURS + 1)
     creation = await client.post(
         "/traitements",
         json={
             "prospection_id": pid_perimee_traitee,
+            "equipe_id": str(equipe_terrestre_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -488,7 +528,7 @@ async def test_a_revalider_retourne_exactement_les_fiches_perimees(
     # condition d'exclusion (`enfant.statut != 'brouillon'`) doit se
     # déclencher dès `en_attente`, sans attendre `validee`.
     pid_perimee_revalidee = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_perimee_revalidee, DELAI_REVALIDATION_JOURS + 1)
     await _creer_prospection(
@@ -498,11 +538,18 @@ async def test_a_revalider_retourne_exactement_les_fiches_perimees(
         "extensive",
         revalide_de_id=pid_perimee_revalidee,
         statut="en_attente",
+        equipe_id=equipe_terrestre_id,
     )
 
     # Intensive périmée : jamais concernée par la règle.
     pid_intensive = await _valider_intensive(
-        client, auth_headers, campagne_id, station_id, verificateur, validateur
+        client,
+        auth_headers,
+        campagne_id,
+        station_id,
+        verificateur,
+        validateur,
+        equipe_id=equipe_terrestre_id,
     )
     await _reculer_validated_at(db_session, pid_intensive, DELAI_REVALIDATION_JOURS + 30)
 
@@ -528,17 +575,23 @@ async def test_deux_fiches_ne_peuvent_pas_revalider_la_meme_origine(
     campagne_id: uuid.UUID,
     verificateur: Utilisateur,
     validateur: Utilisateur,
+    equipe_terrestre_id: uuid.UUID,
 ):
     """`uq_prospection_revalide_de_id` (index unique partiel, migration 0062) :
     chaîne linéaire garantie par la DB, même mécanisme que
     `uq_traitement_terrestre_origine_id` pour la reprise de traitement."""
     pid_origine = await _valider_extensive(
-        client, auth_headers, campagne_id, verificateur, validateur
+        client, auth_headers, campagne_id, verificateur, validateur, equipe_id=equipe_terrestre_id
     )
     await _reculer_validated_at(db_session, pid_origine, DELAI_REVALIDATION_JOURS + 1)
 
     await _creer_prospection(
-        client, auth_headers, campagne_id, "extensive", revalide_de_id=pid_origine
+        client,
+        auth_headers,
+        campagne_id,
+        "extensive",
+        revalide_de_id=pid_origine,
+        equipe_id=equipe_terrestre_id,
     )
 
     resp = await client.post(
@@ -546,6 +599,7 @@ async def test_deux_fiches_ne_peuvent_pas_revalider_la_meme_origine(
         json={
             "type_prospection": "extensive",
             "campagne_id": str(campagne_id),
+            "equipe_id": str(equipe_terrestre_id),
             "date_prospection": "2026-08-01",
             "revalide_de_id": pid_origine,
         },

@@ -21,7 +21,11 @@ const MIGRATED_COLUMNS = [
 
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue(MIGRATED_COLUMNS);
-const openDatabaseAsync = jest.fn().mockResolvedValue({ execAsync, getAllAsync });
+const getFirstAsync = jest.fn().mockResolvedValue(null);
+const withTransactionAsync = jest.fn(async (tache: () => Promise<void>) => tache());
+const openDatabaseAsync = jest
+  .fn()
+  .mockResolvedValue({ execAsync, getAllAsync, getFirstAsync, withTransactionAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),

@@ -9,6 +9,7 @@ import {
   addProduitUtilise,
   deleteAllProduitsForTraitementTerrestre,
 } from '@/lib/traitement-repository';
+import { listAeronefsEquipe } from '@/lib/equipe-db';
 import { listUtilisateursByRole, listPesticides, Pesticide, UtilisateurEquipe } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore, ProduitDraft } from '@/lib/traitement-capture-store';
 import { useAuthStore } from '@/lib/auth-store';
@@ -17,13 +18,14 @@ import {
   computeTotalPesticideTerrestre,
   computeSurfaceTraitee,
   computeSurfaceCumulee,
-  computeSurfaceRestante,
+  computeSurfaceRestanteFiche,
   computePesticideStockRestant,
   validateTerrestreConditions,
   validateAerienEquipe,
   produitsTerrestrePretsPourSynchro,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
+import { BlocVol } from '@/components/vol/BlocVol';
 import { AerienForm } from '@/components/traitement/AerienForm';
 import { TerrestreForm } from '@/components/traitement/TerrestreForm';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
@@ -41,9 +43,11 @@ export default function TraitementScreen() {
   const typeTraitement = store.typeTraitement;
   const [chefsDeBase, setChefsDeBase] = useState<UtilisateurEquipe[]>([]);
   const [chefsEquipe, setChefsEquipe] = useState<UtilisateurEquipe[]>([]);
+  const [aeronefsEquipe, setAeronefsEquipe] = useState<{ immatriculation: string }[]>([]);
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
   const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
+  const [resteOrigineHa, setResteOrigineHa] = useState<number | null>(null);
   // Le store (Lot 1, non modifiable) n'expose pas de updateProduit — seulement
   // addProduit/removeProduit — donc l'édition des produits utilisés (terrestre)
   // est portée par un état local immuable propre à cet écran.
@@ -62,7 +66,14 @@ export default function TraitementScreen() {
       if (!draft) return;
       store.setTypeTraitement(draft.type_traitement);
       setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
+      setResteOrigineHa(draft.cible?.surface_restante_origine_ha ?? null);
       if (draft.type_traitement === 'AERIEN' && draft.aerien) {
+        // Aéronefs de l'équipe à la date de saisie (#642) : choix rapide si plusieurs.
+        if (draft.equipe_id && draft.date_traitement) {
+          listAeronefsEquipe(draft.equipe_id, draft.date_traitement)
+            .then(setAeronefsEquipe)
+            .catch((error) => signalerChargement(error, 'aeronefsEquipe'));
+        }
         // Rotations non chargées ici : sous-ressource propre à l'écran « Pesticides &
         // rotations » (rotations.tsx), qui suit après celui-ci dans le flux aérien.
         store.updateAerien({
@@ -195,7 +206,13 @@ export default function TraitementScreen() {
   const totalPesticideTerrestre = computeTotalPesticideTerrestre(produits);
   const surfaceTraitee = computeSurfaceTraitee(store.terrestre);
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.terrestre.repriseTraitement, origineCumuleeHa);
-  const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
+  const surfaceRestante = computeSurfaceRestanteFiche({
+    surfaceInfesteeHa,
+    surfaceCumuleeHa: surfaceCumulee,
+    surfaceTraiteeHa: surfaceTraitee,
+    repriseTraitement: store.terrestre.repriseTraitement,
+    resteOrigineHa,
+  });
   const pesticideStockRestantTerrestre = computePesticideStockRestant(
     store.terrestre.pesticideRecuL,
     totalPesticideTerrestre,
@@ -338,8 +355,12 @@ export default function TraitementScreen() {
           <AerienForm
             readOnly={readOnly}
             chefsDeBase={chefsDeBase}
+            aeronefsEquipe={aeronefsEquipe}
             errors={errors}
           />
+        )}
+        {typeTraitement === 'AERIEN' && traitementId && (
+          <BlocVol categorie="application" ficheId={traitementId} readOnly={readOnly} />
         )}
 
         {typeTraitement === 'TERRESTRE' && (

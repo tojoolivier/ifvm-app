@@ -8,19 +8,27 @@ import {
   computeSurfaceTraitee,
   computeSurfaceCumulee,
   computeSurfaceRestante,
+  computeSurfaceRestanteFiche,
+  repartirSurfaceCouverte,
   computePesticideStockRestant,
   computePesticideConsommeSuggere,
   validateReferences,
   validateTerrestreConditions,
   validateRotationsHeures,
+  messagesOrdreHeuresRotation,
   validateRecouvrement,
   validateEmpoisonnement,
   validateAerienEquipe,
   computeSignatureMatrix,
   aggregateRecapErrors,
   deriveNomCommercial,
+  deriveUniteDepuisDoseReference,
+  computeUniteApprovisionnementAerien,
   estAerienPretPourSynchro,
   estTerrestrePretPourSynchro,
+  messageVentTropFort,
+  messageTemperatureTropElevee,
+  validateRotationsMeteo,
 } from '../src/lib/traitement-validation';
 
 /**
@@ -83,6 +91,43 @@ describe('deriveNomCommercial', () => {
 
   it('ne retire que les espaces, pas la ponctuation collée au chiffre', () => {
     expect(deriveNomCommercial('SP-9')).toBe('SP-');
+  });
+});
+
+describe('deriveUniteDepuisDoseReference', () => {
+  it('déduit litres pour un produit liquide', () => {
+    expect(deriveUniteDepuisDoseReference('2 l/ha')).toBe('L');
+    expect(deriveUniteDepuisDoseReference('0,5 L/ha')).toBe('L');
+    expect(deriveUniteDepuisDoseReference('500 ml/ha')).toBe('L');
+  });
+
+  it('déduit kilos pour une poudre', () => {
+    expect(deriveUniteDepuisDoseReference('1,5 kg/ha')).toBe('kg');
+    expect(deriveUniteDepuisDoseReference('200 g/ha')).toBe('kg');
+  });
+
+  it("renvoie null quand la dose est absente ou illisible (choix manuel conservé)", () => {
+    expect(deriveUniteDepuisDoseReference(null)).toBeNull();
+    expect(deriveUniteDepuisDoseReference('')).toBeNull();
+    expect(deriveUniteDepuisDoseReference('selon le stade')).toBeNull();
+  });
+});
+
+describe('computeUniteApprovisionnementAerien', () => {
+  it('vaut kg quand tous les produits choisis sont dosés au poids', () => {
+    expect(computeUniteApprovisionnementAerien([{ produit_id: 'p1', unite: 'kg' }])).toBe('kg');
+  });
+
+  it('vaut L pour un liquide, un mélange ou aucun produit choisi', () => {
+    expect(computeUniteApprovisionnementAerien([{ produit_id: 'p1', unite: 'L' }])).toBe('L');
+    expect(
+      computeUniteApprovisionnementAerien([
+        { produit_id: 'p1', unite: 'kg' },
+        { produit_id: 'p2', unite: 'L' },
+      ])
+    ).toBe('L');
+    expect(computeUniteApprovisionnementAerien([{ produit_id: null, unite: 'kg' }])).toBe('L');
+    expect(computeUniteApprovisionnementAerien([])).toBe('L');
   });
 });
 
@@ -221,6 +266,86 @@ describe('computeSurfaceRestante', () => {
 
   it('is zero when the infested surface is unknown', () => {
     expect(computeSurfaceRestante(null, 4)).toBe(0);
+  });
+});
+
+// #zone-a-reprendre-restante-part-du-reste-origine
+describe('computeSurfaceRestanteFiche', () => {
+  it("reprise : démarre au reste de l'origine, sans rien traité", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 6,
+        surfaceTraiteeHa: 0,
+        repriseTraitement: true,
+        resteOrigineHa: 4,
+      })
+    ).toBe(4);
+  });
+
+  it("reprise : diminue de la surface traitée par cette fiche", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 9,
+        surfaceTraiteeHa: 3,
+        repriseTraitement: true,
+        resteOrigineHa: 4,
+      })
+    ).toBe(1);
+  });
+
+  it("reprise : ne descend jamais sous zéro", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 12,
+        surfaceTraiteeHa: 6,
+        repriseTraitement: true,
+        resteOrigineHa: 4,
+      })
+    ).toBe(0);
+  });
+
+  it('coïncide avec la formule du serveur (infestée − cumulée) sur une chaîne de deux traitements', () => {
+    const infestee = 10;
+    const traiteeT1 = 6;
+    const resteT1 = computeSurfaceRestante(infestee, traiteeT1); // 4
+    const traiteeT2 = 3;
+    const cumuleeT2 = computeSurfaceCumulee(traiteeT2, true, traiteeT1); // 9
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: infestee,
+        surfaceCumuleeHa: cumuleeT2,
+        surfaceTraiteeHa: traiteeT2,
+        repriseTraitement: true,
+        resteOrigineHa: resteT1,
+      })
+    ).toBe(computeSurfaceRestante(infestee, cumuleeT2));
+  });
+
+  it("reprise sans reste d'origine connu : repli sur infestée − cumulée", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 7,
+        surfaceTraiteeHa: 1,
+        repriseTraitement: true,
+        resteOrigineHa: null,
+      })
+    ).toBe(3);
+  });
+
+  it("hors reprise : ignore le reste d'origine, infestée − cumulée", () => {
+    expect(
+      computeSurfaceRestanteFiche({
+        surfaceInfesteeHa: 10,
+        surfaceCumuleeHa: 4,
+        surfaceTraiteeHa: 4,
+        repriseTraitement: false,
+        resteOrigineHa: 99,
+      })
+    ).toBe(6);
   });
 });
 
@@ -406,6 +531,69 @@ describe('validateRotationsHeures', () => {
     expect(
       validateRotationsHeures([{ heureDebut: '06:00', heureFin: '06:30', heureOuvertureVanne: null, heureFermetureVanne: null }])
     ).toEqual([]);
+  });
+});
+
+// #ordre-heures-rotation-aerien : début < ouverture vanne < fermeture vanne < fin (strict).
+describe('ordre des heures d’une rotation aérienne (#ordre-heures-rotation-aerien)', () => {
+  const base = {
+    heureDebut: '06:00',
+    heureOuvertureVanne: '06:05',
+    heureFermetureVanne: '06:20',
+    heureFin: '06:30',
+  };
+
+  it('accepte l’ordre début < ouverture < fermeture < fin', () => {
+    expect(messagesOrdreHeuresRotation(base)).toEqual([]);
+  });
+
+  it('refuse une ouverture de vanne avant (ou égale à) l’heure de début', () => {
+    expect(messagesOrdreHeuresRotation({ ...base, heureOuvertureVanne: '05:55' })).toEqual([
+      "l'heure d'ouverture de vanne doit être postérieure à l'heure de début",
+    ]);
+    expect(messagesOrdreHeuresRotation({ ...base, heureOuvertureVanne: '06:00' })).toHaveLength(1);
+  });
+
+  it('refuse une fermeture de vanne avant (ou égale à) l’ouverture', () => {
+    expect(messagesOrdreHeuresRotation({ ...base, heureFermetureVanne: '06:05' })).toEqual([
+      "l'heure de fermeture de vanne doit être postérieure à l'heure d'ouverture de vanne",
+    ]);
+  });
+
+  it('refuse une heure de fin avant (ou égale à) la fermeture de vanne', () => {
+    expect(messagesOrdreHeuresRotation({ ...base, heureFin: '06:20' })).toEqual([
+      "l'heure de fin doit être postérieure à l'heure de fermeture de vanne",
+    ]);
+  });
+
+  it('ne compare que les heures renseignées : début/fin restent contrôlés sans heures de vanne', () => {
+    const sansVanne = { ...base, heureOuvertureVanne: null, heureFermetureVanne: null };
+    expect(messagesOrdreHeuresRotation(sansVanne)).toEqual([]);
+    expect(messagesOrdreHeuresRotation({ ...sansVanne, heureFin: '05:00' })).toEqual([
+      "l'heure de fin doit être postérieure à l'heure de début",
+    ]);
+  });
+
+  it('validateRotationsHeures nomme la rotation fautive', () => {
+    const errors = validateRotationsHeures([base, { ...base, heureOuvertureVanne: '05:00' }]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toMatch(/^Rotation 2 : /);
+  });
+
+  it('le récapitulatif remonte aussi une rotation dont l’ordre est incohérent', () => {
+    const errors = aggregateRecapErrors({
+      typeTraitement: 'AERIEN',
+      references: { typeTraitement: 'AERIEN', dateTraitement: '2026-09-17', dateValidation: null, localite: 'X', prospectionId: 'p1' },
+      recouvrementPercent: null,
+      empoisonnement: { empoisonnement: false, empoisonnementType: null, empoisonnementMode: null, empoisonnementAutre: null },
+      terrestreConditions: null,
+      aerienEquipe: null,
+      aerienRotations: [],
+      aerienRotationsHeures: [{ ...base, heureFin: '06:10' }],
+      terrestreProduits: [],
+      signatureMatrix: [],
+    } as any);
+    expect(errors.some((e) => e.message.includes('Rotation 1 : '))).toBe(true);
   });
 });
 
@@ -704,5 +892,92 @@ describe('aggregateRecapErrors', () => {
       terrestreProduits: [{ produitId: null, quantiteL: null }],
     });
     expect(errors.some((e) => e.field === 'produits')).toBe(true);
+  });
+});
+
+// #alerte-meteo-vent-temperature : au-delà de 6 m/s de vent ou de 35 °C, le
+// traitement est à annuler — seuils strictement supérieurs (6 et 35 pile restent
+// autorisés), valables Aérien (par rotation) comme Terrestre.
+describe('conditions météo (#alerte-meteo-vent-temperature)', () => {
+  it('signale un vent strictement supérieur à 6 m/s, pas 6 pile ni une valeur absente', () => {
+    expect(messageVentTropFort(6.1)).toContain('6 m/s');
+    expect(messageVentTropFort(6)).toBeNull();
+    expect(messageVentTropFort(0)).toBeNull();
+    expect(messageVentTropFort(null)).toBeNull();
+    expect(messageVentTropFort(undefined)).toBeNull();
+  });
+
+  it('signale une température strictement supérieure à 35 °C, pas 35 pile ni une valeur absente', () => {
+    expect(messageTemperatureTropElevee(35.1)).toContain('35 °C');
+    expect(messageTemperatureTropElevee(35)).toBeNull();
+    expect(messageTemperatureTropElevee(null)).toBeNull();
+  });
+
+  it('Terrestre : validateTerrestreConditions bloque vent et température hors seuil, champ par champ', () => {
+    const base = {
+      heureDebut: '06:00',
+      heureFin: '09:00',
+      vitesseVentMs: 6,
+      temperatureC: 35,
+      surfaceRestanteHa: 0,
+      surfaceRestanteAbandonnee: null,
+      motifSurfaceRestanteAbandonnee: null,
+    };
+    expect(validateTerrestreConditions(base)).toEqual([]);
+    expect(validateTerrestreConditions({ ...base, vitesseVentMs: 7 }).map((e) => e.field)).toEqual(['vitesseVentMs']);
+    expect(validateTerrestreConditions({ ...base, temperatureC: 40 }).map((e) => e.field)).toEqual(['temperatureC']);
+  });
+
+  it('Aérien : une erreur par valeur hors seuil, numérotée par rotation', () => {
+    const errors = validateRotationsMeteo([
+      { ventDebutMs: 6, ventFinMs: 6, temperatureDebutC: 35, temperatureFinC: 35 },
+      { ventDebutMs: 8, ventFinMs: 2, temperatureDebutC: 20, temperatureFinC: 36 },
+    ]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0].message).toContain('Rotation 2 (vent début)');
+    expect(errors[1].message).toContain('Rotation 2 (température fin)');
+  });
+
+  it('récapitulatif : aggregateRecapErrors remonte les rotations aériennes hors seuil', () => {
+    const errors = aggregateRecapErrors({
+      typeTraitement: 'AERIEN',
+      references: {
+        typeTraitement: 'AERIEN',
+        dateTraitement: '2026-09-17',
+        dateValidation: null,
+        localite: 'X',
+        prospectionId: 'p1',
+      },
+      recouvrementPercent: null,
+      empoisonnement: { empoisonnement: false, empoisonnementType: null, empoisonnementMode: null, empoisonnementAutre: null },
+      terrestreConditions: null,
+      aerienEquipe: null,
+      aerienRotations: [],
+      aerienRotationsMeteo: [{ ventDebutMs: 9 }],
+      terrestreProduits: [],
+      signatureMatrix: [],
+    } as any);
+    expect(errors.some((e) => e.message.includes('Rotation 1 (vent début)'))).toBe(true);
+  });
+});
+
+// #surface-protegee-champ
+describe('repartirSurfaceCouverte', () => {
+  it('couverture totale : tout est traité, protégée = 0', () => {
+    expect(repartirSurfaceCouverte(12.5, 'TOTAL')).toEqual({ traitee: 12.5, protegee: 0, traiteeEtProtegee: 12.5 });
+  });
+
+  it('barrière : traitée = 0, tout est protégé', () => {
+    expect(repartirSurfaceCouverte(12.5, 'BARRIERE')).toEqual({ traitee: 0, protegee: 12.5, traiteeEtProtegee: 12.5 });
+  });
+
+  it('irrégulier ou mode absent : traité (même règle que le backend)', () => {
+    expect(repartirSurfaceCouverte(4, 'IRREGULIER')).toEqual({ traitee: 4, protegee: 0, traiteeEtProtegee: 4 });
+    expect(repartirSurfaceCouverte(4, null)).toEqual({ traitee: 4, protegee: 0, traiteeEtProtegee: 4 });
+    expect(repartirSurfaceCouverte(4, undefined)).toEqual({ traitee: 4, protegee: 0, traiteeEtProtegee: 4 });
+  });
+
+  it('aucune surface : tout à zéro', () => {
+    expect(repartirSurfaceCouverte(0, 'BARRIERE')).toEqual({ traitee: 0, protegee: 0, traiteeEtProtegee: 0 });
   });
 });

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.campagne import Campagne
 from app.domain.repositories import CampagneRepository
 from app.infrastructure.campagne_model import CampagneModel
+from app.infrastructure.soft_delete import INCLURE_SUPPRIMES
 
 
 class CampagneRepositoryImpl(CampagneRepository):
@@ -63,7 +64,7 @@ class CampagneRepositoryImpl(CampagneRepository):
         stmt = select(CampagneModel).order_by(CampagneModel.start_date.desc())
         if since is not None:
             stmt = stmt.where(CampagneModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     def _to_domain(self, model: CampagneModel) -> Campagne:
@@ -76,4 +77,5 @@ class CampagneRepositoryImpl(CampagneRepository):
             created_by=model.created_by,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )

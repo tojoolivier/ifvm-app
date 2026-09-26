@@ -13,6 +13,7 @@ import {
   syncAllTraitements,
 } from '../src/lib/traitement-sync';
 import { NetworkError, PreconditionError } from '../src/lib/errors';
+import { useEquipeTravailStore } from '../src/lib/equipe-travail-store';
 
 jest.mock('../src/lib/traitement-repository', () => ({
   // Par défaut toujours prête : les fixtures de ce fichier ne visent pas cette
@@ -24,6 +25,11 @@ jest.mock('../src/lib/traitement-repository', () => ({
   markTraitementSynced: jest.fn(),
   markTraitementConflict: jest.fn(),
   markTraitementEchec: jest.fn(),
+}));
+// Le lot des vols (#644) est testé à part : ici on vérifie seulement qu'il est lancé après l'envoi.
+jest.mock('../src/lib/vol-sync', () => ({ synchroniserVols: jest.fn().mockResolvedValue({ reussies: [], echouees: [], conflits: [] }) }));
+jest.mock('../src/lib/storage', () => ({
+  storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
 }));
 jest.mock('../src/lib/api-client', () => {
   // `sync-lot` lit le statut HTTP et la version serveur joints à l'erreur : les
@@ -64,6 +70,7 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
   return {
     id: 'traitement-1',
     prospection_id: 'prospection-1',
+    equipe_id: 'eq-1',
     numero_fiche: null,
     type_traitement: 'AERIEN',
     mode_traitement: null,
@@ -132,8 +139,8 @@ function draft(overrides: Partial<DraftTraitement> = {}): DraftTraitement {
       traitement_origine_id: null,
       surface_cumulee_ha: null,
       surface_restante_ha: null,
-      pesticide_recu_l: null,
-      pesticide_stock_restant_l: null,
+      surface_restante_abandonnee: null,
+      motif_surface_restante_abandonnee: null,
       taux_mortalite_pourcent: null,
       evaluation_efficacite_heures_apres: null,
       methode_evaluation_efficacite: null,
@@ -571,5 +578,41 @@ describe('syncAllTraitements — le lot résume', () => {
 
     expect(resume.reussies).toEqual(['a', 'c']);
     expect(resume.conflits.map((f) => f.id)).toEqual(['b']);
+  });
+});
+
+describe('rattachement à l’équipe (#641)', () => {
+  beforeEach(() => {
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockSyncTraitement.mockResolvedValue({ status: 201, body: { id: 'traitement-1' } });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    useEquipeTravailStore.setState({ equipeId: null });
+  });
+
+  it('envoie l’équipe d’origine de la fiche, même si l’équipe de travail a changé depuis', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-actuelle' });
+
+    await syncOneTraitement(draft({ equipe_id: 'eq-origine' }), 'token-1');
+
+    expect(apiClient.syncTraitement).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ equipe_id: 'eq-origine' })
+    );
+  });
+
+  it('une fiche sans équipe reste synchronisable avec l’équipe de travail courante', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-actuelle' });
+
+    await syncOneTraitement(draft({ equipe_id: null }), 'token-1');
+
+    expect(apiClient.syncTraitement).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ equipe_id: 'eq-actuelle' })
+    );
+  });
+
+  it('refuse avec un message qui renvoie vers Paramètres quand aucune équipe n’est connue', async () => {
+    await expect(syncOneTraitement(draft({ equipe_id: null }), 'token-1')).rejects.toThrow(/équipe de travail/i);
+    expect(apiClient.syncTraitement).not.toHaveBeenCalled();
   });
 });

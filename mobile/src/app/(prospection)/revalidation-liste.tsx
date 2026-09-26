@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ProspectionRead } from '@/lib/api-client';
 import {
   loadFichesARevalider,
   assurerProspectionDisponibleLocalement,
 } from '@/lib/prospection-accueil';
-import { listProspectionsARevaliderLocal, demarrerRevalidation } from '@/lib/prospection-repository';
+import {
+  listProspectionsARevaliderLocal,
+  listProspectionIdsDejaRevalideesLocalement,
+  demarrerRevalidation,
+} from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
@@ -17,6 +21,8 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const LIBELLE_TYPE: Record<string, string> = {
   extensive: 'Extensive',
@@ -67,7 +73,8 @@ export default function RevalidationListeScreen() {
   const [horsLigne, setHorsLigne] = useState(false);
   const { run, isRunning: isSelectionEnCours } = useAsyncAction();
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const charger = useCallback(() => {
     if (!token) return;
@@ -76,9 +83,19 @@ export default function RevalidationListeScreen() {
       criticality: 'essential',
     }).then(async (outcome) => {
       if (outcome.ok) {
+        // #revalidation-liste-exclut-origine-revalidee : le serveur n'exclut une origine qu'une
+        // fois sa revalidation SYNCHRONISÉE — complément best-effort pour celle créée à
+        // l'instant sur cet appareil, pas encore repartie en ligne.
+        const dejaRevalidees = await runTask(() => listProspectionIdsDejaRevalideesLocalement(), {
+          name: 'prospection.revalidationListe.dejaRevalidees',
+          criticality: 'best-effort',
+        });
+        const restantes = dejaRevalidees.ok
+          ? outcome.value.filter((f) => !dejaRevalidees.value.has(f.id))
+          : outcome.value;
         setHorsLigne(false);
         setErreurDeLecture(null);
-        setFiches(outcome.value);
+        setFiches(restantes);
         setLoading(false);
         return;
       }
@@ -95,9 +112,12 @@ export default function RevalidationListeScreen() {
     });
   }, [token]);
 
-  useEffect(() => {
-    charger();
-  }, [charger]);
+  // #revalidation-liste-exclut-origine-revalidee : rafraîchi à chaque prise de focus (pas
+  // seulement au montage) — sans quoi revenir de la création d'une revalidation (même pile de
+  // navigation, écran jamais démonté) laissait l'origine visible jusqu'au prochain redémarrage.
+  // Même mécanisme que (app)/index.tsx, sync.tsx, prospection.tsx, fiches.tsx et
+  // prospection-picker.tsx.
+  useFocusEffect(charger);
 
   const choisir = (fiche: FicheARevalider) =>
     run(
@@ -126,7 +146,7 @@ export default function RevalidationListeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Prospections à revalider</Text>
+      <Text style={styles.title}>Revalidation</Text>
       <Text style={styles.sousTitre}>
         Validées depuis plus de 5 jours sans traitement — la situation sur le
         terrain a pu changer, à revérifier avant de démarrer un traitement.
@@ -149,7 +169,7 @@ export default function RevalidationListeScreen() {
           ListEmptyComponent={
             <EtatVide
               erreur={erreurDeLecture}
-              titreVide="Aucune prospection à revalider pour le moment."
+              titreVide="Aucune revalidation en attente pour le moment."
               onReessayer={charger}
             />
           }
@@ -187,7 +207,7 @@ export default function RevalidationListeScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
     title: {
@@ -213,7 +233,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
     list: { flex: 1 },
     emptyText: { fontFamily: traitementFonts.ui, color: traitementColors.texteLabel, textAlign: 'center', marginTop: 20 },
     row: {
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: traitementColors.bordure,
       borderRadius: traitementRadii.carte,

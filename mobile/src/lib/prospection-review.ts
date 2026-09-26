@@ -1,3 +1,4 @@
+import { assurerVolDeProspection } from './vol-sync';
 import * as Network from 'expo-network';
 import {
   apiClient,
@@ -30,6 +31,7 @@ import { buildGrilles, parseEspeceSelection } from './prospection-especes';
 import { formatDirectionDeplacement } from './prospection-infestation-insights';
 import { getDb } from './prospection-db';
 import { pullReferentiel } from './referentiel-sync';
+import { useEquipeTravailStore } from './equipe-travail-store';
 import { assertPresent, ReferentialError } from './errors';
 import { logger } from './logger';
 import { avecConnexion, syncAll, type LotSync, type ResumeSync } from './sync-lot';
@@ -525,9 +527,22 @@ async function buildProspectionPayload(draft: DraftProspection, token: string) {
     log.detail('station.ignoree_extensive', { prospectionId: draft.id, stationId });
   }
 
+  // #641 : l'équipe d'origine du brouillon prime ; un brouillon antérieur (« Non
+  // renseignée ») reste synchronisable avec l'équipe de travail courante.
+  const equipeId = draft.equipe_id ?? useEquipeTravailStore.getState().equipeId;
+  assertPresent(
+    equipeId,
+    'Aucune équipe de travail : choisissez-en une dans Paramètres avant de synchroniser cette fiche.'
+  );
+
   return {
+    // #678 : la fiche garde SON id sur le serveur. Sans lui l'appareil et le serveur ne se
+    // reconnaissent plus (doublon dans « Mes fiches », statut local figé) et un envoi refait après
+    // une réponse perdue créerait une seconde fiche.
+    id: draft.id,
     type_prospection: draft.type_prospection as ProspectionCreateInput['type_prospection'],
     campagne_id: draft.campagne_id,
+    equipe_id: equipeId,
     // 🔑 station_id = null pour extensive, la valeur pour intensive
     station_id: draft.type_prospection === 'extensive' ? null : stationId,
     n_fiche: draft.n_fiche || null,
@@ -679,6 +694,62 @@ function populationRowHasData(row: PopulationRow, captures: CaptureRow[]): boole
     (!!row.etat && row.etat !== 'repos') ||
     !!row.essaim_en_vol ||
     !!row.essaim_pose
+  );
+}
+
+/**
+ * Pendant de `populationRowHasData` pour `prospection_infestation` — même raison
+ * (#revalidation-prospection) : `demarrerRevalidation` clone aussi les lignes
+ * infestation de la fiche source, mais aucun écran Extensif/Signalisation ne
+ * permet de les rouvrir (`infestation.tsx` est propre à l'Intensif) — une ligne
+ * héritée d'une fiche intensive plus ancienne dans la chaîne de revalidations
+ * est donc TOUJOURS un résidu sur ce parcours, jamais une saisie de l'agent.
+ * Sans ce filtre, elle repart telle quelle à chaque revalidation et peut
+ * échouer sur n'importe laquelle des contraintes de `InfestationCreate`
+ * (bornes numériques, valeurs d'énumération devenues invalides…) — un champ
+ * que l'agent n'a ni vu ni rempli faisait alors échouer toute la
+ * synchronisation, sans qu'aucun écran ne l'explique.
+ */
+function infestationRowHasData(row: InfestationRow): boolean {
+  return (
+    !!row.espece ||
+    row.taille_min != null ||
+    row.taille_max != null ||
+    row.taille_moy != null ||
+    row.surface_totale != null ||
+    row.densite_min != null ||
+    row.densite_max != null ||
+    row.densite_moy != null ||
+    row.interdistance != null ||
+    !!row.comportement ||
+    !!row.direction_de ||
+    !!row.direction_vers ||
+    !!row.vent_de ||
+    row.vent_vitesse != null ||
+    row.pullulation_nb != null ||
+    row.taille_long != null ||
+    row.taille_large != null ||
+    row.taille_epaisseur != null ||
+    !!row.essaim_en_vol ||
+    !!row.essaim_pose ||
+    !!row.type_essaim ||
+    row.nb_taches_bandes != null ||
+    row.interdistance_m != null ||
+    row.interdistance_min != null ||
+    row.interdistance_max != null ||
+    row.interdistance_moy != null ||
+    row.surface_contaminee_ha != null ||
+    !!row.type_larve ||
+    row.surface_infestee_pourcent != null ||
+    !!row.stade_dominant ||
+    row.taille_groupe_m2 != null ||
+    row.front_longueur_m != null ||
+    row.front_largeur_m != null ||
+    row.densite_max_front != null ||
+    row.densite_moy_arriere_front != null ||
+    !!row.heure_observation ||
+    row.densite_en_vol != null ||
+    row.dimension_ha != null
   );
 }
 
@@ -852,12 +923,21 @@ export async function syncOneProspection(
   // saisie réelle. Omise du payload plutôt qu'envoyée pour échouer sur
   // `densite_diffuse` obligatoire, cf. `populationRowHasData`.
   const populationsAvecDonnees = populations.filter((row) => populationRowHasData(row, captures));
+  // #revalidation-infestations-residuelles-sync : même filtre, même raison — cf.
+  // `infestationRowHasData`. Sans lui, une ligne infestation héritée (jamais
+  // rouvrable sur ce parcours) pouvait faire échouer toute la synchronisation
+  // d'une revalidation sur un champ que l'agent n'a jamais vu.
+  const infestationsAvecDonnees = infestations.filter((row) => infestationRowHasData(row));
+
+  // #644 : `prospection.vol_id` référence le vol — il doit exister sur le serveur avant la fiche.
+  const volId = await assurerVolDeProspection(token, draft.id);
 
   const payload = {
     ...(await buildProspectionPayload(draft, token)),
+    ...(volId ? { vol_id: volId } : {}),
     captures: buildCapturesPayload(captures),
     populations: buildPopulationsPayload(populationsAvecDonnees),
-    infestations: buildInfestationsPayload(infestations),
+    infestations: buildInfestationsPayload(infestationsAvecDonnees),
     operations_aeriennes: buildOperationsAeriennesPayload(operationsAeriennes),
   };
 

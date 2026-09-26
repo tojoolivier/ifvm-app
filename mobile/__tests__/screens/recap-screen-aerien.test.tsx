@@ -165,18 +165,71 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
   it('affiche la carte Impacts & risque (empoisonnement, évaluation, comportement, observations)', async () => {
     await render(<RecapScreen />);
 
-    await screen.findByText('Empoisonnement');
+    // #recap-impacts-risque-ordonne : sous-sections, une ligne par information.
+    await screen.findByText("Cas d'empoisonnement");
+    expect(screen.getByText('Empoisonnement')).toBeVisible(); // titre de sous-section
     expect(screen.getByText('Agent')).toBeVisible();
     expect(screen.getByText('Inhalation')).toBeVisible();
-    expect(screen.getByText('Ressources en eau : Oui · Sol : Non')).toBeVisible();
+    expect(screen.getByText('Évaluation du risque')).toBeVisible();
+    expect(screen.getByText('Ressources en eau')).toBeVisible();
+    expect(screen.getByText('Sol')).toBeVisible();
+    // Axes non évalués : « non renseigné », jamais masqués.
+    expect(screen.getByText('Faune non cible')).toBeVisible();
+    expect(screen.getByText('Abeilles/pollinisateurs')).toBeVisible();
+    expect(screen.getByText('Comportement et mortalité')).toBeVisible();
     expect(screen.getByText('Oiseaux, Poissons')).toBeVisible();
+    expect(screen.getByText('Observations')).toBeVisible();
     expect(screen.getByText('RAS')).toBeVisible();
+    // Ordre identique à l'écran de saisie (impacts.tsx).
+    const rendu = JSON.stringify(screen.toJSON());
+    const ordre = ["Cas d'empoisonnement", 'Évaluation du risque', 'Comportement et mortalité', 'Observations'].map((t) =>
+      rendu.indexOf(t)
+    );
+    expect(ordre).toEqual([...ordre].sort((a, b) => a - b));
+  });
+
+  // #surface-traitee-et-protegee : ligne sous « Surface traitée (ha) », toujours égale à elle.
+  it('affiche « Surface traitée et protégée (ha) » sous « Surface traitée (ha) », avec la même valeur', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({ ...DRAFT_AERIEN, mode_traitement: 'TOTAL' });
+
+    await render(<RecapScreen />);
+
+    await screen.findByText('Surface traitée et protégée (ha)');
+    expect(screen.getAllByText('100')).toHaveLength(2); // traitée + traitée et protégée
+    const rendu = JSON.stringify(screen.toJSON());
+    expect(rendu.indexOf('Surface traitée (ha)')).toBeLessThan(rendu.indexOf('Surface traitée et protégée (ha)'));
+  });
+
+  // #surface-protegee-champ : en barrière, traitée = 0, protégée = surface couverte.
+  it('en mode barrière : traitée = 0, protégée = surface couverte, traitée et protégée = la somme', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_AERIEN,
+      mode_traitement: 'BARRIERE',
+      aerien: { ...DRAFT_AERIEN.aerien, surface_traitee_ha: 0, surface_protegee_ha: 100 },
+    });
+
+    await render(<RecapScreen />);
+
+    await screen.findByText('Surface protégée (ha)');
+    expect(screen.getByText('Surface traitée (ha)')).toBeVisible();
+    expect(screen.getAllByText('100')).toHaveLength(2); // protégée + traitée et protégée
+    const rendu = JSON.stringify(screen.toJSON());
+    const ordre = ['Surface traitée (ha)', 'Surface protégée (ha)', 'Surface traitée et protégée (ha)'].map((t) =>
+      rendu.indexOf(t)
+    );
+    expect(ordre).toEqual([...ordre].sort((a, b) => a - b));
   });
 
   it('affiche la carte Évaluation du risque pour la population', async () => {
     await render(<RecapScreen />);
 
-    expect(await screen.findByText('Rizière · 1.5 km · sensibilisée')).toBeVisible();
+    expect(await screen.findByText('Évaluation du risque pour la population')).toBeVisible();
+    expect(screen.getByText('Évaluation 1')).toBeVisible();
+    expect(screen.getByText('Habitat le plus proche')).toBeVisible();
+    expect(screen.getByText('Rizière')).toBeVisible();
+    expect(screen.getByText('Distance (km)')).toBeVisible();
+    expect(screen.getByText('1.5')).toBeVisible();
+    expect(screen.getByText('Sensibilisation')).toBeVisible();
   });
 
   it('affiche les dates d’installation du Stand et de la Base secondaire, et les surfaces cumulée/restante', async () => {
@@ -198,15 +251,58 @@ describe('RecapScreen — Aérien : rien de saisi ne manque à la relecture', ()
     expect(screen.getByText('210')).toBeVisible();
   });
 
-  /** #moyens-humains-materiels : communs à l'Aérien et au Terrestre — cf. le
-   * même test côté Terrestre (recap-screen-terrestre.test.tsx). */
-  it('affiche les sous-sections Humains et Matériels de Moyens & protection', async () => {
+  /** Les Matériels (atomiseur, essence…) ont été retirés du flux Aérien : la sous-section
+   * Humains reste, Matériels n'apparaît plus (elle reste visible côté Terrestre, cf.
+   * recap-screen-terrestre.test.tsx). */
+  it('affiche la sous-section Humains mais plus Matériels dans Moyens & protection', async () => {
     await render(<RecapScreen />);
 
     await screen.findByText('Humains');
-    expect(screen.getByText('Matériels')).toBeVisible();
+    expect(screen.queryByText('Matériels')).toBeNull();
     expect(screen.getByText('12')).toBeVisible(); // Nb agents permanents
-    expect(screen.getByText('55')).toBeVisible(); // Essence (litres)
-    expect(screen.getByText('33')).toBeVisible(); // Nombre de piles
+    expect(screen.queryByText('Essence (litres)')).toBeNull();
+    expect(screen.queryByText('Nombre de piles')).toBeNull();
+  });
+
+  it('regroupe Pesticides & rotations en sous-sections et affiche la décision sur la surface restante', async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_AERIEN,
+      aerien: {
+        ...DRAFT_AERIEN.aerien,
+        surface_restante_abandonnee: true,
+        motif_surface_restante_abandonnee: 'Zone inaccessible',
+      },
+    });
+    await render(<RecapScreen />);
+
+    await screen.findAllByText('Rotations');
+    for (const titre of ['Totaux', 'Surfaces', 'Efficacité', 'Végétation']) {
+      expect(screen.getAllByText(titre).length).toBeGreaterThanOrEqual(1);
+    }
+    expect(screen.getByText('Surface restante abandonnée')).toBeVisible();
+    expect(screen.getByText('Zone inaccessible')).toBeVisible();
+  });
+
+  it("affiche la rotation d'une poudre en kg (le stock vit dans les mouvements, #609)", async () => {
+    jest.mocked(traitementRepository.getTraitement).mockResolvedValue({
+      ...DRAFT_AERIEN,
+      aerien: {
+        ...DRAFT_AERIEN.aerien,
+        rotations: [
+          { id: 'r1', produit_id: 'p1', quantite: 30, unite: 'kg', surface_ha: 10, nom_commercial: 'Green Muscle' },
+        ],
+      },
+    });
+    await render(<RecapScreen />);
+
+    expect(await screen.findByText('Rotation 1 — Green Muscle')).toBeVisible();
+    expect(screen.getByText('30 kg · 10 ha')).toBeVisible();
+  });
+
+  it("n'affiche plus l'étape Surface traitée dans la liste de contrôle", async () => {
+    await render(<RecapScreen />);
+
+    await screen.findByText('Humains');
+    expect(screen.queryByText('Surface traitée')).toBeNull();
   });
 });

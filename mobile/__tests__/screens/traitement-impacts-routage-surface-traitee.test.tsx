@@ -58,7 +58,7 @@ beforeEach(() => {
 });
 
 describe('ImpactsScreen — routage post-Continuer selon le type (#326)', () => {
-  it('route vers Surface traitée pour un traitement Aérien', async () => {
+  it("route directement vers Signatures pour un traitement Aérien (l'étape Surface traitée a été retirée)", async () => {
     useTraitementCaptureStore.setState(RESET_STATE('AERIEN'));
 
     await render(<ImpactsScreen />);
@@ -68,7 +68,7 @@ describe('ImpactsScreen — routage post-Continuer selon le type (#326)', () => 
 
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({ pathname: '/(traitement)/surface-traitee' })
+        expect.objectContaining({ pathname: '/(traitement)/signatures' })
       )
     );
   });

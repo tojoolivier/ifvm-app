@@ -66,7 +66,7 @@ export function ValidationFinalePage() {
   })
 
   return (
-    <div className="px-8 py-6 max-w-4xl mx-auto">
+    <div className="px-4 py-4 sm:px-8 sm:py-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Validation finale</h1>
         <p className="text-sm text-muted-foreground mt-1">

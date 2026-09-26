@@ -212,15 +212,15 @@ export function CampagnesPage({ today }: CampagnesPageProps = {}) {
 
   return (
     // 28px latéraux : aligne le contenu sur le fil d'Ariane du header (Layout).
-    <div className="flex flex-col gap-4 px-7 pb-10 pt-[26px]">
-      <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col gap-4 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <p className="max-w-[640px] font-sans text-[12.5px] font-medium text-ifvm-text-tertiary">
           Une campagne cadre les prospections et les traitements sur une période. Une seule campagne
           est active à la fois ; la clôture verrouille les fiches rattachées.
         </p>
         <button
           onClick={() => setShowModal(true)}
-          className={`${addButtonClass} shrink-0 transition hover:bg-[#1a4429]`}
+          className={`${addButtonClass} shrink-0 self-start transition hover:bg-[#1a4429] sm:self-auto`}
         >
           + Nouvelle campagne
         </button>
@@ -245,10 +245,10 @@ export function CampagnesPage({ today }: CampagnesPageProps = {}) {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md rounded-[11px] border border-[#e7e0cd] bg-card shadow-xl">
-            <div className="border-b border-[#f4efe2] px-6 py-4">
+            <div className="border-b border-[#f4efe2] px-4 py-4 sm:px-6">
               <h2 className="font-sans text-[15px] font-extrabold">Nouvelle campagne</h2>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4 px-6 py-4">
+            <form onSubmit={handleSubmit} className="space-y-4 px-4 py-4 sm:px-6">
               {error && <ErrorBanner label="Création impossible" message={error} />}
               <div>
                 <label

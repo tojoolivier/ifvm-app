@@ -1,4 +1,5 @@
 import { getDb } from './prospection-db';
+import { creerOutbox } from './outbox';
 import { generateId } from './id';
 import { logger } from './logger';
 import { PreconditionError } from './errors';
@@ -46,6 +47,8 @@ export interface DraftProspectionInput {
   /** Extensif uniquement — 'terrestre' | 'aerien' | null (terrestre implicite). Fixé
    * une fois à la création, jamais réécrit ensuite (cf. écran de choix du mode). */
   modeExtensif?: string | null;
+  /** Équipe de travail de l'agent à la création (#641) — reprise automatiquement par l'appelant. */
+  equipeId?: string | null;
 }
 
 export interface DraftProspection {
@@ -79,6 +82,8 @@ export interface DraftProspection {
   /** Extensif uniquement — 'terrestre' | 'aerien' | null (terrestre implicite,
    * fiche existante comme fiche extensive sans mode choisi). */
   mode_extensif: string | null;
+  /** Équipe d'origine (#641) ; `null` pour un brouillon antérieur — « Non renseignée ». */
+  equipe_id: string | null;
   societe: string | null;
   immatricule_aeronef: string | null;
   pilote: string | null;
@@ -463,9 +468,9 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
       date_prospection, latitude, longitude, altitude,
       surface_station, surface_prospectee, surface_infestee,
       signalement_source, signalement_date, signalement_description,
-      mode_extensif,
+      mode_extensif, equipe_id,
       statut, statut_sync, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', 'local', ?, ?)`,
     [
       input.id, input.typeProspection, input.campagneId, input.prospecteurId, input.prospecteurNom ?? null,
       input.stationId ?? null,
@@ -475,6 +480,7 @@ export async function createDraftProspection(input: DraftProspectionInput): Prom
       input.surfaceStation ?? null, input.surfaceProspectee ?? null, input.surfaceInfestee ?? null,
       input.signalementSource ?? null, input.signalementDate ?? null, input.signalementDescription ?? null,
       input.modeExtensif ?? null,
+      input.equipeId ?? null,
       now, now
     ]
   );
@@ -762,6 +768,19 @@ const COLONNES_REVALIDATION_NON_CLONEES = new Set([
 ]);
 
 /**
+ * #revalidation-numero-bis : la fiche qui revalide une autre garde le numéro de la fiche
+ * revalidée, suffixé « -bis » — le suffixe signale d'un coup d'œil une fiche de revalidation.
+ * Une revalidation de revalidation ajoute un nouveau « -bis » (« F-1-bis-bis »), ce qui reste
+ * lisible et ne peut jamais entrer en collision avec le numéro de sa fiche d'origine.
+ * Numéro absent (`null`) : laissé tel quel, jamais un « null-bis ».
+ */
+export const SUFFIXE_NUMERO_REVALIDATION = '-bis';
+
+export function numeroDeRevalidation(numeroSource: string | null | undefined): string | null {
+  return numeroSource ? `${numeroSource}${SUFFIXE_NUMERO_REVALIDATION}` : null;
+}
+
+/**
  * « Prospections à revalider » (#revalidation-prospection) : amorce une
  * NOUVELLE fiche (nouvel id, `statut='brouillon'`/`statut_sync='local'`,
  * `revalide_de_id` pointant vers la source), pré-remplie avec TOUTES les
@@ -803,9 +822,12 @@ export async function demarrerRevalidation(sourceProspectionId: string): Promise
   const colonnesClonees = Object.keys(source).filter(
     (cle) => !COLONNES_REVALIDATION_NON_CLONEES.has(cle)
   );
-  const valeursClonees = colonnesClonees.map(
-    (cle) => (source as unknown as Record<string, string | number | null>)[cle]
-  );
+  const valeursClonees = colonnesClonees.map((cle) => {
+    const valeur = (source as unknown as Record<string, string | number | null>)[cle];
+    // #revalidation-numero-bis : « -bis » sur le numéro de la fiche (et son n° de message).
+    if (cle === 'n_fiche' || cle === 'n_message') return numeroDeRevalidation(valeur as string | null);
+    return valeur;
+  });
 
   await db.runAsync(
     `INSERT INTO prospection (
@@ -950,11 +972,22 @@ export async function updateProspectionEspeces(id: string, especes: string): Pro
  * question de recréer un brouillon comme dans le cas normal (`createDraftProspection`,
  * où `modeExtensif` est fixé une fois pour toutes à la création).
  */
-export async function setProspectionModeExtensif(id: string, modeExtensif: string): Promise<DraftProspection> {
+export async function setProspectionModeExtensif(
+  id: string,
+  modeExtensif: string,
+  equipeId: string | null
+): Promise<DraftProspection> {
   const db = await getDb();
   const now = new Date().toISOString();
 
-  await db.runAsync('UPDATE prospection SET mode_extensif = ?, updated_at = ? WHERE id = ?', [modeExtensif, now, id]);
+  // L'équipe est reprise avec le mode : le brouillon a été créé avant que le mode soit connu, donc
+  // avant que le type de l'équipe puisse être contrôlé (#641).
+  await db.runAsync('UPDATE prospection SET mode_extensif = ?, equipe_id = ?, updated_at = ? WHERE id = ?', [
+    modeExtensif,
+    equipeId,
+    now,
+    id,
+  ]);
 
   const updated = await getProspection(id);
   if (!updated) throw new Error('Échec de la mise à jour de la fiche brouillon locale');
@@ -1515,23 +1548,29 @@ export async function deleteProspectionInfestation(prospectionId: string, typeCi
  * fiches ne doivent jamais partager le même numéro — c'est justement ce
  * numéro qui identifie la fiche pour un administrateur côté web.
  *
- * #revalidation-prospection fait exception à dessein : une fiche qui
- * revalide une fiche périmée reprend délibérément le même numéro
- * (`demarrerRevalidation` clone `n_fiche`/`n_message` tels quels) — ce n'est
- * pas un doublon accidentel, c'est le mécanisme même de la revalidation,
- * déjà toléré côté backend (`CreateProspection.execute` ne rejette jamais un
- * `n_fiche` déjà pris par la fiche que `revalide_de_id` désigne).
+ * #revalidation-prospection : une fiche qui revalide une fiche périmée reprend son
+ * numéro (`demarrerRevalidation`), désormais suffixé « -bis » (#revalidation-numero-bis) —
+ * la fiche revalidée reste tolérée ici comme avant, ainsi qu'un autre brouillon de la même
+ * revalidation (assistant abandonné puis relancé).
  */
 async function assurerNumeroFicheUnique(id: string, current: DraftProspection): Promise<void> {
   const numero = current.type_prospection === 'validation' ? current.n_message : current.n_fiche;
   if (!numero) return;
 
   const db = await getDb();
-  const doublon = await db.getFirstAsync<{ id: string }>(
-    `SELECT id FROM prospection WHERE id != ? AND n_fiche = ? LIMIT 1`,
+  const memeNumero = await db.getAllAsync<{ id: string; statut: string; revalide_de_id: string | null }>(
+    `SELECT id, statut, revalide_de_id FROM prospection WHERE id != ? AND n_fiche = ?`,
     [id, numero]
   );
-  if (doublon && doublon.id !== current.revalide_de_id) {
+  // #revalidation-numero-bis : ne comptent pas comme doublon (a) la fiche revalidée elle-même,
+  // (b) un AUTRE brouillon de la même revalidation — un assistant de revalidation abandonné puis
+  // relancé recrée un clone portant le même « -bis » (`demarrerRevalidation`).
+  const doublons = memeNumero.filter(
+    (autre) =>
+      autre.id !== current.revalide_de_id &&
+      !(current.revalide_de_id && autre.statut === 'brouillon' && autre.revalide_de_id === current.revalide_de_id)
+  );
+  if (doublons.length > 0) {
     throw new PreconditionError(
       `Le numéro « ${numero} » est déjà utilisé par une autre fiche — deux fiches ne peuvent pas partager le même numéro.`
     );
@@ -1654,12 +1693,11 @@ export async function synchroniserStatutServeur(
  * montrer ; `statut_sync` est un `TEXT` libre, une valeur de plus n'en coûte
  * aucune.
  */
-export async function markProspectionEchec(id: string): Promise<void> {
-  const db = await getDb();
-  const now = new Date().toISOString();
-
-  await db.runAsync(`UPDATE prospection SET statut_sync = 'echec', updated_at = ? WHERE id = ?`, [now, id]);
-}
+export const markProspectionEchec = creerOutbox({
+  table: 'prospection',
+  base: () => getDb(),
+  horodate: true,
+}).marquerEnEchec;
 
 export async function deleteDraftProspection(draft: DraftProspection): Promise<void> {
   const db = await getDb();
@@ -1776,6 +1814,22 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
 }
 
 /**
+ * #liste-nouveau-traitement-exclut-deja-traitees : identifiants des fiches de prospection
+ * pour lesquelles une fiche de traitement existe DÉJÀ sur cet appareil — brouillon,
+ * enregistrée hors ligne ou synchronisée, peu importe. Le serveur (`disponible_pour_traitement`)
+ * n'exclut une fiche qu'une fois son traitement synchronisé : sans ce complément local, une fiche
+ * qu'on vient de traiter restait proposée dans « Nouvelle fiche de traitement » jusqu'à la
+ * synchronisation, et pouvait être confondue avec une fiche encore à traiter.
+ */
+export async function listProspectionIdsAvecTraitementLocal(): Promise<Set<string>> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ prospection_id: string }>(
+    'SELECT DISTINCT prospection_id FROM traitement WHERE prospection_id IS NOT NULL'
+  );
+  return new Set(rows.map((r) => r.prospection_id));
+}
+
+/**
  * Repli hors-ligne de « Prospections à revalider »
  * (revalidation-liste.tsx) — même raisonnement que
  * `listProspectionsDisponiblesPourTraitementLocal` ci-dessus, dont c'est
@@ -1805,6 +1859,23 @@ export async function listProspectionsARevaliderLocal(): Promise<DraftProspectio
        )
      ORDER BY p.validated_at ASC`
   );
+}
+
+/**
+ * #revalidation-liste-exclut-origine-revalidee : identifiants des fiches déjà revalidées sur
+ * cet appareil — un enfant chaîné via `revalide_de_id` réellement CRÉÉ (`statut != 'brouillon'`,
+ * même condition que `listProspectionsARevaliderLocal` ci-dessus ; un simple assistant amorcé
+ * puis abandonné ne compte pas). Le serveur (`a_revalider`) n'exclut l'origine qu'une fois cet
+ * enfant SYNCHRONISÉ — sans ce complément local, l'origine restait visible dans « Revalidation »
+ * (en ligne) entre la création de sa revalidation et le prochain passage réseau, remontrant côte
+ * à côte l'ancienne fiche et sa remplaçante fraîchement créée.
+ */
+export async function listProspectionIdsDejaRevalideesLocalement(): Promise<Set<string>> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ revalide_de_id: string }>(
+    `SELECT DISTINCT revalide_de_id FROM prospection WHERE revalide_de_id IS NOT NULL AND statut != 'brouillon'`
+  );
+  return new Set(rows.map((r) => r.revalide_de_id));
 }
 
 /**
@@ -1865,6 +1936,42 @@ export async function countUnsyncedProspections(): Promise<number> {
     `SELECT COUNT(*) as count FROM prospection WHERE statut_sync != 'synced' AND statut != 'brouillon'`
   );
   return row?.count ?? 0;
+}
+
+/**
+ * Date de la dernière intervention (prospection ou traitement) rattachée à l'équipe sur CET
+ * appareil — position courante déductible d'une équipe mobile terrestre (#607/#641), affichée sur
+ * l'Accueil et l'écran Équipes. `null` sans intervention locale.
+ */
+export async function derniereInterventionEquipe(equipeId: string): Promise<string | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ derniere: string | null }>(
+    `SELECT MAX(d) AS derniere FROM (
+       SELECT date_prospection AS d FROM prospection WHERE equipe_id = ?
+       UNION ALL
+       SELECT date_traitement AS d FROM traitement WHERE equipe_id = ?
+     )`,
+    [equipeId, equipeId]
+  );
+  return row?.derniere ?? null;
+}
+
+/**
+ * Autres prospections aériennes de l'équipe le même jour : candidates à « Ce vol couvre aussi »
+ * (#644). Le filtre « n'a pas déjà un vol » est appliqué par l'appelant (autre base SQLite).
+ */
+export async function listProspectionsAeriennesDuJour(
+  equipeId: string,
+  date: string,
+  sauf: string
+): Promise<{ id: string; n_fiche: string | null }[]> {
+  const db = await getDb();
+  return db.getAllAsync<{ id: string; n_fiche: string | null }>(
+    `SELECT id, n_fiche FROM prospection
+     WHERE equipe_id = ? AND date_prospection = ? AND mode_extensif = 'aerien' AND id != ?
+     ORDER BY created_at`,
+    [equipeId, date, sauf]
+  );
 }
 
 export async function deleteProspection(id: string): Promise<boolean> {

@@ -301,9 +301,11 @@ const GROUPES_PHASE_STADE: { espece: 'LMC' | 'NSE'; categorie: 'imago' | 'larve'
  * Unifie les deux formats de stockage existants (confirmés lors de l'implémentation,
  * mêmes unités — effectifs bruts — dans les deux cas, donc additionnables sans
  * distinction visuelle) :
- * - Extensif : phase imago en colonnes scalaires (captures_sol/trans/greg/
- *   solitaro_transiens), stade (imago ou larve) en JSON (stades_imago/densites_larve).
- *   Pas de notion de phase pour les larves côté Extensif (jamais saisie).
+ * - Extensif : phase en colonnes scalaires (captures_sol/trans/greg, + solitaro_transiens
+ *   pour les imagos seulement), stade (imago ou larve) en JSON (stades_imago/densites_larve).
+ *   Les larves ont AUSSI une phase côté Extensif (extensive-larves.tsx, « Règle : Captures =
+ *   Phases = Stades », persistée par larveSpeciesDataToPopulationRow dans ces mêmes colonnes
+ *   sur la ligne population « larve ») — #cible-phase-larves-extensif.
  * - Intensif (fusion B/C) : phase ET stade en lignes CaptureRow individuelles
  *   (categorie/phase/stade/effectif), pour imago et larve.
  * Les deux sources ne se recouvrent jamais pour une même prospection (cf.
@@ -317,8 +319,11 @@ export function construireDetailPhaseStade(
     const population = populations.find((p) => p.espece === espece && p.categorie === categorie) ?? null;
     const capturesGroupe = captures.filter((c) => c.espece === espece && c.categorie === categorie);
 
+    // #cible-phase-larves-extensif : mêmes colonnes scalaires pour imago ET larve (la phase
+    // larvaire Extensif y est stockée sur la ligne « larve ») — seul « solitaro-transiens » est
+    // propre aux imagos et reste à 0/NULL sur une ligne larve.
     const phaseCounts: Record<string, number> = {};
-    if (categorie === 'imago' && population) {
+    if (population) {
       if (population.captures_sol) phaseCounts.solitaire = (phaseCounts.solitaire ?? 0) + population.captures_sol;
       if (population.captures_trans) phaseCounts.transiens = (phaseCounts.transiens ?? 0) + population.captures_trans;
       if (population.captures_solitaro_transiens) {

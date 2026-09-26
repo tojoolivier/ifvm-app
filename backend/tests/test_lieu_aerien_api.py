@@ -20,8 +20,10 @@ def chef_headers(chef_de_base) -> dict:
 
 @pytest.fixture
 def chef_bis_headers(equipe_aerienne_bis) -> dict:
-    """Le chef de base de `equipe_aerienne_bis` — une autre équipe."""
-    return _headers(equipe_aerienne_bis.chef_de_base_id)
+    """Le chef de base de `equipe_aerienne_bis` — une autre équipe. Le chef est une
+    ligne de `equipe_membre` depuis ADR-018."""
+    chef = next(m for m in equipe_aerienne_bis.membres if m.fonction == "chef")
+    return _headers(chef.user_id)
 
 
 @pytest_asyncio.fixture
@@ -270,7 +272,7 @@ async def test_plusieurs_lieux_aeriens_partagent_la_meme_equipe(
 ):
     """Pas d'UNIQUE sur `equipe_aerienne_id` : une équipe peut posséder plusieurs
     lieux (bases principales, secondaires, stands), contrairement à
-    `base_aerienne.equipe_id` (1:1)."""
+    `site_aerienne.equipe_id` (1:1)."""
     lieux = [("Base A", "principale"), ("Base B", "principale"), ("Stand C", "stand")]
     for nom, type_lieu in lieux:
         response = await client.post(

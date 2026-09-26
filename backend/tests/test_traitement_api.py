@@ -3,16 +3,18 @@ import uuid
 from datetime import date, datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.prospection_model import ProspectionModel, ProspectionPopulationModel
 
 
 @pytest.fixture
-def payload_traitement(chef_de_base, pilote, mecanicien):
+def payload_traitement(chef_de_base, pilote, mecanicien, base_aerienne, equipe_aerienne_id):
     def _build(prospection_id, **overrides):
         payload = {
             "prospection_id": str(prospection_id),
+            "equipe_id": str(equipe_aerienne_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -21,9 +23,11 @@ def payload_traitement(chef_de_base, pilote, mecanicien):
                 "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
                 # Texte libre (#traitement-aerien-base-texte-libre) — une valeur
-                # absente du référentiel lieu_aerien doit être acceptée telle
-                # quelle, jamais résolue/validée contre celui-ci.
+                # absente du référentiel site_aerienne doit être acceptée telle
+                # quelle, jamais résolue/validée contre celui-ci. site_principal_id
+                # (#605) est le seul champ validé contre le référentiel.
                 "base_principale": "Base Betioky",
+                "site_principal_id": str(base_aerienne.id),
                 "immatricule_aeronef": "5R-ABC",
             },
         }
@@ -87,7 +91,16 @@ async def test_create_traitement_aerien_brouillon(
 
 @pytest.mark.asyncio
 async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_de_base, pilote, mecanicien
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    chef_de_base,
+    pilote,
+    mecanicien,
+    base_aerienne,
+    equipe_aerienne_id,
 ):
     """#stand-base-secondaire-date-installation : Stand/Base secondaire restent
     du texte libre, la date d'installation de chacun est facultative et
@@ -97,6 +110,7 @@ async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation
         "/traitements",
         json={
             "prospection_id": str(prospection_id),
+            "equipe_id": str(equipe_aerienne_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -105,6 +119,7 @@ async def test_traitement_aerien_stand_et_base_secondaire_avec_date_installation
                 "mecanicien": f"{mecanicien.prenom} {mecanicien.nom}",
                 "chef_de_base_id": str(chef_de_base.id),
                 "base_principale": "Base Betioky",
+                "site_principal_id": str(base_aerienne.id),
                 "stand": "Stand Ihosy",
                 "stand_date_installation": "2026-07-01",
                 "base_secondaire": "Base Ambovombe",
@@ -143,6 +158,38 @@ async def test_traitement_aerien_stand_et_base_secondaire_dates_facultatives(
     assert aerien["stand_date_installation"] is None
     assert aerien["base_secondaire"] is None
     assert aerien["base_secondaire_date_installation"] is None
+
+
+@pytest.mark.asyncio
+async def test_traitement_aerien_expose_le_site_principal_rattache(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement, base_aerienne
+):
+    """#605 : la fiche renvoie le site rattaché (site_principal_id), en plus du
+    texte libre `base_principale` conservé."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    resp = await client.post(
+        "/traitements", json=payload_traitement(prospection_id), headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    aerien = resp.json()["aerien"]
+    assert aerien["site_principal_id"] == str(base_aerienne.id)
+    assert aerien["base_principale"] == "Base Betioky"
+
+    relu = await client.get(f"/traitements/{resp.json()['id']}", headers=auth_headers)
+    assert relu.json()["aerien"]["site_principal_id"] == str(base_aerienne.id)
+
+
+@pytest.mark.asyncio
+async def test_traitement_aerien_refuse_site_principal_inconnu(
+    client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+):
+    """#605 : une site_principal_id absente du référentiel est refusée
+    explicitement (404), jamais une 500."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id)
+    payload["aerien"]["site_principal_id"] = str(uuid.uuid4())
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 404, resp.text
 
 
 @pytest.mark.asyncio
@@ -761,6 +808,219 @@ async def test_delete_rotation_recalcule_totaux(
     assert r2.status_code == 201
 
 
+@pytest_asyncio.fixture
+async def deuxieme_pesticide(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import PesticideModel
+
+    p = PesticideModel(id=uuid.uuid4(), code=f"PEST-{uuid.uuid4().hex[:6]}", nom="Deltamethrine")
+    db_session.add(p)
+    await db_session.commit()
+    await db_session.refresh(p)
+    return p
+
+
+async def _approvisionner(client, headers, pesticide_id, site_id, quantite, unite="L"):
+    resp = await client.post(
+        "/mouvements-pesticide",
+        json={
+            "type": "approvisionnement",
+            "pesticide_id": str(pesticide_id),
+            "site_id": str(site_id),
+            "quantite": quantite,
+            "unite": unite,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+
+async def _solde(client, auth_headers, site_id, pesticide_id, unite):
+    resp = await client.get(
+        f"/stock-pesticide/solde?site_id={site_id}&pesticide_id={pesticide_id}",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    lignes = [ligne for ligne in resp.json() if ligne["unite"] == unite]
+    return lignes[0]["quantite"] if lignes else 0.0
+
+
+# #609 : le traitement aérien débite automatiquement le stock de son site principal —
+# un mouvement `consommation` par couple (pesticide, unité), régénéré à chaque
+# écriture sur les rotations (jamais de double débit, jamais de résidu).
+
+
+@pytest.mark.asyncio
+async def test_approvisionnement_puis_traitement_debite_le_solde_exactement(
+    client,
+    auth_headers,
+    admin_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    solde = await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L")
+    assert solde == 90.0
+
+
+@pytest.mark.asyncio
+async def test_traitement_a_deux_produits_debite_chacun_separement(
+    client,
+    auth_headers,
+    admin_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    deuxieme_pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
+    await _approvisionner(client, admin_headers, deuxieme_pesticide.id, base_aerienne.id, 50.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(produit_id=str(pesticide.id), quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(produit_id=str(deuxieme_pesticide.id), quantite=4.0, unite="L"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 90.0
+    assert await _solde(client, auth_headers, base_aerienne.id, deuxieme_pesticide.id, "L") == 46.0
+
+
+@pytest.mark.asyncio
+async def test_traitement_melangeant_l_et_kg_genere_deux_mouvements_distincts(
+    client,
+    auth_headers,
+    admin_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0, "L")
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 50.0, "kg")
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    resp = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=4.0, unite="kg"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 90.0
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "kg") == 46.0
+
+
+@pytest.mark.asyncio
+async def test_modification_rotation_regenere_le_mouvement_sans_double_debit(
+    client,
+    auth_headers,
+    admin_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    created = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    rotation_id = created.json()["aerien"]["rotations"][0]["id"]
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 90.0
+
+    resp = await client.put(
+        f"/traitements/{traitement_id}/rotations/{rotation_id}",
+        json=payload_rotation(quantite=25.0, unite="L"),
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Régénéré, pas cumulé : 100 - 25, jamais 90 - 25.
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 75.0
+
+
+@pytest.mark.asyncio
+async def test_suppression_rotation_ne_laisse_aucun_residu_de_consommation(
+    client,
+    auth_headers,
+    admin_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    r1 = await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=5.0, unite="L"),
+        headers=auth_headers,
+    )
+    rotation_id_1 = r1.json()["aerien"]["rotations"][0]["id"]
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 85.0
+
+    resp = await client.delete(
+        f"/traitements/{traitement_id}/rotations/{rotation_id_1}", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Plus que la seconde rotation (5.0) consommée — aucun résidu de la première.
+    assert await _solde(client, auth_headers, base_aerienne.id, pesticide.id, "L") == 95.0
+
+
 @pytest.mark.asyncio
 async def test_add_rotation_traitement_inexistant_404(
     client, auth_headers, payload_rotation, db_engine
@@ -1153,10 +1413,11 @@ async def test_list_traitements_filtres(
 
 
 @pytest.fixture
-def payload_traitement_terrestre(chef_equipe):
+def payload_traitement_terrestre(chef_equipe, equipe_terrestre_id):
     def _build(prospection_id, **overrides):
         payload = {
             "prospection_id": str(prospection_id),
+            "equipe_id": str(equipe_terrestre_id),
             "date_traitement": "2026-08-11",
             "date_validation": "2026-08-10",
             "localite": "Betioky",
@@ -2250,11 +2511,12 @@ async def test_modifier_fiche_terrestre_validee_rejetee_sur_tous_les_writes_403(
 # ==========================================
 
 
-def _payload_sync(fiche_id, prospection_id, base_updated_at, **overrides):
+def _payload_sync(fiche_id, prospection_id, base_updated_at, equipe_id, **overrides):
     payload = {
         "id": str(fiche_id),
         "base_updated_at": base_updated_at.isoformat(),
         "prospection_id": str(prospection_id),
+        "equipe_id": str(equipe_id),
         "date_traitement": "2026-08-11",
         "date_validation": "2026-08-10",
         "localite": "Betioky",
@@ -2312,7 +2574,7 @@ async def test_sync_push_aerien_reclasse_la_surface_quand_le_mode_change(
 
 @pytest.mark.asyncio
 async def test_sync_push_cree_fiche_inconnue_201(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
     fiche_id = uuid.uuid4()
@@ -2320,6 +2582,7 @@ async def test_sync_push_cree_fiche_inconnue_201(
         fiche_id,
         prospection_id,
         base_updated_at=datetime.utcnow(),
+        equipe_id=equipe_terrestre_id,
         terrestre={"chef_equipe_id": str(chef_equipe.id)},
     )
     resp = await client.post("/traitements/sync", json=payload, headers=auth_headers)
@@ -2331,7 +2594,7 @@ async def test_sync_push_cree_fiche_inconnue_201(
 
 @pytest.mark.asyncio
 async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflict(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """Critère d'acceptation : deux appareils créant la même fiche hors-ligne (même id)
     avec un contenu divergent -> la seconde synchronisation est rejetée (409), marquée
@@ -2346,6 +2609,7 @@ async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflic
             fiche_id,
             prospection_id,
             base_updated_at=t0,
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2359,6 +2623,7 @@ async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflic
             prospection_id,
             base_updated_at=t0 - timedelta(minutes=5),  # jamais lu la version serveur
             localite="Ampanihy",  # contenu divergent
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2375,7 +2640,7 @@ async def test_sync_deux_appareils_meme_id_contenu_divergent_rejette_409_conflic
 
 @pytest.mark.asyncio
 async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_par_conflict(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """Critère d'acceptation : une fiche serveur déjà `validee` rejette systématiquement
     toute divergence entrante, sans jamais passer par `conflict`."""
@@ -2389,6 +2654,7 @@ async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_pa
             fiche_id,
             prospection_id,
             base_updated_at=t0,
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2413,6 +2679,7 @@ async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_pa
             prospection_id,
             base_updated_at=t0,
             localite="Ampanihy",
+            equipe_id=equipe_terrestre_id,
             terrestre={"chef_equipe_id": str(chef_equipe.id)},
         ),
         headers=auth_headers,
@@ -2428,7 +2695,7 @@ async def test_sync_fiche_validee_rejette_systematiquement_sans_jamais_passer_pa
 
 @pytest.mark.asyncio
 async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """Critère d'acceptation : un renvoi réseau (même id, contenu identique) est traité
     `synced` sans conflit."""
@@ -2439,6 +2706,7 @@ async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
         fiche_id,
         prospection_id,
         base_updated_at=t0,
+        equipe_id=equipe_terrestre_id,
         terrestre={"chef_equipe_id": str(chef_equipe.id)},
     )
 
@@ -2456,7 +2724,7 @@ async def test_sync_renvoi_reseau_contenu_identique_traite_synced_sans_conflit(
 
 @pytest.mark.asyncio
 async def test_sync_renvoi_remplace_les_evaluations_risque_population(
-    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe
+    client, auth_headers, db_session, campagne_id, utilisateur, chef_equipe, equipe_terrestre_id
 ):
     """#evaluation-risque-population, mode Offline-First : une fiche créée hors
     ligne (premier sync) puis rouverte et modifiée (deuxième sync, même id) voit
@@ -2469,6 +2737,7 @@ async def test_sync_renvoi_remplace_les_evaluations_risque_population(
         fiche_id,
         prospection_id,
         base_updated_at=t0,
+        equipe_id=equipe_terrestre_id,
         terrestre={"chef_equipe_id": str(chef_equipe.id)},
         evaluations_risque_population=[
             {"habitat_proche": "Rizière", "distance_km": 1.0, "sensibilisation": False}
@@ -2572,3 +2841,49 @@ async def test_get_traitement_pdf_terrestre_valide_200(
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content.startswith(b"%PDF-")
+
+
+# ==========================================
+# #607 — équipe rattachée au traitement
+# ==========================================
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_aerien_refuse_equipe_terrestre(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    equipe_terrestre_id,
+):
+    """Décision actée #607 : la FK composite `(equipe_id, equipe_type) ->
+    equipe(id, type)` refuse un traitement aérien rattaché à une équipe
+    terrestre — l'erreur doit rester explicite (4xx), jamais une 500."""
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement(prospection_id, equipe_id=str(equipe_terrestre_id))
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert 400 <= resp.status_code < 500
+    assert resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_traitement_expose_equipe_id(
+    client,
+    auth_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement_terrestre,
+    equipe_terrestre_id,
+):
+    prospection_id = await _creer_prospection(db_session, campagne_id, utilisateur)
+    payload = payload_traitement_terrestre(prospection_id)
+    resp = await client.post("/traitements", json=payload, headers=auth_headers)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["equipe_id"] == str(equipe_terrestre_id)
+
+    relu = await client.get(f"/traitements/{resp.json()['id']}", headers=auth_headers)
+    assert relu.status_code == 200
+    assert relu.json()["equipe_id"] == str(equipe_terrestre_id)

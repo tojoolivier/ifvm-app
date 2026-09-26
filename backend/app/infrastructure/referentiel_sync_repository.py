@@ -1,60 +1,71 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, or_, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.domain.referentiel import (
     Aeronef,
     AeronefDejaAffecteError,
-    BaseAerienne,
-    BaseAerienneEquipeInvalideError,
-    ChefDeBaseDejaEquipeError,
-    ChefEquipeDejaEquipeError,
+    AffectationAeronef,
+    ChefDejaDansUneAutreEquipeError,
     CodeStade,
     Culture,
-    EquipeAerienne,
+    Equipe,
+    EquipeADejaUnChefError,
     EquipeAerienneDejaAssigneeError,
     EquipeAerienneIntrouvableError,
-    EquipeTerrestre,
+    EquipeDejaEquipeeError,
+    IdentifiantDejaUtiliseError,
     ImmatriculationAeronefDejaPriseError,
     LieuAerien,
-    MembreEquipeAerienne,
-    MembreEquipeTerrestre,
-    NumeroBaseAerienneDejaPrisError,
-    NumeroStandRemplissageDejaPrisError,
+    MembreDejaDansEquipeError,
+    MembreEquipe,
+    MouvementPesticide,
+    NumeroSiteAerienneDejaPrisError,
+    PeriodeAffectationInvalideError,
     Pesticide,
-    StandRemplissage,
+    PositionActiveIntrouvableError,
+    PositionDejaActiveError,
+    SiteAerienne,
+    SiteAerienneEquipeInvalideError,
+    SiteAeriennePosition,
+    SoldePesticide,
     UtilisateurEquipe,
+    Vol,
 )
 from app.domain.repositories import (
     AeronefRepository,
-    BaseAerienneRepository,
     CodeStadeRepository,
     CultureRepository,
-    EquipeAerienneRepository,
-    EquipeTerrestreRepository,
+    EquipeAeronefRepository,
+    EquipeRepository,
     LieuAerienRepository,
+    MouvementPesticideRepository,
     PesticideRepository,
-    StandRemplissageRepository,
+    SiteAeriennePositionRepository,
+    SiteAerienneRepository,
     UtilisateurEquipeRepository,
+    VolRepository,
 )
 from app.infrastructure.referentiel_model import (
     AeronefModel,
-    BaseAerienneModel,
     CodeStadeModel,
     CultureModel,
-    EquipeAerienneMembreModel,
-    EquipeAerienneModel,
-    EquipeTerrestreMembreModel,
-    EquipeTerrestreModel,
+    EquipeAeronefModel,
+    EquipeMembreModel,
+    EquipeModel,
     LieuAerienModel,
+    MouvementPesticideModel,
     PesticideModel,
+    SiteAerienneModel,
+    SiteAeriennePositionModel,
     StadeModel,
-    StandRemplissageModel,
+    VolModel,
 )
+from app.infrastructure.soft_delete import INCLURE_SUPPRIMES
 from app.models.users import Utilisateur
 
 
@@ -79,7 +90,7 @@ class UtilisateurEquipeRepositoryImpl(UtilisateurEquipeRepository):
         stmt = select(Utilisateur).order_by(Utilisateur.nom)
         if since is not None:
             stmt = stmt.where(Utilisateur.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [
             UtilisateurEquipe(
                 id=m.id,
@@ -102,7 +113,7 @@ class PesticideRepositoryImpl(PesticideRepository):
         stmt = select(PesticideModel).order_by(PesticideModel.code)
         if since is not None:
             stmt = stmt.where(PesticideModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[Pesticide]:
@@ -170,6 +181,7 @@ class PesticideRepositoryImpl(PesticideRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
 
@@ -181,7 +193,7 @@ class CultureRepositoryImpl(CultureRepository):
         stmt = select(CultureModel).order_by(CultureModel.code)
         if since is not None:
             stmt = stmt.where(CultureModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[Culture]:
@@ -241,6 +253,7 @@ class CultureRepositoryImpl(CultureRepository):
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
 
@@ -251,12 +264,12 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
     def _select_with_equipe(self):
         return select(
             LieuAerienModel,
-            EquipeAerienneModel.nom.label("equipe_aerienne_nom"),
+            EquipeModel.nom.label("equipe_aerienne_nom"),
         ).outerjoin(
             # LEFT JOIN : equipe_aerienne_id est nullable, un lieu sans équipe
             # rattachée reste listable (cf. migration 0074).
-            EquipeAerienneModel,
-            LieuAerienModel.equipe_aerienne_id == EquipeAerienneModel.id,
+            EquipeModel,
+            LieuAerienModel.equipe_aerienne_id == EquipeModel.id,
         )
 
     def _to_domain(self, row) -> LieuAerien:
@@ -273,13 +286,14 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
             equipe_aerienne_nom=row.equipe_aerienne_nom,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
     async def list_since(self, since: datetime | None) -> list[LieuAerien]:
         stmt = self._select_with_equipe().order_by(LieuAerienModel.nom)
         if since is not None:
             stmt = stmt.where(LieuAerienModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(row) for row in result.all()]
 
     async def list_all(
@@ -343,203 +357,624 @@ class LieuAerienRepositoryImpl(LieuAerienRepository):
         return lieu
 
 
-class BaseAerienneRepositoryImpl(BaseAerienneRepository):
+class SiteAerienneRepositoryImpl(SiteAerienneRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    def _to_domain(self, model: BaseAerienneModel) -> BaseAerienne:
-        return BaseAerienne(
+    def _to_domain(self, model: SiteAerienneModel) -> SiteAerienne:
+        return SiteAerienne(
             id=model.id,
-            parent_base_id=model.parent_base_id,
+            parent_site_id=model.parent_site_id,
             equipe_id=model.equipe_id,
             numero=model.numero,
             localite=model.localite,
-            longitude=float(model.longitude) if model.longitude is not None else None,
-            latitude=float(model.latitude) if model.latitude is not None else None,
-            altitude=float(model.altitude) if model.altitude is not None else None,
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
 
-    async def list_since(self, since: datetime | None) -> list[BaseAerienne]:
-        stmt = select(BaseAerienneModel).order_by(BaseAerienneModel.numero)
+    async def list_since(self, since: datetime | None) -> list[SiteAerienne]:
+        stmt = select(SiteAerienneModel).order_by(SiteAerienneModel.numero)
         if since is not None:
-            stmt = stmt.where(BaseAerienneModel.updated_at > since)
-        result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
+            stmt = stmt.where(SiteAerienneModel.updated_at > since)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
+        sites = [self._to_domain(m) for m in result.scalars().all()]
+        if sites:
+            # Une requête pour toutes les positions actives : pas de N+1 sur le pull.
+            actives = await self.session.execute(
+                select(SiteAeriennePositionModel).where(
+                    SiteAeriennePositionModel.site_id.in_([s.id for s in sites]),
+                    SiteAeriennePositionModel.date_fin.is_(None),
+                    # Une implantation planifiée dans le futur n'est pas « active ».
+                    SiteAeriennePositionModel.date_debut <= datetime.now(timezone.utc).date(),
+                )
+            )
+            par_site = {p.site_id: p for p in actives.scalars().all()}
+            for site in sites:
+                position = par_site.get(site.id)
+                if position is not None:
+                    site.position_active = _position_to_domain(position)
+        return sites
 
-    async def list_all(self, actif: bool | None = True) -> list[BaseAerienne]:
-        stmt = select(BaseAerienneModel).order_by(BaseAerienneModel.numero)
+    async def list_all(self, actif: bool | None = True) -> list[SiteAerienne]:
+        stmt = select(SiteAerienneModel).order_by(SiteAerienneModel.numero)
         # `actif=None` = pas de filtre : l'administration a besoin des deux états.
         if actif is not None:
-            stmt = stmt.where(BaseAerienneModel.actif == actif)
+            stmt = stmt.where(SiteAerienneModel.actif == actif)
         result = await self.session.execute(stmt)
         return [self._to_domain(m) for m in result.scalars().all()]
 
-    async def get_by_id(self, base_id: uuid.UUID) -> BaseAerienne | None:
+    async def get_by_id(self, site_id: uuid.UUID) -> SiteAerienne | None:
         result = await self.session.execute(
-            select(BaseAerienneModel).where(BaseAerienneModel.id == base_id)
+            select(SiteAerienneModel).where(SiteAerienneModel.id == site_id)
         )
         model = result.scalar_one_or_none()
         return None if model is None else self._to_domain(model)
 
-    async def create(self, base: BaseAerienne) -> BaseAerienne:
-        model = BaseAerienneModel(
-            id=base.id,
-            parent_base_id=base.parent_base_id,
-            equipe_id=base.equipe_id,
-            numero=base.numero,
-            localite=base.localite,
-            longitude=base.longitude,
-            latitude=base.latitude,
-            altitude=base.altitude,
-            actif=base.actif,
-            created_at=base.created_at,
-            updated_at=base.updated_at,
+    async def create(self, site: SiteAerienne) -> SiteAerienne:
+        model = SiteAerienneModel(
+            id=site.id,
+            parent_site_id=site.parent_site_id,
+            equipe_id=site.equipe_id,
+            numero=site.numero,
+            localite=site.localite,
+            actif=site.actif,
+            created_at=site.created_at,
+            updated_at=site.updated_at,
         )
         self.session.add(model)
         try:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise self._traduire_integrite(exc, base) from exc
+            raise self._traduire_integrite(exc, site) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
 
-    def _traduire_integrite(self, exc: IntegrityError, base: BaseAerienne) -> Exception:
+    def _traduire_integrite(self, exc: IntegrityError, site: SiteAerienne) -> Exception:
         """Traduit l'IntegrityError en erreur domaine actionnable — sans ça, une
         équipe déjà assignée ou inexistante remontait comme un doublon de `numero`
         (message trompeur pour l'agent qui remplit le formulaire)."""
         contrainte = _contrainte_violee(exc)
-        if contrainte == "ck_base_aerienne_equipe_coherente":
-            return BaseAerienneEquipeInvalideError(str(base.equipe_id))
-        if contrainte == "uq_base_aerienne_equipe_id":
-            return EquipeAerienneDejaAssigneeError(str(base.equipe_id))
-        if contrainte == "fk_base_aerienne_equipe_id":
-            return EquipeAerienneIntrouvableError(str(base.equipe_id))
-        return NumeroBaseAerienneDejaPrisError(base.numero)
+        if contrainte == "ck_site_aerienne_equipe_coherente":
+            return SiteAerienneEquipeInvalideError(str(site.equipe_id))
+        if contrainte == "uq_site_aerienne_equipe_id":
+            return EquipeAerienneDejaAssigneeError(str(site.equipe_id))
+        if contrainte == "fk_site_aerienne_equipe_id":
+            return EquipeAerienneIntrouvableError(str(site.equipe_id))
+        if contrainte == "site_aerienne_pkey":
+            # Rejeu concurrent d'une création à id client (#655) : c'est le use case
+            # qui relit et tranche entre rejeu identique et conflit.
+            return IdentifiantDejaUtiliseError(str(site.id))
+        return NumeroSiteAerienneDejaPrisError(site.numero)
 
-    async def update(self, base: BaseAerienne) -> BaseAerienne:
+    async def update(self, site: SiteAerienne) -> SiteAerienne:
         result = await self.session.execute(
-            select(BaseAerienneModel).where(BaseAerienneModel.id == base.id)
+            select(SiteAerienneModel).where(SiteAerienneModel.id == site.id)
         )
         model = result.scalar_one()
-        model.parent_base_id = base.parent_base_id
-        model.equipe_id = base.equipe_id
-        model.numero = base.numero
-        model.localite = base.localite
-        model.longitude = base.longitude
-        model.latitude = base.latitude
-        model.altitude = base.altitude
-        model.actif = base.actif
-        model.updated_at = base.updated_at
+        model.parent_site_id = site.parent_site_id
+        model.equipe_id = site.equipe_id
+        model.numero = site.numero
+        model.localite = site.localite
+        model.actif = site.actif
+        model.updated_at = site.updated_at
         try:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            raise self._traduire_integrite(exc, base) from exc
+            raise self._traduire_integrite(exc, site) from exc
         await self.session.refresh(model)
         return self._to_domain(model)
 
 
-class EquipeAerienneRepositoryImpl(EquipeAerienneRepository):
+def _position_to_domain(model: SiteAeriennePositionModel) -> SiteAeriennePosition:
+    return SiteAeriennePosition(
+        id=model.id,
+        site_id=model.site_id,
+        latitude=float(model.latitude),
+        longitude=float(model.longitude),
+        altitude=float(model.altitude) if model.altitude is not None else None,
+        date_debut=model.date_debut,
+        date_fin=model.date_fin,
+        created_at=model.created_at,
+    )
+
+
+class SiteAeriennePositionRepositoryImpl(SiteAeriennePositionRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: SiteAeriennePositionModel) -> SiteAeriennePosition:
+        return _position_to_domain(model)
+
+    async def _toucher_site(self, site_id: uuid.UUID) -> None:
+        """Le pull embarque la position active dans le site : sans rehausse de
+        `site.updated_at`, une implantation ou un démontage ne serait jamais repris
+        par un mobile déjà synchronisé (#638). Committé avec la position."""
+        site = await self.session.get(SiteAerienneModel, site_id)
+        if site is not None:
+            site.updated_at = datetime.now(timezone.utc)
+
+    async def list_par_site(self, site_id: uuid.UUID) -> list[SiteAeriennePosition]:
+        stmt = (
+            select(SiteAeriennePositionModel)
+            .where(SiteAeriennePositionModel.site_id == site_id)
+            .order_by(SiteAeriennePositionModel.date_debut.desc())
+        )
+        result = await self.session.execute(stmt)
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def get_active(self, site_id: uuid.UUID) -> SiteAeriennePosition | None:
+        stmt = select(SiteAeriennePositionModel).where(
+            SiteAeriennePositionModel.site_id == site_id,
+            SiteAeriennePositionModel.date_fin.is_(None),
+        )
+        result = await self.session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def installer(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
+        model = SiteAeriennePositionModel(
+            id=position.id,
+            site_id=position.site_id,
+            latitude=position.latitude,
+            longitude=position.longitude,
+            altitude=position.altitude,
+            date_debut=position.date_debut,
+            date_fin=position.date_fin,
+            created_at=position.created_at,
+        )
+        self.session.add(model)
+        await self._toucher_site(position.site_id)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            traduite = self._traduire_integrite(exc, position)
+            raise (traduite if traduite is not None else exc) from exc
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    def _traduire_integrite(
+        self, exc: IntegrityError, position: SiteAeriennePosition
+    ) -> Exception | None:
+        """`None` : contrainte non reconnue, l'IntegrityError d'origine remonte telle
+        quelle plutôt que d'inventer une erreur domaine trompeuse."""
+        if _contrainte_violee(exc) == "uq_site_aerienne_position_ouverte_par_site":
+            return PositionDejaActiveError(str(position.site_id))
+        return None
+
+    async def demonter(self, position: SiteAeriennePosition) -> SiteAeriennePosition:
+        result = await self.session.execute(
+            select(SiteAeriennePositionModel).where(SiteAeriennePositionModel.id == position.id)
+        )
+        model = result.scalar_one_or_none()
+        if model is None or model.date_fin is not None:
+            raise PositionActiveIntrouvableError(str(position.site_id))
+        model.date_fin = position.date_fin
+        await self._toucher_site(position.site_id)
+        await self.session.commit()
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def deplacer(
+        self,
+        site_ids: list[uuid.UUID],
+        latitude: float,
+        longitude: float,
+        altitude: float | None,
+        aujourdhui: date,
+    ) -> list[SiteAeriennePosition]:
+        modeles: list[SiteAeriennePositionModel] = []
+        for site_id in site_ids:
+            result = await self.session.execute(
+                select(SiteAeriennePositionModel).where(
+                    SiteAeriennePositionModel.site_id == site_id,
+                    SiteAeriennePositionModel.date_fin.is_(None),
+                )
+            )
+            active = result.scalar_one_or_none()
+            if active is not None and active.date_debut >= aujourdhui:
+                # Même jour : `date_fin >= date_debut` interdit de clore à J-1, on
+                # corrige la position ouverte (c'est aussi ce qui rend le rejeu inerte).
+                active.latitude = latitude
+                active.longitude = longitude
+                active.altitude = altitude
+                modeles.append(active)
+            else:
+                if active is not None:
+                    active.date_fin = aujourdhui - timedelta(days=1)
+                    # Vider l'index « une seule ouverte par site » avant l'INSERT.
+                    await self.session.flush()
+                nouvelle = SiteAeriennePositionModel(
+                    id=uuid.uuid4(),
+                    site_id=site_id,
+                    latitude=latitude,
+                    longitude=longitude,
+                    altitude=altitude,
+                    date_debut=aujourdhui,
+                    date_fin=None,
+                    created_at=datetime.now(timezone.utc),
+                )
+                self.session.add(nouvelle)
+                modeles.append(nouvelle)
+            await self._toucher_site(site_id)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if _contrainte_violee(exc) == "uq_site_aerienne_position_ouverte_par_site":
+                raise PositionDejaActiveError(",".join(str(s) for s in site_ids)) from exc
+            raise
+        for modele in modeles:
+            await self.session.refresh(modele)
+        return [self._to_domain(m) for m in modeles]
+
+
+class EquipeRepositoryImpl(EquipeRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
     _CHARGEMENT = (
-        selectinload(EquipeAerienneModel.membres),
-        selectinload(EquipeAerienneModel.aeronef),
+        selectinload(EquipeModel.membres).joinedload(EquipeMembreModel.utilisateur),
+        selectinload(EquipeModel.affectations_aeronef).joinedload(EquipeAeronefModel.aeronef),
     )
 
-    def _to_domain(self, model: EquipeAerienneModel) -> EquipeAerienne:
-        return EquipeAerienne(
+    async def list_since(self, since: datetime | None) -> list[Equipe]:
+        stmt = select(EquipeModel).options(*self._CHARGEMENT).order_by(EquipeModel.nom)
+        if since is not None:
+            stmt = stmt.where(EquipeModel.updated_at > since)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
+        return [self._to_domain(m) for m in result.scalars().unique().all()]
+
+    async def list_membres_since(self, since: datetime | None) -> list[MembreEquipe]:
+        stmt = (
+            select(EquipeMembreModel)
+            .options(joinedload(EquipeMembreModel.utilisateur))
+            .order_by(EquipeMembreModel.created_at)
+        )
+        if since is not None:
+            stmt = stmt.where(EquipeMembreModel.created_at > since)
+        result = await self.session.execute(stmt)
+        return [_membre_to_domain(m) for m in result.scalars().unique().all()]
+
+    def _to_domain(self, model: EquipeModel) -> Equipe:
+        # `aeronef_id` / `aeronef` ne sont plus des colonnes (#603) : ils projettent
+        # l'affectation en cours, celle dont `date_fin IS NULL`. Une équipe entre deux
+        # appareils les voit à `None`, ce que le 1:1 ne savait pas exprimer.
+        active = next((a for a in model.affectations_aeronef if a.date_fin is None), None)
+        return Equipe(
             id=model.id,
             nom=model.nom,
-            chef_de_base_id=model.chef_de_base_id,
-            pilote=model.pilote,
-            mecanicien=model.mecanicien,
-            consultant_international=model.consultant_international,
-            aeronef_id=model.aeronef_id,
-            aeronef=_aeronef_to_domain(model.aeronef) if model.aeronef is not None else None,
+            type=model.type,
+            aeronef_id=active.aeronef_id if active is not None else None,
+            aeronef=_aeronef_to_domain(active.aeronef) if active is not None else None,
             actif=model.actif,
             created_at=model.created_at,
             updated_at=model.updated_at,
-            membres=[
-                MembreEquipeAerienne(id=m.id, equipe_aerienne_id=m.equipe_aerienne_id, nom=m.nom)
-                for m in model.membres
-            ],
+            deleted_at=model.deleted_at,
+            membres=[_membre_to_domain(m) for m in model.membres],
         )
 
-    async def list_all(self, actif: bool | None = True) -> list[EquipeAerienne]:
+    async def list_all(
+        self, actif: bool | None = True, type_equipe: str | None = None
+    ) -> list[Equipe]:
         stmt = (
-            select(EquipeAerienneModel).options(*self._CHARGEMENT).order_by(EquipeAerienneModel.nom)
+            select(EquipeModel)
+            .options(*self._CHARGEMENT)
+            .order_by(EquipeModel.nom)
+            .execution_options(populate_existing=True)
         )
         if actif is not None:
-            stmt = stmt.where(EquipeAerienneModel.actif == actif)
+            stmt = stmt.where(EquipeModel.actif == actif)
+        if type_equipe is not None:
+            stmt = stmt.where(EquipeModel.type == type_equipe)
         result = await self.session.execute(stmt)
         return [self._to_domain(m) for m in result.scalars().unique().all()]
 
-    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeAerienne | None:
+    async def get_by_id(self, equipe_id: uuid.UUID) -> Equipe | None:
+        # `populate_existing` : sans lui, une équipe déjà chargée dans la session garde
+        # sa collection `membres` telle quelle — un membre ajouté juste avant resterait
+        # invisible à la relecture.
         result = await self.session.execute(
-            select(EquipeAerienneModel)
+            select(EquipeModel)
             .options(*self._CHARGEMENT)
-            .where(EquipeAerienneModel.id == equipe_id)
+            .where(EquipeModel.id == equipe_id)
+            .execution_options(populate_existing=True)
         )
         model = result.unique().scalar_one_or_none()
         return None if model is None else self._to_domain(model)
 
-    async def get_by_chef_de_base_id(self, chef_de_base_id: uuid.UUID) -> EquipeAerienne | None:
+    async def get_by_chef_id(self, user_id: uuid.UUID) -> Equipe | None:
         result = await self.session.execute(
-            select(EquipeAerienneModel)
+            select(EquipeModel)
             .options(*self._CHARGEMENT)
-            .where(EquipeAerienneModel.chef_de_base_id == chef_de_base_id)
+            .join(EquipeMembreModel, EquipeMembreModel.equipe_id == EquipeModel.id)
+            .where(EquipeMembreModel.user_id == user_id, EquipeMembreModel.fonction == "chef")
         )
         model = result.unique().scalar_one_or_none()
         return None if model is None else self._to_domain(model)
 
-    async def create(self, equipe: EquipeAerienne) -> EquipeAerienne:
+    async def create(self, equipe: Equipe) -> Equipe:
         aeronef = equipe.aeronef
-        model = EquipeAerienneModel(
+        model = EquipeModel(
             id=equipe.id,
             nom=equipe.nom,
-            chef_de_base_id=equipe.chef_de_base_id,
-            pilote=equipe.pilote,
-            mecanicien=equipe.mecanicien,
-            consultant_international=equipe.consultant_international,
-            aeronef_id=aeronef.id if aeronef is not None else equipe.aeronef_id,
+            type=equipe.type,
             actif=equipe.actif,
             created_at=equipe.created_at,
             updated_at=equipe.updated_at,
-            membres=[EquipeAerienneMembreModel(id=m.id, nom=m.nom) for m in equipe.membres],
+            membres=[
+                EquipeMembreModel(user_id=m.user_id, fonction=m.fonction, created_at=m.created_at)
+                for m in equipe.membres
+            ],
         )
         if aeronef is not None:
             # Même transaction que l'équipe : un échec (immatriculation déjà prise,
             # chef déjà affecté) n'écrit ni l'un ni l'autre — jamais d'aéronef orphelin.
-            model.aeronef = AeronefModel(
-                id=aeronef.id,
-                immatriculation=aeronef.immatriculation,
-                societe=aeronef.societe,
-                volume_cuve_l=aeronef.volume_cuve_l,
-                actif=aeronef.actif,
-                created_at=aeronef.created_at,
-                updated_at=aeronef.updated_at,
+            self.session.add(
+                AeronefModel(
+                    id=aeronef.id,
+                    immatriculation=aeronef.immatriculation,
+                    societe=aeronef.societe,
+                    volume_cuve_l=aeronef.volume_cuve_l,
+                    actif=aeronef.actif,
+                    created_at=aeronef.created_at,
+                    updated_at=aeronef.updated_at,
+                )
             )
+        aeronef_id = aeronef.id if aeronef is not None else equipe.aeronef_id
+        if aeronef_id is not None:
+            # L'équipe naît avec son appareil en service : affectation ouverte, qui
+            # commence le jour de la création — la seule date que l'appelant fournisse.
+            model.affectations_aeronef = [
+                EquipeAeronefModel(
+                    id=uuid.uuid4(),
+                    aeronef_id=aeronef_id,
+                    date_debut=equipe.created_at.date(),
+                    date_fin=None,
+                    created_at=equipe.created_at,
+                )
+            ]
         self.session.add(model)
         try:
             await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
-            contrainte = _contrainte_violee(exc)
-            if contrainte == "uq_aeronef_immatriculation":
-                raise ImmatriculationAeronefDejaPriseError(
-                    aeronef.immatriculation if aeronef is not None else ""
-                ) from exc
-            if contrainte == "uq_equipe_aerienne_aeronef_id":
-                raise AeronefDejaAffecteError(str(equipe.aeronef_id)) from exc
-            raise ChefDeBaseDejaEquipeError(str(equipe.chef_de_base_id)) from exc
-        await self.session.refresh(model, attribute_names=["membres", "aeronef"])
-        return self._to_domain(model)
+            raise _traduire_integrite_equipe(exc, aeronef, aeronef_id) from exc
+        await self.session.refresh(model, attribute_names=["membres", "affectations_aeronef"])
+        return await self._relire(model.id)
+
+    async def update(self, equipe: Equipe) -> Equipe:
+        result = await self.session.execute(select(EquipeModel).where(EquipeModel.id == equipe.id))
+        model = result.scalar_one()
+        # `type` n'est délibérément pas réécrit : il n'existe pas dans `EquipeUpdate`.
+        model.nom = equipe.nom
+        model.actif = equipe.actif
+        model.updated_at = equipe.updated_at
+        await self.session.commit()
+        return await self._relire(equipe.id)
+
+    async def _relire(self, equipe_id: uuid.UUID) -> Equipe:
+        """Une écriture relit l'équipe complète : `membres` porte les nom/prénom, qui
+        vivent sur `utilisateur` et non sur la ligne de membre."""
+        equipe = await self.get_by_id(equipe_id)
+        if equipe is None:  # pragma: no cover — on vient de l'écrire dans cette session
+            raise RuntimeError(f"Équipe {equipe_id} introuvable juste après écriture")
+        return equipe
+
+    async def ajouter_membre(self, membre: MembreEquipe) -> MembreEquipe:
+        model = EquipeMembreModel(
+            equipe_id=membre.equipe_id,
+            user_id=membre.user_id,
+            fonction=membre.fonction,
+            created_at=membre.created_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise _traduire_integrite_equipe(exc, None) from exc
+        await self.session.refresh(model)
+        utilisateur = await self.session.get(Utilisateur, membre.user_id)
+        return MembreEquipe(
+            equipe_id=model.equipe_id,
+            user_id=model.user_id,
+            fonction=model.fonction,
+            nom=utilisateur.nom if utilisateur is not None else None,
+            prenom=utilisateur.prenom if utilisateur is not None else None,
+            created_at=model.created_at,
+        )
+
+
+def _affectation_to_domain(model: EquipeAeronefModel) -> AffectationAeronef:
+    return AffectationAeronef(
+        id=model.id,
+        equipe_id=model.equipe_id,
+        aeronef_id=model.aeronef_id,
+        date_debut=model.date_debut,
+        date_fin=model.date_fin,
+        aeronef=_aeronef_to_domain(model.aeronef) if model.aeronef is not None else None,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+        deleted_at=model.deleted_at,
+    )
+
+
+class EquipeAeronefRepositoryImpl(EquipeAeronefRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def list_since(self, since: datetime | None) -> list[AffectationAeronef]:
+        stmt = (
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .order_by(EquipeAeronefModel.date_debut)
+        )
+        if since is not None:
+            stmt = stmt.where(EquipeAeronefModel.updated_at > since)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
+        return [_affectation_to_domain(m) for m in result.scalars().all()]
+
+    async def list_par_equipe(self, equipe_id: uuid.UUID) -> list[AffectationAeronef]:
+        result = await self.session.execute(
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .where(EquipeAeronefModel.equipe_id == equipe_id)
+            .order_by(EquipeAeronefModel.date_debut.desc(), EquipeAeronefModel.created_at.desc())
+            .execution_options(populate_existing=True)
+        )
+        return [_affectation_to_domain(m) for m in result.scalars().unique().all()]
+
+    async def get_by_id(self, affectation_id: uuid.UUID) -> AffectationAeronef | None:
+        result = await self.session.execute(
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .where(EquipeAeronefModel.id == affectation_id)
+            .execution_options(populate_existing=True)
+        )
+        model = result.unique().scalar_one_or_none()
+        return None if model is None else _affectation_to_domain(model)
+
+    async def list_chevauchements(
+        self,
+        date_debut: date,
+        date_fin: date | None,
+        equipe_id: uuid.UUID | None = None,
+        aeronef_id: uuid.UUID | None = None,
+        sauf_id: uuid.UUID | None = None,
+    ) -> list[AffectationAeronef]:
+        # Deux intervalles semi-ouverts se recoupent si chacun commence avant que
+        # l'autre ne finisse ; `date_fin IS NULL` vaut « pas de fin », donc la moitié
+        # correspondante de la condition tombe.
+        stmt = (
+            select(EquipeAeronefModel)
+            .options(joinedload(EquipeAeronefModel.aeronef))
+            .where(
+                or_(
+                    EquipeAeronefModel.date_fin.is_(None),
+                    EquipeAeronefModel.date_fin > date_debut,
+                )
+            )
+            .order_by(EquipeAeronefModel.date_debut)
+        )
+        if date_fin is not None:
+            stmt = stmt.where(EquipeAeronefModel.date_debut < date_fin)
+        cibles = [
+            c
+            for c in (
+                EquipeAeronefModel.equipe_id == equipe_id if equipe_id is not None else None,
+                EquipeAeronefModel.aeronef_id == aeronef_id if aeronef_id is not None else None,
+            )
+            if c is not None
+        ]
+        if not cibles:  # pragma: no cover — garde-fou : un appel sans cible balaierait tout
+            raise ValueError("list_chevauchements exige une equipe_id et/ou un aeronef_id")
+        stmt = stmt.where(or_(*cibles))
+        if sauf_id is not None:
+            stmt = stmt.where(EquipeAeronefModel.id != sauf_id)
+        result = await self.session.execute(stmt)
+        return [_affectation_to_domain(m) for m in result.scalars().unique().all()]
+
+    async def create(self, affectation: AffectationAeronef) -> AffectationAeronef:
+        model = EquipeAeronefModel(
+            id=affectation.id,
+            equipe_id=affectation.equipe_id,
+            aeronef_id=affectation.aeronef_id,
+            date_debut=affectation.date_debut,
+            date_fin=affectation.date_fin,
+            created_at=affectation.created_at,
+            updated_at=affectation.updated_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise _traduire_integrite_affectation(exc, affectation) from exc
+        relue = await self.get_by_id(affectation.id)
+        assert relue is not None  # noqa: S101 — on vient de l'écrire dans cette session
+        return relue
+
+    async def update(self, affectation: AffectationAeronef) -> AffectationAeronef:
+        result = await self.session.execute(
+            select(EquipeAeronefModel).where(EquipeAeronefModel.id == affectation.id)
+        )
+        model = result.scalar_one()
+        # Seule `date_fin` bouge : rouvrir une période close ou déplacer son début
+        # réécrirait l'histoire, ce que cette table existe précisément pour empêcher.
+        model.date_fin = affectation.date_fin
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise _traduire_integrite_affectation(exc, affectation) from exc
+        relue = await self.get_by_id(affectation.id)
+        assert relue is not None  # noqa: S101 — on vient de l'écrire dans cette session
+        return relue
+
+
+def _traduire_integrite_affectation(
+    exc: IntegrityError, affectation: AffectationAeronef
+) -> Exception:
+    """Filet de sécurité derrière la validation applicative : les index partiels de la
+    migration 0087 ne couvrent que les affectations *ouvertes*, et la règle complète est
+    vérifiée en amont. Ce qui passe ici est donc une course entre deux requêtes."""
+    contrainte = _contrainte_violee(exc)
+    if contrainte == "uq_equipe_aeronef_ouverte_par_aeronef":
+        return AeronefDejaAffecteError(str(affectation.aeronef_id))
+    if contrainte == "uq_equipe_aeronef_ouverte_par_equipe":
+        return EquipeDejaEquipeeError(str(affectation.equipe_id))
+    if contrainte == "ck_equipe_aeronef_periode":
+        return PeriodeAffectationInvalideError(str(affectation.id))
+    return exc
+
+
+def _membre_to_domain(model: EquipeMembreModel) -> MembreEquipe:
+    return MembreEquipe(
+        equipe_id=model.equipe_id,
+        user_id=model.user_id,
+        fonction=model.fonction,
+        nom=model.utilisateur.nom if model.utilisateur is not None else None,
+        prenom=model.utilisateur.prenom if model.utilisateur is not None else None,
+        created_at=model.created_at,
+    )
+
+
+def _traduire_integrite_equipe(
+    exc: IntegrityError, aeronef: Aeronef | None, aeronef_id: uuid.UUID | None = None
+) -> Exception:
+    """Traduit une violation d'intégrité en erreur métier, par *nom de contrainte*.
+
+    Les noms lus ici sont ceux des migrations 0086/0087 et des `__table_args__` : un
+    renommage des deux côtés est obligatoire, sans quoi toute violation retomberait
+    silencieusement sur l'erreur générique.
+
+    `aeronef_id` est passé à part : sur le chemin « appareil déjà au référentiel »
+    (#621) il n'y a pas d'objet `Aeronef` à créer, et c'est pourtant le seul chemin qui
+    puisse violer l'index partiel — sans lui le message sortait vide."""
+    contrainte = _contrainte_violee(exc)
+    if contrainte == "uq_aeronef_immatriculation":
+        return ImmatriculationAeronefDejaPriseError(
+            aeronef.immatriculation if aeronef is not None else ""
+        )
+    if contrainte == "uq_equipe_aeronef_ouverte_par_aeronef":
+        vise = aeronef.id if aeronef is not None else aeronef_id
+        return AeronefDejaAffecteError(str(vise) if vise is not None else "")
+    if contrainte == "uq_equipe_aeronef_ouverte_par_equipe":
+        return EquipeDejaEquipeeError(contrainte)
+    if contrainte == "uq_equipe_membre_chef_par_equipe":
+        return EquipeADejaUnChefError(contrainte)
+    if contrainte == "uq_equipe_membre_chef_par_utilisateur":
+        return ChefDejaDansUneAutreEquipeError(contrainte)
+    if contrainte == "equipe_membre_pkey":
+        return MembreDejaDansEquipeError(contrainte)
+    # Contrainte non reconnue : on rend l'erreur d'origine telle quelle plutôt que de la
+    # déguiser en erreur métier — le 500 qui suit est la bonne réponse.
+    return exc
 
 
 def _aeronef_to_domain(model: AeronefModel) -> Aeronef:
@@ -551,12 +986,20 @@ def _aeronef_to_domain(model: AeronefModel) -> Aeronef:
         actif=model.actif,
         created_at=model.created_at,
         updated_at=model.updated_at,
+        deleted_at=model.deleted_at,
     )
 
 
 class AeronefRepositoryImpl(AeronefRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def list_since(self, since: datetime | None) -> list[Aeronef]:
+        stmt = select(AeronefModel).order_by(AeronefModel.immatriculation)
+        if since is not None:
+            stmt = stmt.where(AeronefModel.updated_at > since)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
+        return [_aeronef_to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[Aeronef]:
         stmt = select(AeronefModel).order_by(AeronefModel.immatriculation)
@@ -571,6 +1014,26 @@ class AeronefRepositoryImpl(AeronefRepository):
         )
         model = result.scalar_one_or_none()
         return None if model is None else _aeronef_to_domain(model)
+
+    async def create(self, aeronef: Aeronef) -> Aeronef:
+        model = AeronefModel(
+            id=aeronef.id,
+            immatriculation=aeronef.immatriculation,
+            societe=aeronef.societe,
+            volume_cuve_l=aeronef.volume_cuve_l,
+            actif=aeronef.actif,
+            created_at=aeronef.created_at,
+            updated_at=aeronef.updated_at,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            # Seule contrainte possible ici : l'appareil n'a aucune FK sortante.
+            raise ImmatriculationAeronefDejaPriseError(aeronef.immatriculation) from exc
+        await self.session.refresh(model)
+        return _aeronef_to_domain(model)
 
     async def update(self, aeronef: Aeronef) -> Aeronef:
         result = await self.session.execute(
@@ -591,156 +1054,6 @@ class AeronefRepositoryImpl(AeronefRepository):
         return _aeronef_to_domain(model)
 
 
-class EquipeTerrestreRepositoryImpl(EquipeTerrestreRepository):
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
-    _CHARGEMENT = (selectinload(EquipeTerrestreModel.membres),)
-
-    def _to_domain(self, model: EquipeTerrestreModel) -> EquipeTerrestre:
-        return EquipeTerrestre(
-            id=model.id,
-            nom=model.nom,
-            chef_equipe_id=model.chef_equipe_id,
-            actif=model.actif,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            membres=[
-                MembreEquipeTerrestre(id=m.id, equipe_terrestre_id=m.equipe_terrestre_id, nom=m.nom)
-                for m in model.membres
-            ],
-        )
-
-    async def list_all(self, actif: bool | None = True) -> list[EquipeTerrestre]:
-        stmt = (
-            select(EquipeTerrestreModel)
-            .options(*self._CHARGEMENT)
-            .order_by(EquipeTerrestreModel.nom)
-        )
-        if actif is not None:
-            stmt = stmt.where(EquipeTerrestreModel.actif == actif)
-        result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().unique().all()]
-
-    async def get_by_id(self, equipe_id: uuid.UUID) -> EquipeTerrestre | None:
-        result = await self.session.execute(
-            select(EquipeTerrestreModel)
-            .options(*self._CHARGEMENT)
-            .where(EquipeTerrestreModel.id == equipe_id)
-        )
-        model = result.unique().scalar_one_or_none()
-        return None if model is None else self._to_domain(model)
-
-    async def create(self, equipe: EquipeTerrestre) -> EquipeTerrestre:
-        model = EquipeTerrestreModel(
-            id=equipe.id,
-            nom=equipe.nom,
-            chef_equipe_id=equipe.chef_equipe_id,
-            actif=equipe.actif,
-            created_at=equipe.created_at,
-            updated_at=equipe.updated_at,
-            membres=[EquipeTerrestreMembreModel(id=m.id, nom=m.nom) for m in equipe.membres],
-        )
-        self.session.add(model)
-        try:
-            await self.session.commit()
-        except IntegrityError as exc:
-            await self.session.rollback()
-            raise ChefEquipeDejaEquipeError(str(equipe.chef_equipe_id)) from exc
-        await self.session.refresh(model, attribute_names=["membres"])
-        return self._to_domain(model)
-
-
-class StandRemplissageRepositoryImpl(StandRemplissageRepository):
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
-    def _to_domain(self, model: StandRemplissageModel) -> StandRemplissage:
-        return StandRemplissage(
-            id=model.id,
-            numero=model.numero,
-            localite=model.localite,
-            longitude=float(model.longitude) if model.longitude is not None else None,
-            latitude=float(model.latitude) if model.latitude is not None else None,
-            altitude=float(model.altitude) if model.altitude is not None else None,
-            equipe_aerienne_id=model.equipe_aerienne_id,
-            actif=model.actif,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-        )
-
-    async def list_since(self, since: datetime | None) -> list[StandRemplissage]:
-        stmt = select(StandRemplissageModel).order_by(StandRemplissageModel.numero)
-        if since is not None:
-            stmt = stmt.where(StandRemplissageModel.updated_at > since)
-        result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
-
-    async def list_all(self, actif: bool | None = True) -> list[StandRemplissage]:
-        stmt = select(StandRemplissageModel).order_by(StandRemplissageModel.numero)
-        if actif is not None:
-            stmt = stmt.where(StandRemplissageModel.actif == actif)
-        result = await self.session.execute(stmt)
-        return [self._to_domain(m) for m in result.scalars().all()]
-
-    async def get_by_id(self, stand_id: uuid.UUID) -> StandRemplissage | None:
-        result = await self.session.execute(
-            select(StandRemplissageModel).where(StandRemplissageModel.id == stand_id)
-        )
-        model = result.scalar_one_or_none()
-        return None if model is None else self._to_domain(model)
-
-    async def create(self, stand: StandRemplissage) -> StandRemplissage:
-        model = StandRemplissageModel(
-            id=stand.id,
-            numero=stand.numero,
-            localite=stand.localite,
-            longitude=stand.longitude,
-            latitude=stand.latitude,
-            altitude=stand.altitude,
-            equipe_aerienne_id=stand.equipe_aerienne_id,
-            actif=stand.actif,
-            created_at=stand.created_at,
-            updated_at=stand.updated_at,
-        )
-        self.session.add(model)
-        try:
-            await self.session.commit()
-        except IntegrityError as exc:
-            await self.session.rollback()
-            raise self._traduire_integrite(exc, stand) from exc
-        await self.session.refresh(model)
-        return self._to_domain(model)
-
-    @staticmethod
-    def _traduire_integrite(exc: IntegrityError, stand: StandRemplissage) -> Exception:
-        """Une équipe inexistante ne doit pas remonter comme un doublon de `numero`."""
-        if _contrainte_violee(exc) == "fk_stand_remplissage_equipe_aerienne_id":
-            return EquipeAerienneIntrouvableError(str(stand.equipe_aerienne_id))
-        return NumeroStandRemplissageDejaPrisError(stand.numero)
-
-    async def update(self, stand: StandRemplissage) -> StandRemplissage:
-        result = await self.session.execute(
-            select(StandRemplissageModel).where(StandRemplissageModel.id == stand.id)
-        )
-        model = result.scalar_one()
-        model.numero = stand.numero
-        model.localite = stand.localite
-        model.longitude = stand.longitude
-        model.latitude = stand.latitude
-        model.altitude = stand.altitude
-        model.equipe_aerienne_id = stand.equipe_aerienne_id
-        model.actif = stand.actif
-        model.updated_at = stand.updated_at
-        try:
-            await self.session.commit()
-        except IntegrityError as exc:
-            await self.session.rollback()
-            raise self._traduire_integrite(exc, stand) from exc
-        await self.session.refresh(model)
-        return self._to_domain(model)
-
-
 class CodeStadeRepositoryImpl(CodeStadeRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -754,7 +1067,7 @@ class CodeStadeRepositoryImpl(CodeStadeRepository):
         stmt = self._select_ordonne()
         if since is not None:
             stmt = stmt.where(CodeStadeModel.updated_at > since)
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt, execution_options=INCLURE_SUPPRIMES)
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def list_all(self, actif: bool | None = True) -> list[CodeStade]:
@@ -841,4 +1154,227 @@ class CodeStadeRepositoryImpl(CodeStadeRepository):
             ordre=model.ordre,
             actif=model.actif,
             updated_at=model.updated_at,
+            deleted_at=model.deleted_at,
         )
+
+
+class MouvementPesticideRepositoryImpl(MouvementPesticideRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_domain(self, model: MouvementPesticideModel) -> MouvementPesticide:
+        return MouvementPesticide(
+            id=model.id,
+            type=model.type,
+            pesticide_id=model.pesticide_id,
+            site_id=model.site_id,
+            site_destination_id=model.site_destination_id,
+            quantite=float(model.quantite),
+            unite=model.unite,
+            date_mouvement=model.date_mouvement,
+            created_at=model.created_at,
+            traitement_id=model.traitement_id,
+        )
+
+    async def create(self, mouvement: MouvementPesticide) -> MouvementPesticide:
+        model = MouvementPesticideModel(
+            id=mouvement.id,
+            type=mouvement.type,
+            pesticide_id=mouvement.pesticide_id,
+            site_id=mouvement.site_id,
+            site_destination_id=mouvement.site_destination_id,
+            quantite=mouvement.quantite,
+            unite=mouvement.unite,
+            date_mouvement=mouvement.date_mouvement,
+            created_at=mouvement.created_at,
+            traitement_id=mouvement.traitement_id,
+        )
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if await self.get_by_id(mouvement.id) is None:
+                raise
+            raise IdentifiantDejaUtiliseError(str(mouvement.id)) from exc
+        await self.session.refresh(model)
+        return self._to_domain(model)
+
+    async def get_by_id(self, mouvement_id: uuid.UUID) -> MouvementPesticide | None:
+        result = await self.session.execute(
+            select(MouvementPesticideModel).where(MouvementPesticideModel.id == mouvement_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else self._to_domain(model)
+
+    async def regenerer_consommation(
+        self,
+        traitement_id: uuid.UUID,
+        site_id: uuid.UUID | None,
+        date_mouvement: date,
+        consommations: list[tuple[uuid.UUID, str, float]],
+    ) -> None:
+        await self.session.execute(
+            delete(MouvementPesticideModel).where(
+                MouvementPesticideModel.traitement_id == traitement_id,
+                MouvementPesticideModel.type == "consommation",
+            )
+        )
+        if site_id is not None:
+            maintenant = datetime.now(timezone.utc)
+            for pesticide_id, unite, quantite in consommations:
+                if quantite <= 0:
+                    continue
+                self.session.add(
+                    MouvementPesticideModel(
+                        type="consommation",
+                        pesticide_id=pesticide_id,
+                        site_id=site_id,
+                        quantite=quantite,
+                        unite=unite,
+                        date_mouvement=date_mouvement,
+                        created_at=maintenant,
+                        traitement_id=traitement_id,
+                    )
+                )
+        await self.session.commit()
+
+    async def solde(
+        self,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+    ) -> list[SoldePesticide]:
+        """Agrège les mouvements en trois branches signées, unifiées par UNION ALL puis
+        sommées par (site, pesticide, unité) — un `transfert` débite `site_id` et
+        crédite `site_destination_id` dans le même calcul (AC #606)."""
+        m = MouvementPesticideModel
+        entrees = select(
+            m.site_id.label("site_id"),
+            m.pesticide_id.label("pesticide_id"),
+            m.unite.label("unite"),
+            m.quantite.label("delta"),
+        ).where(m.type == "approvisionnement")
+        sorties = select(
+            m.site_id.label("site_id"),
+            m.pesticide_id.label("pesticide_id"),
+            m.unite.label("unite"),
+            (-m.quantite).label("delta"),
+        ).where(m.type.in_(("transfert", "consommation")))
+        credits_transfert = select(
+            m.site_destination_id.label("site_id"),
+            m.pesticide_id.label("pesticide_id"),
+            m.unite.label("unite"),
+            m.quantite.label("delta"),
+        ).where(m.type == "transfert")
+
+        mouvements = union_all(entrees, sorties, credits_transfert).subquery()
+        stmt = select(
+            mouvements.c.site_id,
+            mouvements.c.pesticide_id,
+            mouvements.c.unite,
+            func.sum(mouvements.c.delta).label("quantite"),
+        )
+        if site_id is not None:
+            stmt = stmt.where(mouvements.c.site_id == site_id)
+        if pesticide_id is not None:
+            stmt = stmt.where(mouvements.c.pesticide_id == pesticide_id)
+        stmt = stmt.group_by(mouvements.c.site_id, mouvements.c.pesticide_id, mouvements.c.unite)
+
+        result = await self.session.execute(stmt)
+        return [
+            SoldePesticide(
+                site_id=row.site_id,
+                pesticide_id=row.pesticide_id,
+                unite=row.unite,
+                quantite=float(row.quantite),
+            )
+            for row in result.all()
+        ]
+
+
+def _vol_to_domain(model: VolModel) -> Vol:
+    return Vol(
+        id=model.id,
+        type=model.type,
+        equipe_id=model.equipe_id,
+        aeronef_id=model.aeronef_id,
+        site_principal_id=model.site_principal_id,
+        stand_id=model.stand_id,
+        base_secondaire_id=model.base_secondaire_id,
+        traitement_id=model.traitement_id,
+        date_vol=model.date_vol,
+        heure_debut=model.heure_debut,
+        heure_fin=model.heure_fin,
+        motif=model.motif,
+        lieu_depart=model.lieu_depart,
+        lieu_arrivee=model.lieu_arrivee,
+        observations=model.observations,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def _vol_to_model(vol: Vol) -> VolModel:
+    """Mapping inverse de `_vol_to_domain` — les deux se lisent champ à champ l'un en
+    face de l'autre plutôt que de relister les 14 champs une troisième fois dans
+    `VolRepositoryImpl.create`."""
+    return VolModel(
+        id=vol.id,
+        type=vol.type,
+        equipe_id=vol.equipe_id,
+        aeronef_id=vol.aeronef_id,
+        site_principal_id=vol.site_principal_id,
+        stand_id=vol.stand_id,
+        base_secondaire_id=vol.base_secondaire_id,
+        traitement_id=vol.traitement_id,
+        date_vol=vol.date_vol,
+        heure_debut=vol.heure_debut,
+        heure_fin=vol.heure_fin,
+        motif=vol.motif,
+        lieu_depart=vol.lieu_depart,
+        lieu_arrivee=vol.lieu_arrivee,
+        observations=vol.observations,
+        created_at=vol.created_at,
+        updated_at=vol.updated_at,
+    )
+
+
+class VolRepositoryImpl(VolRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(self, vol: Vol) -> Vol:
+        model = _vol_to_model(vol)
+        self.session.add(model)
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if await self.get_by_id(vol.id) is None:
+                raise
+            raise IdentifiantDejaUtiliseError(str(vol.id)) from exc
+        await self.session.refresh(model)
+        return _vol_to_domain(model)
+
+    async def update(self, vol: Vol) -> Vol:
+        """Rattachement différé d'un traitement (#610) — seul champ mutable
+        après création, cf. docstring de `VolRepository`."""
+        result = await self.session.execute(select(VolModel).where(VolModel.id == vol.id))
+        model = result.scalar_one()
+        model.traitement_id = vol.traitement_id
+        model.updated_at = vol.updated_at
+        await self.session.commit()
+        await self.session.refresh(model)
+        return _vol_to_domain(model)
+
+    async def get_by_id(self, vol_id: uuid.UUID) -> Vol | None:
+        result = await self.session.execute(select(VolModel).where(VolModel.id == vol_id))
+        model = result.scalar_one_or_none()
+        return None if model is None else _vol_to_domain(model)
+
+    async def list_all(self, equipe_id: uuid.UUID | None = None) -> list[Vol]:
+        stmt = select(VolModel).order_by(VolModel.date_vol.desc(), VolModel.created_at.desc())
+        if equipe_id is not None:
+            stmt = stmt.where(VolModel.equipe_id == equipe_id)
+        result = await self.session.execute(stmt)
+        return [_vol_to_domain(m) for m in result.scalars().all()]

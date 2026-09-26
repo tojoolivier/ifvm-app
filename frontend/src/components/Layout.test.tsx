@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { api } from '../api/client'
@@ -18,7 +18,10 @@ function renderLayout() {
       {
         path: '/',
         element: <Layout />,
-        children: [{ index: true, element: <div>contenu</div>, handle: { title: 'Tableau de bord' } }],
+        children: [
+          { index: true, element: <div>contenu</div>, handle: { title: 'Tableau de bord' } },
+          { path: 'campagnes', element: <div>page campagnes</div>, handle: { title: 'Campagnes' } },
+        ],
       },
     ],
     { initialEntries: ['/'] },
@@ -108,6 +111,58 @@ describe('Layout (#121)', () => {
     await waitFor(() => {
       const item = screen.getByText('Heures de vol').closest('a')
       expect(item).toHaveAttribute('href', '/fiches-vol')
+    })
+  })
+
+  /** Sous 1024 px le menu est un tiroir (jsdom n'applique pas les media queries : on teste l'état). */
+  describe('menu tiroir (écrans étroits)', () => {
+    const bouton = () => screen.getByRole('button', { name: 'Ouvrir le menu' })
+    const menu = () => document.getElementById('menu-principal') as HTMLElement
+
+    it('est fermé au départ, et le bouton de l’en-tête l’ouvre', async () => {
+      renderLayout()
+      await screen.findByRole('button', { name: 'Ouvrir le menu' })
+
+      expect(bouton()).toHaveAttribute('aria-expanded', 'false')
+      expect(bouton()).toHaveAttribute('aria-controls', 'menu-principal')
+      expect(menu()).toHaveClass('-translate-x-full')
+
+      fireEvent.click(bouton())
+
+      expect(bouton()).toHaveAttribute('aria-expanded', 'true')
+      expect(menu()).toHaveClass('translate-x-0')
+      expect(menu()).not.toHaveClass('-translate-x-full')
+    })
+
+    it('se referme avec le bouton ✕, la touche Échap ou un clic sur le fond', async () => {
+      renderLayout()
+      await screen.findByRole('button', { name: 'Ouvrir le menu' })
+
+      fireEvent.click(bouton())
+      fireEvent.click(screen.getByRole('button', { name: 'Fermer le menu' }))
+      expect(bouton()).toHaveAttribute('aria-expanded', 'false')
+
+      fireEvent.click(bouton())
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(bouton()).toHaveAttribute('aria-expanded', 'false')
+
+      fireEvent.click(bouton())
+      // Le fond est le seul élément masqué aux lecteurs d'écran qui couvre la page.
+      const fond = document.querySelector('div.fixed.inset-0') as HTMLElement
+      fireEvent.click(fond)
+      expect(bouton()).toHaveAttribute('aria-expanded', 'false')
+      expect(document.querySelector('div.fixed.inset-0')).toBeNull()
+    })
+
+    it('se referme dès qu’on navigue vers une autre page', async () => {
+      renderLayout()
+      await screen.findByRole('button', { name: 'Ouvrir le menu' })
+
+      fireEvent.click(bouton())
+      fireEvent.click(await screen.findByRole('link', { name: /Campagnes/ }))
+
+      await screen.findByText('page campagnes')
+      expect(bouton()).toHaveAttribute('aria-expanded', 'false')
     })
   })
 })

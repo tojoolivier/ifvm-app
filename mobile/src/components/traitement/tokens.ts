@@ -10,32 +10,32 @@ import { scaleTypeSizes } from '@/lib/typography';
  * théorique de NativeWind.
  */
 export const traitementColors = {
-  vertPrincipal: '#235a36',
-  fondApp: '#faf7ef',
-  carte: '#fff',
-  bordure: '#e7e0cd',
-  infoFond: '#eaf2ec',
+  vertPrincipal: '#1f5b39',
+  fondApp: '#f5efe3',
+  carte: '#fffdf8',
+  bordure: '#d1c2a1',
+  infoFond: '#edf5ee',
 
-  texteTitre: '#16201a',
-  texteSecondaire: '#6f6a59',
-  texteLabel: '#9a9484',
-  texteNote: '#7a7259',
+  texteTitre: '#171d19',
+  texteSecondaire: '#2f4339',
+  texteLabel: '#4b5e51',
+  texteNote: '#5a4d3d',
 
-  avertissementFond: '#fdf6e7',
-  avertissementBordure: '#f0e2bf',
-  avertissementTexte: '#8a6d2f',
-  attente: '#e89b2b',
+  avertissementFond: '#fff8ea',
+  avertissementBordure: '#e7cc7c',
+  avertissementTexte: '#744d13',
+  attente: '#d48a1d',
 
-  erreurFond: '#fbe9e5',
-  erreurBordure: '#f0c4b9',
-  erreurTexte: '#a5341c',
-  danger: '#c0412b',
+  erreurFond: '#fdf0ed',
+  erreurBordure: '#e7a894',
+  erreurTexte: '#7b2d1d',
+  danger: '#b63a28',
 
-  chipInactive: '#efeada',
-  chipInactiveAlt: '#faf7ef',
-  segmentInactif: '#dcd5c2',
+  chipInactive: '#f1e7d6',
+  chipInactiveAlt: '#f7f1e8',
+  segmentInactif: '#d3c5a7',
 
-  dashedBordure: '#bdb6a2',
+  dashedBordure: '#9a8f76',
 } as const;
 
 export const traitementFonts = {

@@ -13,3 +13,4 @@ class Campagne:
     created_by: uuid.UUID = field(default_factory=uuid.uuid4)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    deleted_at: datetime | None = None

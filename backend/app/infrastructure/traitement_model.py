@@ -5,8 +5,10 @@ from sqlalchemy import (
     TIMESTAMP,
     Boolean,
     CheckConstraint,
+    Computed,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
@@ -71,6 +73,25 @@ class TraitementModel(Base):
     observations: Mapped[str | None] = mapped_column(Text(), nullable=True)
     statut: Mapped[str] = mapped_column(String(30), nullable=False, default="brouillon")
     statut_sync: Mapped[str] = mapped_column(String(30), nullable=False, default="local")
+    # Équipe (#607, ADR-018) : nullable en base, exigée côté TraitementCreate pour
+    # toute nouvelle fiche. Portée par la fiche de base (pas aerien/terrestre) :
+    # `type_traitement` détermine déjà le type d'équipe sans ambiguïté (contrairement
+    # à la prospection, où l'axe aérien est orthogonal à `type_prospection` via
+    # `mode_extensif`) — `equipe_type` est donc `GENERATED ALWAYS ... STORED` à partir
+    # de `type_traitement` seul, même patron que `_equipe_type_genere` de
+    # referentiel_model.py mais avec un mapping AERIEN/TERRESTRE -> aerien/terrestre
+    # au lieu d'une constante.
+    equipe_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    equipe_type: Mapped[str | None] = mapped_column(
+        Text(),
+        Computed(
+            "CASE WHEN equipe_id IS NULL THEN NULL "
+            "WHEN type_traitement = 'AERIEN' THEN 'aerien' "
+            "ELSE 'terrestre' END",
+            persisted=True,
+        ),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
     )
@@ -113,6 +134,13 @@ class TraitementModel(Base):
         # Nom de contrainte conservé pour continuité malgré l'inversion du sens : elle
         # porte toujours sur la relation date_traitement/date_validation.
         CheckConstraint("date_traitement >= date_validation", name="ck_traitement_date_validation"),
+        ForeignKeyConstraint(
+            ["equipe_id", "equipe_type"],
+            ["equipe.id", "equipe.type"],
+            name="fk_traitement_equipe_id",
+            ondelete="RESTRICT",
+        ),
+        Index("ix_traitement_equipe_id", "equipe_id"),
     )
 
 
@@ -181,6 +209,13 @@ class TraitementAerienModel(Base):
     # facultatif (vide = ravitaillement fait directement à une base) ; base
     # secondaire facultative.
     base_principale: Mapped[str] = mapped_column(String(255), nullable=False)
+    # FK référentiel `site_aerienne` (migration 0089, #605) : nullable en base
+    # (fiches existantes non rapprochées par le backfill, cf. docstring de la
+    # migration), exigée côté `TraitementAerienCreate` pour toute nouvelle
+    # fiche. `base_principale` (texte) n'est pas supprimée — hors périmètre.
+    site_principal_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("site_aerienne.id", ondelete="RESTRICT"), nullable=True
+    )
     stand: Mapped[str | None] = mapped_column(String(255), nullable=True)
     base_secondaire: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Date d'installation (migration 0056) — facultative, indépendante de
@@ -203,8 +238,11 @@ class TraitementAerienModel(Base):
     surface_traitee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     surface_protegee_ha: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     surface_restante_ha: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    pesticide_recu_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    pesticide_stock_restant_l: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # pesticide_recu_l/pesticide_stock_restant_l supprimées (migration 0094, #609) :
+    # le stock vit désormais dans `mouvement_pesticide` (#606), pas par fiche.
+    # Surface restante abandonnée ? (migration 0097) — mirroir de TraitementTerrestreModel.
+    surface_restante_abandonnee: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
+    motif_surface_restante_abandonnee: Mapped[str | None] = mapped_column(Text(), nullable=True)
     # Efficacité (migration 0058, fiche CRT papier section "Traitement") : une
     # seule évaluation par fiche (après l'ensemble des rotations), pas par
     # rotation individuelle — même patron que TraitementTerrestreModel ci-dessous.

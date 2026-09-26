@@ -13,6 +13,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import * as prospectionRepository from '@/lib/prospection-repository';
 import * as prospectionReview from '@/lib/prospection-review';
 import { formatHeureLocale } from '@/lib/prospection-fiche-lecture';
+import { routerMock } from '../test-utils/mock-expo-router';
 
 jest.mock('expo-router', () =>
   require('../test-utils/mock-expo-router').expoRouterMock({ params: { draftId: 'draft-123' } })
@@ -591,5 +592,34 @@ describe('ExtensiveRecapScreen — Remarques', () => {
     await render(<ExtensiveRecapScreen />);
 
     expect(await screen.findByText('Remarques : —')).toBeVisible();
+  });
+});
+
+/**
+ * #retour-apres-creation-fiche : après l'enregistrement, retour à la liste « Prospection » par
+ * `dismissTo` (pas `replace`, qui empilait une seconde instance du groupe `(app)` : deux « Retour »
+ * pour revenir à l'accueil — cf. navigation-fin-creation-fiche.test.tsx avec le vrai routeur).
+ */
+describe('ExtensiveRecapScreen — navigation après enregistrement', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ token: 'tok-1' });
+    jest.mocked(prospectionRepository.listAllProspectionPopulations).mockResolvedValue([]);
+    jest.mocked(prospectionRepository.alignerNumeroFicheSurNumeroMessage).mockReset();
+    routerMock.dismissTo.mockClear();
+    routerMock.replace.mockClear();
+  });
+
+  it('revient à la liste par dismissTo (avec justSaved), sans replace', async () => {
+    const draft = { ...DRAFT_BASE, type_prospection: 'extensive' };
+    jest.mocked(prospectionRepository.alignerNumeroFicheSurNumeroMessage).mockResolvedValueOnce(draft as any);
+    useProspectionWizardStore.setState({ draft, captures: [] });
+
+    await render(<ExtensiveRecapScreen />);
+    fireEvent.press(await screen.findByText('Enregistrer (hors-ligne) ✓'));
+
+    await waitFor(() =>
+      expect(routerMock.dismissTo).toHaveBeenCalledWith({ pathname: '/(app)/prospection', params: { justSaved: '1' } })
+    );
+    expect(routerMock.replace).not.toHaveBeenCalled();
   });
 });

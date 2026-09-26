@@ -39,6 +39,8 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { logger } from '@/lib/logger';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 380;
@@ -65,7 +67,8 @@ export default function SyncScreen() {
   const router = useRouter();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => scaleTypeSizes(BASE_TYPE_SIZES, scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   const token = useAuthStore((s) => s.token);
   const [data, setData] = useState<AccueilViewModel>(EMPTY_DATA);
   // Domaine « traitement » (#erreur-sync-fiche-introuvable) — absent de cet
@@ -111,7 +114,11 @@ export default function SyncScreen() {
   // `statut === 'en_attente'` : une fiche de traitement reste `'brouillon'`
   // jusqu'à son premier envoi réussi (cf. listUnsyncedTraitements), donc
   // l'exiger ici l'aurait rendue hors de portée de toute synchronisation.
-  const pendingTraitements = traitements.filter((item) => item.statut_sync !== 'synced');
+  // #traitement-brouillon-distinct-fiche-creee : un brouillon (parcours non terminé, jamais
+  // enregistré) n'est pas une fiche à synchroniser.
+  const pendingTraitements = traitements.filter(
+    (item) => item.statut_sync !== 'synced' && item.statut_sync !== 'brouillon'
+  );
   const syncedTraitements = traitements.filter((item) => item.statut_sync === 'synced');
 
   const stats = {
@@ -463,11 +470,11 @@ const BASE_TYPE_SIZES = {
   syncButtonText: isSmallScreen ? 14 : 15,
 };
 
-function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>) {
+function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TYPE_SIZES>>, theme: ThemePalette) {
   return StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: '#F3F4F6',
+      backgroundColor: theme.inputBg,
     },
     header: {
       backgroundColor: IFVM_GREEN_DARK,
@@ -520,7 +527,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     statsContainer: {
       flexDirection: 'row',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderRadius: 12,
       paddingVertical: 16,
       paddingHorizontal: 12,
@@ -538,11 +545,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     statNumber: {
       fontSize: typeSizes.statNumber,
       fontWeight: '700',
-      color: '#111827',
+      color: theme.text,
     },
     statLabel: {
       fontSize: typeSizes.statLabel,
-      color: '#6B7280',
+      color: theme.muted,
       marginTop: 2,
     },
     statDivider: {
@@ -553,7 +560,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderRadius: 12,
       padding: 16,
       marginBottom: 16,
@@ -565,7 +572,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     },
     progressLabel: {
       fontSize: typeSizes.progressLabel,
-      color: '#6B7280',
+      color: theme.muted,
       fontWeight: '500',
     },
     statusBanner: {
@@ -574,18 +581,18 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       marginBottom: 16,
     },
     statusSuccess: {
-      backgroundColor: '#DCFCE7',
+      backgroundColor: theme.successBg,
       borderWidth: 1,
-      borderColor: '#86EFAC',
+      borderColor: theme.successBorder,
     },
     statusError: {
-      backgroundColor: '#FEE2E2',
+      backgroundColor: theme.dangerBg,
       borderWidth: 1,
-      borderColor: '#FCA5A5',
+      borderColor: theme.dangerBorder,
     },
     /** Partiel ≠ échec : l'ambre dit « à finir », le rouge disait « c'est cassé ». */
     statusPartiel: {
-      backgroundColor: '#FEF3C7',
+      backgroundColor: theme.warnBg,
       borderWidth: 1,
       borderColor: '#FDE68A',
     },
@@ -593,7 +600,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       fontSize: typeSizes.statusBannerText,
       fontWeight: '600',
       textAlign: 'center',
-      color: '#111827',
+      color: theme.text,
     },
     // #lisibilite-terrain-sync : le motif exact du serveur (souvent une longue
     // phrase technique, cf. resumeLigne) doit rester lisible en plein soleil —
@@ -601,7 +608,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     // texte encore plus consulté (l'écran de synchronisation).
     resumeLigne: {
       fontSize: typeSizes.resumeLigne,
-      color: '#374151',
+      color: theme.muted,
       marginTop: 6,
       lineHeight: isSmallScreen ? 19 : 20,
     },
@@ -609,7 +616,7 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       marginBottom: 16,
       paddingVertical: 10,
       borderRadius: 8,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: '#D97706',
       alignItems: 'center',
@@ -617,16 +624,16 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     retryCibleText: {
       fontSize: typeSizes.retryCibleText,
       fontWeight: '700',
-      color: '#B45309',
+      color: theme.warn,
     },
     referentielEtat: {
       marginHorizontal: 16,
       marginTop: 12,
       padding: 12,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: '#e7e0cd',
+      borderColor: theme.inputBorder,
     },
     // #lisibilite-terrain-sync : même bascule que resumeLigne ci-dessus — ce
     // bloc (compteurs par table de référentiel) était le plus petit texte de
@@ -639,19 +646,19 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
       marginBottom: 6,
     },
     referentielEtatLigne: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-    referentielEtatTable: { fontSize: typeSizes.referentielEtatTable, color: '#6f6a59' },
-    referentielEtatNombre: { fontSize: typeSizes.referentielEtatNombre, fontWeight: '700', color: '#16201a' },
-    referentielEtatVide: { color: '#c0412b' },
+    referentielEtatTable: { fontSize: typeSizes.referentielEtatTable, color: theme.muted },
+    referentielEtatNombre: { fontSize: typeSizes.referentielEtatNombre, fontWeight: '700', color: theme.text },
+    referentielEtatVide: { color: theme.danger },
     lastSyncContainer: {
       marginBottom: 16,
       alignItems: 'center',
     },
     lastSyncText: {
       fontSize: typeSizes.lastSyncText,
-      color: '#9CA3AF',
+      color: theme.faint,
     },
     syncListContainer: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.card,
       borderRadius: 12,
       padding: 16,
       marginBottom: 20,
@@ -670,12 +677,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     syncListTitle: {
       fontSize: typeSizes.syncListTitle,
       fontWeight: '600',
-      color: '#111827',
+      color: theme.text,
     },
     syncListCount: {
       fontSize: typeSizes.syncListCount,
-      color: '#6B7280',
-      backgroundColor: '#F3F4F6',
+      color: theme.muted,
+      backgroundColor: theme.inputBg,
       paddingHorizontal: 10,
       paddingVertical: 3,
       borderRadius: 12,
@@ -714,11 +721,11 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     syncItemCode: {
       fontSize: typeSizes.syncItemCode,
       fontWeight: '600',
-      color: '#111827',
+      color: theme.text,
     },
     syncItemDate: {
       fontSize: typeSizes.syncItemDate,
-      color: '#9CA3AF',
+      color: theme.faint,
       marginTop: 1,
     },
     syncItemRight: {
@@ -743,12 +750,12 @@ function createStyles(typeSizes: ReturnType<typeof scaleTypeSizes<typeof BASE_TY
     emptyTitle: {
       fontSize: typeSizes.emptyTitle,
       fontWeight: '600',
-      color: '#111827',
+      color: theme.text,
       marginBottom: 4,
     },
     emptySub: {
       fontSize: typeSizes.emptySub,
-      color: '#9CA3AF',
+      color: theme.faint,
     },
     syncButton: {
       backgroundColor: IFVM_GREEN,

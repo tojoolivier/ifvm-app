@@ -356,12 +356,12 @@ export function ProspectionDetailPage() {
   }, [showPrintView])
 
   if (isLoading) {
-    return <div className="px-8 py-6 text-muted-foreground">Chargement…</div>
+    return <div className="px-4 py-4 sm:px-8 sm:py-6 text-muted-foreground">Chargement…</div>
   }
 
   if (isError || !prospection) {
     return (
-      <div className="px-8 py-6">
+      <div className="px-4 py-4 sm:px-8 sm:py-6">
         <p className="text-destructive">Fiche introuvable.</p>
         <Button variant="ghost" className="mt-2" onClick={() => navigate('/prospections')}>
           ← Retour à la liste
@@ -403,11 +403,11 @@ export function ProspectionDetailPage() {
 
   return (
     // Grille de la maquette : 1fr (fiche) / 316px (journal de validation + actions).
-    <div className="grid grid-cols-1 items-start gap-5 px-7 pb-10 pt-[26px] lg:grid-cols-[1fr_316px]">
+    <div className="grid grid-cols-1 items-start gap-5 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px] lg:grid-cols-[minmax(0,1fr)_316px]">
       <div className="flex min-w-0 flex-col gap-4">
         {/* En-tête vert de la maquette */}
-        <header className="flex items-center gap-5 rounded-[12px] bg-ifvm-green-text px-[22px] py-5 text-white">
-          <div className="min-w-0 flex-1">
+        <header className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-[12px] bg-ifvm-green-text px-4 py-4 text-white sm:px-[22px] sm:py-5">
+          <div className="min-w-0 basis-full sm:flex-1 sm:basis-0">
             <h1 className="truncate font-mono text-[17px] font-bold tracking-[.4px]">
               {prospection.n_fiche ?? TIRET}
             </h1>
@@ -691,7 +691,7 @@ function FicheImprimable({
         </p>
       </header>
 
-      <dl className="grid grid-cols-2 gap-4 mb-4 text-sm">
+      <dl className="grid grid-cols-1 gap-4 mb-4 text-sm sm:grid-cols-2">
         <Field label="Prospecteur" value={shortId(prospection.prospecteur_id)} />
         <Field label="Date de prospection" value={synthese.dateProspection} />
         <Field label="Point d'appui / station" value={stationLabel} />

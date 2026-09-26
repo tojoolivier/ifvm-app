@@ -24,6 +24,7 @@ from app.presentation.traitement_schemas import (
     RepartitionPopulation,
     RoleSignature,
     SignatureRead,
+    TraitementAerienRead,
     TraitementRead,
     TypeTraitement,
 )
@@ -381,6 +382,16 @@ def _section_pesticides(traitement: TraitementRead) -> str:
     # d'équivalent Aérien : `getattr` avec repli sur "L".
     unite_brute = getattr(fait, "pesticide_unite", "L") if fait else "L"
     unite = unite_brute.value if isinstance(unite_brute, Enum) else unite_brute
+    consomme = fait.total_pesticide_l if fait else None
+    # Aérien : « Approvisionnement » est saisi dans l'unité du produit (poudre en kg) —
+    # même règle que `TraitementAerien.recalculer_stock_pesticide`.
+    if (
+        isinstance(fait, TraitementAerienRead)
+        and fait.total_pesticide_l == 0
+        and fait.total_pesticide_kg > 0
+    ):
+        unite = "kg"
+        consomme = fait.total_pesticide_kg
     return (
         '<h2 class="section">5. Pesticides</h2>'
         + _ligne(
@@ -389,11 +400,22 @@ def _section_pesticides(traitement: TraitementRead) -> str:
         )
         + _ligne(
             ("5.3 Stock initial", getattr(fait, "stock_initial_l", None) if fait else None),
-            (f"5.4 Approvisionnement ({unite})", fait.pesticide_recu_l if fait else None),
+            # pesticide_recu_l/pesticide_stock_restant_l : Terrestre uniquement
+            # depuis #609 — le stock Aérien vit dans `mouvement_pesticide`, hors
+            # périmètre de ce PDF (écrans de consultation du stock, hors scope
+            # #609). Même repli `getattr` que pesticide_unite/stock_initial_l
+            # ci-dessus pour l'Aérien.
+            (
+                f"5.4 Approvisionnement ({unite})",
+                getattr(fait, "pesticide_recu_l", None) if fait else None,
+            ),
         )
         + _ligne(
-            (f"5.5 Produit consommé ({unite})", fait.total_pesticide_l if fait else None),
-            (f"5.6 Stock final ({unite})", fait.pesticide_stock_restant_l if fait else None),
+            (f"5.5 Produit consommé ({unite})", consomme),
+            (
+                f"5.6 Stock final ({unite})",
+                getattr(fait, "pesticide_stock_restant_l", None) if fait else None,
+            ),
         )
     )
 

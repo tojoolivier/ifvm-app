@@ -19,7 +19,7 @@ export interface NavTabItem {
 
 export function NavTabs({ items, ariaLabel }: { items: NavTabItem[]; ariaLabel: string }) {
   return (
-    <nav aria-label={ariaLabel} className="flex items-center gap-2">
+    <nav aria-label={ariaLabel} className="flex flex-wrap items-center gap-2">
       {items.map((item) => (
         <Link
           key={item.to}

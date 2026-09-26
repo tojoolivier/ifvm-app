@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/lib/auth-store';
 import { apiClient, ProspectionRead } from '@/lib/api-client';
-import { buildFicheLecture, FicheLectureViewModel, isFicheValidee } from '@/lib/prospection-fiche-lecture';
+import { buildFicheLecture, FicheLectureViewModel } from '@/lib/prospection-fiche-lecture';
 import { telechargerEtPartagerPdf } from '@/lib/pdf-partage';
 import { depsPdfPartage } from '@/lib/pdf-partage-natif';
 import { useAsyncAction } from '@/hooks/use-async-action';
@@ -12,6 +12,8 @@ import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const IFVM_GREEN = '#1B5E1B';
 const IFVM_GREEN_DARK = '#163F16';
@@ -31,7 +33,8 @@ export default function FicheLectureScreen() {
   const { run, isRunning: isExporting } = useAsyncAction();
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const charger = useCallback(() => {
     if (!id || !token) return;
@@ -77,10 +80,8 @@ export default function FicheLectureScreen() {
     );
   }
 
-  if (!isFicheValidee(prospection)) {
-    return <View style={styles.root} />;
-  }
-
+  // Lecture seule de toute fiche du serveur, pas seulement des validées : « Mes fiches » ouvre cet
+  // écran pour une fiche « En attente » ou « Vérifiée », qui restait sinon un écran blanc sans erreur.
   const recap: FicheLectureViewModel = buildFicheLecture(prospection);
   const prospecteurLabel = user ? `${user.prenom} ${user.nom}` : '—';
 
@@ -152,7 +153,8 @@ export default function FicheLectureScreen() {
 function Row({ label, value }: { label: string; value: string }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -178,26 +180,26 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F3F4F6' },
+  root: { flex: 1, backgroundColor: theme.inputBg },
   header: { backgroundColor: IFVM_GREEN_DARK, paddingHorizontal: 16, paddingBottom: 14 },
   backLink: { color: '#FFFFFFCC', fontSize: typeSizes.backLink, marginBottom: 6 },
   headerTitle: { color: '#FFFFFF', fontSize: typeSizes.headerTitle, fontWeight: '700' },
-  badge: { backgroundColor: '#DCFCE7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 6 },
-  badgeText: { color: '#15803d', fontSize: typeSizes.badgeText, fontWeight: '700' },
+  badge: { backgroundColor: theme.successBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 6 },
+  badgeText: { color: theme.success, fontSize: typeSizes.badgeText, fontWeight: '700' },
   content: { flex: 1 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, marginBottom: 12 },
-  cardLabel: { fontSize: typeSizes.cardLabel, fontWeight: '700', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' },
+  card: { backgroundColor: theme.card, borderRadius: 10, padding: 14, marginBottom: 12 },
+  cardLabel: { fontSize: typeSizes.cardLabel, fontWeight: '700', color: theme.muted, marginBottom: 8, textTransform: 'uppercase' },
   especeBlock: { marginBottom: 10 },
-  especeTitle: { fontSize: typeSizes.especeTitle, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  especeTitle: { fontSize: typeSizes.especeTitle, fontWeight: '700', color: theme.text, marginBottom: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   // #lisibilite-terrain : libellés/valeurs agrandis (densité incluse) pour rester
   // lisibles sur le terrain par tous les prospecteurs.
   rowLabel: { color: '#4B5563', fontSize: typeSizes.rowLabel, fontWeight: '600' },
-  rowValue: { color: '#111827', fontSize: typeSizes.rowValue, fontWeight: '700' },
-  summaryText: { color: '#111827', fontSize: typeSizes.summaryText, lineHeight: 19 },
-  errorText: { color: '#dc2626', fontSize: typeSizes.errorText, marginBottom: 8, textAlign: 'center' },
+  rowValue: { color: theme.text, fontSize: typeSizes.rowValue, fontWeight: '700' },
+  summaryText: { color: theme.text, fontSize: typeSizes.summaryText, lineHeight: 19 },
+  errorText: { color: theme.danger, fontSize: typeSizes.errorText, marginBottom: 8, textAlign: 'center' },
   btnExport: { backgroundColor: IFVM_GREEN, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   btnDisabled: { opacity: 0.6 },
   btnExportText: { color: '#FFFFFF', fontSize: typeSizes.btnExportText, fontWeight: '600' },

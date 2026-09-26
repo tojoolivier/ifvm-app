@@ -148,7 +148,7 @@ export function NouvelleProspectionPage() {
 
   return (
     // Grille de la maquette : 1fr (formulaire) / 320px (encarts de contexte).
-    <div className="grid grid-cols-1 items-start gap-5 px-7 pb-10 pt-[26px] lg:grid-cols-[1fr_320px]">
+    <div className="grid grid-cols-1 items-start gap-5 px-4 pb-10 pt-4 sm:px-7 sm:pt-[26px] lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-4">
         <p className="rounded-[10px] border border-ifvm-amber-border bg-ifvm-amber-bg px-4 py-[13px] font-sans text-[12px] font-medium leading-[1.55] text-ifvm-amber-text">
           La saisie terrain complète (captures, végétation, GPS) se fait sur mobile hors-ligne.

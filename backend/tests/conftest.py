@@ -299,29 +299,32 @@ async def lieu_aerien(db_session: AsyncSession):
     return lieu
 
 
-@pytest_asyncio.fixture
-async def equipe_aerienne(db_session: AsyncSession, chef_de_base: Utilisateur):
-    from app.infrastructure.referentiel_model import EquipeAerienneModel
+async def _creer_equipe(db_session: AsyncSession, nom: str, type_equipe: str, chef: Utilisateur):
+    """Équipe + son chef, en une fois (ADR-018 : le chef est une ligne de
+    `equipe_membre`, plus une colonne de l'équipe)."""
+    from app.infrastructure.referentiel_model import EquipeMembreModel, EquipeModel
 
-    equipe = EquipeAerienneModel(
-        id=uuid.uuid4(),
-        nom="Équipe Ihosy",
-        chef_de_base_id=chef_de_base.id,
-        actif=True,
-    )
+    equipe = EquipeModel(id=uuid.uuid4(), nom=nom, type=type_equipe, actif=True)
+    equipe.membres = [EquipeMembreModel(user_id=chef.id, fonction="chef")]
     db_session.add(equipe)
     await db_session.commit()
     await db_session.refresh(equipe)
+    # Chargé explicitement : les fixtures synchrones qui lisent `equipe.membres` ne
+    # peuvent pas déclencher un lazy load (pas de greenlet asyncio).
+    await db_session.refresh(equipe, attribute_names=["membres"])
     return equipe
+
+
+@pytest_asyncio.fixture
+async def equipe_aerienne(db_session: AsyncSession, chef_de_base: Utilisateur):
+    return await _creer_equipe(db_session, "Équipe Ihosy", "aerien", chef_de_base)
 
 
 @pytest_asyncio.fixture
 async def equipe_aerienne_bis(db_session: AsyncSession):
     """Deuxième équipe, chef distinct — pour les tests qui ont besoin d'une équipe
-    encore libre (`base_aerienne.equipe_id` UNIQUE) sans réutiliser celle de la
+    encore libre (`site_aerienne.equipe_id` UNIQUE) sans réutiliser celle de la
     fixture `base_aerienne`."""
-    from app.infrastructure.referentiel_model import EquipeAerienneModel
-
     chef = Utilisateur(
         id=uuid.uuid4(),
         nom="Rasolo",
@@ -333,33 +336,24 @@ async def equipe_aerienne_bis(db_session: AsyncSession):
     )
     db_session.add(chef)
     await db_session.commit()
-
-    equipe = EquipeAerienneModel(
-        id=uuid.uuid4(),
-        nom="Équipe Betroka",
-        chef_de_base_id=chef.id,
-        actif=True,
-    )
-    db_session.add(equipe)
-    await db_session.commit()
-    await db_session.refresh(equipe)
-    return equipe
+    return await _creer_equipe(db_session, "Équipe Betroka", "aerien", chef)
 
 
 @pytest_asyncio.fixture
 async def base_aerienne(db_session: AsyncSession, equipe_aerienne):
-    from app.infrastructure.referentiel_model import BaseAerienneModel
+    """Site aérien principal (migration 0088, #604 — fusion de `base_aerienne` et
+    `stand_remplissage` en `site_aerienne`). Le nom de la fixture est conservé : elle
+    reste sémantiquement une base principale, seules les coordonnées GPS ont bougé vers
+    `site_aerienne_position` (installées via l'API par les tests qui en ont besoin)."""
+    from app.infrastructure.referentiel_model import SiteAerienneModel
 
     # #equipe-aerienne (migration 0066) : une base principale doit avoir une
-    # équipe (`ck_base_aerienne_equipe_coherente`).
-    base = BaseAerienneModel(
+    # équipe (`ck_site_aerienne_equipe_coherente`).
+    base = SiteAerienneModel(
         id=uuid.uuid4(),
         equipe_id=equipe_aerienne.id,
         numero="IHO01",
         localite="Ihosy",
-        latitude=-22.4021,
-        longitude=46.1250,
-        altitude=764.0,
         actif=True,
     )
     db_session.add(base)
@@ -369,22 +363,22 @@ async def base_aerienne(db_session: AsyncSession, equipe_aerienne):
 
 
 @pytest_asyncio.fixture
-async def stand_remplissage(db_session: AsyncSession):
-    from app.infrastructure.referentiel_model import StandRemplissageModel
+async def autre_base_aerienne(db_session: AsyncSession, equipe_aerienne_bis):
+    """Second site aérien principal, équipe distincte (`site_aerienne.equipe_id`
+    UNIQUE) — pour les tests de transfert entre deux sites (#606)."""
+    from app.infrastructure.referentiel_model import SiteAerienneModel
 
-    stand = StandRemplissageModel(
+    base = SiteAerienneModel(
         id=uuid.uuid4(),
-        numero="STD01",
-        localite="Stand Sud",
-        latitude=-22.4100,
-        longitude=46.1300,
-        altitude=770.0,
+        equipe_id=equipe_aerienne_bis.id,
+        numero="BTK01",
+        localite="Betroka",
         actif=True,
     )
-    db_session.add(stand)
+    db_session.add(base)
     await db_session.commit()
-    await db_session.refresh(stand)
-    return stand
+    await db_session.refresh(base)
+    return base
 
 
 @pytest_asyncio.fixture
@@ -406,18 +400,20 @@ async def chef_equipe(db_session: AsyncSession) -> Utilisateur:
 
 @pytest_asyncio.fixture
 async def equipe_terrestre(db_session: AsyncSession, chef_equipe: Utilisateur):
-    from app.infrastructure.referentiel_model import EquipeTerrestreModel
+    return await _creer_equipe(db_session, "Équipe Terrestre Ihosy", "terrestre", chef_equipe)
 
-    equipe = EquipeTerrestreModel(
-        id=uuid.uuid4(),
-        nom="Équipe Terrestre Ihosy",
-        chef_equipe_id=chef_equipe.id,
-        actif=True,
-    )
-    db_session.add(equipe)
-    await db_session.commit()
-    await db_session.refresh(equipe)
-    return equipe
+
+@pytest_asyncio.fixture
+async def equipe_terrestre_id(equipe_terrestre) -> uuid.UUID:
+    """#607 : payload le plus courant (`prospection`/`traitement` terrestre ne
+    veulent qu'un id, pas l'objet équipe complet) — même patron que `station_id`."""
+    return equipe_terrestre.id
+
+
+@pytest_asyncio.fixture
+async def equipe_aerienne_id(equipe_aerienne) -> uuid.UUID:
+    """#607, pendant aérien de `equipe_terrestre_id`."""
+    return equipe_aerienne.id
 
 
 @pytest_asyncio.fixture

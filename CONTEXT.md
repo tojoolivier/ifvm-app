@@ -34,29 +34,62 @@ Agriculteur → Signalement → Prospection de Validation
 - **Prospection de validation** : type de prospection déclenchée par un **signalement d'agriculteur ou non-specialiste**. Vérification sur le terrain si le signalement est réel. Station `ponctuelle`.
 - **Validation de fiche** : workflow en 3 étapes (voir ci-dessous). À ne pas confondre avec "prospection de validation".
 - **Fiche de vol : fonctionnalité supprimée** (migration 0080, `docs/adr/ADR-017`). Les tables
-  `fiche_vol`, `vol`, `fiche_vol_signature` et `campagne_fiche_vol_compteur` n'existent plus ; la
+  `fiche_vol`, `fiche_vol_signature` et `campagne_fiche_vol_compteur` n'existent plus ; la
   page web « Heures de vol » est une page d'attente. Une **rotation** (`traitement_rotation`, côté
   CRT) reste le cycle d'épandage d'**une cuve**. Le cadrage historique est dans
   `docs/adr/ADR-011` (parties fiche de vol abandonnées ; le relevé météo n'est pas concerné).
+  Une **entité `vol`** (ligne d'activité aérienne : `type ∈ {mise_en_place, application,
+  convoyage, prospection, divers}`, `equipe_id`/`aeronef_id` obligatoires, trois FK
+  indépendantes vers `site_aerienne` — `site_principal_id`, `stand_id`, `base_secondaire_id`)
+  a été **réintroduite** par `docs/adr/ADR-018` (migration 0092, #608) — **révocation partielle**
+  d'ADR-017, pas l'ancienne fiche de vol : ni signatures, ni cumuls d'heures, ni `rotation_id`,
+  ni lien vers `traitement_aerien`/`prospection` (ticket séparé, bloqué par #608). Site principal
+  et stand obligatoires pour `mise_en_place`/`application` (§6 du document de cadrage, CHECK
+  SQL) ; motif obligatoire pour `convoyage`/`divers`, lieux de départ/arrivée pour `convoyage`
+  (CHECK SQL). L'aéronef affecté à l'équipe à la date du vol, et le rattachement hiérarchique
+  stand/base secondaire → site principal, sont validés côté application (422), pas en SQL.
 
 - **Base aérienne** vs **stand de remplissage**. Deux lieux distincts d'une équipe aérienne,
   chacun relevé en position (lat/lon/alt captées automatiquement, hors ligne) et nommé à la main.
   Ni l'un ni l'autre n'est un **poste acridien** ou une **station fixe**.
 
-- **Équipe aérienne** et **aéronef** (migrations 0066, 0072, 0075). Une équipe aérienne = un
-  chef de base (seul compte utilisateur de l'équipe) + un pilote, un mécanicien (noms libres),
-  un consultant international facultatif, des autres membres en nombre variable, et **un
-  aéronef** (hélicoptère : immatriculation, société, volume de cuve — table `aeronef`,
-  relation 1:1, `immatriculation` en est la clé candidate). Une équipe possède sa base
-  principale (`base_aerienne.equipe_id`), ses bases secondaires (héritées de la principale) et
-  ses stands (`stand_remplissage.equipe_aerienne_id`). **Seul le chef de base de l'équipe (ou
-  un admin) crée ses lieux**, rattachés d'office à SON équipe (contrôle serveur, 403 sinon).
-  Le référentiel de lieux d'une équipe reste `base_aerienne`/`stand_remplissage` (décision 0064),
-  distinct de `lieu_aerien` (prospection/traitement).
+- **Équipe** (table unique `equipe`, migration 0086 — ADR-018 §2). Une équipe est
+  `terrestre` ou `aerien` (`type`, non modifiable après création), et ses intervenants sont des
+  lignes de `equipe_membre(equipe_id, user_id, fonction)` — il n'y a plus de rôle nommé en dur.
+  `fonction` reprend le vocabulaire de `ROLES`, plus `chef` : une équipe a **un seul chef**, un
+  chef ne dirige **qu'une équipe** (deux index partiels `WHERE fonction = 'chef'`). Une équipe
+  aérienne dispose de **2 à 3 aéronefs affectés successivement** (hélicoptère :
+  immatriculation, société, volume de cuve — table `aeronef`, `immatriculation` en est la clé
+  candidate ; le parc se peuple indépendamment des équipes, `POST /aeronefs`, admin). Les
+  affectations sont **bornées dans le temps** — `equipe_aeronef(equipe_id, aeronef_id,
+  date_debut, date_fin)`, migration 0087, ADR-018 §2 : `date_fin IS NULL` désigne l'appareil
+  **en service**, que `EquipeRead.aeronef` projette (`null` entre deux appareils), et
+  l'historique complet se lit par `GET /equipes/{id}/aeronefs`. « Un aéronef sur une seule
+  équipe à la fois » est une règle de **chevauchement d'intervalles**, pas un `UNIQUE` :
+  validée côté application (422) — `EXCLUDE USING gist` reste hors scope, les deux index
+  partiels `WHERE date_fin IS NULL` ne rattrapent que les courses. Elle possède sa base
+  principale (`base_aerienne.equipe_id`, UNIQUE), ses bases secondaires (héritées de la
+  principale) et ses stands (`stand_remplissage.equipe_aerienne_id`) ; une équipe terrestre est
+  rattachée à un ou plusieurs postes (`poste_acridien.equipe_terrestre_id`, sans UNIQUE : équipe
+  mobile). Toutes ces FK sont **composites et type-sûres** — `(equipe_id, equipe_type) →
+  equipe(id, type)`, la colonne `equipe_type` étant générée : un lieu aérien ne peut pas pointer
+  vers une équipe terrestre. **Seul le chef de base de l'équipe (ou un admin) crée ses lieux**,
+  rattachés d'office à SON équipe (contrôle serveur, 403 sinon). Le référentiel de lieux d'une
+  équipe reste `base_aerienne`/`stand_remplissage` (décision 0064), distinct de `lieu_aerien`
+  (prospection/traitement).
+  ⚠️ La suite de la remodélisation reste **cadrée mais pas implémentée**
+  (`docs/adr/ADR-018`, épic #592) :
+  `base_aerienne` + `stand_remplissage` → `site_aerienne` (principale / secondaire / stand
+  distinguées par `parent_base_id`), positions historisées, stock de pesticides centralisé.
 
-- **Pilote** et **mécanicien** sont **externes à l'IFVM** (compagnie aérienne ou Armée malgache) :
-  ce sont des noms, pas des comptes `utilisateur`. Seul le **chef de base** est un agent IFVM. Le
-  **consultant international** signe lorsqu'il intervient.
+- **Pilote**, **mécanicien** et **consultant international** sont **externes à l'IFVM**
+  (compagnie aérienne ou Armée malgache) : ils n'ont pas d'accès applicatif, mais depuis la
+  migration 0086 ils ont bien une identité — un compte créé « à la volée »
+  (`peut_se_connecter = false`), comme membre de l'équipe, plutôt qu'un nom en texte libre.
+  Seul le **chef de base** est un agent IFVM authentifiable. Le **consultant international**
+  signe lorsqu'il intervient.
+  `utilisateur.chef_de_base_id` / `chef_equipe_id` sont conservés en l'état : redondance
+  assumée avec `equipe_membre(fonction='chef')`, dette explicite, sans synchronisation.
 
 - **Relevé** vs **fiche papier** : l'unité d'enregistrement en base est le **relevé** (un point, une ligne `prospection`). La feuille papier de l'extensive juxtapose **2** relevés par commodité d'impression ; en base ils deviennent **2 lignes distinctes** (regroupables via `n_fiche`).
 
@@ -217,7 +250,8 @@ prospection → station (fixe pour intensive, ponctuelle pour extensive/validati
   └── prospection_infestation (taches, bandes, vols, essaims)                             [queryable]
 
 audit_log
-  ├── fiche_type (intensive | extensive | validation | traitement | vol | meteo)  — `vol` : valeur morte depuis 0080
+  ├── fiche_type (intensive | extensive | validation | traitement | vol | meteo)  — `vol` : valeur
+  │              morte pour l'audit_log (la nouvelle entité `vol`, #608, n'y écrit pas encore)
   ├── fiche_id
   ├── auteur_id → utilisateur
   ├── action (creation | modification | soumission | verification | validation | rejet | commentaire)
@@ -243,7 +277,17 @@ traitement (ex-CRT — le sigle CRT désigne le compte-rendu affiché à l'utili
   └── traitement_signature (1-N selon rôle : PILOTE | MECANICIEN | CHEF_DE_BASE |
                              CHEF_EQUIPE | CONSULTANT_INTERNATIONAL)
 
-(fiche_vol, vol, fiche_vol_signature : supprimées en 0080 — voir docs/adr/ADR-017)
+(fiche_vol, fiche_vol_signature, campagne_fiche_vol_compteur : supprimées en 0080 —
+ docs/adr/ADR-017 ; restent supprimées, ADR-018 ne les réintroduit pas)
+
+vol (ligne d'activité aérienne, migration 0092, #608 — réintroduite, révocation
+     partielle d'ADR-017 par docs/adr/ADR-018 ; PAS l'ancienne `vol`)
+  ├── type: mise_en_place | application | convoyage | prospection | divers
+  ├── → equipe (obligatoire, equipe_type='aerien' forcé par FK composite)
+  ├── → aeronef (obligatoire ; doit être affecté à l'équipe à date_vol, côté application)
+  └── → site_aerienne × 3, indépendantes : site_principal_id, stand_id, base_secondaire_id
+      (site_principal_id + stand_id obligatoires pour mise_en_place/application, CHECK SQL ;
+       stand_id/base_secondaire_id doivent être rattachés à site_principal_id, côté application)
 ```
 
 > **Domaine `espece` : `cible` vs `prospection`.** `prospection.espece` et

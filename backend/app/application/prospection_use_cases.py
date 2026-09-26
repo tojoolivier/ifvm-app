@@ -12,7 +12,45 @@ from app.domain.prospection import (
     StadeInconnuError,
     valider_surfaces_prospection,
 )
-from app.domain.repositories import AuditLogRepository, ProspectionRepository
+from app.domain.repositories import (
+    AuditLogRepository,
+    EquipeRepository,
+    ProspectionRepository,
+    VolRepository,
+)
+
+
+def _type_equipe_attendu(type_prospection: str, mode_extensif: str | None) -> str:
+    """Type d'équipe imposé par la fiche (#607) — même règle que le CASE de
+    `ProspectionModel.equipe_type` (colonne générée), dupliquée ici pour échouer
+    explicitement (ValueError -> 422) avant l'écriture plutôt que de laisser
+    remonter une violation de FK composite anonyme."""
+    if type_prospection in ("intensive", "validation"):
+        return "terrestre"
+    return "aerien" if mode_extensif == "aerien" else "terrestre"
+
+
+async def _valider_equipe(
+    equipe_repository: EquipeRepository, equipe_id: uuid.UUID, type_attendu: str
+) -> None:
+    equipe = await equipe_repository.get_by_id(equipe_id)
+    if equipe is None:
+        raise ValueError(f"equipe_id {equipe_id} ne référence aucune équipe du référentiel")
+    if equipe.type != type_attendu:
+        raise ValueError(
+            f"equipe_id {equipe_id} référence une équipe '{equipe.type}', "
+            f"attendu '{type_attendu}' pour cette fiche"
+        )
+
+
+async def _valider_vol(vol_repository: VolRepository, vol_id: uuid.UUID) -> None:
+    """`vol_id` doit référencer un vol de type `prospection` (#610) — cohérence de
+    type inter-tables, hors CHECK SQL, même patron que `_valider_equipe`."""
+    vol = await vol_repository.get_by_id(vol_id)
+    if vol is None:
+        raise ValueError(f"vol_id {vol_id} ne référence aucun vol")
+    if vol.type != "prospection":
+        raise ValueError(f"vol_id {vol_id} référence un vol '{vol.type}', attendu 'prospection'")
 
 
 async def _verifier_stades(
@@ -39,23 +77,36 @@ def _calculer_duree_minutes(debut_heure: str, fin_heure: str) -> int:
     return fin - debut
 
 
+class ProspectionIdentifiantPrisError(ValueError):
+    """L'identifiant fourni par le client désigne déjà la fiche d'un autre agent."""
+
+
 class CreateProspection:
     def __init__(
         self,
         repository: ProspectionRepository,
+        equipe_repository: EquipeRepository,
         audit_repo: AuditLogRepository | None = None,
+        vol_repository: VolRepository | None = None,
     ):
         self.repository = repository
+        self.equipe_repository = equipe_repository
         # Optionnel, rétrocompatible : seule la route l'a toujours fourni en
         # pratique. `None` reste accepté pour ne pas casser un appelant qui ne
         # se soucierait pas des notifications (ex. import de masse).
         self.audit_repo = audit_repo
+        # Optionnel, rétrocompatible (#610) : `None` accepté pour ne pas casser
+        # un appelant qui ne rattache jamais de vol — `vol_id` reste alors
+        # simplement non vérifiable côté application (la FK protège quand même
+        # en base contre une valeur inexistante).
+        self.vol_repository = vol_repository
 
     async def execute(
         self,
         type_prospection: str,
         campagne_id: uuid.UUID,
         prospecteur_id: uuid.UUID,
+        equipe_id: uuid.UUID,
         date_prospection: date,
         station_id: uuid.UUID | None = None,
         n_fiche: str | None = None,
@@ -145,12 +196,36 @@ class CreateProspection:
         # prospection.py) — jamais décidé côté serveur, toujours transmis
         # explicitement par le client.
         revalide_de_id: uuid.UUID | None = None,
+        vol_id: uuid.UUID | None = None,
+        # Identifiant choisi par le client (#678) : la fiche naît sur l'appareil avant d'exister
+        # ici, et son id local doit rester SON id. Sans lui, l'appareil et le serveur ne se
+        # reconnaissent plus (doublon dans « Mes fiches », statut local figé) et un envoi refait
+        # après une réponse perdue crée une seconde fiche. Rejouer le même id renvoie la fiche
+        # déjà créée, sans rien modifier.
+        prospection_id: uuid.UUID | None = None,
     ) -> Prospection:
+        if prospection_id is not None:
+            existante = await self.repository.get_by_id(prospection_id)
+            if existante is not None:
+                if existante.prospecteur_id != prospecteur_id:
+                    raise ProspectionIdentifiantPrisError(
+                        "Cet identifiant de fiche appartient déjà à un autre agent"
+                    )
+                return existante
+
         if type_prospection == "intensive" and station_id is None:
             raise ValueError("station_id est obligatoire pour une prospection intensive")
 
+        await _valider_equipe(
+            self.equipe_repository,
+            equipe_id,
+            _type_equipe_attendu(type_prospection, mode_extensif),
+        )
+        if vol_id is not None and self.vol_repository is not None:
+            await _valider_vol(self.vol_repository, vol_id)
+
         await _verifier_stades(self.repository, captures)
-        valider_surfaces_prospection(surface_prospectee, surface_infestee)
+        valider_surfaces_prospection(surface_prospectee, surface_infestee, surface_station)
 
         now = datetime.utcnow()
         # Une fiche de validation / signalisation NEUVE (jamais une
@@ -184,6 +259,7 @@ class CreateProspection:
             n_fiche = n_message
 
         prospection = Prospection(
+            **({} if prospection_id is None else {"id": prospection_id}),
             type_prospection=type_prospection,
             campagne_id=campagne_id,
             prospecteur_id=prospecteur_id,
@@ -210,6 +286,8 @@ class CreateProspection:
             statut=statut,
             validated_at=validated_at,
             revalide_de_id=revalide_de_id,
+            equipe_id=equipe_id,
+            vol_id=vol_id,
             created_at=now,
             updated_at=now,
             populations=populations or [],
@@ -324,6 +402,8 @@ class ListProspections:
         campagne_id: uuid.UUID | None = None,
         station_id: uuid.UUID | None = None,
         prospecteur_id: uuid.UUID | None = None,
+        equipe_id: uuid.UUID | None = None,
+        vol_id: uuid.UUID | None = None,
         disponible_pour_traitement: bool = False,
         a_revalider: bool = False,
     ) -> list[Prospection]:
@@ -333,6 +413,8 @@ class ListProspections:
             campagne_id=campagne_id,
             station_id=station_id,
             prospecteur_id=prospecteur_id,
+            equipe_id=equipe_id,
+            vol_id=vol_id,
             disponible_pour_traitement=disponible_pour_traitement,
             a_revalider=a_revalider,
         )
@@ -363,8 +445,11 @@ class GenererProspectionPdf:
 
 
 class UpdateProspection:
-    def __init__(self, repository: ProspectionRepository):
+    def __init__(
+        self, repository: ProspectionRepository, vol_repository: VolRepository | None = None
+    ):
         self.repository = repository
+        self.vol_repository = vol_repository
 
     async def execute(
         self,
@@ -449,6 +534,7 @@ class UpdateProspection:
         signature_chef_base_nom: str | None = None,
         signature_chef_base_horodatage: datetime | None = None,
         signature_chef_base_image: str | None = None,
+        vol_id: uuid.UUID | None = None,
     ) -> Prospection | None:
         prospection = await self.repository.get_by_id(prospection_id)
         if prospection is None:
@@ -456,6 +542,9 @@ class UpdateProspection:
 
         if prospection.statut != "brouillon":
             raise PermissionError("Seules les fiches en brouillon peuvent être modifiées")
+
+        if vol_id is not None and self.vol_repository is not None:
+            await _valider_vol(self.vol_repository, vol_id)
 
         if station_id is not None:
             prospection.station_id = station_id
@@ -499,6 +588,8 @@ class UpdateProspection:
             prospection.observations = observations
         if statut is not None:
             prospection.statut = statut
+        if vol_id is not None:
+            prospection.vol_id = vol_id
 
         # ==========================================
         # Mise à jour des nouveaux champs - Références (A)
@@ -608,7 +699,11 @@ class UpdateProspection:
         if signature_chef_base_image is not None:
             prospection.signature_chef_base_image = signature_chef_base_image
 
-        valider_surfaces_prospection(prospection.surface_prospectee, prospection.surface_infestee)
+        valider_surfaces_prospection(
+            prospection.surface_prospectee,
+            prospection.surface_infestee,
+            prospection.surface_station,
+        )
         prospection.updated_at = datetime.utcnow()
 
         return await self.repository.update(prospection)

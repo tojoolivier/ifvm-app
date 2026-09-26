@@ -111,13 +111,18 @@ async def test_get_station_inexistante_retourne_404(client: AsyncClient, auth_he
 
 @pytest.mark.asyncio
 async def test_create_prospection_intensive_avec_station_valide(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, station_id: uuid.UUID
+    client: AsyncClient,
+    auth_headers: dict,
+    campagne_id: uuid.UUID,
+    station_id: uuid.UUID,
+    equipe_terrestre_id: uuid.UUID,
 ):
     response = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
+            "equipe_id": str(equipe_terrestre_id),
             "station_id": str(station_id),
             "date_prospection": "2026-06-25",
             "biotope": ["xerophyle"],
@@ -131,13 +136,14 @@ async def test_create_prospection_intensive_avec_station_valide(
 
 @pytest.mark.asyncio
 async def test_create_prospection_intensive_avec_station_invalide_echoue(
-    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID
+    client: AsyncClient, auth_headers: dict, campagne_id: uuid.UUID, equipe_terrestre_id: uuid.UUID
 ):
     response = await client.post(
         "/prospections",
         json={
             "type_prospection": "intensive",
             "campagne_id": str(campagne_id),
+            "equipe_id": str(equipe_terrestre_id),
             "station_id": str(uuid.uuid4()),
             "date_prospection": "2026-06-25",
             "biotope": ["xerophyle"],

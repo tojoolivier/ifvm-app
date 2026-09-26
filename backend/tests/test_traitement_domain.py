@@ -32,6 +32,7 @@ from app.domain.traitement import (
     Rotation,
     RotationIntrouvableError,
     SignaturesManquantesError,
+    SitePrincipalIntrouvableError,
     Traitement,
     TraitementAerien,
     TraitementIntrouvableError,
@@ -437,10 +438,45 @@ class FakeUtilisateurRepo:
         return self.user
 
 
+class FakeSiteAerienneRepo:
+    def __init__(self, site=None):
+        self.site = site
+
+    async def get_by_id(self, site_id):
+        return self.site
+
+
+class _FakeEquipe:
+    def __init__(self, type_equipe: str):
+        self.type = type_equipe
+
+
+class FakeEquipeRepo:
+    """#607 : renvoie une équipe du type demandé par le test pour n'importe quel
+    id — `_valider_equipe` ne compare que `equipe.type`, jamais l'identité."""
+
+    def __init__(self, type_equipe: str | None = "aerien"):
+        self.type_equipe = type_equipe
+
+    async def get_by_id(self, equipe_id):
+        if self.type_equipe is None:
+            return None
+        return _FakeEquipe(self.type_equipe)
+
+
+_CHEF = UtilisateurRef(id=uuid.uuid4(), prenom="Hery", role="chef_de_base")
+_SITE_PRINCIPAL_ID = uuid.uuid4()
+_SITE_PRINCIPAL = object()  # get_by_id ne renvoie jamais None => site trouvé
+_EQUIPE_AERIENNE_ID = uuid.uuid4()
+_EQUIPE_TERRESTRE_ID = uuid.uuid4()
+
+
 def _use_case(
     prospection: Prospection | None = None,
     chef: UtilisateurRef | None = None,
     conflits: int = 0,
+    site_principal: object | None = _SITE_PRINCIPAL,
+    type_equipe: str | None = "aerien",
 ) -> tuple[CreateTraitementAerien, FakeTraitementRepo]:
     repo = FakeTraitementRepo(conflits=conflits)
     return (
@@ -448,12 +484,11 @@ def _use_case(
             traitement_repository=repo,
             prospection_repository=FakeProspectionRepo(prospection),
             utilisateur_repository=FakeUtilisateurRepo(chef),
+            site_aerienne_repository=FakeSiteAerienneRepo(site_principal),
+            equipe_repository=FakeEquipeRepo(type_equipe),
         ),
         repo,
     )
-
-
-_CHEF = UtilisateurRef(id=uuid.uuid4(), prenom="Hery", role="chef_de_base")
 
 
 def _args(**overrides):
@@ -466,6 +501,8 @@ def _args(**overrides):
         mecanicien="Marc Rabe",
         chef_de_base_id=_CHEF.id,
         base_principale="Base Betioky",
+        site_principal_id=_SITE_PRINCIPAL_ID,
+        equipe_id=_EQUIPE_AERIENNE_ID,
         immatricule_aeronef="5R-XYZ",
     )
     args.update(overrides)
@@ -493,25 +530,19 @@ async def test_creation_genere_numero_fiche_et_snapshot():
 
 
 @pytest.mark.asyncio
-async def test_creation_aerien_transmet_immatriculation_et_stock_pesticide():
+async def test_creation_aerien_transmet_immatriculation():
     prospection = _prospection(
         surface_infestee=100.0,
         populations=[ProspectionPopulation(espece="LMC", categorie="imago")],
     )
     use_case, _ = _use_case(prospection=prospection, chef=_CHEF)
-    traitement = await use_case.execute(
-        **_args(
-            immatricule_aeronef="5R-ABC",
-            pesticide_recu_l=200.0,
-        )
-    )
+    traitement = await use_case.execute(**_args(immatricule_aeronef="5R-ABC"))
 
     assert traitement.aerien.immatricule_aeronef == "5R-ABC"
     assert traitement.aerien.surface_traitee_ha == 0.0
     # Pas de rotation à la création (sous-ressource ajoutée après coup) : rien de
-    # consommé, le stock = tout le reçu.
+    # consommé.
     assert traitement.aerien.surface_restante_ha == 100.0
-    assert traitement.aerien.pesticide_stock_restant_l == 200.0
 
 
 @pytest.mark.asyncio
@@ -553,6 +584,13 @@ async def test_rejette_chef_de_base_avec_mauvais_role():
 async def test_rejette_chef_de_base_inconnu():
     use_case, _ = _use_case(prospection=_prospection(), chef=None)
     with pytest.raises(ChefDeBaseInvalideError):
+        await use_case.execute(**_args())
+
+
+@pytest.mark.asyncio
+async def test_rejette_site_principal_inconnu():
+    use_case, _ = _use_case(prospection=_prospection(), chef=_CHEF, site_principal=None)
+    with pytest.raises(SitePrincipalIntrouvableError):
         await use_case.execute(**_args())
 
 
@@ -804,28 +842,31 @@ def test_recalculer_surfaces_aerien_avec_cumul_precedent():
     assert aerien.surface_restante_ha == 60.0
 
 
-def test_recalculer_totaux_aerien_alimente_le_stock_pesticide():
-    aerien = TraitementAerien(pesticide_recu_l=200.0)
-    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
-    aerien.recalculer_totaux("TOTAL")
-    assert aerien.total_pesticide_l == 60.0
-    assert aerien.pesticide_stock_restant_l == 140.0
-
-
-def test_recalculer_stock_pesticide_aerien_sans_reception_reste_none():
+def test_consommations_pesticide_agrege_par_produit_et_unite():
+    """#609 : un mouvement par couple (pesticide, unité), jamais un total unique
+    mêlant deux produits ou deux unités."""
+    produit_a = uuid.uuid4()
+    produit_b = uuid.uuid4()
     aerien = TraitementAerien()
-    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
-    aerien.recalculer_totaux("TOTAL")
-    assert aerien.pesticide_stock_restant_l is None
+    aerien.rotations = [
+        _rotation(numero=1, quantite=10.0, produit_id=produit_a, unite="L"),
+        _rotation(numero=2, quantite=5.0, produit_id=produit_a, unite="L"),
+        _rotation(numero=3, quantite=4.0, produit_id=produit_a, unite="kg"),
+        _rotation(numero=4, quantite=7.0, produit_id=produit_b, unite="L"),
+    ]
+    consommations = {
+        (produit_id, unite): quantite
+        for produit_id, unite, quantite in aerien.consommations_pesticide()
+    }
+    assert consommations == {
+        (produit_a, "L"): 15.0,
+        (produit_a, "kg"): 4.0,
+        (produit_b, "L"): 7.0,
+    }
 
 
-def test_recalculer_stock_pesticide_aerien_plancher_zero_surconsommation():
-    """Consommation > réception (ex. pesticide partagé avec une autre fiche) :
-    le stock ne descend jamais sous 0, même convention que surface_restante_ha."""
-    aerien = TraitementAerien(pesticide_recu_l=50.0)
-    aerien.rotations = [_rotation(numero=1, quantite=80.0)]
-    aerien.recalculer_totaux("TOTAL")
-    assert aerien.pesticide_stock_restant_l == 0.0
+def test_consommations_pesticide_vide_sans_rotation():
+    assert TraitementAerien().consommations_pesticide() == []
 
 
 # ==========================================
@@ -857,7 +898,6 @@ class FakeTraitementRepoRotations:
         surface_protegee_ha,
         surface_cumulee_ha,
         surface_restante_ha,
-        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
@@ -866,7 +906,6 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.surface_protegee_ha = surface_protegee_ha
         self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
-        self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
     async def update_rotation(
@@ -880,7 +919,6 @@ class FakeTraitementRepoRotations:
         surface_protegee_ha,
         surface_cumulee_ha,
         surface_restante_ha,
-        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
@@ -889,7 +927,6 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.surface_protegee_ha = surface_protegee_ha
         self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
-        self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
 
     async def remove_rotation(
@@ -903,7 +940,6 @@ class FakeTraitementRepoRotations:
         surface_protegee_ha,
         surface_cumulee_ha,
         surface_restante_ha,
-        pesticide_stock_restant_l,
     ):
         self.traitement.aerien.nb_rotations = nb_rotations
         self.traitement.aerien.total_pesticide_l = total_pesticide_l
@@ -912,8 +948,26 @@ class FakeTraitementRepoRotations:
         self.traitement.aerien.surface_protegee_ha = surface_protegee_ha
         self.traitement.aerien.surface_cumulee_ha = surface_cumulee_ha
         self.traitement.aerien.surface_restante_ha = surface_restante_ha
-        self.traitement.aerien.pesticide_stock_restant_l = pesticide_stock_restant_l
         return self.traitement
+
+
+class FakeMouvementPesticideRepo:
+    """#609 : capture les appels de régénération pour les tests qui veulent les
+    inspecter, sans DB — la plupart des tests AddRotation/UpdateRotation/
+    RemoveRotation ne portent que sur les totaux et ignorent cet appel."""
+
+    def __init__(self):
+        self.appels: list[dict] = []
+
+    async def regenerer_consommation(self, traitement_id, site_id, date_mouvement, consommations):
+        self.appels.append(
+            {
+                "traitement_id": traitement_id,
+                "site_id": site_id,
+                "date_mouvement": date_mouvement,
+                "consommations": consommations,
+            }
+        )
 
 
 def _traitement_aerien(rotations: list[Rotation] | None = None) -> Traitement:
@@ -947,7 +1001,7 @@ def _rotation_args(**overrides):
 async def test_add_rotation_incremente_totaux():
     traitement = _traitement_aerien()
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
 
     resultat = await use_case.execute(traitement_id=traitement.id, **_rotation_args())
 
@@ -956,11 +1010,50 @@ async def test_add_rotation_incremente_totaux():
 
 
 @pytest.mark.asyncio
+async def test_add_rotation_regenere_la_consommation_pesticide_du_site_principal():
+    """#609 : chaque écriture sur les rotations régénère les mouvements de
+    consommation — agrégés depuis `aerien.rotations`, débités du site principal."""
+    site_id = uuid.uuid4()
+    produit_id = uuid.uuid4()
+    aerien = TraitementAerien(site_principal_id=site_id)
+    traitement = Traitement(aerien=aerien)
+    repo = FakeTraitementRepoRotations(traitement)
+    mouvement_repo = FakeMouvementPesticideRepo()
+    use_case = AddRotation(repo, mouvement_repo)
+
+    await use_case.execute(
+        traitement_id=traitement.id, **_rotation_args(produit_id=produit_id, quantite=10.0)
+    )
+
+    assert len(mouvement_repo.appels) == 1
+    appel = mouvement_repo.appels[0]
+    assert appel["traitement_id"] == aerien.traitement_id
+    assert appel["site_id"] == site_id
+    assert appel["consommations"] == [(produit_id, "L", 10.0)]
+
+
+@pytest.mark.asyncio
+async def test_add_rotation_sans_site_principal_ne_regenere_rien_a_debiter():
+    """Fiche historique non rapprochée à un site (#605) : pas de site connu, pas de
+    débit — mais l'appel de régénération a bien lieu (nettoyage d'un éventuel résidu)."""
+    aerien = TraitementAerien(site_principal_id=None)
+    traitement = Traitement(aerien=aerien)
+    repo = FakeTraitementRepoRotations(traitement)
+    mouvement_repo = FakeMouvementPesticideRepo()
+    use_case = AddRotation(repo, mouvement_repo)
+
+    await use_case.execute(traitement_id=traitement.id, **_rotation_args())
+
+    assert len(mouvement_repo.appels) == 1
+    assert mouvement_repo.appels[0]["site_id"] is None
+
+
+@pytest.mark.asyncio
 async def test_add_rotation_numero_auto_incremente():
     existante = _rotation(numero=1, quantite=10.0)
     traitement = _traitement_aerien([existante])
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
 
     await use_case.execute(traitement_id=traitement.id, **_rotation_args(quantite=5.0))
 
@@ -975,7 +1068,7 @@ async def test_add_rotation_numero_cuve_derive_jamais_saisi():
     toujours dérivé de numero (str(numero)), quoi que le client ait pu envoyer."""
     traitement = _traitement_aerien()
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
 
     await use_case.execute(traitement_id=traitement.id, **_rotation_args())
     await use_case.execute(traitement_id=traitement.id, **_rotation_args())
@@ -986,7 +1079,7 @@ async def test_add_rotation_numero_cuve_derive_jamais_saisi():
 @pytest.mark.asyncio
 async def test_add_rotation_traitement_introuvable():
     repo = FakeTraitementRepoRotations(None)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(TraitementIntrouvableError):
         await use_case.execute(traitement_id=uuid.uuid4(), **_rotation_args())
 
@@ -995,7 +1088,7 @@ async def test_add_rotation_traitement_introuvable():
 async def test_add_rotation_traitement_non_aerien():
     traitement = Traitement(aerien=None)
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(TraitementIntrouvableError):
         await use_case.execute(traitement_id=traitement.id, **_rotation_args())
 
@@ -1004,7 +1097,7 @@ async def test_add_rotation_traitement_non_aerien():
 async def test_add_rotation_rejette_heure_fin_anterieure_ou_egale():
     traitement = _traitement_aerien()
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(ValueError):
         await use_case.execute(
             traitement_id=traitement.id,
@@ -1016,7 +1109,7 @@ async def test_add_rotation_rejette_heure_fin_anterieure_ou_egale():
 async def test_add_rotation_rejette_heure_fermeture_vanne_anterieure_ou_egale():
     traitement = _traitement_aerien()
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(ValueError):
         await use_case.execute(
             traitement_id=traitement.id,
@@ -1029,7 +1122,7 @@ async def test_update_rotation_recalcule_totaux():
     existante = _rotation(numero=1, quantite=10.0)
     traitement = _traitement_aerien([existante])
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = UpdateRotation(repo)
+    use_case = UpdateRotation(repo, FakeMouvementPesticideRepo())
 
     resultat = await use_case.execute(
         traitement_id=traitement.id,
@@ -1046,7 +1139,7 @@ async def test_update_rotation_recalcule_totaux():
 async def test_update_rotation_introuvable():
     traitement = _traitement_aerien()
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = UpdateRotation(repo)
+    use_case = UpdateRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(RotationIntrouvableError):
         await use_case.execute(
             traitement_id=traitement.id, rotation_id=uuid.uuid4(), **_rotation_args()
@@ -1058,7 +1151,7 @@ async def test_update_rotation_rejette_heure_fin_anterieure_ou_egale():
     existante = _rotation(numero=1)
     traitement = _traitement_aerien([existante])
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = UpdateRotation(repo)
+    use_case = UpdateRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(ValueError):
         await use_case.execute(
             traitement_id=traitement.id,
@@ -1073,7 +1166,7 @@ async def test_remove_rotation_recalcule_totaux():
     r2 = _rotation(numero=2, quantite=5.0)
     traitement = _traitement_aerien([r1, r2])
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = RemoveRotation(repo)
+    use_case = RemoveRotation(repo, FakeMouvementPesticideRepo())
 
     resultat = await use_case.execute(traitement_id=traitement.id, rotation_id=r1.id)
 
@@ -1086,7 +1179,7 @@ async def test_remove_rotation_recalcule_totaux():
 async def test_remove_rotation_introuvable():
     traitement = _traitement_aerien()
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = RemoveRotation(repo)
+    use_case = RemoveRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(RotationIntrouvableError):
         await use_case.execute(traitement_id=traitement.id, rotation_id=uuid.uuid4())
 
@@ -1216,6 +1309,7 @@ def _use_case_terrestre(
     conflits: int = 0,
     traitements_par_id: dict | None = None,
     origines_deja_utilisees: set | None = None,
+    type_equipe: str | None = "terrestre",
 ) -> tuple[CreateTraitementTerrestre, FakeTraitementRepo]:
     repo = FakeTraitementRepo(
         conflits=conflits,
@@ -1227,6 +1321,7 @@ def _use_case_terrestre(
             traitement_repository=repo,
             prospection_repository=FakeProspectionRepo(prospection),
             utilisateur_repository=FakeUtilisateurRepo(chef),
+            equipe_repository=FakeEquipeRepo(type_equipe),
         ),
         repo,
     )
@@ -1243,6 +1338,7 @@ def _args_terrestre(**overrides):
         vitesse_vent_ms=1.5,
         temperature_c=24.0,
         chef_equipe_id=_CHEF_EQUIPE.id,
+        equipe_id=_EQUIPE_TERRESTRE_ID,
     )
     args.update(overrides)
     return args
@@ -1604,15 +1700,6 @@ def test_recalculer_stock_pesticide_terrestre_stock_initial_plancher_zero_surcon
     assert terrestre.pesticide_stock_restant_l == 0.0
 
 
-def test_recalculer_stock_pesticide_aerien_sans_stock_initial_inchange():
-    """Aérien n'a pas de `stock_initial_l` : `_stock_pesticide_restant` doit se
-    comporter exactement comme avant l'ajout du stock initial (Terrestre)."""
-    aerien = TraitementAerien(pesticide_recu_l=200.0)
-    aerien.rotations = [_rotation(numero=1, quantite=60.0)]
-    aerien.recalculer_totaux("TOTAL")
-    assert aerien.pesticide_stock_restant_l == 140.0
-
-
 # ==========================================
 # AddProduitUtilise / RemoveProduitUtilise (fakes en mémoire)
 # ==========================================
@@ -1741,7 +1828,7 @@ async def test_add_rotation_sur_traitement_verrouille_leve_verrouille():
     aerien = TraitementAerien()
     traitement = Traitement(statut="validee", aerien=aerien)
     repo = FakeTraitementRepoRotations(traitement)
-    use_case = AddRotation(repo)
+    use_case = AddRotation(repo, FakeMouvementPesticideRepo())
     with pytest.raises(TraitementVerrouilleError):
         await use_case.execute(traitement_id=traitement.id, **_rotation_args())
 
@@ -1937,6 +2024,36 @@ def test_valider_terrestre_surface_restante_abandonnee_avec_motif_ok():
         motif_surface_restante_abandonnee="Zone inaccessible (crue)",
     )
     traitement.valider(date(2026, 8, 12), [{"role": "CHEF_EQUIPE", "signataire_nom": "Hery"}])
+    assert traitement.statut == "validee"
+
+
+def test_valider_aerien_surface_restante_abandonnee_sans_motif_bloque():
+    traitement = _traitement_aerien_valide()
+    traitement.aerien.surface_restante_abandonnee = True
+    traitement.aerien.motif_surface_restante_abandonnee = None
+    with pytest.raises(MotifAbandonManquantError):
+        traitement.valider(
+            date(2026, 8, 12),
+            [
+                {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+                {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+                {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+            ],
+        )
+
+
+def test_valider_aerien_surface_restante_abandonnee_avec_motif_ok():
+    traitement = _traitement_aerien_valide()
+    traitement.aerien.surface_restante_abandonnee = True
+    traitement.aerien.motif_surface_restante_abandonnee = "Zone inaccessible (crue)"
+    traitement.valider(
+        date(2026, 8, 12),
+        [
+            {"role": "PILOTE", "signataire_nom": "J. Dupont"},
+            {"role": "MECANICIEN", "signataire_nom": "M. Rabe"},
+            {"role": "CHEF_DE_BASE", "signataire_nom": "Hery"},
+        ],
+    )
     assert traitement.statut == "validee"
 
 
@@ -2263,6 +2380,7 @@ def _sync_terrestre_args(fiche_id, base_updated_at, **overrides):
         vitesse_vent_ms=1.5,
         temperature_c=24.0,
         chef_equipe_id=_CHEF_EQUIPE.id,
+        equipe_id=_EQUIPE_TERRESTRE_ID,
         surface_atomiseur_ha=10.0,
         surface_restante_abandonnee=False,
         numero_fiche="Hery-Terrestre-2026-08-11",
@@ -2280,6 +2398,7 @@ def _sync_use_case(existant: Traitement | None = None):
                 _prospection(id=_PROSPECTION_ID_SYNC, surface_infestee=100.0)
             ),
             utilisateur_repository=FakeUtilisateurRepo(_CHEF_EQUIPE),
+            equipe_repository=FakeEquipeRepo("terrestre"),
         ),
         repo,
     )

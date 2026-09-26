@@ -6,7 +6,7 @@ import {
   getTraitement,
   addRotation,
   deleteAllRotationsForTraitementAerien,
-  updateTraitementAerienPesticideRecu,
+  updateTraitementAerienSurfaceRestante,
 } from '@/lib/traitement-repository';
 import { listPesticides, Pesticide } from '@/lib/referentiel-db';
 import { useTraitementCaptureStore } from '@/lib/traitement-capture-store';
@@ -15,13 +15,18 @@ import {
   computeTotalPesticideAerienParUnite,
   computeSurfaceTraiteeAerien,
   computeSurfaceCumulee,
-  computeSurfaceRestante,
-  computePesticideStockRestant,
+  computeSurfaceRestanteFiche,
+  deriveUniteDepuisDoseReference,
   computeDureesRotation,
   formatDureeRotation,
   validateRotationsHeures,
+  messagesOrdreHeuresRotation,
+  validateRotationsMeteo,
+  messageVentTropFort,
+  messageTemperatureTropElevee,
   deriveNomCommercial,
   rotationsAerienPretesPourSynchro,
+  repartirSurfaceCouverte,
 } from '@/lib/traitement-validation';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN } from '@/components/traitement/ProgressBar';
 import { Card } from '@/components/traitement/Card';
@@ -41,9 +46,13 @@ import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
  * une superficie traitée et des heures d'ouverture/fermeture de vanne, en plus des
  * champs déjà existants (produit, températures, vent, heure_debut/heure_fin de la
  * rotation entière). N° de cuve et les 3 durées ne sont jamais saisis : dérivés à
- * l'affichage. « Pesticide reçu (l) » (libellé affiché « Approvisionnement (l) »)
- * y a été déplacé depuis Équipe : c'est une
- * information propre au traitement (stock de pesticide), pas à l'équipe.
+ * l'affichage.
+ *
+ * « Pesticide reçu (l) » / « Reste en stock (l) » (anciennement affichés ici,
+ * déplacés depuis Équipe par #equipe-slide-aerien) ont été retirés par #609 : le
+ * stock aérien vit désormais dans `mouvement_pesticide` (#606), débité
+ * automatiquement des rotations — plus de saisie manuelle d'un « reçu » par fiche.
+ * Terrestre conserve ce concept (`TerrestreForm.tsx`), hors périmètre de #609.
  */
 // Saisie francophone : la virgule est le séparateur décimal attendu par l'utilisateur,
 // mais JS/JSON n'utilisent que le point en interne — même paire de fonctions que
@@ -61,7 +70,6 @@ function formatDecimalDisplay(value: number | null | undefined): string {
   return value != null ? String(value).replace('.', ',') : '';
 }
 
-type AerienDecimalField = 'pesticideRecuL';
 type RotationDecimalField =
   | 'quantite'
   | 'surface_ha'
@@ -79,38 +87,14 @@ export default function RotationsScreen() {
   const [pesticides, setPesticides] = useState<Pesticide[]>([]);
   const [surfaceInfesteeHa, setSurfaceInfesteeHa] = useState<number | null>(null);
   const [origineCumuleeHa, setOrigineCumuleeHa] = useState<number | null>(null);
+  const [resteOrigineHa, setResteOrigineHa] = useState<number | null>(null);
   const [error, setError] = useState<string | undefined>();
   // Texte brut en cours de saisie pour les champs décimaux — permet de taper un
   // séparateur décimal ou un zéro de fin ("3," / "3,2") sans que le champ ne se
   // reformate à chaque frappe (cf. `store.aerien.xxx != null ? String(...) : ''`
   // sinon). Un objet pour les champs "aérien" (niveau fiche), un autre indexé par
   // rotation (`localId`) pour les champs propres à chaque rotation.
-  const [aerienDrafts, setAerienDrafts] = useState<Partial<Record<AerienDecimalField, string>>>({});
   const [rotationDrafts, setRotationDrafts] = useState<Record<string, Partial<Record<RotationDecimalField, string>>>>({});
-
-  const getAerienDraft = (field: AerienDecimalField): string | undefined => aerienDrafts[field];
-
-  const handleAerienDecimalChange = (field: AerienDecimalField, raw: string) => {
-    if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return;
-    setAerienDrafts((current) => ({ ...current, [field]: raw }));
-    if (raw === '') {
-      store.updateAerien({ [field]: null });
-      return;
-    }
-    if (raw.endsWith('.') || raw.endsWith(',')) return;
-    const val = parseDecimalInput(raw);
-    if (val === null) return;
-    store.updateAerien({ [field]: val });
-  };
-
-  const clearAerienDraft = (field: AerienDecimalField) => {
-    setAerienDrafts((current) => {
-      if (current[field] === undefined) return current;
-      const next = { ...current };
-      delete next[field];
-      return next;
-    });
-  };
 
   const getRotationDraft = (localId: string, field: RotationDecimalField): string | undefined =>
     rotationDrafts[localId]?.[field];
@@ -150,13 +134,16 @@ export default function RotationsScreen() {
       .then((draft) => {
         if (!draft) return;
         setSurfaceInfesteeHa(draft.cible?.surface_infestee_ha ?? null);
-        // pesticide_recu_l chargé ici depuis #equipe-slide-aerien (déplacé depuis
-        // Équipe/traitement.tsx) — même garde ailleurs sur cet écran : recharge à
-        // chaque montage (bornée à `traitementId`), sans écraser une saisie en cours
-        // entre deux montages du même écran.
+        setResteOrigineHa(draft.cible?.surface_restante_origine_ha ?? null);
+        // Surface restante abandonnée : chargée ici (déplacée avec la décision de l'agent) — même garde
+        // ailleurs sur cet écran : recharge à chaque montage (bornée à `traitementId`), sans écraser
+        // une saisie en cours entre deux montages du même écran.
         if (draft.type_traitement === 'AERIEN' && draft.aerien) {
           store.updateAerien({
-            pesticideRecuL: draft.aerien.pesticide_recu_l,
+            // SQLite stocke 0/1 : conversion en booléen tri-état (null = pas encore tranché).
+            surfaceRestanteAbandonnee:
+              draft.aerien.surface_restante_abandonnee == null ? null : !!draft.aerien.surface_restante_abandonnee,
+            motifSurfaceRestanteAbandonnee: draft.aerien.motif_surface_restante_abandonnee,
           });
         }
         // Rotations chargées ici seulement (sous-ressource propre à cet écran, pas à
@@ -198,6 +185,19 @@ export default function RotationsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traitementId, store.ref.modeTraitement]);
 
+  // Unité de chaque rotation = celle du produit choisi (« dose de référence » du
+  // référentiel : liquide → L, poudre → kg). Recale aussi les rotations rechargées dont
+  // l'unité stockée ne correspondrait plus au produit, dès que le référentiel est chargé.
+  useEffect(() => {
+    if (readOnly) return;
+    for (const rotation of store.aerien.rotations) {
+      const pesticide = pesticides.find((p) => p.id === rotation.produit_id);
+      const uniteAuto = deriveUniteDepuisDoseReference(pesticide?.dose_reference);
+      if (uniteAuto && rotation.unite !== uniteAuto) store.updateRotation(rotation.localId, { unite: uniteAuto });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pesticides, store.aerien.rotations, readOnly]);
+
   // Chaînage de reprise (migration backend 0050, mirroir de l'effet équivalent dans
   // traitement.tsx côté Terrestre) : la surface déjà traitée par la chaîne avant
   // cette fiche, pour que l'aperçu de surface restante ici ne surestime pas ce qui
@@ -228,11 +228,15 @@ export default function RotationsScreen() {
   const nbRotations = computeNbRotations(store.aerien.rotations);
   const totauxPesticide = computeTotalPesticideAerienParUnite(store.aerien.rotations);
   const surfaceTraitee = computeSurfaceTraiteeAerien(store.aerien.rotations);
+  const repartition = repartirSurfaceCouverte(surfaceTraitee, store.ref.modeTraitement);
   const surfaceCumulee = computeSurfaceCumulee(surfaceTraitee, store.aerien.repriseTraitement, origineCumuleeHa);
-  const surfaceRestante = computeSurfaceRestante(surfaceInfesteeHa, surfaceCumulee);
-  // Le stock reçu (pesticide_recu_l) est en litres : seule la consommation en litres
-  // s'en déduit, jamais celle en kg (grandeurs différentes, cf. total_pesticide_kg).
-  const pesticideStockRestant = computePesticideStockRestant(store.aerien.pesticideRecuL, totauxPesticide.l);
+  const surfaceRestante = computeSurfaceRestanteFiche({
+    surfaceInfesteeHa,
+    surfaceCumuleeHa: surfaceCumulee,
+    surfaceTraiteeHa: surfaceTraitee,
+    repriseTraitement: store.aerien.repriseTraitement,
+    resteOrigineHa,
+  });
 
   const handleContinuer = () =>
     run(
@@ -249,6 +253,20 @@ export default function RotationsScreen() {
           setError(heuresErrors[0].message);
           return;
         }
+        // #alerte-meteo-vent-temperature : vent > 6 m/s ou température > 35 °C =
+        // traitement à annuler — on n'avance pas tant que la valeur n'est pas corrigée.
+        const meteoErrors = validateRotationsMeteo(
+          store.aerien.rotations.map((r) => ({
+            ventDebutMs: r.vent_debut_ms,
+            ventFinMs: r.vent_fin_ms,
+            temperatureDebutC: r.temperature_debut_c,
+            temperatureFinC: r.temperature_fin_c,
+          }))
+        );
+        if (meteoErrors.length > 0) {
+          setError(meteoErrors[0].message);
+          return;
+        }
         // #traitement-aerien-sync-apres-enregistrement : une rotation ajoutée
         // (bouton « + ») mais jamais remplie (produit non choisi, quantité
         // vide) passait inaperçue jusqu'ici — seule la synchronisation, bien
@@ -262,8 +280,23 @@ export default function RotationsScreen() {
           setError('Chaque rotation doit avoir un produit et une quantité renseignés');
           return;
         }
+        // Même règle que le Terrestre : une surface restante > 0 doit être tranchée
+        // (abandonnée ou non), et un abandon doit être motivé.
+        if (surfaceRestante > 0) {
+          if (store.aerien.surfaceRestanteAbandonnee == null) {
+            setError('Vous devez indiquer si la surface restante est abandonnée');
+            return;
+          }
+          if (store.aerien.surfaceRestanteAbandonnee && !store.aerien.motifSurfaceRestanteAbandonnee?.trim()) {
+            setError("Le motif d'abandon est obligatoire");
+            return;
+          }
+        }
         setError(undefined);
-        await updateTraitementAerienPesticideRecu(traitementId, store.aerien.pesticideRecuL);
+        await updateTraitementAerienSurfaceRestante(traitementId, {
+          abandonnee: surfaceRestante > 0 ? store.aerien.surfaceRestanteAbandonnee : null,
+          motif: store.aerien.motifSurfaceRestanteAbandonnee,
+        });
         // Purge avant re-création (#persistance-fiches-traitement) : le store
         // ne porte pas d'id stable côté DB pour distinguer une rotation déjà
         // enregistrée d'une nouvelle — sans cette purge, ré-enregistrer une
@@ -304,18 +337,6 @@ export default function RotationsScreen() {
         <ProgressBar currentIndex={3} segments={PROGRESS_SEGMENTS_AERIEN} />
         <Text style={chrome.title}>Pesticides & rotations</Text>
 
-        <Text style={formStyles.label}>Approvisionnement (l)</Text>
-        <TextInput
-          testID="pesticide-recu-input"
-          editable={!readOnly}
-          style={formStyles.input}
-          placeholder="0"
-          keyboardType="decimal-pad"
-          value={getAerienDraft('pesticideRecuL') ?? formatDecimalDisplay(store.aerien.pesticideRecuL)}
-          onChangeText={(v) => handleAerienDecimalChange('pesticideRecuL', v)}
-          onBlur={() => clearAerienDraft('pesticideRecuL')}
-        />
-
         {store.aerien.rotations.map((rotation, index) => {
           const durees = computeDureesRotation({
             heureDebut: rotation.heure_debut ?? null,
@@ -324,6 +345,11 @@ export default function RotationsScreen() {
             heureFermetureVanne: rotation.heure_fermeture_vanne ?? null,
           });
           const unite = rotation.unite ?? 'L';
+          // Unité imposée par le produit choisi (dose de référence) ; `null` = produit
+          // absent ou dose non renseignée au référentiel → choix manuel conservé.
+          const uniteAuto = deriveUniteDepuisDoseReference(
+            pesticides.find((p) => p.id === rotation.produit_id)?.dose_reference
+          );
 
           return (
             <Card key={rotation.localId} style={formStyles.rotationCard}>
@@ -348,11 +374,22 @@ export default function RotationsScreen() {
                 </Text>
               </Card>
 
-              <Text style={formStyles.label}>Unité *</Text>
-              <View style={formStyles.chipRow}>
-                <Chip label="Litres (L)" selected={unite === 'L'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'L' })} />
-                <Chip label="Kilos (kg)" selected={unite === 'kg'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'kg' })} />
-              </View>
+              {uniteAuto ? (
+                <Card variant="derivee">
+                  <Text style={formStyles.label}>Unité (selon le produit)</Text>
+                  <Text testID={`rotation-unite-auto-${index}`} style={formStyles.derivedValue}>
+                    {uniteAuto === 'kg' ? 'Kilos (kg)' : 'Litres (L)'}
+                  </Text>
+                </Card>
+              ) : (
+                <>
+                  <Text style={formStyles.label}>Unité *</Text>
+                  <View style={formStyles.chipRow}>
+                    <Chip label="Litres (L)" selected={unite === 'L'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'L' })} />
+                    <Chip label="Kilos (kg)" selected={unite === 'kg'} onPress={() => !readOnly && store.updateRotation(rotation.localId, { unite: 'kg' })} />
+                  </View>
+                </>
+              )}
 
               <Text style={formStyles.label}>{`Pesticides consommés (${unite === 'kg' ? 'kg' : 'l'}) *`}</Text>
               <TextInput
@@ -387,6 +424,9 @@ export default function RotationsScreen() {
                   store.updateRotation(rotation.localId, {
                     produit_id: p.id,
                     nom_commercial: deriveNomCommercial(p.nom),
+                    ...(deriveUniteDepuisDoseReference(p.dose_reference)
+                      ? { unite: deriveUniteDepuisDoseReference(p.dose_reference)! }
+                      : {}),
                   })
                 }
               />
@@ -432,6 +472,18 @@ export default function RotationsScreen() {
                   />
                 </View>
               </View>
+              {/* #ordre-heures-rotation-aerien : début < ouverture vanne < fermeture vanne < fin,
+                  signalé en direct ; « Continuer » reste refusé tant que l'ordre n'est pas rétabli. */}
+              {messagesOrdreHeuresRotation({
+                heureDebut: rotation.heure_debut ?? null,
+                heureFin: rotation.heure_fin ?? null,
+                heureOuvertureVanne: rotation.heure_ouverture_vanne ?? null,
+                heureFermetureVanne: rotation.heure_fermeture_vanne ?? null,
+              }).map((m) => (
+                <Text key={m} style={formStyles.error}>
+                  ⚠️ {m.charAt(0).toUpperCase() + m.slice(1)}
+                </Text>
+              ))}
 
               <View style={formStyles.row}>
                 <View style={formStyles.flex1}>
@@ -459,6 +511,13 @@ export default function RotationsScreen() {
                   />
                 </View>
               </View>
+              {[messageTemperatureTropElevee(rotation.temperature_debut_c), messageTemperatureTropElevee(rotation.temperature_fin_c)]
+                .filter((m, i, all) => m && all.indexOf(m) === i)
+                .map((m) => (
+                  <Text key={m} style={formStyles.error}>
+                    {m}
+                  </Text>
+                ))}
 
               <View style={formStyles.row}>
                 <View style={formStyles.flex1}>
@@ -488,6 +547,13 @@ export default function RotationsScreen() {
                   />
                 </View>
               </View>
+              {[messageVentTropFort(rotation.vent_debut_ms), messageVentTropFort(rotation.vent_fin_ms)]
+                .filter((m, i, all) => m && all.indexOf(m) === i)
+                .map((m) => (
+                  <Text key={m} style={formStyles.error}>
+                    {m}
+                  </Text>
+                ))}
 
               {/* Durées calculées, jamais saisies (critère d'acceptation). */}
               <View style={formStyles.row}>
@@ -532,9 +598,20 @@ export default function RotationsScreen() {
           <Text style={formStyles.label}>Total pesticide (kg)</Text>
           <Text style={formStyles.derivedValue}>{totauxPesticide.kg}</Text>
         </Card>
+        {/* #surface-protegee-champ : la surface des rotations est « traitée » (couverture totale)
+            OU « protégée » (barrière), selon le mode — l'autre vaut 0. « Traitée et protégée »
+            est leur somme. Tout est en lecture seule. */}
         <Card variant="derivee">
           <Text style={formStyles.label}>Surface traitée (ha)</Text>
-          <Text style={formStyles.derivedValue}>{surfaceTraitee}</Text>
+          <Text style={formStyles.derivedValue}>{repartition.traitee}</Text>
+        </Card>
+        <Card variant="derivee">
+          <Text style={formStyles.label}>Surface protégée (ha)</Text>
+          <Text style={formStyles.derivedValue}>{repartition.protegee}</Text>
+        </Card>
+        <Card variant="derivee">
+          <Text style={formStyles.label}>Surface traitée et protégée (ha)</Text>
+          <Text style={formStyles.derivedValue}>{repartition.traiteeEtProtegee}</Text>
         </Card>
         {store.aerien.repriseTraitement && (
           <Card variant="derivee">
@@ -546,11 +623,37 @@ export default function RotationsScreen() {
           <Text style={formStyles.label}>Surface restante (ha)</Text>
           <Text style={formStyles.derivedValue}>{surfaceRestante}</Text>
         </Card>
-        {pesticideStockRestant != null && (
-          <Card variant="derivee">
-            <Text style={formStyles.label}>Reste en stock (l)</Text>
-            <Text style={formStyles.derivedValue}>{pesticideStockRestant}</Text>
-          </Card>
+        {surfaceRestante > 0 && (
+          <>
+            <Text style={formStyles.label}>Surface restante abandonnée ?</Text>
+            <View style={formStyles.chipRow}>
+              <Chip
+                label={store.aerien.surfaceRestanteAbandonnee == null ? 'À trancher' : 'Non'}
+                selected={store.aerien.surfaceRestanteAbandonnee === false}
+                onPress={() =>
+                  !readOnly && store.updateAerien({ surfaceRestanteAbandonnee: false, motifSurfaceRestanteAbandonnee: null })
+                }
+              />
+              <Chip
+                label="Oui"
+                selected={store.aerien.surfaceRestanteAbandonnee === true}
+                onPress={() => !readOnly && store.updateAerien({ surfaceRestanteAbandonnee: true })}
+              />
+            </View>
+            {store.aerien.surfaceRestanteAbandonnee && (
+              <>
+                <Text style={formStyles.label}>Motif d&apos;abandon *</Text>
+                <TextInput
+                  testID="motif-abandon-input"
+                  editable={!readOnly}
+                  style={formStyles.input}
+                  placeholder="Ex. Zone inaccessible (crue)"
+                  value={store.aerien.motifSurfaceRestanteAbandonnee ?? ''}
+                  onChangeText={(v) => store.updateAerien({ motifSurfaceRestanteAbandonnee: v })}
+                />
+              </>
+            )}
+          </>
         )}
 
         {error && <Text style={formStyles.error}>{error}</Text>}

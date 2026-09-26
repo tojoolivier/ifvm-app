@@ -99,8 +99,12 @@ export interface AerienDraft {
   // surfaceTraiteeHa n'y figure plus (migration 0046) : dérivée de la somme des
   // `surface_ha` des rotations, calculée à l'écran via computeSurfaceTraiteeAerien
   // (traitement-validation.ts) — jamais une saisie stockée dans le draft.
-  // Saisi sur l'écran « Traitement » (rotations.tsx), pas « Équipe » — #equipe-slide-aerien.
-  pesticideRecuL?: number | null;
+  // pesticideRecuL supprimé (#609) : le stock aérien vit désormais dans
+  // `mouvement_pesticide` (#606), débité automatiquement des rotations — plus de
+  // saisie manuelle d'un « reçu » par fiche (Terrestre le conserve, cf. TerrestreDraft).
+  // Surface restante abandonnée ? (migration backend 0097) — mirroir de TerrestreDraft.
+  surfaceRestanteAbandonnee?: boolean | null;
+  motifSurfaceRestanteAbandonnee?: string | null;
   // Efficacité (migration backend 0058) : gérée directement en local state sur
   // l'écran « Moyens & protection » (moyens.tsx, #efficacite-moyens-protection),
   // pas dans ce store — n'y figure donc plus depuis son déplacement.

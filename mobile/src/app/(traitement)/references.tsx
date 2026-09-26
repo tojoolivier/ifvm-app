@@ -1,3 +1,6 @@
+import { listAeronefsEquipe, listMembresEquipe } from '@/lib/equipe-db';
+import { aeronefPreselectionne, prefillTraitementAerien } from '@/lib/equipe-regles';
+import { equipeDeTravailPour } from '@/lib/equipe-travail';
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +34,8 @@ import { DateField } from '@/components/traitement/DateField';
 import { ProgressBar, PROGRESS_SEGMENTS_AERIEN, PROGRESS_SEGMENTS_TERRESTRE } from '@/components/traitement/ProgressBar';
 import { SegmentedControl } from '@/components/traitement/SegmentedControl';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 function formatDateFr(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -68,7 +73,8 @@ export default function ReferencesScreen() {
   // (prospection-picker.tsx : n_fiche, puis n_message).
   const [prospectionNFiche, setProspectionNFiche] = useState<string | null>(null);
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const readOnly = isValidationView === '1';
   // #zone-a-reprendre-numero-annexe : présence d'`origineId` = fiche démarrée
@@ -244,18 +250,33 @@ export default function ReferencesScreen() {
 
         let id = traitementId;
         if (!id) {
+          // #641 : équipe de travail reprise automatiquement ; bloque un type d'équipe qui ne
+          // correspond pas au traitement (aérien / terrestre) en renvoyant vers Paramètres.
+          const equipeId = await equipeDeTravailPour(typeTraitement === 'AERIEN' ? 'aerien' : 'terrestre');
+          // Pilote, mécanicien, chef de base, consultant : auto-complétés depuis les membres de
+          // l'équipe de travail quand elle les porte (ils restent modifiables — présents ce jour-là).
+          const equipage = prefillTraitementAerien(equipeId ? await listMembresEquipe(equipeId) : []);
           const created =
             typeTraitement === 'AERIEN'
               ? await createDraftTraitementAerien({
                   id: generateId(),
+                  equipeId,
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
-                  pilote: '',
-                  mecanicien: '',
-                  chefDeBaseId: '',
+                  ...equipage,
+                  // Aéronef : affectation active de l'équipe à la date de saisie (#642).
+                  immatriculeAeronef: aeronefPreselectionne(
+                    equipeId && store.ref.dateTraitement
+                      ? await listAeronefsEquipe(equipeId, store.ref.dateTraitement).catch((error) => {
+                          logger.ignore(error, 'aéronef non pré-rempli : la saisie reste libre');
+                          return [];
+                        })
+                      : []
+                  ),
                 })
               : await createDraftTraitementTerrestre({
                   id: generateId(),
+                  equipeId,
                   prospectionId: prospectionId!,
                   dateTraitement: store.ref.dateTraitement,
                   chefEquipeId: '',
@@ -493,7 +514,7 @@ export default function ReferencesScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp },
     keyboardAvoidingView: { flex: 1 },
@@ -521,7 +542,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       fontFamily: traitementFonts.ui,
       fontSize: typeSizes.corps,
       color: traitementColors.texteTitre,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
     monoReadonly: { fontFamily: traitementFonts.mono, fontSize: typeSizes.corps, color: traitementColors.texteSecondaire },
     error: { fontFamily: traitementFonts.ui, fontSize: typeSizes.label, color: traitementColors.erreurTexte },

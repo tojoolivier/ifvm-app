@@ -113,16 +113,16 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
 
   it('Surface infestée (ha) accepte une saisie décimale et la conserve exactement', async () => {
     useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: -18.9, longitude: 47.5 } as any,
+      draft: { id: 'draft-123', surface_station: 1000, type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: -18.9, longitude: 47.5 } as any,
       captures: [],
     });
 
     await render(<ExtensiveReferenceScreen />);
     await screen.findByText('Surface infestée (ha)');
 
-    // Station (saisie libre), Surface prospectée (ha) puis Surface infestée (ha) sont
-    // les 3 champs vides, dans cet ordre.
-    fireEvent.changeText(screen.getAllByDisplayValue('')[2], '0.5');
+    // Surface prospectée déjà renseignée (plafond de la surface infestée) : restent vides
+    // Station (saisie libre) puis Surface infestée (ha), dans cet ordre.
+    fireEvent.changeText(screen.getAllByDisplayValue('')[1], '0.5');
     expect(await screen.findByDisplayValue('0.5')).toBeVisible();
 
     // #biotope-multi : désormais obligatoire (au moins un sélectionné), non
@@ -150,7 +150,7 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
       latitude: -18.9, longitude: 47.5, altitude: null, accuracy: 5, timestamp: timestampGps,
     });
     useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: null, longitude: null, surface_infestee: 3.5 } as any,
+      draft: { id: 'draft-123', surface_station: 1000, type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: null, longitude: null, surface_infestee: 3.5 } as any,
       captures: [],
     });
 
@@ -176,7 +176,7 @@ describe('ExtensiveReferenceScreen — restauration après hydratation tardive d
   it("restaure l'heure d'observation déjà enregistrée sans relancer d'acquisition GPS au remontage", async () => {
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
         latitude: -18.9,
@@ -209,7 +209,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
 
   it("n'affiche aucun champ aérien pour une fiche terrestre (mode_extensif absent)", async () => {
     useProspectionWizardStore.setState({
-      draft: { id: 'draft-123', type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: -18.9, longitude: 47.5 } as any,
+      draft: { id: 'draft-123', surface_station: 1000, type_prospection: 'extensive', date_prospection: '2026-08-25', latitude: -18.9, longitude: 47.5 } as any,
       captures: [],
     });
 
@@ -231,7 +231,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
   it('Base (mode aérien) : saisie manuelle, envoyée telle quelle à l’enregistrement', async () => {
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
         latitude: -18.9,
@@ -265,7 +265,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
   it('Base (mode aérien) : effacer une valeur déjà enregistrée l’envoie comme null', async () => {
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
         latitude: -18.9,
@@ -312,7 +312,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
 
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
         latitude: -18.9,
@@ -385,7 +385,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
   it('ne propose plus que « Prospection » comme type d’opération', async () => {
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
         latitude: -18.9,
@@ -441,7 +441,7 @@ describe('ExtensiveReferenceScreen — mode aérien', () => {
     ]);
     useProspectionWizardStore.setState({
       draft: {
-        id: 'draft-123',
+        id: 'draft-123', surface_station: 1000,
         type_prospection: 'extensive',
         date_prospection: '2026-08-25',
         latitude: -18.9,

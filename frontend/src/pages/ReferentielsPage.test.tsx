@@ -318,7 +318,7 @@ describe('ReferentielsPage — écritures poste_acridien (#132)', () => {
       if (url.startsWith('/zones-anti-acridiennes')) return Promise.resolve({ data: [ZONE] })
       // Sélecteur « Filtrer par équipe terrestre » (poste_acridien fait partie
       // du périmètre filtrable) : liste vide suffit, non testée ici.
-      if (url.startsWith('/equipes-terrestres')) return Promise.resolve({ data: [] })
+      if (url.startsWith('/equipes?type=terrestre')) return Promise.resolve({ data: [] })
       return Promise.resolve(pull())
     })
   }
@@ -477,7 +477,7 @@ describe('ReferentielsPage — filtre par équipe terrestre (#equipe-terrestre)'
     mockedGet.mockImplementation((url: string) => {
       if (url.startsWith('/postes-acridiens')) return Promise.resolve({ data: [POSTE_RATTACHE, POSTE_LIBRE] })
       if (url.startsWith('/zones-anti-acridiennes')) return Promise.resolve({ data: [ZONE] })
-      if (url.startsWith('/equipes-terrestres')) return Promise.resolve({ data: [EQUIPE_IHOSY] })
+      if (url.startsWith('/equipes?type=terrestre')) return Promise.resolve({ data: [EQUIPE_IHOSY] })
       return Promise.resolve(pull())
     })
   }
@@ -682,12 +682,12 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
   /**
    * L'administration lit `/lieux-aeriens?inclure_inactifs=true` et non le pull :
    * elle affiche un badge « État », il lui faut donc aussi les lieux désactivés.
-   * `/equipes-aeriennes` alimente la liste déroulante « Équipe aérienne ».
+   * `/equipes?type=aerien` alimente la liste déroulante « Équipe aérienne ».
    */
   function mockGetParUrl(lieux: Record<string, unknown>[] = [LIEU]) {
     mockedGet.mockImplementation((url: string) => {
       if (url.startsWith('/lieux-aeriens')) return Promise.resolve({ data: lieux })
-      if (url === '/equipes-aeriennes') return Promise.resolve({ data: EQUIPES })
+      if (url === '/equipes?type=aerien') return Promise.resolve({ data: EQUIPES })
       return Promise.resolve(pull())
     })
   }
@@ -752,7 +752,7 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
 
     const modal = within(screen.getByRole('dialog', { name: 'Nouveau lieu aérien' }))
     fireEvent.change(modal.getByLabelText('Nom *'), { target: { value: 'Ihosy' } })
-    // Les options du select sont chargées par `/equipes-aeriennes` : attendre qu'elles
+    // Les options du select sont chargées par `/equipes?type=aerien` : attendre qu'elles
     // existent, sinon jsdom ignore la valeur assignée.
     await modal.findByRole('option', { name: 'Équipe Betroka' })
     fireEvent.change(modal.getByLabelText('Équipe aérienne *'), { target: { value: 'ea2' } })
@@ -783,11 +783,11 @@ describe('ReferentielsPage — écritures lieu_aerien (#prospection-lieu-base)',
     expect(within(ligneAncien).getAllByText('—').length).toBeGreaterThan(0)
   })
 
-  it('alimente la liste « Équipe aérienne » depuis /equipes-aeriennes', async () => {
+  it('alimente la liste « Équipe aérienne » depuis /equipes?type=aerien', async () => {
     await ouvrirLieuxAeriens()
 
     await waitFor(() =>
-      expect(mockedGet).toHaveBeenCalledWith('/equipes-aeriennes'),
+      expect(mockedGet).toHaveBeenCalledWith('/equipes?type=aerien'),
     )
     const select = screen.getByLabelText('Équipe aérienne *')
     expect(await within(select).findByRole('option', { name: 'Équipe Betroka' })).toBeInTheDocument()

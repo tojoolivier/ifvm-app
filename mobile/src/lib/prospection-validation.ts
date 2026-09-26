@@ -110,6 +110,50 @@ export function validateInfestationFormation(input: InfestationValidationInput):
   return { blocages, avertissements };
 }
 
+export interface SurfaceInfesteeExtensifInput {
+  /** Champ « Surface prospectée (ha) » tel que saisi sur l'écran Extensif / Validation / Revalidation. */
+  surfaceProspectee: number | null;
+  /** `surface_prospectee` déjà portée par le brouillon (héritée d'une revalidation d'une fiche Intensif). */
+  surfaceProspecteeHeritee: number | null;
+  surfaceInfestee: number | null;
+}
+
+/**
+ * La surface infestée ne peut jamais dépasser la surface prospectée (ADR-006) —
+ * même règle que `reference.tsx` (Intensif) et que le backend, appliquée à l'écran
+ * Extensif / Validation / Revalidation. Le plafond est le plus petit des plafonds
+ * connus (champ saisi, valeur héritée). Une surface infestée strictement positive
+ * exige un plafond : sans surface prospectée, il n'y a pas de zone parcourue où
+ * l'infestation ait pu être relevée.
+ */
+export function validateSurfaceInfesteeExtensif(input: SurfaceInfesteeExtensifInput): ValidationResult {
+  const infestee = input.surfaceInfestee;
+  if (infestee == null || Number.isNaN(infestee) || infestee <= 0) {
+    return { blocages: [], avertissements: [] };
+  }
+
+  const plafonds = [input.surfaceProspectee, input.surfaceProspecteeHeritee].filter(
+    (v): v is number => v != null && !Number.isNaN(v)
+  );
+  if (plafonds.length === 0) {
+    return {
+      blocages: ['Renseignez la surface prospectée : la surface infestée ne peut pas la dépasser.'],
+      avertissements: [],
+    };
+  }
+
+  const plafond = Math.min(...plafonds);
+  if (infestee > plafond) {
+    return {
+      blocages: [
+        `La surface infestée (${infestee} ha) ne peut pas dépasser la surface prospectée (${plafond} ha).`,
+      ],
+      avertissements: [],
+    };
+  }
+  return { blocages: [], avertissements: [] };
+}
+
 export interface ComportementDirectionValidationInput {
   typeCible: string;
   comportement: 'repos' | 'deplacement' | null;

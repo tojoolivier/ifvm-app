@@ -103,4 +103,19 @@ describe('SyncScreen — fiches de traitement en attente', () => {
     expect(screen.queryByText('Aucune fiche à synchroniser')).toBeNull();
     await waitFor(() => expect(screen.getByText(/synchronisée/)).toBeVisible());
   });
+
+  // #traitement-brouillon-distinct-fiche-creee : un traitement jamais enregistré (parcours en
+  // cours) n'est pas une fiche à synchroniser — ni listé, ni compté, ni envoyé.
+  it('n’affiche ni ne compte un traitement encore en brouillon (jamais enregistré)', async () => {
+    jest.mocked(traitementRepository.listToutesTraitementsLocal).mockResolvedValue([
+      { ...TRAITEMENT_EN_ATTENTE, id: 'trait-brouillon', numero_fiche: 'TRAIT-BROUILLON', statut_sync: 'brouillon' },
+      TRAITEMENT_EN_ATTENTE,
+    ]);
+
+    await render(<SyncScreen />);
+
+    await waitFor(() => expect(screen.getByText('TRAIT-2026-00042')).toBeVisible());
+    expect(screen.queryByText('TRAIT-BROUILLON')).toBeNull();
+    expect(screen.getByText('🔄 Synchroniser (1)')).toBeVisible();
+  });
 });

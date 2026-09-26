@@ -27,13 +27,11 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useSignalerChargement } from '@/hooks/use-signaler-chargement';
 import { useFontScale } from '@/hooks/use-font-scale';
 import { scaleTypeSizes } from '@/lib/typography';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const GREEN = '#235a36';
 const RED = '#c0412b';
-const BG = '#faf7ef';
-const TEXT = '#16201a';
-const TEXT_SECONDARY = '#6f6a59';
-const BORDER = '#e7e0cd';
 
 interface DetailRow {
   label: string;
@@ -243,7 +241,8 @@ function buildSignaturesRows(draft: DraftProspection): DetailRow[] {
 function DetailRows({ rows }: { rows: DetailRow[] }) {
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   return (
     <>
       {rows.map((row) => (
@@ -268,7 +267,8 @@ export default function ExtensiveRecapScreen() {
   const signalerChargement = useSignalerChargement('extensive-recap');
   const { scale } = useFontScale();
   const typeSizes = useMemo(() => createTypeSizes(scale), [scale]);
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
   // Terrestre implicite (NULL) — même garde que sur les autres écrans du mode aérien.
   const isAerien = draft?.mode_extensif === 'aerien';
 
@@ -331,7 +331,11 @@ export default function ExtensiveRecapScreen() {
         const draftAvecNFiche = await alignerNumeroFicheSurNumeroMessage(draft.id);
         await enregistrerEtSynchroniser(draftAvecNFiche, [], token!);
         resetWizard();
-        router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
+        // #retour-apres-creation-fiche : `dismissTo` (et non `replace`) — `replace` vers le groupe
+        // `(app)` depuis le groupe `(prospection)` en empilait une SECONDE instance sous laquelle
+        // restait la liste d'origine : deux « Retour » pour revenir à l'accueil. `dismissTo` revient
+        // à la liste « Prospection » déjà dans la pile (un seul « Retour » ensuite).
+        router.dismissTo({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
       },
       {
         screen: 'extensive-recap',
@@ -348,7 +352,7 @@ export default function ExtensiveRecapScreen() {
         const concluded = await concludeValidation(draft.id, conclusion);
         await enregistrerEtSynchroniser(concluded, [], token!);
         resetWizard();
-        router.replace({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
+        router.dismissTo({ pathname: '/(app)/prospection' as any, params: { justSaved: '1' } });
       },
       {
         screen: 'extensive-recap',
@@ -706,9 +710,9 @@ function createTypeSizes(scale: number) {
   return scaleTypeSizes(BASE_TYPE_SIZES, scale);
 }
 
-function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof createTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: theme.screen },
   safe: { flex: 1 },
   keyboardAvoidingView: { flex: 1 },
   headerGreen: { backgroundColor: GREEN, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16 },
@@ -717,35 +721,35 @@ function createStyles(typeSizes: ReturnType<typeof createTypeSizes>) {
   titleWhite: { fontSize: typeSizes.titleWhite, fontWeight: '700', color: '#fff' },
   subtitleWhite: { fontSize: typeSizes.subtitleWhite, fontWeight: '500', color: '#ffffffcc', marginTop: 2 },
   scroll: { flex: 1 },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 11 },
   checkBadge: { width: 24, height: 24, borderRadius: 7, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
   checkBadgeText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.checkBadgeText },
-  checkLabel: { fontSize: typeSizes.checkLabel, fontWeight: '600', color: '#2a2a22' },
-  detailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginTop: -2 },
+  checkLabel: { fontSize: typeSizes.checkLabel, fontWeight: '600', color: theme.text },
+  detailCard: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 11, marginTop: -2 },
   detailSubtitle: { fontSize: typeSizes.detailSubtitle, fontWeight: '700', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  detailLine: { fontSize: typeSizes.detailLine, color: '#5c5848', lineHeight: 17 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f0eee8' },
+  detailLine: { fontSize: typeSizes.detailLine, color: theme.muted, lineHeight: 17 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.border },
   // #lisibilite-terrain : libellés/valeurs agrandis (au lieu de 11.5px) pour rester
   // lisibles sur le terrain, y compris pour la densité.
-  detailRowLabel: { fontSize: typeSizes.detailRowLabel, fontWeight: '600', color: TEXT_SECONDARY, flexShrink: 1 },
-  detailRowValue: { fontSize: typeSizes.detailRowValue, color: TEXT, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
-  offlineBanner: { marginTop: 6, backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 11, padding: 12 },
-  offlineText: { fontSize: typeSizes.offlineText, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
+  detailRowLabel: { fontSize: typeSizes.detailRowLabel, fontWeight: '600', color: theme.muted, flexShrink: 1 },
+  detailRowValue: { fontSize: typeSizes.detailRowValue, color: theme.text, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
+  offlineBanner: { marginTop: 6, backgroundColor: theme.warnBg, borderWidth: 1, borderColor: theme.warnBorder, borderRadius: 11, padding: 12 },
+  offlineText: { fontSize: typeSizes.offlineText, lineHeight: 16, color: theme.warn, fontWeight: '500' },
   footer: { padding: 16 },
   saveButton: { backgroundColor: GREEN, borderRadius: 13, padding: 15, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.saveButtonText },
-  quoteBanner: { backgroundColor: '#fdf6e7', borderWidth: 1, borderColor: '#f0e2bf', borderRadius: 10, padding: 11, marginBottom: 12 },
-  quoteText: { fontSize: typeSizes.quoteText, lineHeight: 16, color: '#8a6d2f', fontWeight: '500' },
+  quoteBanner: { backgroundColor: theme.warnBg, borderWidth: 1, borderColor: theme.warnBorder, borderRadius: 10, padding: 11, marginBottom: 12 },
+  quoteText: { fontSize: typeSizes.quoteText, lineHeight: 16, color: theme.warn, fontWeight: '500' },
   row: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   flex1: { flex: 1 },
-  figureCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 9 },
-  figureLabel: { fontSize: typeSizes.figureLabel, fontWeight: '500', color: '#9a9484', textTransform: 'uppercase' },
-  figureValue: { fontSize: typeSizes.figureValue, fontWeight: '700', color: TEXT, fontFamily: 'monospace' },
-  summaryCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 11, marginBottom: 14 },
-  summaryText: { fontSize: typeSizes.summaryText, lineHeight: 16, color: '#5c5848', fontWeight: '500' },
-  conclusionLabel: { fontSize: typeSizes.conclusionLabel, fontWeight: '700', color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 9 },
+  figureCard: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 9 },
+  figureLabel: { fontSize: typeSizes.figureLabel, fontWeight: '500', color: theme.faint, textTransform: 'uppercase' },
+  figureValue: { fontSize: typeSizes.figureValue, fontWeight: '700', color: theme.text, fontFamily: 'monospace' },
+  summaryCard: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, padding: 11, marginBottom: 14 },
+  summaryText: { fontSize: typeSizes.summaryText, lineHeight: 16, color: theme.muted, fontWeight: '500' },
+  conclusionLabel: { fontSize: typeSizes.conclusionLabel, fontWeight: '700', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 9 },
   footerRow: { padding: 16, paddingTop: 10, flexDirection: 'row', gap: 9 },
-  infirmeeButton: { flex: 1, backgroundColor: '#fff', borderWidth: 1.5, borderColor: RED, borderRadius: 13, padding: 14, alignItems: 'center' },
+  infirmeeButton: { flex: 1, backgroundColor: theme.card, borderWidth: 1.5, borderColor: RED, borderRadius: 13, padding: 14, alignItems: 'center' },
   infirmeeButtonText: { color: RED, fontWeight: '800', fontSize: typeSizes.infirmeeButtonText },
   confirmeeButton: { flex: 1, backgroundColor: GREEN, borderRadius: 13, padding: 14, alignItems: 'center' },
   confirmeeButtonText: { color: '#fff', fontWeight: '800', fontSize: typeSizes.confirmeeButtonText },

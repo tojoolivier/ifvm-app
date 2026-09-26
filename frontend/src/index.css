@@ -5,24 +5,24 @@
 @layer base {
   :root {
     /* Palette IFVM — docs/design_handoff_web/README.md §Design tokens */
-    --background: 44 52% 96%;
-    --foreground: 144 19% 11%;
+    --background: 38 31% 94%;
+    --foreground: 150 14% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 144 19% 11%;
+    --card-foreground: 150 14% 15%;
     --popover: 43 100% 99%;
     --popover-foreground: 60 9% 21%;
     --primary: 141 44% 25%;
     --primary-foreground: 0 0% 100%;
     --secondary: 43 45% 92%;
-    --secondary-foreground: 144 19% 11%;
+    --secondary-foreground: 150 14% 15%;
     --muted: 43 45% 92%;
-    --muted-foreground: 46 11% 39%;
+    --muted-foreground: 150 10% 27%;
     --accent: 135 24% 93%;
     --accent-foreground: 141 44% 25%;
     --destructive: 9 63% 46%;
     --destructive-foreground: 0 0% 100%;
-    --border: 44 35% 85%;
-    --input: 45 31% 82%;
+    --border: 44 27% 77%;
+    --input: 45 22% 74%;
     --ring: 141 44% 25%;
     --radius: 0.5rem;
     --chart-1: 141 44% 25%;

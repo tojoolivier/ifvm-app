@@ -23,6 +23,7 @@ jest.mock('../src/lib/referentiel-sync', () => ({
 }));
 
 
+import { assurerVolDeProspection } from '../src/lib/vol-sync';
 import {
   CaptureRow,
   DraftProspection,
@@ -36,6 +37,7 @@ import {
   listAllProspectionInfestations,
   listOperationsAeriennes,
 } from '../src/lib/prospection-repository';
+import { useEquipeTravailStore } from '../src/lib/equipe-travail-store';
 import { apiClient } from '../src/lib/api-client';
 import { NetworkError } from '../src/lib/errors';
 import * as Network from 'expo-network';
@@ -70,6 +72,10 @@ jest.mock('../src/lib/api-client', () => ({
   versionServeurDe: (error: unknown) =>
     (error as { serverVersion?: unknown } | null)?.serverVersion ?? null,
 }));
+jest.mock('../src/lib/vol-sync', () => ({ assurerVolDeProspection: jest.fn() }));
+jest.mock('../src/lib/storage', () => ({
+  storage: { getItem: jest.fn(), setItem: jest.fn(), deleteItem: jest.fn() },
+}));
 jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn() }));
 
 const mockCompleteProspection = jest.mocked(completeProspection);
@@ -77,6 +83,7 @@ const mockMarkSynced = jest.mocked(markProspectionSynced);
 const mockMarkEchec = jest.mocked(markProspectionEchec);
 const mockSynchroniserStatutServeur = jest.mocked(synchroniserStatutServeur);
 const mockCreateProspection = jest.mocked(apiClient.createProspection);
+const mockVolDeProspection = jest.mocked(assurerVolDeProspection);
 const mockGetNetworkState = jest.mocked(Network.getNetworkStateAsync);
 const mockListAllCaptures = jest.mocked(listAllProspectionCaptures);
 const mockListAllPopulations = jest.mocked(listAllProspectionPopulations);
@@ -92,6 +99,7 @@ function draft(overrides: Partial<DraftProspection> = {}): DraftProspection {
     prospecteur_nom: null,
     validated_at: null,
     revalide_de_id: null,
+    equipe_id: 'eq-1',
     station_id: null,
     biotope: 'Mesophyle',
     region: null,
@@ -176,6 +184,7 @@ beforeEach(() => {
   mockListAllPopulations.mockReset().mockResolvedValue([]);
   mockListAllInfestations.mockReset().mockResolvedValue([]);
   mockListOperationsAeriennes.mockReset().mockResolvedValue([]);
+  mockVolDeProspection.mockReset().mockResolvedValue(null);
 });
 
 describe('formatChrono / chronoSeconds', () => {
@@ -394,6 +403,8 @@ describe('enregistrerEtSynchroniser', () => {
     expect(mockCreateProspection).toHaveBeenCalledWith(
       'token-1',
       expect.objectContaining({
+        // #678 : la fiche garde son id local sur le serveur — sinon doublon et statut local figé.
+        id: 'draft-1',
         populations: [expect.objectContaining({ espece: 'LMC', categorie: 'imago', densite_diffuse: 5 })],
         infestations: [expect.objectContaining({ type_cible: 'dense', surface_totale: 5 })],
       })
@@ -538,6 +549,56 @@ describe('enregistrerEtSynchroniser', () => {
     );
   });
 
+  /** #revalidation-infestations-residuelles-sync : pendant de la ligne population
+   * ci-dessus pour `prospection_infestation` — `demarrerRevalidation` clone aussi
+   * ces lignes, mais aucun écran Extensif/Signalisation ne permet de les
+   * rouvrir. `type_cible` reste renseigné (colonne jamais nulle), mais aucun
+   * autre champ ne l'est : un résidu de clonage, jamais une saisie de l'agent.
+   * Sans filtrage, elle partirait quand même et exposerait la synchro entière à
+   * n'importe quelle contrainte de `InfestationCreate` sur un champ que l'agent
+   * n'a jamais vu. */
+  it('omet du payload une ligne infestation sans aucune donnée hormis type_cible (résidu de clonage), sans échouer', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'validee', validated_at: null });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockListAllPopulations.mockResolvedValue([]);
+    mockListAllInfestations.mockResolvedValue([
+      {
+        espece: null, type_cible: 'dense', taille_min: null, taille_max: null, taille_moy: null,
+        surface_totale: null, densite_min: null, densite_max: null, densite_moy: null, interdistance: null,
+        comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null,
+        pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null,
+        essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null,
+        interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null,
+        surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null,
+        taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null,
+        densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null,
+      },
+      // Celle-ci a de vraies données (surface_totale) : reste dans le payload.
+      {
+        espece: 'LMC', type_cible: 'vol_clair', taille_min: null, taille_max: null, taille_moy: null,
+        surface_totale: 8, densite_min: null, densite_max: null, densite_moy: null, interdistance: null,
+        comportement: null, direction_de: null, direction_vers: null, vent_de: null, vent_vitesse: null,
+        pullulation_nb: null, taille_long: null, taille_large: null, taille_epaisseur: null,
+        essaim_en_vol: null, essaim_pose: null, type_essaim: null, nb_taches_bandes: null,
+        interdistance_m: null, interdistance_min: null, interdistance_max: null, interdistance_moy: null,
+        surface_contaminee_ha: null, type_larve: null, surface_infestee_pourcent: null, stade_dominant: null,
+        taille_groupe_m2: null, front_longueur_m: null, front_largeur_m: null, densite_max_front: null,
+        densite_moy_arriere_front: null, heure_observation: null, densite_en_vol: null, dimension_ha: null,
+      },
+    ] as any);
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({
+        infestations: [expect.objectContaining({ type_cible: 'vol_clair', surface_totale: 8 })],
+      })
+    );
+  });
+
   /** #revalidation-sync-lien-perdu : `revalide_de_id` n'était jusqu'ici jamais
    * transmis à la synchronisation — le serveur ne pouvait donc ni faire
    * passer cette fiche directement à `validee` (CreateProspection.execute),
@@ -572,6 +633,18 @@ describe('enregistrerEtSynchroniser', () => {
       'token-1',
       expect.objectContaining({ revalide_de_id: null })
     );
+  });
+
+  it('envoie le vol de la fiche avant elle et transmet son vol_id (#644)', async () => {
+    mockCompleteProspection.mockResolvedValue(draft({ statut: 'en_attente' }));
+    mockGetNetworkState.mockResolvedValue({ isConnected: true, isInternetReachable: true } as any);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'en_attente', validated_at: null });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    mockVolDeProspection.mockResolvedValue('vol-1');
+
+    await enregistrerEtSynchroniser(draft(), [], 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith('token-1', expect.objectContaining({ vol_id: 'vol-1' }));
   });
 
   it('normalise type_cible et type_essaim pour la synchro (0031 : "essaim" a disparu du contrat TypeCible ; anciennes valeurs à 5 niveaux de type_essaim toujours reconnues)', async () => {
@@ -727,5 +800,43 @@ describe('syncAllProspections — le lot résume', () => {
 
     expect(resume.reussies).toEqual(['a', 'c']);
     expect(resume.echouees.map((f) => f.id)).toEqual(['b']);
+  });
+});
+describe('rattachement à l’équipe (#641)', () => {
+  beforeEach(() => {
+    mockListAllCaptures.mockResolvedValue([]);
+    mockListAllPopulations.mockResolvedValue([]);
+    mockListAllInfestations.mockResolvedValue([]);
+    mockListOperationsAeriennes.mockResolvedValue([]);
+    mockCreateProspection.mockResolvedValue({ id: 'remote-1', statut: 'brouillon', validated_at: null });
+    mockMarkSynced.mockResolvedValue(draft({ statut_sync: 'synced' }));
+    useEquipeTravailStore.setState({ equipeId: null });
+  });
+
+  it('envoie l’équipe d’origine du brouillon, même si l’équipe de travail a changé depuis', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-actuelle' });
+
+    await syncOneProspection(draft({ equipe_id: 'eq-origine' }), 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ equipe_id: 'eq-origine' })
+    );
+  });
+
+  it('un brouillon sans équipe reste synchronisable avec l’équipe de travail courante', async () => {
+    useEquipeTravailStore.setState({ equipeId: 'eq-actuelle' });
+
+    await syncOneProspection(draft({ equipe_id: null }), 'token-1');
+
+    expect(mockCreateProspection).toHaveBeenCalledWith(
+      'token-1',
+      expect.objectContaining({ equipe_id: 'eq-actuelle' })
+    );
+  });
+
+  it('refuse avec un message qui renvoie vers Paramètres quand aucune équipe n’est connue', async () => {
+    await expect(syncOneProspection(draft({ equipe_id: null }), 'token-1')).rejects.toThrow(/équipe de travail/i);
+    expect(mockCreateProspection).not.toHaveBeenCalled();
   });
 });

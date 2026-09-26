@@ -8,13 +8,18 @@ import {
   assurerProspectionDisponibleLocalement,
   materialiserFichesDisponibles,
 } from '@/lib/prospection-accueil';
-import { listProspectionsDisponiblesPourTraitementLocal } from '@/lib/prospection-repository';
+import {
+  listProspectionIdsAvecTraitementLocal,
+  listProspectionsDisponiblesPourTraitementLocal,
+} from '@/lib/prospection-repository';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from '@/components/traitement/tokens';
 import { runTask } from '@/lib/run-task';
 import { EtatVide } from '@/components/erreurs/etat-vide';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 const LIBELLE_TYPE: Record<string, string> = {
   extensive: 'Extensive',
@@ -67,7 +72,8 @@ export default function TraitementProspectionPickerScreen() {
   const [horsLigne, setHorsLigne] = useState(false);
   const { run, isRunning: isSelectionEnCours } = useAsyncAction();
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const charger = useCallback(() => {
     if (!token) return;
@@ -80,9 +86,26 @@ export default function TraitementProspectionPickerScreen() {
         // dès qu'elle apparaît en ligne (pas seulement la fiche choisie), pour
         // qu'elle reste consultable au prochain passage hors connexion.
         await materialiserFichesDisponibles(outcome.value);
+        // #liste-nouveau-traitement-exclut-deja-traitees : le serveur n'exclut une fiche qu'une
+        // fois son traitement synchronisé — on retire aussi, tout de suite, celles pour
+        // lesquelles un traitement existe déjà sur cet appareil (brouillon, enregistré hors
+        // ligne…). Complément best-effort : s'il échoue, la liste serveur reste affichée telle quelle.
+        const dejaTraitees = await runTask(() => listProspectionIdsAvecTraitementLocal(), {
+          name: 'traitement.prospectionPicker.dejaTraitees',
+          criticality: 'best-effort',
+        });
+        const disponibles = dejaTraitees.ok
+          ? outcome.value.filter((p) => !dejaTraitees.value.has(p.id))
+          : outcome.value;
         setHorsLigne(false);
         setErreurDeLecture(null);
-        setProspections(outcome.value);
+        // Même liste (mêmes fiches, même ordre) : on garde l'état tel quel — évite un rendu
+        // inutile à chaque prise de focus (le filtre produit un nouveau tableau à chaque appel).
+        setProspections((precedentes) =>
+          precedentes.length === disponibles.length && precedentes.every((p, i) => p.id === disponibles[i].id)
+            ? precedentes
+            : disponibles
+        );
         setLoading(false);
         return;
       }
@@ -185,7 +208,7 @@ export default function TraitementProspectionPickerScreen() {
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: traitementColors.fondApp, padding: 16, gap: 12 },
     title: {
@@ -206,7 +229,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       padding: 10,
     },
     row: {
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
       borderWidth: 1,
       borderColor: traitementColors.bordure,
       borderRadius: traitementRadii.carte,

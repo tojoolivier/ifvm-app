@@ -25,12 +25,13 @@ import { resetDbForTests } from '../src/lib/prospection-db';
 const execAsync = jest.fn().mockResolvedValue(undefined);
 const runAsync = jest.fn().mockResolvedValue(undefined);
 const getAllAsync = jest.fn().mockResolvedValue([]);
+const getFirstAsync = jest.fn().mockResolvedValue(null);
 const withTransactionAsync = jest.fn(async (fn: () => Promise<void>) => {
   await fn();
 });
 const openDatabaseAsync = jest
   .fn()
-  .mockResolvedValue({ execAsync, runAsync, getAllAsync, withTransactionAsync });
+  .mockResolvedValue({ execAsync, runAsync, getAllAsync, getFirstAsync, withTransactionAsync });
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: (...args: unknown[]) => openDatabaseAsync(...args),
@@ -124,7 +125,8 @@ describe("l'écriture d'un lot", () => {
   it('écrit une ligne par entrée, dans une seule transaction', async () => {
     await creerTransportJournal().write([ligne(), ligne(), ligne()]);
 
-    expect(withTransactionAsync).toHaveBeenCalledTimes(1);
+    // Une transaction pour l'unique étape de migration (ouverture de la base), une pour le lot.
+    expect(withTransactionAsync).toHaveBeenCalledTimes(2);
     expect(runAsync).toHaveBeenCalledTimes(3);
   });
 

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, Platform, Modal, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
 import { traitementColors, traitementFonts, traitementRadii, useTraitementTypeSizes } from './tokens';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemePalette } from '@/constants/theme';
 
 interface TimeFieldProps {
   /** Heure au format "HH:mm", ou null si non renseignée. */
@@ -35,7 +37,8 @@ function fromHhmm(hhmm: string): Date {
 export function TimeField({ value, onChange, editable = true, placeholder = 'hh:mm', style, textStyle, placeholderStyle }: TimeFieldProps) {
   const [show, setShow] = useState(false);
   const typeSizes = useTraitementTypeSizes();
-  const styles = useMemo(() => createStyles(typeSizes), [typeSizes]);
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(typeSizes, theme), [typeSizes, theme]);
 
   const onValueChange = (_event: DateTimePickerChangeEvent, selectedDate: Date) => {
     setShow(false);
@@ -82,7 +85,7 @@ export function TimeField({ value, onChange, editable = true, placeholder = 'hh:
   );
 }
 
-function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
+function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>, theme: ThemePalette) {
   return StyleSheet.create({
     input: {
       minHeight: 44,
@@ -91,7 +94,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       borderColor: traitementColors.bordure,
       borderRadius: traitementRadii.chip,
       paddingHorizontal: 10,
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
     },
     value: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteTitre },
     placeholder: { fontFamily: traitementFonts.ui, fontSize: typeSizes.corps, color: traitementColors.texteLabel },
@@ -102,7 +105,7 @@ function createStyles(typeSizes: ReturnType<typeof useTraitementTypeSizes>) {
       alignItems: 'center',
     },
     pickerCard: {
-      backgroundColor: '#fff',
+      backgroundColor: theme.card,
       borderRadius: traitementRadii.chip,
       padding: 8,
       overflow: 'hidden',

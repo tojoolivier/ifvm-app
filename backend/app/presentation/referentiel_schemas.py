@@ -1,8 +1,17 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Annotated, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    computed_field,
+    model_validator,
+)
+
+from app.models.users import FONCTIONS_EQUIPE
 
 
 class ZoneAntiAcridienRead(BaseModel):
@@ -133,6 +142,7 @@ class ZoneAntiAcridienSyncRead(BaseModel):
     nom: str
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class PosteAcridienSyncRead(BaseModel):
@@ -143,6 +153,7 @@ class PosteAcridienSyncRead(BaseModel):
     za_id: uuid.UUID
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class StationFixeSyncRead(BaseModel):
@@ -159,6 +170,7 @@ class StationFixeSyncRead(BaseModel):
     region: str
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class UtilisateurEquipeSyncRead(BaseModel):
@@ -221,6 +233,126 @@ class PesticideSyncRead(BaseModel):
     type_produit: str | None
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
+
+
+class MouvementPesticideCreate(BaseModel):
+    """`site_destination_id` requis si et seulement si `type == 'transfert'` — même
+    règle que le CHECK `ck_mouvement_pesticide_destination_coherente` (#606), vérifiée
+    ici en amont pour un 422 lisible plutôt qu'une violation de contrainte brute."""
+
+    # Identifiant généré côté client (saisie hors-ligne, #639) : un rejeu du même
+    # contenu renvoie la ressource existante, un contenu différent répond 409.
+    id: uuid.UUID | None = None
+    type: Literal["approvisionnement", "transfert", "consommation"]
+    pesticide_id: uuid.UUID
+    site_id: uuid.UUID
+    site_destination_id: uuid.UUID | None = None
+    quantite: float = Field(gt=0)
+    unite: Literal["L", "kg"]
+    date_mouvement: date | None = None
+
+    @model_validator(mode="after")
+    def _valider_destination_coherente(self) -> "MouvementPesticideCreate":
+        est_transfert = self.type == "transfert"
+        if est_transfert and self.site_destination_id is None:
+            raise ValueError("site_destination_id est requis pour un transfert")
+        if not est_transfert and self.site_destination_id is not None:
+            raise ValueError("site_destination_id ne doit être renseigné que pour un transfert")
+        return self
+
+
+class MouvementPesticideRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    type: str
+    pesticide_id: uuid.UUID
+    site_id: uuid.UUID
+    site_destination_id: uuid.UUID | None
+    quantite: float
+    unite: str
+    date_mouvement: date
+    created_at: datetime
+    # Fiche traitement aérien d'origine (migration 0093, #609) — None pour tout
+    # mouvement manuel (approvisionnement, transfert).
+    traitement_id: uuid.UUID | None
+
+
+class SoldePesticideRead(BaseModel):
+    site_id: uuid.UUID
+    pesticide_id: uuid.UUID
+    unite: str
+    quantite: float
+
+
+class VolCreate(BaseModel):
+    """Les règles d'obligation par catégorie (site principal + stand pour
+    mise_en_place/application, motif pour convoyage/divers, lieux pour convoyage —
+    §6/§5.3/§5.5 du document de cadrage) sont vérifiées côté use case, pas ici : le
+    message d'erreur y est plus précis qu'un `ValueError` de validateur Pydantic."""
+
+    # Identifiant généré côté client (saisie hors-ligne, #639) — cf.
+    # `MouvementPesticideCreate.id`.
+    id: uuid.UUID | None = None
+    type: Literal["mise_en_place", "application", "convoyage", "prospection", "divers"]
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    date_vol: date
+    heure_debut: time
+    heure_fin: time
+    site_principal_id: uuid.UUID | None = None
+    stand_id: uuid.UUID | None = None
+    base_secondaire_id: uuid.UUID | None = None
+    motif: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    lieu_depart: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = (
+        None
+    )
+    lieu_arrivee: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = (
+        None
+    )
+    observations: str | None = None
+
+    @model_validator(mode="after")
+    def _valider_heures(self) -> "VolCreate":
+        if self.heure_fin <= self.heure_debut:
+            raise ValueError("heure_fin doit être postérieure à heure_debut")
+        return self
+
+
+class VolUpdate(BaseModel):
+    """Rattachement différé d'un traitement aérien (#610) — seul champ mutable
+    après création d'un vol."""
+
+    traitement_id: uuid.UUID
+
+
+class VolRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    type: str
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    site_principal_id: uuid.UUID | None
+    stand_id: uuid.UUID | None
+    base_secondaire_id: uuid.UUID | None
+    traitement_id: uuid.UUID | None
+    date_vol: date
+    heure_debut: time
+    heure_fin: time
+    motif: str | None
+    lieu_depart: str | None
+    lieu_arrivee: str | None
+    observations: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def duree_minutes(self) -> int:
+        """Dérivée de heure_debut/heure_fin à la lecture, jamais stockée (#608)."""
+        debut = datetime.combine(date.min, self.heure_debut)
+        fin = datetime.combine(date.min, self.heure_fin)
+        return int((fin - debut).total_seconds() // 60)
 
 
 class CultureRead(BaseModel):
@@ -286,16 +418,6 @@ class LieuAerienUpdate(BaseModel):
     actif: bool | None = None
 
 
-class MembreEquipeAerienneRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    nom: str
-
-
-class MembreEquipeAerienneCreate(BaseModel):
-    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-
-
 class AeronefRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -308,8 +430,8 @@ class AeronefRead(BaseModel):
 
 
 class AeronefCreate(BaseModel):
-    """Aéronef créé avec son équipe (`EquipeAerienneCreate.aeronef`) — pas d'endpoint de
-    création isolé : un aéronef n'existe pas sans équipe."""
+    """Corps de `POST /aeronefs` (#621), et forme imbriquée de `EquipeCreate.aeronef`
+    pour les formulaires qui saisissent l'appareil en même temps que l'équipe."""
 
     immatriculation: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)
@@ -332,155 +454,203 @@ class AeronefUpdate(BaseModel):
     actif: bool | None = None
 
 
-class EquipeAerienneRead(BaseModel):
+class AffectationAeronefRead(BaseModel):
+    """Période pendant laquelle un appareil a servi dans une équipe (#603).
+    `date_fin: null` désigne l'affectation en cours."""
+
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    nom: str
-    chef_de_base_id: uuid.UUID
-    # Nullable : équipes créées avant la migration 0072. Toujours renseignés pour
-    # une équipe créée depuis (EquipeAerienneCreate les exige).
-    pilote: str | None = None
-    mecanicien: str | None = None
-    consultant_international: str | None = None
-    # Hélicoptère de l'équipe (migration 0078) — nullable pour les équipes antérieures.
-    aeronef_id: uuid.UUID | None = None
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    date_debut: date
+    date_fin: date | None = None
     aeronef: AeronefRead | None = None
-    membres: list[MembreEquipeAerienneRead] = Field(default_factory=list)
-    actif: bool
     created_at: datetime
-    updated_at: datetime
 
 
-class EquipeAerienneCreate(BaseModel):
-    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-    chef_de_base_id: uuid.UUID
-    pilote: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-    mecanicien: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
-    ]
-    consultant_international: (
-        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+class AffectationAeronefCreate(BaseModel):
+    """`date_debut` est explicite : une affectation est saisie après coup aussi souvent
+    qu'en temps réel, et la dater du jour de la saisie fausserait l'historique."""
+
+    aeronef_id: uuid.UUID
+    date_debut: date
+    date_fin: date | None = None
+
+
+class AffectationAeronefCloture(BaseModel):
+    """Retrait d'un appareil : on borne la période, on n'efface pas la ligne."""
+
+    date_fin: date
+
+
+class MembreEquipeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    user_id: uuid.UUID
+    fonction: str
+    # Résolus par jointure sur `utilisateur` : l'identité n'est plus stockée sur la
+    # ligne de membre (ADR-018), elle est lue là où elle vit.
+    nom: str | None = None
+    prenom: str | None = None
+
+
+class MembreEquipeCreate(BaseModel):
+    """Membre désigné soit par son compte (`user_id`), soit par son identité — auquel
+    cas un compte non authentifiable est créé à la volée (`ROLES_A_LA_VOLEE`)."""
+
+    fonction: Literal[FONCTIONS_EQUIPE]  # type: ignore[valid-type]
+    user_id: uuid.UUID | None = None
+    nom: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
         | None
     ) = None
-    # Hélicoptère de l'équipe (migration 0078) : exigé pour toute nouvelle équipe, comme
-    # pilote/mécanicien — nullable en base uniquement pour les équipes antérieures.
-    aeronef: AeronefCreate
-    membres: list[MembreEquipeAerienneCreate] = Field(default_factory=list)
+    prenom: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
+
+    @model_validator(mode="after")
+    def _exiger_compte_ou_identite(self) -> "MembreEquipeCreate":
+        if self.user_id is None and not self.nom:
+            raise ValueError("un membre doit porter soit user_id, soit nom")
+        if self.user_id is not None and self.nom:
+            raise ValueError("user_id et nom sont exclusifs : le compte porte déjà l'identité")
+        return self
 
 
-class MembreEquipeTerrestreRead(BaseModel):
+class EquipeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     nom: str
-
-
-class MembreEquipeTerrestreCreate(BaseModel):
-    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-
-
-class EquipeTerrestreRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    nom: str
-    chef_equipe_id: uuid.UUID
-    membres: list[MembreEquipeTerrestreRead] = Field(default_factory=list)
+    type: Literal["terrestre", "aerien"]
+    # Appareil **en service** dans l'équipe — projection de l'affectation ouverte de
+    # `equipe_aeronef` (#603), et non plus une colonne. `null` quand l'équipe est entre
+    # deux appareils. L'historique complet se lit par `GET /equipes/{id}/aeronefs`.
+    aeronef_id: uuid.UUID | None = None
+    aeronef: AeronefRead | None = None
+    membres: list[MembreEquipeRead] = Field(default_factory=list)
     actif: bool
     created_at: datetime
     updated_at: datetime
 
 
-class EquipeTerrestreCreate(BaseModel):
+class EquipeCreate(BaseModel):
     nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-    chef_equipe_id: uuid.UUID
-    membres: list[MembreEquipeTerrestreCreate] = Field(default_factory=list)
+    type: Literal["terrestre", "aerien"]
+    # Deux formes exclusives (#621) : l'appareil est saisi ici (création à la volée,
+    # forme historique) ou désigné au référentiel par son identifiant.
+    aeronef: AeronefCreate | None = None
+    aeronef_id: uuid.UUID | None = None
+    membres: list[MembreEquipeCreate] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _exiger_un_chef_et_un_seul(self) -> "EquipeCreate":
+        """Une équipe naît avec son chef, comme du temps où `chef_de_base_id` /
+        `chef_equipe_id` étaient NOT NULL : l'unification en `equipe_membre` ne devait
+        pas rendre le chef facultatif. Une équipe sans chef est d'ailleurs inutilisable
+        — `_resoudre_equipe_creation` refuse ensuite la création de ses lieux.
+
+        L'unicité, elle, est déjà tenue en base (`uq_equipe_membre_chef_par_equipe`) ;
+        la vérifier ici n'en fait qu'un 422 explicite plutôt qu'un 409 de contrainte."""
+        chefs = [m for m in self.membres if m.fonction == "chef"]
+        if not chefs:
+            raise ValueError("une équipe doit avoir un membre de fonction 'chef'")
+        if len(chefs) > 1:
+            raise ValueError("une équipe n'a qu'un seul chef")
+        return self
+
+    @model_validator(mode="after")
+    def _aeronef_suit_le_type(self) -> "EquipeCreate":
+        """L'aéronef suit exactement le type : exigé en aérien (règle inchangée depuis
+        la migration 0078), interdit en terrestre (`ck_equipe_aeronef_reserve_aerien`).
+
+        `aeronef` et `aeronef_id` sont exclusifs : l'un crée l'appareil, l'autre en
+        désigne un du référentiel ; accepter les deux obligerait à trancher lequel
+        l'emporte, sans qu'aucune réponse ne soit évidente pour l'appelant."""
+        if self.aeronef is not None and self.aeronef_id is not None:
+            raise ValueError("aeronef et aeronef_id sont exclusifs")
+        designe = self.aeronef is not None or self.aeronef_id is not None
+        if self.type == "aerien" and not designe:
+            raise ValueError("une équipe aérienne doit avoir un aéronef")
+        if self.type != "aerien" and designe:
+            raise ValueError("un aéronef ne s'affecte qu'à une équipe aérienne")
+        return self
 
 
-class BaseAerienneRead(BaseModel):
+class EquipeUpdate(BaseModel):
+    """Mise à jour partielle. `type` en est volontairement absent : le type d'une équipe
+    n'est pas modifiable après création (ADR-018) — garanti ici, sans trigger en base.
+    Pas de suppression non plus : `actif=False` est la seule sortie."""
+
+    nom: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)] | (
+        None
+    ) = None
+    actif: bool | None = None
+
+
+class SiteAerienneRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    parent_base_id: uuid.UUID | None
-    # NOT NULL uniquement sur une base principale (#equipe-aerienne, migration
-    # 0066) — une secondaire hérite de l'équipe de sa principale via
-    # `parent_base_id`, elle n'a pas sa propre `equipe_id`.
+    parent_site_id: uuid.UUID | None
+    # NOT NULL uniquement sur un site principal (#equipe-aerienne, migration
+    # 0066) — un secondaire hérite de l'équipe de son principal via
+    # `parent_site_id`, il n'a pas sa propre `equipe_id`.
     equipe_id: uuid.UUID | None
     numero: str
     localite: str
-    longitude: float | None
-    latitude: float | None
-    altitude: float | None
     actif: bool
     created_at: datetime
     updated_at: datetime
 
 
-class BaseAerienneCreate(BaseModel):
-    numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
-    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    parent_base_id: uuid.UUID | None = None
-    # Requis si `parent_base_id` est absent (base principale), doit être absent
-    # sinon (base secondaire) — validé par `CreateBaseAerienne` (message clair)
-    # et par `ck_base_aerienne_equipe_coherente` (garde-fou base de données).
-    equipe_id: uuid.UUID | None = None
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
+class SiteAeriennePositionInstaller(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
     altitude: float | None = None
 
 
-class BaseAerienneUpdate(BaseModel):
+class SiteAerienneCreate(BaseModel):
+    # `id` fourni par le mobile hors-ligne (#655, patron #639) : création idempotente.
+    id: uuid.UUID | None = None
+    # Position initiale facultative : évite un second appel `POST …/positions`.
+    position: SiteAeriennePositionInstaller | None = None
+    numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    parent_site_id: uuid.UUID | None = None
+    # Requis si `parent_site_id` est absent (site principal), doit être absent
+    # sinon (site secondaire) — validé par `CreateSiteAerienne` (message clair)
+    # et par `ck_site_aerienne_equipe_coherente` (garde-fou base de données).
+    equipe_id: uuid.UUID | None = None
+
+
+class SiteAerienneUpdate(BaseModel):
     """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
 
     numero: (
         Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)] | None
     ) = None
     localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
-    parent_base_id: uuid.UUID | None = None
+    parent_site_id: uuid.UUID | None = None
     equipe_id: uuid.UUID | None = None
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    altitude: float | None = None
     actif: bool | None = None
 
 
-class StandRemplissageRead(BaseModel):
+class SiteAeriennePositionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    numero: str
-    localite: str
-    longitude: float | None
-    latitude: float | None
+    site_id: uuid.UUID
+    latitude: float
+    longitude: float
     altitude: float | None
-    # `None` pour un stand créé avant la migration 0078, non encore rattaché à une équipe.
-    equipe_aerienne_id: uuid.UUID | None = None
-    actif: bool
+    date_debut: date
+    date_fin: date | None
+    # Dérivée à la lecture, jamais stockée (AC #604) : `date_fin - date_debut`, ou
+    # l'écart à `today()` si la position est encore active.
+    duree_jours: int
     created_at: datetime
-    updated_at: datetime
 
 
-class StandRemplissageCreate(BaseModel):
-    numero: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
-    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    altitude: float | None = None
-    # Omis par un chef de base : le stand est rattaché à SON équipe (une seule possible).
-    # Obligatoire pour un admin, qui agit pour le compte d'une équipe qu'il doit désigner.
-    equipe_aerienne_id: uuid.UUID | None = None
+class SiteAerienneDeplacer(SiteAeriennePositionInstaller):
+    """Déplacement groupé (#655) : `dependants` = ids des sites rattachés à déplacer
+    avec le principal, à la même position."""
 
-
-class StandRemplissageUpdate(BaseModel):
-    """Mise à jour partielle. Pas de suppression : `actif=False` est la seule sortie."""
-
-    numero: (
-        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)] | None
-    ) = None
-    localite: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    altitude: float | None = None
-    # Réservé aux admins : rattache/change l'équipe d'un stand (dont ceux antérieurs à la
-    # migration 0078, « sans équipe »).
-    equipe_aerienne_id: uuid.UUID | None = None
-    actif: bool | None = None
+    dependants: list[uuid.UUID] = Field(default_factory=list)
 
 
 class CultureSyncRead(BaseModel):
@@ -490,6 +660,7 @@ class CultureSyncRead(BaseModel):
     nom: str
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class LieuAerienSyncRead(BaseModel):
@@ -503,6 +674,7 @@ class LieuAerienSyncRead(BaseModel):
     actif: bool
     equipe_aerienne_id: uuid.UUID | None = None
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class CodeStadeSyncRead(BaseModel):
@@ -517,6 +689,7 @@ class CodeStadeSyncRead(BaseModel):
     ordre: int
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class CodeStadeRead(BaseModel):
@@ -564,6 +737,77 @@ class CampagneSyncRead(BaseModel):
     end_date: date | None
     actif: bool
     updated_at: datetime
+    deleted_at: datetime | None = None
+
+
+class SiteAerienneSyncRead(BaseModel):
+    """Site aérien pour le pull mobile (#638), avec sa position active aplatie.
+
+    `latitude`/`longitude`/`date_debut_position` valent `None` pour un site sans
+    implantation en cours (jamais installé, ou démonté) : le mobile doit distinguer
+    « pas de position » de « position à (0, 0) »."""
+
+    id: uuid.UUID
+    parent_site_id: uuid.UUID | None
+    equipe_id: uuid.UUID | None
+    numero: str
+    localite: str
+    actif: bool
+    latitude: float | None = None
+    longitude: float | None = None
+    altitude: float | None = None
+    date_debut_position: date | None = None
+    updated_at: datetime
+    deleted_at: datetime | None = None
+
+
+class EquipeSyncRead(BaseModel):
+    """Équipe pour le pull mobile (#638). Les membres et affectations d'appareil ont
+    leurs propres collections (`equipe_membres`, `equipe_aeronefs`) : elles évoluent
+    à des moments différents et se pullent avec leur propre curseur."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nom: str
+    type: Literal["terrestre", "aerien"]
+    actif: bool
+    updated_at: datetime
+    deleted_at: datetime | None = None
+
+
+class EquipeMembreSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    equipe_id: uuid.UUID
+    user_id: uuid.UUID
+    fonction: str
+    nom: str | None = None
+    prenom: str | None = None
+    created_at: datetime
+
+
+class AeronefSyncRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    immatriculation: str
+    societe: str
+    volume_cuve_l: float
+    actif: bool
+    updated_at: datetime
+    deleted_at: datetime | None = None
+
+
+class EquipeAeronefSyncRead(BaseModel):
+    """Affectation d'un appareil à une équipe (#638). `date_fin: null` = en cours ;
+    une clôture remonte comme une ligne mise à jour, jamais comme une absence."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    equipe_id: uuid.UUID
+    aeronef_id: uuid.UUID
+    date_debut: date
+    date_fin: date | None = None
+    updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 T = TypeVar("T")
@@ -583,4 +827,11 @@ class ReferentielPullResponse(BaseModel):
     cultures: EntityPull[CultureSyncRead]
     codes_stades: EntityPull[CodeStadeSyncRead]
     campagnes: EntityPull[CampagneSyncRead]
-    lieux_aeriens: EntityPull[LieuAerienSyncRead]
+    # DÉPRÉCIÉ (#638) : remplacé par `sites_aeriens` (+ position active), `equipes`
+    # et `aeronefs`. Conservé tant que le mobile publié le lit ; à retirer avec #641.
+    lieux_aeriens: EntityPull[LieuAerienSyncRead] = Field(deprecated=True)
+    sites_aeriens: EntityPull[SiteAerienneSyncRead]
+    equipes: EntityPull[EquipeSyncRead]
+    equipe_membres: EntityPull[EquipeMembreSyncRead]
+    aeronefs: EntityPull[AeronefSyncRead]
+    equipe_aeronefs: EntityPull[EquipeAeronefSyncRead]
