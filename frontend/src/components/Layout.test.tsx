@@ -146,12 +146,13 @@ describe('Layout (#121)', () => {
   )
 
   /** #suivi-heures-de-vol : même lectorat que Traitements (aérien). */
-  it('affiche l’entrée de nav "Heures de vol", à côté de Traitements', async () => {
+  it('affiche l’entrée de nav "Vols", à côté de Traitements (remplace "Heures de vol")', async () => {
     renderLayout()
     await waitFor(() => {
-      const item = screen.getByText('Heures de vol').closest('a')
-      expect(item).toHaveAttribute('href', '/fiches-vol')
+      const item = screen.getByText('Vols').closest('a')
+      expect(item).toHaveAttribute('href', '/vols')
     })
+    expect(screen.queryByText('Heures de vol')).not.toBeInTheDocument()
   })
 
   /** Sous 1024 px le menu est un tiroir (jsdom n'applique pas les media queries : on teste l'état). */
