@@ -496,4 +496,58 @@ describe('pullReferentiel', () => {
     await expect(pullReferentiel('token-1')).rejects.toThrow('network down');
     expect(runAsync).not.toHaveBeenCalledWith(expect.stringContaining('referentiel_sync_meta'), expect.anything());
   });
+
+  /**
+   * #referentiel-pull-entite-manquante : reproduit le plantage observé en production
+   * (« TypeError: Cannot read property 'upserts' of undefined », dans purgerSupprimes) —
+   * un serveur pas encore à jour avec une entité récente (ici equipe_aeronefs) omet sa clé
+   * de la réponse. La synchro doit continuer les autres entités plutôt que tout faire échouer
+   * avec le message générique « Un problème inattendu est survenu ».
+   */
+  it('ne plante pas quand une entité est absente de la réponse (serveur pas encore à jour)', async () => {
+    const reponsePartielle = emptyResponse('2026-08-02T00:00:00Z') as Record<string, unknown>;
+    delete reponsePartielle.equipe_aeronefs;
+    mockPullReferentiel.mockResolvedValue(reponsePartielle as never);
+
+    await expect(pullReferentiel('token-1')).resolves.toBeUndefined();
+
+    // Les autres entités sont bien traitées normalement.
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO referentiel_sync_meta'),
+      ['postes_acridiens', '2026-08-02T00:00:00Z']
+    );
+    // L'entité absente n'avance pas son curseur — elle sera redemandée en entier au
+    // prochain pull, une fois le serveur à jour.
+    expect(runAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO referentiel_sync_meta'),
+      ['equipe_aeronefs', expect.anything()]
+    );
+  });
+
+  it('ne plante pas non plus quand l’entité absente porte des suppressions à traiter pour une autre (#674)', async () => {
+    // equipe_aeronefs est dans PURGE_ENFANTS_D_ABORD : vérifie que son absence n'empêche pas
+    // la purge des autres entités de cette même liste.
+    const supprime = {
+      id: 'pa-supprime',
+      code: 'PA-2',
+      nom: 'PA',
+      za_id: 'za',
+      actif: true,
+      updated_at: '2026-08-02T00:00:00Z',
+      deleted_at: '2026-08-02T00:00:00Z',
+    };
+    const reponsePartielle = {
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      postes_acridiens: { upserts: [supprime], server_time: '2026-08-02T00:00:00Z' },
+    } as Record<string, unknown>;
+    delete reponsePartielle.equipe_aeronefs;
+    mockPullReferentiel.mockResolvedValue(reponsePartielle as never);
+
+    await expect(pullReferentiel('token-1')).resolves.toBeUndefined();
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM poste_acridien'),
+      ['pa-supprime']
+    );
+  });
 });
