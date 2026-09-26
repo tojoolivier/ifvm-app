@@ -50,3 +50,8 @@ export function coordonneesValides(latitude: number, longitude: number): boolean
     longitude <= 51
   );
 }
+
+/** Décimal signé saisi à la main (virgule ou point) ; `NaN` si vide ou illisible. */
+export function parserCoordonnee(texte: string): number {
+  return texte.trim() === '' ? Number.NaN : Number(texte.trim().replace(',', '.'));
+}

@@ -1,4 +1,5 @@
 import type { components } from '@/lib/api-schema.generated';
+import type { ProspectionCreate, SaisieProspection } from '@/lib/prospection-db';
 import { parserHa, type ReferenceValeurs } from '@/lib/prospection-reference-schema';
 import type { ZoneAdministrative } from '@/lib/geo-administratif';
 
@@ -69,4 +70,56 @@ export function repartitionSurfaces(s: { total: number | null; prospectee: numbe
 export function formaterDateHeure(d: Date): string {
   const deux = (n: number) => String(n).padStart(2, '0');
   return `${deux(d.getDate())}/${deux(d.getMonth() + 1)}/${d.getFullYear()} · ${deux(d.getHours())}:${deux(d.getMinutes())}`;
+}
+
+export interface PositionSaisie {
+  latitude: number;
+  longitude: number;
+  altitude: number | null;
+}
+
+/**
+ * Fiche complète écrite par l'étape Référence : reprend le brouillon existant (listes, champs des autres
+ * étapes) et n'y remplace que ce que cet écran gère.
+ */
+export function construireSaisieReference(p: {
+  brouillon?: ProspectionCreate & { id: string };
+  id: string;
+  type: SaisieReference['type'];
+  campagneId: string;
+  equipeId: string;
+  dateProspection: string;
+  numeroFiche: string;
+  numeroMessage: string;
+  stationId: string | null;
+  paCode: string | null;
+  zone: ZoneAdministrative | null;
+  position: PositionSaisie | null;
+  valeurs: ReferenceValeurs;
+}): SaisieProspection {
+  const { brouillon: b } = p;
+  return {
+    ...b,
+    id: p.id,
+    type_prospection: p.type,
+    campagne_id: p.campagneId,
+    equipe_id: p.equipeId,
+    date_prospection: p.dateProspection,
+    n_fiche: p.numeroFiche,
+    n_message: p.type === 'extensive' ? p.numeroMessage : null,
+    station_id: p.stationId,
+    pa_code: p.paCode,
+    region: p.zone?.region ?? null,
+    district: p.zone?.district ?? null,
+    commune: p.zone?.commune ?? null,
+    latitude: p.position?.latitude ?? null,
+    longitude: p.position?.longitude ?? null,
+    altitude: p.position?.altitude ?? null,
+    avertissements: b?.avertissements ?? [],
+    populations: b?.populations ?? [],
+    captures: b?.captures ?? [],
+    infestations: b?.infestations ?? [],
+    operations_aeriennes: b?.operations_aeriennes ?? [],
+    ...champsDeReference({ ...p.valeurs, type: p.type, biotope: p.valeurs.biotope as SaisieReference['biotope'] }),
+  };
 }

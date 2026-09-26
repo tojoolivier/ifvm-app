@@ -1,4 +1,4 @@
-import { coordonneesValides, formaterDistance, plusProche } from '@/lib/prospection-rattachement';
+import { coordonneesValides, formaterDistance, parserCoordonnee, plusProche } from '@/lib/prospection-rattachement';
 
 const ici = { latitude: -25, longitude: 45 };
 
@@ -33,5 +33,14 @@ describe('coordonneesValides', () => {
     expect(coordonneesValides(0, 0)).toBe(false);
     expect(coordonneesValides(48.8, 2.3)).toBe(false);
     expect(coordonneesValides(Number.NaN, 45)).toBe(false);
+  });
+});
+
+describe('parserCoordonnee', () => {
+  it('lit un décimal signé à virgule ou à point, NaN si vide ou illisible', () => {
+    expect(parserCoordonnee('-24,5')).toBe(-24.5);
+    expect(parserCoordonnee(' 45.2 ')).toBe(45.2);
+    expect(parserCoordonnee('')).toBeNaN();
+    expect(parserCoordonnee('abc')).toBeNaN();
   });
 });
