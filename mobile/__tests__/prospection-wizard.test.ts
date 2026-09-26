@@ -22,9 +22,9 @@ describe('prospection-wizard', () => {
     expect(etapeDeReprise({})).toBe(0);
     expect(etapeDeReprise(ref)).toBe(1);
     expect(etapeDeReprise({ ...ref, vegetation: { verdissement: 3 } as never })).toBe(2);
-    expect(
-      etapeDeReprise({ ...ref, vegetation: { a: 1 } as never, sol: { b: 1 } as never, observations: 'RAS' }),
-    ).toBe(4);
+    const faite = { ...ref, vegetation: { a: 1 } as never, sol: { b: 1 } as never };
+    expect(etapeDeReprise(faite)).toBe(3);
+    expect(etapeDeReprise(faite, { aucunCriquet: true, grilles: {} })).toBe(4);
   });
 
   describe('reprise d’un brouillon (#689, #688)', () => {
@@ -36,9 +36,10 @@ describe('prospection-wizard', () => {
     });
 
     it('intensif : humidité seule ne suffit pas, humidité et texture oui', () => {
-      const base = { ...ref, type_prospection: 'intensive' as const, vegetation: { strates: { herbeuse: { recouvrement: 80 } } } as never, observations: 'RAS' };
-      expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'] } as never })).toBe(2);
-      expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'], texture: ['bloc'] } as never })).toBe(4);
+      const base = { ...ref, type_prospection: 'intensive' as const, vegetation: { strates: { herbeuse: { recouvrement: 80 } } } as never };
+      const filtre = { aucunCriquet: false, grilles: { 'LMC:imago': { phases: ['solitaire'], stades: ['A4'] } } };
+      expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'] } as never }, filtre)).toBe(2);
+      expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'], texture: ['bloc'] } as never }, filtre)).toBe(4);
     });
 
     it('extensif : la Végétation est « faite » dès qu’une de ses colonnes est saisie (pas de JSON vegetation)', () => {

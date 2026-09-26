@@ -1,4 +1,5 @@
 import type { ProspectionCreate } from './prospection-db';
+import type { FiltreObservation } from './prospection-observation';
 
 /**
  * Étapes du wizard de prospection (#683), déclarées une seule fois : l'en-tête, la navigation et la
@@ -33,7 +34,7 @@ export function estRenseignee(valeur: unknown): boolean {
 type Saisie = Partial<ProspectionCreate>;
 
 /** Une étape est « faite » quand ses champs clés sont renseignés ; la récap n'a pas de saisie propre. */
-const ESTIMATEURS: Record<Exclude<Etape, 'recapitulatif'>, (s: Saisie) => boolean> = {
+const ESTIMATEURS: Record<Exclude<Etape, 'recapitulatif'>, (s: Saisie, filtre: FiltreObservation | null) => boolean> = {
   reference: (s) => estRenseignee(s.station_id) && estRenseignee(s.date_prospection),
   // En extensif, la végétation n'est pas un JSON mais trois colonnes (#688).
   vegetation: (s) =>
@@ -42,11 +43,12 @@ const ESTIMATEURS: Record<Exclude<Etape, 'recapitulatif'>, (s: Saisie) => boolea
       : estRenseignee(s.vegetation),
   // En intensif, `sol` contient déjà `solNu` dès l'étape Végétation : seules humidité et texture (obligatoires) font l'étape Sol (#689).
   sol: (s) => (s.type_prospection === 'intensive' ? estRenseignee(s.sol?.humidite) && estRenseignee(s.sol?.texture) : estRenseignee(s.sol)),
-  observations: (s) => estRenseignee(s.observations) || estRenseignee(s.ennemis_naturels),
+  // Le filtre « Qu'avez-vous observé ? » est enregistré à part du corps de la fiche (#701) : posé = étape faite.
+  observations: (_s, filtre) => filtre != null,
 };
 
 /** Reprise d'un brouillon : première étape non renseignée (0-indexé), la récap si tout est fait. */
-export function etapeDeReprise(saisie: Saisie): number {
-  const i = ETAPES.findIndex((e) => e !== 'recapitulatif' && !ESTIMATEURS[e](saisie));
+export function etapeDeReprise(saisie: Saisie, filtre: FiltreObservation | null = null): number {
+  const i = ETAPES.findIndex((e) => e !== 'recapitulatif' && !ESTIMATEURS[e](saisie, filtre));
   return i === -1 ? NB_ETAPES - 1 : i;
 }

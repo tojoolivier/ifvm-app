@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ObservationStep } from '@/components/prospection/ObservationStep';
 import { ReferenceStep } from '@/components/prospection/ReferenceStep';
 import { SolStep } from '@/components/prospection/SolStep';
 import { VegetationExtensiveStep } from '@/components/prospection/VegetationExtensiveStep';
@@ -12,6 +13,7 @@ import { UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import { logger } from '@/lib/logger';
 import { getFiche, type ProspectionCreate } from '@/lib/prospection-db';
+import type { FiltreObservation } from '@/lib/prospection-observation';
 import { ETAPES, NB_ETAPES, estTypeWizard, etapeDeReprise, typeDeFiche, type TypeWizard } from '@/lib/prospection-wizard';
 
 const log = logger.child({ module: 'wizard' });
@@ -29,6 +31,7 @@ export default function WizardScreen() {
   const [typeFiche, setTypeFiche] = useState<TypeWizard | null>(estTypeWizard(type) ? type : null);
   const [numero, setNumero] = useState<string | null>(null);
   const [brouillon, setBrouillon] = useState<(ProspectionCreate & { id: string }) | undefined>();
+  const [filtre, setFiltre] = useState<FiltreObservation | null>(null);
   const [index, setIndex] = useState(0);
   const [introuvable, setIntrouvable] = useState(false);
 
@@ -42,7 +45,8 @@ export default function WizardScreen() {
         setTypeFiche(typeDeFiche(locale.fiche));
         setNumero(locale.fiche.n_fiche ?? null);
         setBrouillon(locale.fiche);
-        setIndex(etapeDeReprise(locale.fiche));
+        setFiltre(locale.filtre_observation ?? null);
+        setIndex(etapeDeReprise(locale.fiche, locale.filtre_observation ?? null));
       })
       .catch(() => !annule && setIntrouvable(true));
     return () => {
@@ -56,6 +60,7 @@ export default function WizardScreen() {
       const locale = await getFiche(ficheId);
       if (!locale) return setIntrouvable(true);
       setBrouillon(locale.fiche);
+      setFiltre(locale.filtre_observation ?? null);
       setIndex(prochaine);
     } catch (e) {
       log.failure('wizard_relecture_fiche', e);
@@ -94,6 +99,9 @@ export default function WizardScreen() {
       {index === 2 && typeFiche === 'intensive' && brouillon && (
         <SolStep brouillon={brouillon} onContinuer={apres(3)} onModifier={() => setIndex(1)} />
       )}
+      {index === 3 && brouillon && (
+        <ObservationStep type={brouillon.type_prospection} brouillonId={brouillon.id} filtreInitial={filtre} onContinuer={apres(4)} />
+      )}
       {index > 0 && index < NB_ETAPES - 1 && !etapeAvecEcran(index, typeFiche) && (
         <PrimaryButton label={t('prospection.suivant')} onPress={() => setIndex(index + 1)} testID="wizard-suivant" />
       )}
@@ -103,7 +111,7 @@ export default function WizardScreen() {
 
 /** Étapes qui ont leur propre écran (donc leur propre bouton « Continuer ») : pas de « Suivant » générique. */
 const etapeAvecEcran = (index: number, type: TypeWizard) =>
-  (index === 1 && (type === 'intensive' || type === 'extensive')) || (index === 2 && type === 'intensive');
+  (index === 1 && (type === 'intensive' || type === 'extensive')) || (index === 2 && type === 'intensive') || index === 3;
 
 const styles = StyleSheet.create({ root: { flex: 1 }, message: { padding: UiSpace[16] } });
 

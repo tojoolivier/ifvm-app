@@ -6,6 +6,7 @@ import {
   creerRevalidation,
   enregistrerBrouillon,
   enregistrerDepuisServeur,
+  enregistrerFiltreObservation,
   getFiche,
   listerARevalider,
   listerBrouillons,
@@ -95,6 +96,40 @@ describe('brouillon', () => {
     await soumettreFiche(soumise);
     await expect(supprimerBrouillon(soumise)).rejects.toBeInstanceOf(PreconditionError);
     await expect(enregistrerBrouillon({ ...saisie(), id: soumise })).rejects.toBeInstanceOf(PreconditionError);
+  });
+});
+
+describe('filtre « Qu’avez-vous observé ? » du brouillon (#701)', () => {
+  const filtre = { aucunCriquet: false, grilles: { 'LMC:imago': { phases: ['solitaire'], stades: ['A4', 'A5'] } } };
+
+  it('vaut null tant que l’étape n’a pas été faite', async () => {
+    const id = await enregistrerBrouillon(saisie());
+
+    expect((await getFiche(id))?.filtre_observation).toBeNull();
+  });
+
+  it('se relit à l’identique (reprise sans perte)', async () => {
+    const id = await enregistrerBrouillon(saisie());
+
+    await enregistrerFiltreObservation(id, filtre);
+
+    expect((await getFiche(id))?.filtre_observation).toEqual(filtre);
+  });
+
+  it('survit à une nouvelle sauvegarde du corps de la fiche', async () => {
+    const id = await enregistrerBrouillon(saisie());
+    await enregistrerFiltreObservation(id, filtre);
+
+    await enregistrerBrouillon({ ...saisie({ observations: 'reprise' }), id });
+
+    expect((await getFiche(id))?.filtre_observation).toEqual(filtre);
+  });
+
+  it('ne s’écrit plus sur une fiche soumise', async () => {
+    const id = await enregistrerBrouillon(saisie());
+    await soumettreFiche(id);
+
+    await expect(enregistrerFiltreObservation(id, filtre)).rejects.toBeInstanceOf(PreconditionError);
   });
 });
 

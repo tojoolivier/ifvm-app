@@ -3,6 +3,7 @@ import { getDb } from './db';
 import { PreconditionError } from './errors';
 import { generateId } from './id';
 import { creerOutbox } from './outbox';
+import type { FiltreObservation } from './prospection-observation';
 
 /**
  * Fiches de prospection locales (#722) : brouillon, envoi, reprise, revalidation.
@@ -31,6 +32,8 @@ export interface FicheLocale {
   statut_sync: 'local' | 'synced' | 'echec' | 'conflict';
   validated_at: string | null;
   server_updated_at: string | null;
+  /** Ce que l'agent a déclaré voir à l'étape Observations (#701) ; null tant qu'elle n'est pas faite. Local, jamais envoyé. */
+  filtre_observation: FiltreObservation | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +80,7 @@ interface LigneProspection {
   validated_at: string | null;
   server_updated_at: string | null;
   corps: string;
+  filtre_observation: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -159,6 +163,7 @@ async function lireFiche(db: Db, ligne: LigneProspection): Promise<FicheLocale> 
     statut_sync: ligne.statut_sync,
     validated_at: ligne.validated_at,
     server_updated_at: ligne.server_updated_at,
+    filtre_observation: ligne.filtre_observation ? (JSON.parse(ligne.filtre_observation) as FiltreObservation) : null,
     created_at: ligne.created_at,
     updated_at: ligne.updated_at,
   };
@@ -199,6 +204,21 @@ export async function enregistrerBrouillon(
 }
 
 /** Le brouillon devient une fiche à envoyer : `en_attente`, elle entre dans la file de synchronisation. */
+/** Enregistre le filtre de l'étape Observations avec le brouillon, sans toucher au corps de la fiche. */
+export async function enregistrerFiltreObservation(id: string, filtre: FiltreObservation): Promise<void> {
+  const db = await getDb();
+  const existante = await ligneDe(db, id);
+  if (!existante) throw new PreconditionError(`Brouillon ${id} introuvable sur cet appareil.`);
+  if (existante.statut !== 'brouillon') {
+    throw new PreconditionError('Cette fiche est déjà soumise : elle ne peut plus être modifiée.');
+  }
+  await db.runAsync('UPDATE prospection SET filtre_observation = ?, updated_at = ? WHERE id = ?', [
+    JSON.stringify(filtre),
+    new Date().toISOString(),
+    id,
+  ]);
+}
+
 export async function soumettreFiche(id: string): Promise<void> {
   const db = await getDb();
   const ligne = await ligneDe(db, id);

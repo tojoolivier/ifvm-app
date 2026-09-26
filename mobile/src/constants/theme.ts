@@ -253,6 +253,8 @@ export const UiText = {
   captionMedium: { fontFamily: InterFonts.medium, fontSize: 13, lineHeight: 17 },
   button: { fontFamily: InterFonts.semiBold, fontSize: 16, lineHeight: 20 },
   heading: { fontFamily: InterFonts.semiBold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2 },
+  /** Titre d'écran « Qu'avez-vous observé ? » (style Figma `Title`). */
+  title: { fontFamily: InterFonts.bold, fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
   micro: { fontFamily: InterFonts.medium, fontSize: 11, lineHeight: 13 },
   eyebrow: {
     fontFamily: InterFonts.semiBold,

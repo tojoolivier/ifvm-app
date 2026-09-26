@@ -40,4 +40,11 @@ export const MIGRATIONS_CAPTURES: readonly Migration[] = [
     nom: 'stockage-prospection',
     up: (db) => db.execAsync(PROSPECTION_DDL),
   },
+  {
+    // Filtre « Qu'avez-vous observé ? » (#701) : état d'écran du brouillon, jamais envoyé au serveur, donc hors
+    // contrat OpenAPI. Un JSON par fiche (1:1, jamais filtré par morceaux en SQL) ; NULL = étape pas encore faite.
+    version: 4,
+    nom: 'prospection-filtre-observation',
+    up: (db) => db.execAsync('ALTER TABLE prospection ADD COLUMN filtre_observation TEXT'),
+  },
 ];

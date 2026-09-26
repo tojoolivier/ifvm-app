@@ -124,6 +124,12 @@ typography:
     fontWeight: 600
     lineHeight: 22px
     letterSpacing: -0.2px
+  ui-title:
+    fontFamily: Inter, sans-serif
+    fontSize: 22px
+    fontWeight: 700
+    lineHeight: 28px
+    letterSpacing: -0.3px
   ui-button:
     fontFamily: Inter, sans-serif
     fontSize: 16px

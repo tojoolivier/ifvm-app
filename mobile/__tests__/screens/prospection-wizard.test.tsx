@@ -72,6 +72,19 @@ jest.mock('@/components/prospection/VegetationExtensiveStep', () => {
   };
 });
 
+// Idem pour « Qu'avez-vous observé ? » (prospection-observation.test.tsx) : le double montre ce qu'il reçoit.
+jest.mock('@/components/prospection/ObservationStep', () => {
+  const { Text, Pressable } = require('react-native');
+  return {
+    ObservationStep: ({ type, brouillonId, filtreInitial, onContinuer }: { type: string; brouillonId: string; filtreInitial?: { aucunCriquet: boolean } | null; onContinuer: () => void }) => (
+      <Pressable onPress={onContinuer}>
+        <Text>{`Observation ${type} ${brouillonId}${filtreInitial ? ' avec filtre' : ''}`}</Text>
+        <Text>Continuer observation</Text>
+      </Pressable>
+    ),
+  };
+});
+
 describe('WizardScreen', () => {
   beforeEach(() => {
     mockParams = {};
@@ -213,11 +226,41 @@ describe('WizardScreen', () => {
 
     await fireEvent.press(screen.getByText('Suivant'));
     await fireEvent.press(await screen.findByText('Continuer végétation extensive'));
-    for (let i = 0; i < 2; i++) await fireEvent.press(screen.getByText('Suivant'));
+    await fireEvent.press(screen.getByText('Suivant'));
+    await fireEvent.press(await screen.findByText('Continuer observation'));
 
     expect(screen.getByText('Étape 5 sur 5')).toBeVisible();
     expect(screen.getByText('Récapitulatif')).toBeVisible();
     expect(screen.queryByText('Suivant')).toBeNull();
+  });
+
+  it.each(['intensive', 'extensive', 'validation'] as const)('étape 4 (%s) : monte « Qu’avez-vous observé ? » sur la fiche relue, sans « Suivant » générique', async (type) => {
+    mockParams = { id: 'f4' };
+    jest.mocked(getFiche).mockResolvedValue({
+      fiche: { id: 'f4', type_prospection: type, revalide_de_id: null, n_fiche: 'FI-4', station_id: 's', date_prospection: '2026-09-25', vegetation: { a: 1 }, sol: { humidite: ['surface'], texture: ['bloc'] }, hauteur_herbe_cm: 40 },
+      filtre_observation: null,
+    } as never);
+    await render(<WizardScreen />);
+
+    expect(await screen.findByText(`Observation ${type} f4`)).toBeVisible();
+    expect(screen.getByText('Étape 4 sur 5')).toBeVisible();
+    expect(screen.queryByTestId('wizard-suivant')).toBeNull();
+    await fireEvent.press(screen.getByText('Continuer observation'));
+    expect(await screen.findByText('Étape 5 sur 5')).toBeVisible();
+  });
+
+  it('reprise : un filtre déjà enregistré passe l’étape 4 et se retrouve en revenant dessus', async () => {
+    mockParams = { id: 'f5' };
+    jest.mocked(getFiche).mockResolvedValue({
+      fiche: { id: 'f5', type_prospection: 'extensive', revalide_de_id: null, n_fiche: 'FI-5', station_id: 's', date_prospection: '2026-09-25', hauteur_herbe_cm: 40, sol: { humidite: ['surface'] } },
+      filtre_observation: { aucunCriquet: true, grilles: {} },
+    } as never);
+    await render(<WizardScreen />);
+
+    await waitFor(() => expect(screen.getByText('Étape 5 sur 5')).toBeVisible());
+    await fireEvent.press(screen.getByLabelText('Retour'));
+
+    expect(screen.getByText('Observation extensive f5 avec filtre')).toBeVisible();
   });
 
   it('signale un brouillon illisible au lieu d’échouer en silence', async () => {
