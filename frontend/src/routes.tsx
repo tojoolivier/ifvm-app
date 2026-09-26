@@ -111,7 +111,7 @@ export const routes: RouteObject[] = [
             element: <SynthesesPage />,
             handle: { crumb: 'Analyse', title: 'Synthèses & export' },
           },
-          { path: '/carte', element: <CartePage />, handle: { title: 'Carte des infestations' } },
+          { path: '/carte', element: <CartePage />, handle: { title: 'Cartographie' } },
           {
             path: '/design-system',
             element: <DesignSystemPage />,

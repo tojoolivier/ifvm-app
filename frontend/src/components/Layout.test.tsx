@@ -105,6 +105,16 @@ describe('Layout (#121)', () => {
     expect(screen.queryByText('Administration')).not.toBeInTheDocument()
   })
 
+  /** L'onglet de la carte s'appelle « Cartographie » (et non plus « Carte des infestations »). */
+  it('affiche l’entrée de nav "Cartographie" vers la carte, et plus "Carte des infestations"', async () => {
+    renderLayout()
+    await waitFor(() => {
+      const item = screen.getByText('Cartographie').closest('a')
+      expect(item).toHaveAttribute('href', '/carte')
+    })
+    expect(screen.queryByText('Carte des infestations')).not.toBeInTheDocument()
+  })
+
   /** #suivi-heures-de-vol : même lectorat que Traitements (aérien). */
   it('affiche l’entrée de nav "Heures de vol", à côté de Traitements', async () => {
     renderLayout()

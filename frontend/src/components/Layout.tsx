@@ -101,7 +101,7 @@ export function Layout() {
       ? [
           { to: '/campagnes', label: 'Campagnes', count: campagnes.length },
           { to: '/prospections', label: 'Prospections', count: nbProspections },
-          { to: '/carte', label: 'Carte des infestations' },
+          { to: '/carte', label: 'Cartographie' },
           { to: '/syntheses', label: 'Synthèses & export' },
           { to: '/administration', label: 'Utilisateurs & stations', count: role === 'admin' ? nbUsers : undefined },
           { to: '/referentiels', label: 'Référentiels', count: NB_REFERENTIELS },
@@ -110,13 +110,13 @@ export function Layout() {
     ...(role === 'verificateur' || role === 'prospecteur'
       ? [
           { to: '/prospections', label: 'Prospections', count: nbProspections },
-          { to: '/carte', label: 'Carte des infestations' },
+          { to: '/carte', label: 'Cartographie' },
         ]
       : []),
     ...(role === 'validation_finale'
       ? [
           { to: '/validation-finale', label: 'Validation finale', count: nbVerifiees },
-          { to: '/carte', label: 'Carte des infestations' },
+          { to: '/carte', label: 'Cartographie' },
         ]
       : []),
     ...(canTraitements
