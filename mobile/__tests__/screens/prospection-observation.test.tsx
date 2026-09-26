@@ -8,10 +8,10 @@ jest.mock('@/lib/referentiel-db', () => ({ listStadesGrille: jest.fn() }));
 jest.mock('@/lib/prospection-db', () => ({ enregistrerFiltreObservation: jest.fn() }));
 
 const stade = (code: string) => ({ code, libelle: code });
-/** Référentiel du ticket #701 : extensif sans sexe (A1–A5), intensif ♀ avec quarts de A3, larves par espèce. */
+/** Référentiel réel : imagos par sexe (♀ avec quarts de A3, ♂ groupé A234), larves sans sexe (LMC L1–L5, NSE jusqu'à L7). */
 const referentiel = async (espece: string, categorie: 'imago' | 'larve', sexe: 'F' | 'M' | null) => {
   if (categorie === 'larve') return (espece === 'NSE' ? ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'] : ['L1', 'L2', 'L3', 'L4', 'L5']).map(stade);
-  const codes = sexe === 'F' ? ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'] : ['A1', 'A2', 'A3', 'A4', 'A5'];
+  const codes = sexe === 'F' ? ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5'] : ['A1', 'A234', 'A5'];
   return codes.map(stade);
 };
 
@@ -20,15 +20,18 @@ beforeEach(() => {
 });
 
 describe('ObservationStep — jeux de puces par type et par espèce', () => {
-  it('intensif : un seul jeu de puces, avec les quarts de A3 du référentiel ♀', async () => {
+  it('intensif : un jeu ♀ avec les quarts de A3 et un jeu ♂ (A1, A234, A5)', async () => {
     await render(<ObservationStep brouillonId="b-1" type="intensive" onContinuer={jest.fn()} />);
 
     await fireEvent.press(screen.getByTestId('grille-LMC-imago'));
 
     for (const code of ['A1', 'A2', 'A3', 'A3-1/4', 'A3-1/2', 'A3-3/4', 'A3-4/4', 'A4', 'A5']) {
-      expect(await screen.findByTestId(`stade-LMC-imago-${code}`)).toBeTruthy();
+      expect(await screen.findByTestId(`stade-LMC-imago-F-${code}`)).toBeTruthy();
     }
-    expect(screen.queryByTestId('stade-LMC-imago-A234')).toBeNull();
+    for (const code of ['A1', 'A234', 'A5']) {
+      expect(await screen.findByTestId(`stade-LMC-imago-M-${code}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId('stade-LMC-imago-F-A234')).toBeNull();
   });
 
   it('NSE larves : pas de Solitaro-trans., stades L1 à L7', async () => {
@@ -38,7 +41,7 @@ describe('ObservationStep — jeux de puces par type et par espèce', () => {
 
     expect(screen.queryByTestId('phase-NSE-larve-solitaro_trans')).toBeNull();
     expect(screen.getByTestId('phase-NSE-larve-transiens')).toBeTruthy();
-    expect(await screen.findByTestId('stade-NSE-larve-L7')).toBeTruthy();
+    expect(await screen.findByTestId('stade-NSE-larve-sans_sexe-L7')).toBeTruthy();
   });
 });
 
@@ -74,14 +77,14 @@ describe('ObservationStep — validation du filtre', () => {
     await render(<ObservationStep brouillonId="b-1" type="extensive" onContinuer={onContinuer} />);
     await fireEvent.press(screen.getByTestId('grille-LMC-imago'));
     await fireEvent.press(screen.getByTestId('phase-LMC-imago-solitaire'));
-    await fireEvent.press(await screen.findByTestId('stade-LMC-imago-A4'));
+    await fireEvent.press(await screen.findByTestId('stade-LMC-imago-F-A4'));
 
     await fireEvent.press(screen.getByTestId('observation-continuer'));
 
     await waitFor(() => expect(onContinuer).toHaveBeenCalledTimes(1));
     expect(enregistrerFiltreObservation).toHaveBeenCalledWith('b-1', {
       aucunCriquet: false,
-      grilles: { 'LMC:imago': { phases: ['solitaire'], stades: ['A4'] } },
+      grilles: { 'LMC:imago': { phases: ['solitaire'], stades: { F: ['A4'], M: [], sans_sexe: [] } } },
     });
   });
 
@@ -111,7 +114,7 @@ describe('ObservationStep — validation du filtre', () => {
 
 describe('ObservationStep — reprise d\'un brouillon', () => {
   it('réaffiche le filtre enregistré : grille, phases et stades cochés', async () => {
-    const filtreInitial = { aucunCriquet: false, grilles: { 'NSE:larve': { phases: ['transiens', 'gregaire'], stades: ['L3', 'L4'] } } };
+    const filtreInitial = { aucunCriquet: false, grilles: { 'NSE:larve': { phases: ['transiens', 'gregaire'], stades: { F: [], M: [], sans_sexe: ['L3', 'L4'] } } } };
     await render(<ObservationStep brouillonId="b-1" type="extensive" filtreInitial={filtreInitial} onContinuer={jest.fn()} />);
 
     expect(screen.getByTestId('grille-NSE-larve').props.accessibilityState.selected).toBe(true);
@@ -136,7 +139,17 @@ describe('ObservationStep — référentiel des stades absent', () => {
     await fireEvent.press(screen.getByTestId('grille-LMC-imago'));
 
     expect(await screen.findByText(/Stades indisponibles hors ligne/)).toBeTruthy();
-    expect(screen.queryByTestId('stade-LMC-imago-A1')).toBeNull();
+    expect(screen.queryByTestId('stade-LMC-imago-F-A1')).toBeNull();
+  });
+
+  it('une autre erreur de lecture (base illisible) n\'est pas présentée comme un problème hors ligne', async () => {
+    (listStadesGrille as jest.Mock).mockRejectedValue(new Error('SQLite'));
+    await render(<ObservationStep brouillonId="b-1" type="extensive" onContinuer={jest.fn()} />);
+
+    await fireEvent.press(screen.getByTestId('grille-LMC-imago'));
+
+    expect(await screen.findByText('Les stades n’ont pas pu être lus sur cet appareil. Réessayez.')).toBeTruthy();
+    expect(screen.queryByText(/Stades indisponibles hors ligne/)).toBeNull();
   });
 });
 
@@ -150,12 +163,17 @@ describe('ObservationStep — extensif (maquette K1)', () => {
       expect(await screen.findByText(phase)).toBeTruthy();
     }
     for (const code of ['A1', 'A2', 'A3', 'A4', 'A5']) {
-      expect(await screen.findByTestId(`stade-LMC-imago-${code}`)).toBeTruthy();
+      expect(await screen.findByTestId(`stade-LMC-imago-F-${code}`)).toBeTruthy();
     }
-    expect(screen.queryByTestId('stade-LMC-imago-A3-1/4')).toBeNull();
+    for (const code of ['A1', 'A234', 'A5']) {
+      expect(await screen.findByTestId(`stade-LMC-imago-M-${code}`)).toBeTruthy();
+    }
+    expect(screen.getByText('♀ Femelles')).toBeTruthy();
+    expect(screen.getByText('♂ Mâles')).toBeTruthy();
+    expect(screen.queryByTestId('stade-LMC-imago-F-A3-1/4')).toBeNull();
 
     await fireEvent.press(screen.getByTestId('phase-LMC-imago-solitaire'));
-    await fireEvent.press(screen.getByTestId('stade-LMC-imago-A4'));
+    await fireEvent.press(screen.getByTestId('stade-LMC-imago-F-A4'));
     expect(screen.getByText('Captures · 1 grille ›')).toBeTruthy();
   });
 
@@ -181,11 +199,11 @@ describe('ObservationStep — extensif (maquette K1)', () => {
     await fireEvent.press(screen.getByTestId('grille-LMC-imago'));
 
     await fireEvent.press(screen.getByTestId('phase-LMC-imago-solitaire'));
-    await fireEvent.press(await screen.findByTestId('stade-LMC-imago-A4'));
+    await fireEvent.press(await screen.findByTestId('stade-LMC-imago-F-A4'));
 
     expect(screen.getByText('✓ Solitaires')).toBeTruthy();
     expect(screen.getByText('✓ A4')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('stade-LMC-imago-A4'));
+    await fireEvent.press(screen.getByTestId('stade-LMC-imago-F-A4'));
     expect(screen.queryByText('✓ A4')).toBeNull();
   });
 });

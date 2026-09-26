@@ -15,8 +15,11 @@ import {
   filtreVide,
   grilleVue,
   nbGrilles,
+  stadesAffiches,
   type FiltreObservation,
+  type SexeVu,
 } from '@/lib/prospection-observation';
+import { ReferentialError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { enregistrerFiltreObservation } from '@/lib/prospection-db';
 import { listStadesGrille } from '@/lib/referentiel-db';
@@ -129,30 +132,39 @@ type FiltreGrilleProps = {
   appliquer: (transition: (filtre: FiltreObservation) => FiltreObservation) => void;
 };
 
-/** Deux lignes de puces compactes : phases vues, puis stades vus lus dans le référentiel. */
+type Stade = { code: string; libelle: string };
+
+/** Les imagos ont un jeu de stades par sexe, les larves un seul. */
+const sexesDe = (categorie: CategorieGrille): SexeVu[] => (categorie === 'imago' ? ['F', 'M'] : ['sans_sexe']);
+
+/** Phases vues, puis stades vus lus dans le référentiel : un jeu par sexe pour les imagos, un seul pour les larves. */
 function FiltreGrille({ type, espece, categorie, filtre, appliquer }: FiltreGrilleProps) {
   const c = useUiTheme();
   const { t } = useTranslation();
-  const [stades, setStades] = useState<{ code: string; libelle: string }[]>([]);
-  const [indisponibles, setIndisponibles] = useState(false);
   const grille = grilleVue(filtre, espece, categorie)!;
   const choisi = (libelle: string, coche: boolean) => (coche ? t('ui.choisi', { libelle }) : libelle);
   const libelleCategorie = t(categorie === 'imago' ? 'prospection.observation.imagos' : 'prospection.observation.larves');
+  const [stades, setStades] = useState<Partial<Record<SexeVu, Stade[]>>>({});
+  const [erreur, setErreur] = useState<'referentiel' | 'lecture' | null>(null);
 
-  // Intensif : jeu de puces ♀ (la grille en déduit la ligne ♂) ; extensif et validation : grille non sexée.
-  const sexe = type === 'intensive' && categorie === 'imago' ? 'F' : null;
   useEffect(() => {
     let actif = true;
-    listStadesGrille(espece, categorie, sexe)
-      .then((liste) => actif && setStades(liste))
+    Promise.all(
+      sexesDe(categorie).map(async (sexe) => {
+        const liste = await listStadesGrille(espece, categorie, sexe === 'sans_sexe' ? null : sexe);
+        return [sexe, stadesAffiches(type, liste)] as const;
+      })
+    )
+      .then((paires) => actif && setStades(Object.fromEntries(paires)))
       .catch((e) => {
         log.failure('observation_stades', e);
-        if (actif) setIndisponibles(true);
+        // Référentiel sans stade pour cette grille (pas synchronisé) ≠ base illisible : deux messages, deux remèdes.
+        if (actif) setErreur(e instanceof ReferentialError ? 'referentiel' : 'lecture');
       });
     return () => {
       actif = false;
     };
-  }, [espece, categorie, sexe]);
+  }, [type, espece, categorie]);
 
   return (
     <View style={[styles.filtre, { backgroundColor: c.greenBg }]}>
@@ -174,19 +186,32 @@ function FiltreGrille({ type, espece, categorie, filtre, appliquer }: FiltreGril
       <Text style={[UiText.captionMedium, { color: c.primary }]}>
         {t('prospection.observation.stadesVus', { categorie: libelleCategorie })}
       </Text>
-      {indisponibles && <Banner tone="warning" message={t('prospection.observation.stadesIndisponibles')} />}
-      <View style={styles.puces}>
-        {stades.map((stade) => (
-          <Chip
-            key={stade.code}
-            compact
-            label={choisi(stade.libelle, grille.stades.includes(stade.code))}
-            selected={grille.stades.includes(stade.code)}
-            onPress={() => appliquer((f) => basculerStade(f, espece, categorie, stade.code))}
-            testID={`stade-${espece}-${categorie}-${stade.code}`}
-          />
-        ))}
-      </View>
+      {erreur && (
+        <Banner
+          tone="warning"
+          message={t(erreur === 'referentiel' ? 'prospection.observation.stadesIndisponibles' : 'prospection.observation.stadesIllisibles')}
+        />
+      )}
+      {sexesDe(categorie).map((sexe) => (
+        <View key={sexe} style={styles.sexe}>
+          {sexe !== 'sans_sexe' && <Text style={[UiText.caption, { color: c.fg3 }]}>{t(`prospection.observation.sexe.${sexe}`)}</Text>}
+          <View style={styles.puces}>
+            {(stades[sexe] ?? []).map((stade) => {
+              const coche = grille.stades[sexe].includes(stade.code);
+              return (
+                <Chip
+                  key={stade.code}
+                  compact
+                  label={choisi(stade.libelle, coche)}
+                  selected={coche}
+                  onPress={() => appliquer((f) => basculerStade(f, espece, categorie, sexe, stade.code))}
+                  testID={`stade-${espece}-${categorie}-${sexe}-${stade.code}`}
+                />
+              );
+            })}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -200,5 +225,6 @@ const styles = StyleSheet.create({
   aucun: { paddingVertical: UiSpace[12], borderRadius: Radius.md, borderWidth: UiBorder.field, alignItems: 'center' },
   sautees: { paddingHorizontal: UiSpace[14], paddingVertical: UiSpace[12], borderRadius: Radius.md },
   filtre: { padding: UiSpace[12], borderRadius: Radius.sm, gap: UiSpace[10] },
+  sexe: { gap: UiSpace[6] },
   puces: { flexDirection: 'row', flexWrap: 'wrap', gap: UiSpace[6] },
 });

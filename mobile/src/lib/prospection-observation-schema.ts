@@ -14,7 +14,7 @@ export function creerObservationSchema(t: (cle: string) => string) {
         Object.values(grilles ?? {}).every((g) => g.phases.length > 0)
       )
       .test('stades', t('prospection.observation.erreurs.stades'), (grilles) =>
-        Object.values(grilles ?? {}).every((g) => g.stades.length > 0)
+        Object.values(grilles ?? {}).every((g) => Object.values(g.stades).some((liste) => liste.length > 0))
       ),
   });
 }

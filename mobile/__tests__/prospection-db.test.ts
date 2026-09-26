@@ -100,7 +100,7 @@ describe('brouillon', () => {
 });
 
 describe('filtre « Qu’avez-vous observé ? » du brouillon (#701)', () => {
-  const filtre = { aucunCriquet: false, grilles: { 'LMC:imago': { phases: ['solitaire'], stades: ['A4', 'A5'] } } };
+  const filtre = { aucunCriquet: false, grilles: { 'LMC:imago': { phases: ['solitaire'], stades: { F: ['A4', 'A5'], M: ['A234'], sans_sexe: [] } } } };
 
   it('vaut null tant que l’étape n’a pas été faite', async () => {
     const id = await enregistrerBrouillon(saisie());

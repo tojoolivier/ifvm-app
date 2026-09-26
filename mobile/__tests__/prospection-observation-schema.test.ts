@@ -29,7 +29,15 @@ describe('schéma « Qu\'avez-vous observé ? »', () => {
   it('accepte une grille avec au moins une phase et un stade', async () => {
     let filtre = basculerGrille(filtreVide(), 'LMC', 'imago');
     filtre = basculerPhase(filtre, 'LMC', 'imago', 'solitaire');
-    filtre = basculerStade(filtre, 'LMC', 'imago', 'A4');
+    filtre = basculerStade(filtre, 'LMC', 'imago', 'F', 'A4');
+
+    expect(await messages(filtre)).toEqual([]);
+  });
+
+  it('accepte une grille dont le seul stade vu est côté mâle', async () => {
+    let filtre = basculerGrille(filtreVide(), 'LMC', 'imago');
+    filtre = basculerPhase(filtre, 'LMC', 'imago', 'gregaire');
+    filtre = basculerStade(filtre, 'LMC', 'imago', 'M', 'A234');
 
     expect(await messages(filtre)).toEqual([]);
   });

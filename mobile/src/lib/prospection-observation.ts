@@ -1,8 +1,11 @@
-import type { CategorieGrille } from './prospection-capture-rules';
+import type { CategorieGrille, TypeGrille } from './prospection-capture-rules';
+
+/** Sexe sous lequel un stade est vu : les imagos ont un jeu par sexe, les larves n'en ont pas. */
+export type SexeVu = 'F' | 'M' | 'sans_sexe';
 
 export interface GrilleVue {
   phases: string[];
-  stades: string[];
+  stades: Record<SexeVu, string[]>;
 }
 
 /** Ce que l'agent a vu : une entrée par grille cochée, clé `espece:categorie`. */
@@ -27,7 +30,7 @@ export function basculerGrille(
   if (dejaCochee) return { ...filtre, grilles: autres };
   return {
     aucunCriquet: false,
-    grilles: { ...filtre.grilles, [cle(espece, categorie)]: { phases: [], stades: [] } },
+    grilles: { ...filtre.grilles, [cle(espece, categorie)]: { phases: [], stades: { F: [], M: [], sans_sexe: [] } } },
   };
 }
 
@@ -51,8 +54,13 @@ function modifierGrille(
 export const basculerPhase = (filtre: FiltreObservation, espece: string, categorie: CategorieGrille, phase: string) =>
   modifierGrille(filtre, espece, categorie, (g) => ({ ...g, phases: basculer(g.phases, phase) }));
 
-export const basculerStade = (filtre: FiltreObservation, espece: string, categorie: CategorieGrille, stade: string) =>
-  modifierGrille(filtre, espece, categorie, (g) => ({ ...g, stades: basculer(g.stades, stade) }));
+export const basculerStade = (
+  filtre: FiltreObservation,
+  espece: string,
+  categorie: CategorieGrille,
+  sexe: SexeVu,
+  stade: string
+) => modifierGrille(filtre, espece, categorie, (g) => ({ ...g, stades: { ...g.stades, [sexe]: basculer(g.stades[sexe], stade) } }));
 
 /** « Aucun criquet observé » est exclusif : il vide toutes les grilles. */
 export const choisirAucunCriquet = (_filtre: FiltreObservation): FiltreObservation => ({
@@ -61,3 +69,10 @@ export const choisirAucunCriquet = (_filtre: FiltreObservation): FiltreObservati
 });
 
 export const nbGrilles = (filtre: FiltreObservation) => Object.keys(filtre.grilles).length;
+
+/** Les quarts de A3 (A3-1/4 … A3-4/4) ne se saisissent que sur la fiche intensive. */
+const estQuartDeA3 = (code: string) => /^A3-\d\/\d$/.test(code);
+
+/** Stades proposés en puces : le référentiel complet en intensif, sans le détail des quarts de A3 ailleurs. */
+export const stadesAffiches = <T extends { code: string }>(type: TypeGrille, stades: T[]): T[] =>
+  type === 'intensive' ? stades : stades.filter((s) => !estQuartDeA3(s.code));

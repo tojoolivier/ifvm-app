@@ -37,7 +37,7 @@ describe('prospection-wizard', () => {
 
     it('intensif : humidité seule ne suffit pas, humidité et texture oui', () => {
       const base = { ...ref, type_prospection: 'intensive' as const, vegetation: { strates: { herbeuse: { recouvrement: 80 } } } as never };
-      const filtre = { aucunCriquet: false, grilles: { 'LMC:imago': { phases: ['solitaire'], stades: ['A4'] } } };
+      const filtre = { aucunCriquet: false, grilles: { 'LMC:imago': { phases: ['solitaire'], stades: { F: ['A4'], M: [], sans_sexe: [] } } } };
       expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'] } as never }, filtre)).toBe(2);
       expect(etapeDeReprise({ ...base, sol: { solNu: 20, humidite: ['surface'], texture: ['bloc'] } as never }, filtre)).toBe(4);
     });
