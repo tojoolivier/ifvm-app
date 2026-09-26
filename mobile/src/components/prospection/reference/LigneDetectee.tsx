@@ -1,11 +1,12 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { AppIcon, type AppIconName } from '@/components/ui/AppIcon';
 import { Radius, UiSize, UiSpace, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 
 type Props = {
-  icone: AppIconName;
+  /** Icône de la maquette (18 px, couleur primaire) — posée dans la pastille ronde. */
+  icone: ReactNode;
   libelle: string;
   valeur: string;
   /** Détail vert sous la valeur (« ✓ Auto · … », « Horodatage automatique »). */
@@ -23,7 +24,7 @@ export function LigneDetectee({ icone, libelle, valeur, note, action, valeurTest
   return (
     <View style={styles.ligne}>
       <View style={[styles.pastille, { backgroundColor: c.greenBg }]}>
-        <AppIcon name={icone} boite={UiSize.iconeLigne} color={c.primary} />
+        {icone}
       </View>
       <View style={styles.texte}>
         <Text style={[UiText.micro, { color: c.fg3 }]}>{libelle}</Text>

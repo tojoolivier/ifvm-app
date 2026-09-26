@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 /** Petites icônes en trait (stroke 2) du socle UI — la couleur est un paramètre. */
 type IconProps = { size?: number; color: string };
@@ -71,5 +71,24 @@ export function IconFermer({ size = 20, color }: IconProps) {
     <IconeSvg size={size}>
       <Path d="M6 6L18 18M18 6L6 18" stroke={color} {...trait} />
     </IconeSvg>
+  );
+}
+
+/** Poste acridien : drapeau (maquette Référence, boîte 18×18, trait 1,5). */
+export function IconPosteAcridien({ size = 18, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none" testID="icone-poste-acridien" accessibilityElementsHidden importantForAccessibility="no">
+      <Path d="M3.75 15.75V3H12L10.5 6L12 9H3.75" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** Station : cible — anneau et point central (maquette Référence, boîte 18×18, trait 1,5). */
+export function IconStation({ size = 18, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none" testID="icone-station" accessibilityElementsHidden importantForAccessibility="no">
+      <Circle cx={9} cy={9} r={2.25} fill={color} />
+      <Circle cx={9} cy={9} r={6} stroke={color} strokeWidth={1.5} />
+    </Svg>
   );
 }

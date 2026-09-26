@@ -377,3 +377,14 @@ describe('ReferenceStep — position persistée dès la capture (extensive)', ()
     expect(jest.mocked(enregistrerBrouillon).mock.calls[1][1]).toEqual({});
   });
 });
+
+describe('ReferenceStep — icônes de la maquette', () => {
+  it('affiche le drapeau du PA, la cible de la station, l’horloge de la date et l’épingle du GPS', async () => {
+    await render(<ReferenceStep type="intensive" onContinuer={jest.fn()} />);
+    await screen.findByText('BEL-014 · Andranomanitsy');
+    expect(screen.getByTestId('icone-poste-acridien', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('icone-station', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('icone-heures-de-vol')).toBeTruthy();
+    expect(screen.getByTestId('icone-localisation')).toBeTruthy();
+  });
+});

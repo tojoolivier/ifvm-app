@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { Text } from 'react-native';
 import { Card } from '@/components/ui';
-import { UiText } from '@/constants/theme';
+import { AppIcon } from '@/components/ui/AppIcon';
+import { IconPosteAcridien, IconStation } from '@/components/ui/icons';
+import { UiSize, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import type { Rattachement } from '@/hooks/use-rattachement';
 import { formaterDateHeure } from '@/lib/prospection-reference';
@@ -28,7 +30,7 @@ export function RattachementCard({ rattachement, horodatage, onChangerPa, onChan
     <Card>
       <Text style={[UiText.eyebrow, { color: c.fg3 }]}>{t('prospection.reference.rattachement')}</Text>
       <LigneDetectee
-        icone="sites"
+        icone={<IconPosteAcridien size={UiSize.iconeLigne} color={c.primary} />}
         libelle={t('prospection.reference.pa')}
         valeur={rattachement?.pa?.nom ?? vide}
         note={note(rattachement?.paManuel, t('prospection.reference.autoPlusProche', { distance }))}
@@ -36,7 +38,7 @@ export function RattachementCard({ rattachement, horodatage, onChangerPa, onChan
       />
       <Separateur />
       <LigneDetectee
-        icone="localisation"
+        icone={<IconStation size={UiSize.iconeLigne} color={c.primary} />}
         libelle={t('prospection.reference.station')}
         valeur={rattachement ? `${rattachement.station.code} · ${rattachement.station.nom}` : vide}
         note={note(rattachement?.stationManuel, t('prospection.reference.autoStation', { distance }))}
@@ -44,7 +46,7 @@ export function RattachementCard({ rattachement, horodatage, onChangerPa, onChan
       />
       <Separateur />
       <LigneDetectee
-        icone="heures-de-vol"
+        icone={<AppIcon name="heures-de-vol" boite={UiSize.iconeLigne} color={c.primary} />}
         libelle={t('prospection.reference.dateReleve')}
         valeur={formaterDateHeure(horodatage)}
         valeurTestID="date-releve"

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Text } from 'react-native';
 import { Card, NumberField } from '@/components/ui';
-import { UiText } from '@/constants/theme';
+import { AppIcon } from '@/components/ui/AppIcon';
+import { UiSize, UiText } from '@/constants/theme';
 import { useUiTheme } from '@/hooks/use-ui-theme';
 import type { ErreursReference, ReferenceForm } from '@/hooks/use-reference-form';
 import { formaterDateHeure } from '@/lib/prospection-reference';
@@ -34,7 +35,7 @@ export function LocalisationLibreCard({ form, erreurs, horodatage }: Props) {
       </form.Field>
       <Separateur />
       <LigneDetectee
-        icone="heures-de-vol"
+        icone={<AppIcon name="heures-de-vol" boite={UiSize.iconeLigne} color={c.primary} />}
         libelle={t('prospection.reference.dateReleve')}
         valeur={formaterDateHeure(horodatage)}
         valeurTestID="date-releve"
