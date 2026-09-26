@@ -1862,6 +1862,23 @@ export async function listProspectionsARevaliderLocal(): Promise<DraftProspectio
 }
 
 /**
+ * #revalidation-liste-exclut-origine-revalidee : identifiants des fiches déjà revalidées sur
+ * cet appareil — un enfant chaîné via `revalide_de_id` réellement CRÉÉ (`statut != 'brouillon'`,
+ * même condition que `listProspectionsARevaliderLocal` ci-dessus ; un simple assistant amorcé
+ * puis abandonné ne compte pas). Le serveur (`a_revalider`) n'exclut l'origine qu'une fois cet
+ * enfant SYNCHRONISÉ — sans ce complément local, l'origine restait visible dans « Revalidation »
+ * (en ligne) entre la création de sa revalidation et le prochain passage réseau, remontrant côte
+ * à côte l'ancienne fiche et sa remplaçante fraîchement créée.
+ */
+export async function listProspectionIdsDejaRevalideesLocalement(): Promise<Set<string>> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ revalide_de_id: string }>(
+    `SELECT DISTINCT revalide_de_id FROM prospection WHERE revalide_de_id IS NOT NULL AND statut != 'brouillon'`
+  );
+  return new Set(rows.map((r) => r.revalide_de_id));
+}
+
+/**
  * Fiches de prospection éligibles au sélecteur de « Nouvelle fiche de traitement »
  * (traitement-picker.tsx) — exclut désormais celles dont la surface infestée est
  * déjà intégralement couverte par une fiche de traitement existante (Aérien ou
