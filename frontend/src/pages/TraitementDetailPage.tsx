@@ -1,31 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ErrorBanner } from '@/components/ui/error-banner'
 import { FicheTableau } from '@/components/FicheTableau'
 import { NavTabs } from '@/components/ui/nav-tabs'
-import { OngletsFiche, type OngletFiche } from '@/components/ui/onglets-fiche'
 import { PILL_TONES, Pill } from '@/components/ui/pill'
 import { MODE_LABELS, ROLE_LABELS, SIGNATURE_ROLES, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
 import {
-  KITS_EPI,
-  axesRisque,
-  especesListees,
-  formatHeure,
   formatHorodatage,
   formatSurface,
-  libelleImpact,
   libelleSurfaceTraitee,
-  resumeEspeces,
   surfaceTraiteeOuProtegee,
-  zonesExposeesLabels,
 } from '@/lib/traitement-fiche'
-import { useAnnuaire } from '@/lib/use-annuaire'
 
 interface Rotation {
   id: string
@@ -175,69 +165,12 @@ interface TraitementDetail {
   }[]
 }
 
-interface PesticideSync {
-  id: string
-  nom: string
-}
-
-interface ReferentielPullResponse {
-  pesticides: { upserts: PesticideSync[] }
-}
-
 /** Carte blanche de la maquette : `#fff`, bordure `#e7e0cd`, rayon `11px`. */
 function Carte({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <section className={cn('rounded-[11px] border border-[#e7e0cd] bg-card', className)}>
       {children}
     </section>
-  )
-}
-
-/** Titre de section en capitales — `600 9.5px`, interlettrage `1px`. */
-function TitreSection({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="mb-3 font-sans text-[9.5px] font-semibold uppercase tracking-[1px] text-ifvm-text-weak">
-      {children}
-    </h2>
-  )
-}
-
-/** Pastille EPI : `16px`, rayon `4px`, verte cochée / rouge décochée. */
-function PastilleEpi({ actif }: { actif: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] font-sans text-[9px] font-bold text-white',
-        actif ? 'bg-ifvm-green-text' : 'bg-[#c0412b]',
-      )}
-    >
-      {actif ? '✓' : '✕'}
-    </span>
-  )
-}
-
-/** `-22,4021 · 44,3167` — même notation que la fiche de prospection. */
-function formatCoordonnees(t: { latitude: number | null; longitude: number | null }): string | null {
-  if (t.latitude == null || t.longitude == null) return null
-  const fr = (v: number) => v.toFixed(4).replace('.', ',')
-  return `${fr(t.latitude)} · ${fr(t.longitude)}`
-}
-
-/** Date ISO ("AAAA-MM-JJ") -> "JJ/MM/AAAA", même convention que le DateField mobile. */
-function formatDateJour(iso: string | null): string | null {
-  if (!iso) return null
-  const [year, month, day] = iso.split('T')[0].split('-')
-  return year && month && day ? `${day}/${month}/${year}` : iso
-}
-
-/** Ligne clé/valeur des cartes « Informations complémentaires ». */
-function Champ({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">{label}</span>
-      <span className="font-mono text-[12px] font-semibold text-[#16201a]">{value ?? '—'}</span>
-    </div>
   )
 }
 
@@ -289,11 +222,6 @@ export function TraitementDetailPage() {
     enabled: !!id,
   })
 
-  const { data: pesticidePull } = useQuery<ReferentielPullResponse>({
-    queryKey: ['referentiel-pull', 'pesticides'],
-    queryFn: () => api.get('/referentiel/pull').then((r) => r.data),
-  })
-
   // « Demander une reprise » (Lot C) : purement informatif — on réutilise le
   // filtre `reprenable` déjà servi par GET /traitements (surface_restante_ha
   // > 0, fiche non déjà utilisée comme origine) plutôt que de dupliquer cette
@@ -314,87 +242,8 @@ export function TraitementDetailPage() {
     enabled: !!traitement,
   })
   const [reprisePromptOuvert, setReprisePromptOuvert] = useState(false)
-  // « Fiche » (tableaux du CRT, comme le PDF) à l'ouverture ; « Données BDD » garde les cartes.
-  const [onglet, setOnglet] = useState<OngletFiche>('fiche')
   const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
   const [erreurPdf, setErreurPdf] = useState<string | null>(null)
-
-  const { nomAgent } = useAnnuaire()
-
-  const pesticideNoms = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const p of pesticidePull?.pesticides.upserts ?? []) map.set(p.id, p.nom)
-    return map
-  }, [pesticidePull])
-
-  // La maquette affiche « produit · matière active ». La colonne matière
-  // active n'existe pas encore sur `pesticide` (issue #129, arbitrage produit
-  // en attente) : on rend le nom seul plutôt qu'un séparateur orphelin.
-  const rotationColumns: DataTableColumn<Rotation>[] = useMemo(
-    () => [
-      {
-        key: 'numero_cuve',
-        header: 'N° cuve',
-        render: (r) => (
-          <span className="font-mono text-[12px] font-semibold text-ifvm-green-text">
-            {r.numero_cuve}
-          </span>
-        ),
-      },
-      { key: 'produit', header: 'Produit', render: (r) => pesticideNoms.get(r.produit_id) ?? '—' },
-      {
-        key: 'quantite',
-        header: 'Quantité',
-        align: 'right',
-        mono: true,
-        render: (r) => `${r.quantite} ${r.unite}`,
-      },
-      {
-        key: 'surface',
-        header: 'Surface (ha)',
-        align: 'right',
-        mono: true,
-        render: (r) => (r.surface_ha == null ? '—' : r.surface_ha),
-      },
-      {
-        key: 'heures',
-        header: 'Heures (rotation · vanne)',
-        align: 'right',
-        mono: true,
-        render: (r) =>
-          `${formatHeure(r.heure_debut)} → ${formatHeure(r.heure_fin)} · ${formatHeure(r.heure_ouverture_vanne)} → ${formatHeure(r.heure_fermeture_vanne)}`,
-      },
-      {
-        key: 'temperature',
-        header: 'T° début → fin',
-        align: 'right',
-        mono: true,
-        render: (r) => `${r.temperature_debut_c} → ${r.temperature_fin_c} °C`,
-      },
-      {
-        key: 'vent',
-        header: 'Vent début → fin',
-        align: 'right',
-        mono: true,
-        render: (r) => `${r.vent_debut_ms} → ${r.vent_fin_ms} m/s`,
-      },
-    ],
-    [pesticideNoms],
-  )
-
-  const produitColumns: DataTableColumn<ProduitUtilise>[] = useMemo(
-    () => [
-      { key: 'produit', header: 'Produit', render: (p) => pesticideNoms.get(p.produit_id) ?? '—' },
-      {
-        key: 'quantite',
-        header: 'Quantité (l)',
-        align: 'right',
-        mono: true,
-        render: (p) => p.quantite_l,
-      },
-    ],
-    [pesticideNoms],
-  )
 
   if (isLoading) {
     return (
@@ -433,28 +282,6 @@ export function TraitementDetailPage() {
     .filter(Boolean)
     .join(' · ')
 
-  const zones = zonesExposeesLabels(traitement.zones_exposees)
-  const axes = axesRisque(traitement.evaluation_risque)
-  const nonCibles = especesListees(traitement.comportement_non_cibles)
-  const familles = especesListees(traitement.mortalite_familles)
-  const comportementLabel = libelleImpact(
-    traitement.comportement_anormal,
-    resumeEspeces(nonCibles, 'espèce non cible', 'espèces non cibles'),
-  )
-  const mortaliteLabel = libelleImpact(
-    traitement.mortalite,
-    resumeEspeces(familles, 'famille', 'familles'),
-  )
-  // « Oui — Ingestion / Contact » : la maquette accroche le détail à la
-  // réponse plutôt que d'ouvrir une ligne séparée.
-  const empoisonnementDetail = [
-    traitement.empoisonnement_type,
-    traitement.empoisonnement_mode,
-    traitement.empoisonnement_autre,
-  ]
-    .filter(Boolean)
-    .join(' / ')
-  const empoisonnementLabel = libelleImpact(traitement.empoisonnement, empoisonnementDetail)
   const surfaceInfestee = traitement.cible?.surface_infestee_ha
   // Surfaces portées par aerien ET terrestre (mêmes noms de champs, migration
   // 0050 a généralisé le chaînage de reprise à l'Aérien) : le panneau
@@ -471,17 +298,6 @@ export function TraitementDetailPage() {
     ? traitement.aerien
     : null
   const estReprenable = (reprenables ?? []).some((t) => t.id === traitement.id)
-  const totalRotations = traitement.aerien
-    ? [
-        `${traitement.aerien.nb_rotations} rotation${traitement.aerien.nb_rotations > 1 ? 's' : ''}`,
-        traitement.aerien.total_pesticide_l != null
-          ? `${formatSurface(traitement.aerien.total_pesticide_l)} l`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : null
-
   const traitementId = traitement.id
   const numeroFiche = traitement.numero_fiche
 
@@ -545,8 +361,6 @@ export function TraitementDetailPage() {
       </header>
       {erreurPdf && <ErrorBanner label="PDF" message={erreurPdf} />}
 
-      <OngletsFiche actif={onglet} onChange={setOnglet} />
-
       {/* N° fiche prospection liée (#numero-fiche-prospection-liee) — dérivé de
           prospection_id côté backend, jamais saisi ici, toujours visible (pas
           seulement quand un snapshot de cible existe, cf. bandeau ambre plus bas). */}
@@ -573,311 +387,12 @@ export function TraitementDetailPage() {
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
-          {onglet === 'fiche' ? (
-            <FicheTableau
-              endpoint={`/traitements/${traitement.id}/fiche-html`}
-              cleVersion={`${traitement.statut}|${traitement.updated_at}`}
-              titre={`Fiche de traitement ${traitement.numero_fiche}`}
-            />
-          ) : (
-          <>
-          {traitement.aerien && (
-            <Carte className="overflow-hidden">
-              <div className="flex items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-[15px]">
-                <h2 className="font-sans text-[14px] font-bold">Rotations</h2>
-                <div className="flex-1" />
-                <p className="font-mono text-[12px] font-semibold text-ifvm-green-text">
-                  {totalRotations}
-                </p>
-              </div>
-              <DataTable
-                columns={rotationColumns}
-                rows={traitement.aerien.rotations}
-                getRowKey={(r) => r.id}
-                emptyMessage="Aucune rotation."
-              />
-            </Carte>
-          )}
-
-          {traitement.terrestre && (
-            <Carte className="overflow-hidden">
-              <div className="flex items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-[15px]">
-                <h2 className="font-sans text-[14px] font-bold">Produits utilisés</h2>
-                <div className="flex-1" />
-                <p className="font-mono text-[12px] font-semibold text-ifvm-green-text">
-                  {formatHeure(traitement.terrestre.heure_debut)} –{' '}
-                  {formatHeure(traitement.terrestre.heure_fin)} ·{' '}
-                  {traitement.terrestre.vitesse_vent_ms} m/s
-                </p>
-              </div>
-              <DataTable
-                columns={produitColumns}
-                rows={traitement.terrestre.produits}
-                getRowKey={(p) => p.id}
-                emptyMessage="Aucun produit utilisé."
-              />
-            </Carte>
-          )}
-
-          {/* Deux cartes côte à côte — grille `1fr 1fr` de la maquette */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Carte className="px-5 py-[18px]">
-              <TitreSection>Moyens &amp; protection</TitreSection>
-              <ul className="flex flex-col gap-2">
-                {KITS_EPI.map((kit) => {
-                  // Migration backend 0040 : les 5 colonnes sont passées de
-                  // booléen à un nombre de personnes équipées — la pastille
-                  // reste dérivée de « > 0 » mais le compte réel s'affiche.
-                  const nombre = traitement[kit.key] ?? 0
-                  const actif = nombre > 0
-                  return (
-                    <li key={kit.key} className="flex items-center gap-[9px]">
-                      <PastilleEpi actif={actif} />
-                      <span className="font-sans text-[12px] font-medium text-[#3a3a30]">
-                        {kit.label}
-                      </span>
-                      <span className="ml-auto font-mono text-[11px] font-semibold text-ifvm-text-tertiary">
-                        {nombre}
-                      </span>
-                      <span className="sr-only">{actif ? 'présent' : 'absent'}</span>
-                    </li>
-                  )
-                })}
-              </ul>
-              <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
-                Zones exposées :{' '}
-                <b className="text-[#16201a]">{zones.length > 0 ? zones.join(', ') : 'aucune'}</b>
-              </p>
-            </Carte>
-
-            <Carte className="px-5 py-[18px]">
-              <TitreSection>Impacts &amp; évaluation du risque</TitreSection>
-              {axes.length > 0 ? (
-                <ul className="flex flex-col gap-2">
-                  {axes.map((axe) => (
-                    <li key={axe.key} className="flex items-center gap-[9px]">
-                      <span className="flex-1 font-sans text-[12px] font-medium text-[#3a3a30]">
-                        {axe.label}
-                      </span>
-                      <Pill tone={axe.className}>{axe.niveau}</Pill>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="font-sans text-[11.5px] font-medium text-ifvm-text-weak">
-                  Aucun axe de risque évalué.
-                </p>
-              )}
-              <div className="mt-3 flex flex-col gap-[5px] border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium text-ifvm-text-tertiary">
-                <p>
-                  Empoisonnement :{' '}
-                  <b className={traitement.empoisonnement ? 'text-ifvm-amber-text' : 'text-ifvm-green-text'}>
-                    {empoisonnementLabel}
-                  </b>
-                </p>
-                <p>
-                  Comportement anormal :{' '}
-                  <b
-                    className={
-                      traitement.comportement_anormal ? 'text-ifvm-amber-text' : 'text-ifvm-green-text'
-                    }
-                  >
-                    {comportementLabel}
-                  </b>
-                </p>
-                <p>
-                  Mortalité :{' '}
-                  <b className={traitement.mortalite ? 'text-ifvm-amber-text' : 'text-ifvm-green-text'}>
-                    {mortaliteLabel}
-                  </b>
-                </p>
-              </div>
-
-              {(traitement.evaluations_risque_population ?? []).length > 0 && (
-                <div className="mt-3 border-t border-[#f1ecdd] pt-3">
-                  <p className="mb-2 font-sans text-[11px] font-bold uppercase tracking-wide text-ifvm-text-tertiary">
-                    Évaluation du risque pour la population
-                  </p>
-                  <ul className="flex flex-col gap-2">
-                    {traitement.evaluations_risque_population.map((evaluation, index) => (
-                      <li
-                        key={evaluation.id}
-                        className="rounded-[8px] border border-[#f1ecdd] px-3 py-2 font-sans text-[11.5px] font-medium text-[#3a3a30]"
-                      >
-                        <p className="font-bold text-ifvm-text-tertiary">{`Évaluation ${index + 1}`}</p>
-                        <p>Habitats les plus proches : {evaluation.habitat_proche || 'non renseigné'}</p>
-                        <p>
-                          Distance :{' '}
-                          {evaluation.distance_km == null ? 'non renseignée' : `${evaluation.distance_km} km`}
-                        </p>
-                        <p>
-                          Sensibilisation :{' '}
-                          {evaluation.sensibilisation == null
-                            ? 'non renseignée'
-                            : evaluation.sensibilisation
-                              ? 'Oui'
-                              : 'Non'}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </Carte>
-          </div>
-
-          {/* Informations complémentaires — champs jusqu'ici absents de la fiche
-              de lecture web (position GPS, strates, observations, traçabilité). */}
-          <Carte className="px-5 py-[18px]">
-            <TitreSection>Informations complémentaires</TitreSection>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
-              <Champ label="Position GPS" value={formatCoordonnees(traitement)} />
-              <Champ
-                label="Altitude"
-                value={traitement.altitude == null ? null : `${formatSurface(traitement.altitude)} m`}
-              />
-              <Champ
-                label="Strate herbeuse"
-                value={
-                  traitement.hauteur_strate_herbeuse_m == null
-                    ? null
-                    : `${formatSurface(traitement.hauteur_strate_herbeuse_m)} m`
-                }
-              />
-              <Champ
-                label="Strate arborée"
-                value={
-                  traitement.hauteur_strate_arboree_m == null
-                    ? null
-                    : `${formatSurface(traitement.hauteur_strate_arboree_m)} m`
-                }
-              />
-              <Champ
-                label="Recouvrement"
-                value={
-                  traitement.recouvrement_percent == null
-                    ? null
-                    : `${traitement.recouvrement_percent} %`
-                }
-              />
-              <Champ label="Statut de synchronisation" value={traitement.statut_sync} />
-              <Champ label="Créée le" value={formatHorodatage(traitement.created_at)} />
-              <Champ label="Mise à jour le" value={formatHorodatage(traitement.updated_at)} />
-            </div>
-            {traitement.observations && (
-              <p className="mt-3 border-t border-[#f1ecdd] pt-3 font-sans text-[11.5px] font-medium leading-[1.5] text-ifvm-text-tertiary">
-                Observations : <span className="text-[#3a3a30]">{traitement.observations}</span>
-              </p>
-            )}
-          </Carte>
-
-          {traitement.aerien && (
-            <Carte className="px-5 py-[18px]">
-              <TitreSection>Équipe &amp; aéronef</TitreSection>
-              <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
-                <Champ label="Pilote" value={traitement.aerien.pilote} />
-                <Champ label="Mécanicien" value={traitement.aerien.mecanicien} />
-                <Champ label="Chef de base" value={nomAgent(traitement.aerien.chef_de_base_id)} />
-                <Champ
-                  label="Consultant international"
-                  value={traitement.aerien.consultant_international}
-                />
-                <Champ label="Immatriculation aéronef" value={traitement.aerien.immatricule_aeronef} />
-                <Champ label="Base principale" value={traitement.aerien.base_principale} />
-                <Champ label="Stand" value={traitement.aerien.stand} />
-                <Champ
-                  label="Date d'installation (Stand)"
-                  value={formatDateJour(traitement.aerien.stand_date_installation)}
-                />
-                <Champ label="Base secondaire" value={traitement.aerien.base_secondaire} />
-                <Champ
-                  label="Date d'installation (Base secondaire)"
-                  value={formatDateJour(traitement.aerien.base_secondaire_date_installation)}
-                />
-                <Champ
-                  label="Total pesticide"
-                  value={
-                    traitement.aerien.total_pesticide_kg == null
-                      ? null
-                      : `${formatSurface(traitement.aerien.total_pesticide_kg)} kg`
-                  }
-                />
-                <Champ
-                  label="Pesticide reçu"
-                  value={
-                    traitement.aerien.pesticide_recu_l == null
-                      ? null
-                      : `${formatSurface(traitement.aerien.pesticide_recu_l)} l`
-                  }
-                />
-                <Champ
-                  label="Stock restant"
-                  value={
-                    traitement.aerien.pesticide_stock_restant_l == null
-                      ? null
-                      : `${formatSurface(traitement.aerien.pesticide_stock_restant_l)} l`
-                  }
-                />
-              </div>
-            </Carte>
-          )}
-
-          {traitement.terrestre && (
-            <Carte className="px-5 py-[18px]">
-              <TitreSection>Équipe &amp; matériel</TitreSection>
-              <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
-                <Champ label="Chef d'équipe" value={nomAgent(traitement.terrestre.chef_equipe_id)} />
-                <Champ
-                  label="Agent encadreur"
-                  value={
-                    traitement.terrestre.agent_encadreur_id
-                      ? nomAgent(traitement.terrestre.agent_encadreur_id)
-                      : null
-                  }
-                />
-                <Champ
-                  label="Consultant international"
-                  value={traitement.terrestre.consultant_international}
-                />
-                <Champ label="Direction du vent" value={traitement.terrestre.direction_vent} />
-                <Champ
-                  label="Essence"
-                  value={
-                    traitement.terrestre.essence_litres == null
-                      ? null
-                      : `${formatSurface(traitement.terrestre.essence_litres)} l`
-                  }
-                />
-                <Champ label="Piles" value={traitement.terrestre.nb_piles} />
-                <Champ
-                  label="Total pesticide"
-                  value={
-                    traitement.terrestre.total_pesticide_l == null
-                      ? null
-                      : `${formatSurface(traitement.terrestre.total_pesticide_l)} l`
-                  }
-                />
-                <Champ
-                  label="Pesticide reçu"
-                  value={
-                    traitement.terrestre.pesticide_recu_l == null
-                      ? null
-                      : `${formatSurface(traitement.terrestre.pesticide_recu_l)} l`
-                  }
-                />
-                <Champ
-                  label="Stock restant"
-                  value={
-                    traitement.terrestre.pesticide_stock_restant_l == null
-                      ? null
-                      : `${formatSurface(traitement.terrestre.pesticide_stock_restant_l)} l`
-                  }
-                />
-              </div>
-            </Carte>
-          )}
-          </>
-          )}
+          {/* Fiche de lecture : le gabarit du PDF (mêmes tableaux), servi par le backend. */}
+          <FicheTableau
+            endpoint={`/traitements/${traitement.id}/fiche-html`}
+            cleVersion={`${traitement.statut}|${traitement.updated_at}`}
+            titre={`Fiche de traitement ${traitement.numero_fiche}`}
+          />
         </div>
 
         {/* Colonne latérale 320px */}
