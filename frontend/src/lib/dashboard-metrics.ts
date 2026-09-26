@@ -21,6 +21,10 @@ export interface DashboardProspection {
   date_prospection: string
   surface_prospectee: number | null
   surface_infestee: number | null
+  /** Localisation de la fiche — alimente la carte « Zones suivies par région ». */
+  region?: string | null
+  latitude?: number | null
+  longitude?: number | null
   created_at: string
   updated_at: string
 }
@@ -34,6 +38,9 @@ export interface DashboardTraitement {
   mode_traitement?: string | null
   date_traitement: string
   localite: string
+  region?: string | null
+  latitude?: number | null
+  longitude?: number | null
   statut: string
   created_at: string
   updated_at: string
@@ -68,6 +75,8 @@ export interface DashboardStation {
   id: string
   code: string
   nom: string
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export function compteProspections(

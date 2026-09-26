@@ -9,6 +9,18 @@ vi.mock('../api/client', () => ({
   api: { get: vi.fn() },
 }))
 
+// Leaflet ne se dessine pas dans jsdom : on simule les composants de la carte des zones.
+vi.mock('react-leaflet', () => ({
+  MapContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="carte-zones">{children}</div>
+  ),
+  TileLayer: () => null,
+  CircleMarker: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="bulle">{children}</div>
+  ),
+  Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
+
 const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>
 
 // « Maintenant » figé : la colonne « Reçue » et la fenêtre de 24 h en dépendent.
@@ -342,5 +354,24 @@ describe('DashboardPage — maquette §1', () => {
     expect(
       screen.getByText('Superficies infestées, traitées et protégées — Campagne 2024-2025'),
     ).toBeInTheDocument()
+  })
+
+  it('remplace le placeholder de la carte par les zones suivies, selon la lecture choisie', async () => {
+    mockApi({
+      '/prospections': [
+        fiche({ id: 'p1', region: 'Atsimo-Andrefana', latitude: -22, longitude: 44 }),
+        fiche({ id: 'p2', region: 'Menabe', latitude: -20, longitude: 44.5, surface_infestee: 0 }),
+      ],
+    })
+    renderPage()
+
+    expect(screen.queryByText(/Carte de Madagascar — à brancher/)).not.toBeInTheDocument()
+    // Lecture « Infestation » par défaut : Menabe (0 ha infesté) n'apparaît pas.
+    await waitFor(() => expect(screen.getAllByTestId('bulle')).toHaveLength(1))
+    expect(within(screen.getAllByTestId('bulle')[0]).getByText('Atsimo-Andrefana')).toBeInTheDocument()
+
+    // Lecture « Prospection » : les deux régions.
+    fireEvent.click(screen.getByRole('button', { name: 'Prospection' }))
+    expect(screen.getAllByTestId('bulle')).toHaveLength(2)
   })
 })
