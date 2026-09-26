@@ -6,6 +6,7 @@ import {
   STRATE_KEYS,
   stratesAffichees,
   phenologieVide,
+  strateValeursVides,
   valeursDeVegetation,
 } from '@/lib/prospection-vegetation-schema';
 
@@ -67,8 +68,8 @@ describe('valeursDeVegetation (reprise d’un brouillon)', () => {
       sol: { humidite: 'surface', solNu: 15 },
     });
     expect(v.solNu).toBe(15);
-    expect(v.strates.arbustive).toEqual({ recouvrement: 15, hMoy: '1,8', verdissement: '40', surfRel: '', repousse: null, phenologie: phenologieVide() });
-    expect(v.strates.herbeuse).toEqual({ recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() });
+    expect(v.strates.arbustive).toEqual({ ...strateValeursVides(), recouvrement: 15, hMoy: '1,8', verdissement: '40' });
+    expect(v.strates.herbeuse).toEqual(strateValeursVides());
   });
 
   it('brouillon sans végétation : tout à 0, sol nu à 0', () => {
@@ -86,7 +87,7 @@ describe('champsDeVegetation (enregistrement)', () => {
 
   it('garde les 6 clés du JSON, convertit les textes en nombres et une strate non ajoutée reste par défaut', () => {
     const v = valeursDeVegetation(brouillon);
-    v.strates.arbustive = { recouvrement: 15, hMoy: '1,8', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() };
+    v.strates.arbustive = { ...strateValeursVides(), recouvrement: 15, hMoy: '1,8' };
     const { vegetation } = champsDeVegetation(brouillon, v);
     const strates = (vegetation as { strates: Record<string, unknown> }).strates;
     expect(Object.keys(strates)).toEqual([...STRATE_KEYS]);
@@ -116,7 +117,7 @@ describe('champsDeVegetation — strate retirée', () => {
   it('une strate à 0 %, sans hauteur ni verdissement, repasse à ses valeurs par défaut (plus d’ORPAD hérité)', () => {
     const brouillon = { vegetation: { strates: { arbustive: { ...defaultStrateDetail(), recouvrement: 15, orpad: ['Rare'], surfRel: 30 } } }, sol: null };
     const v = valeursDeVegetation(brouillon);
-    v.strates.arbustive = { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() };
+    v.strates.arbustive = strateValeursVides();
     const strates = (champsDeVegetation(brouillon, v).vegetation as { strates: Record<string, unknown> }).strates;
     expect(strates.arbustive).toEqual(defaultStrateDetail());
   });
@@ -126,7 +127,7 @@ describe('creerVegetationSchema', () => {
   const schema = creerVegetationSchema((cle) => cle);
   const valeurs = (arbustive: Partial<{ hMoy: string; verdissement: string }>) => {
     const v = valeursDeVegetation({});
-    v.strates.arbustive = { recouvrement: 15, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide(), ...arbustive };
+    v.strates.arbustive = { ...strateValeursVides(), recouvrement: 15, ...arbustive };
     return v;
   };
 
@@ -150,7 +151,7 @@ describe('creerVegetationSchema — recouvrement à 0 %', () => {
   const schema = creerVegetationSchema((cle) => cle);
   const avecRecouvrement = (recouvrement: number, champs: { hMoy?: string; verdissement?: string }) => {
     const v = valeursDeVegetation({});
-    v.strates.arboree = { recouvrement, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide(), ...champs };
+    v.strates.arboree = { ...strateValeursVides(), recouvrement, ...champs };
     return v;
   };
   const erreurs = (v: ReturnType<typeof valeursDeVegetation>) => {

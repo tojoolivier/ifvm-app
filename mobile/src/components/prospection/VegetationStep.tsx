@@ -9,9 +9,9 @@ import { logger } from '@/lib/logger';
 import { enregistrerBrouillon, type ProspectionCreate } from '@/lib/prospection-db';
 import {
   champsDeVegetation,
-  phenologieVide,
   repartition,
   STRATE_KEYS,
+  strateValeursVides,
   stratesAffichees,
   valeursDeVegetation,
   type StrateKey,
@@ -40,7 +40,7 @@ export function VegetationStep({ brouillon, onContinuer }: Props) {
   const affichees = stratesAffichees(valeurs.strates, ajoutees);
 
   const retirer = (cle: StrateKey) => {
-    form.setFieldValue(`strates.${cle}`, { recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() });
+    form.setFieldValue(`strates.${cle}`, strateValeursVides());
     setAjoutees((liste) => liste.filter((k) => k !== cle));
   };
 

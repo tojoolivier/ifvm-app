@@ -20,8 +20,10 @@ export interface StrateDetail {
 export type Strates = Record<StrateKey, StrateDetail>;
 
 /** Niveaux d'un stade phénologique, tels qu'enregistrés (un seul élément dans le tableau, #686). */
-export const PHENOLOGIE_STAGES = ['Néant', 'Rare', 'Beaucoup'] as const;
-export type NiveauPhenologie = (typeof PHENOLOGIE_STAGES)[number];
+export const NIVEAUX_PHENOLOGIE = ['Néant', 'Rare', 'Beaucoup'] as const;
+export type NiveauPhenologie = (typeof NIVEAUX_PHENOLOGIE)[number];
+/** Niveaux qu'on choisit sur un stade touché (Néant = stade non touché). */
+export const NIVEAUX_CHOISIS = ['Rare', 'Beaucoup'] as const;
 
 /** Stades du bloc « Qu'observez-vous ? » ; `orpad` (Germination) garde son nom historique dans le JSON. */
 export const STADES_PHENOLOGIE = ['orpad', 'feuille', 'fleur', 'fruit', 'sec'] as const;
@@ -33,7 +35,7 @@ export const phenologieVide = (): Phenologie => ({ orpad: 'Néant', feuille: 'N�
 const tableauxDePhenologie = (p: Phenologie) => Object.fromEntries(STADES_PHENOLOGIE.map((st) => [st, [p[st]]]));
 
 const niveauDeTableau = (valeur: unknown): NiveauPhenologie =>
-  Array.isArray(valeur) && (valeur[0] === 'Rare' || valeur[0] === 'Beaucoup') ? valeur[0] : 'Néant';
+  Array.isArray(valeur) && NIVEAUX_CHOISIS.find((n) => n === valeur[0]) ? valeur[0] : 'Néant';
 
 /** Valeurs d'une strate non ajoutée : enregistrée telle quelle pour garder les 6 clés. */
 export function defaultStrateDetail(): StrateDetail {
@@ -76,6 +78,9 @@ export interface VegetationValeurs {
   solNu: number;
   strates: Record<StrateKey, StrateValeurs>;
 }
+
+/** Valeurs d'une strate vide : recouvrement à 0 %, rien saisi, aucun stade touché. */
+export const strateValeursVides = (): StrateValeurs => ({ recouvrement: 0, hMoy: '', verdissement: '', surfRel: '', repousse: null, phenologie: phenologieVide() });
 
 /** Vrai si la feuille « Plus de détails » renseigne quelque chose (indicateur sur la carte). */
 export const aDesDetails = ({ surfRel, repousse }: Pick<StrateValeurs, 'surfRel' | 'repousse'>) => surfRel.trim() !== '' || repousse !== null;

@@ -4,7 +4,7 @@ import { Chip } from '@/components/ui';
 import { Radius, UiBorder, UiSize, UiSpace, UiText } from '@/constants/theme';
 import type { VegetationForm } from '@/hooks/use-vegetation-form';
 import { useUiTheme } from '@/hooks/use-ui-theme';
-import { STADES_PHENOLOGIE, type StrateKey } from '@/lib/prospection-vegetation-schema';
+import { NIVEAUX_CHOISIS, STADES_PHENOLOGIE, type StrateKey } from '@/lib/prospection-vegetation-schema';
 
 type Props = {
   cle: StrateKey;
@@ -54,7 +54,7 @@ export function PhenologieBlock({ cle, form, avecAide }: Props) {
                   {(field) => (
                     <View style={styles.niveau}>
                       <Text style={[UiText.bodyMedium, styles.flex, { color: c.fg2 }]}>{t(`prospection.vegetation.phenologie.${stade}`)}</Text>
-                      {(['Rare', 'Beaucoup'] as const).map((n) => (
+                      {NIVEAUX_CHOISIS.map((n) => (
                         <View key={n} style={styles.chipNiveau}>
                           <Chip
                             label={t(`prospection.vegetation.phenologie.${n}`)}
