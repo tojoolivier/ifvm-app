@@ -6,6 +6,7 @@ import { StatusBadge, type Statut } from '@/components/ui/status-badge'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { ErrorBanner } from '@/components/ui/error-banner'
 import { EvolutionCampagne } from '@/components/dashboard/EvolutionCampagne'
+import { RepartitionProspections } from '@/components/dashboard/RepartitionProspections'
 import { campagneActive, type CampagneDatee } from '@/lib/campagne-active'
 import { useAnnuaire } from '@/lib/use-annuaire'
 import {
@@ -654,6 +655,14 @@ export function DashboardPage() {
             </div>
           </section>
 
+          {/* Répartition par type de prospection */}
+          <RepartitionProspections
+            className={`${CARD} px-5 py-[18px]`}
+            prospections={fiches}
+            perimetre={perimetre}
+            enChargement={enChargement}
+          />
+
           {/* Évolution */}
           <EvolutionCampagne
             className={`${CARD} px-5 py-[18px]`}
@@ -664,46 +673,6 @@ export function DashboardPage() {
             perimetre={perimetre}
             enChargement={enChargement}
           />
-
-          {/* Carte */}
-          <section className={`${CARD} px-5 py-[18px]`}>
-            <div className="mb-3.5 flex items-baseline justify-between gap-2.5">
-              <div>
-                <h2 className="font-sans text-[14.5px] font-bold">Zones suivies par région</h2>
-                <p className="mt-0.5 font-sans text-[12px] text-ifvm-text-weak">
-                  Taille = nombre de fiches rattachées — {perimetre}
-                </p>
-              </div>
-              <div className="flex gap-1 rounded-[9px] border border-[#e7e0cd] bg-[#edece3] p-[3px]">
-                {['Infestation', 'Traitement'].map((t, i) => (
-                  <button
-                    key={t}
-                    type="button"
-                    className={`rounded-[6px] px-[10px] py-[5px] font-sans text-[12px] font-semibold ${
-                      i === 0 ? 'bg-ifvm-green-text text-white' : 'text-ifvm-text-tertiary'
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-center">
-              <div className="flex aspect-[300/565] w-full max-w-[320px] items-center justify-center rounded-[10px] border border-dashed border-[#e7e0cd] bg-[#fafaf5] font-sans text-[12px] text-ifvm-text-weak">
-                Carte de Madagascar — à brancher
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-[#e7e0cd] pt-3">
-              <span className="inline-flex items-center gap-1.5 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary">
-                <span className="h-2 w-2 rounded-full bg-ifvm-danger" />
-                Infesté
-              </span>
-              <span className="inline-flex items-center gap-1.5 font-sans text-[11.5px] font-semibold text-ifvm-text-tertiary">
-                <span className="h-2 w-2 rounded-full bg-[#aab1a3]" />
-                Hors aire grégarigène
-              </span>
-            </div>
-          </section>
         </div>
 
         {/* --------- Colonne droite --------- */}
