@@ -121,7 +121,10 @@ describe('ReferentielsScreen', () => {
       expect(await screen.findByText('Ihosy centre')).toBeTruthy();
       expect(screen.getByText('STF-014 · Ihosy')).toBeTruthy();
       expect(screen.getByText('Maïs Ihosy')).toBeTruthy();
-      expect(rechercherPartout).toHaveBeenLastCalledWith('ihosy');
+      // La recherche est différée de 200 ms : le mock renvoie `trouves` pour TOUT terme, donc les
+      // résultats peuvent déjà être affichés (issus de l'appel initial `''`, si le rendu a pris plus
+      // de 200 ms sur un runner lent) avant que l'appel pour « ihosy » ne parte — on l'attend.
+      await waitFor(() => expect(rechercherPartout).toHaveBeenLastCalledWith('ihosy'));
     });
 
     it('un résultat ouvre sa fiche : écran dédié pour une station, fiche générique pour une culture', async () => {
