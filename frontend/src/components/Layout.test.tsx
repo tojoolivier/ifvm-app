@@ -115,6 +115,36 @@ describe('Layout (#121)', () => {
     expect(screen.queryByText('Carte des infestations')).not.toBeInTheDocument()
   })
 
+  /** #621 : le parc aéronefs est proposé aux profils admin et chef (l'écriture reste réservée à l'admin). */
+  it.each(['admin', 'chef'])('affiche l’entrée de nav "Parc aéronefs" vers /parc-aeronefs pour le profil %s', async (role) => {
+    localStorage.setItem('user_role', role)
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', role, nom: 'Rasoa', prenom: 'Hery', email: 'h@t.com' } })
+      return Promise.resolve({ data: [] })
+    })
+    renderLayout()
+
+    await waitFor(() => {
+      const item = screen.getByText('Parc aéronefs').closest('a')
+      expect(item).toHaveAttribute('href', '/parc-aeronefs')
+    })
+  })
+
+  it.each(['verificateur', 'prospecteur', 'validation_finale'])(
+    'n’affiche pas l’entrée "Parc aéronefs" au profil %s',
+    async (role) => {
+      localStorage.setItem('user_role', role)
+      mockedGet.mockImplementation((url: string) => {
+        if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', role, nom: 'Rasoa', prenom: 'Hery', email: 'h@t.com' } })
+        return Promise.resolve({ data: [] })
+      })
+      renderLayout()
+
+      await screen.findByText('Rasoa', { exact: false })
+      expect(screen.queryByText('Parc aéronefs')).not.toBeInTheDocument()
+    },
+  )
+
   /** #suivi-heures-de-vol : même lectorat que Traitements (aérien). */
   it('affiche l’entrée de nav "Heures de vol", à côté de Traitements', async () => {
     renderLayout()
