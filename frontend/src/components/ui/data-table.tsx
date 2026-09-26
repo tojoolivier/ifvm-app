@@ -72,7 +72,10 @@ export function DataTable<T>({
                 key={column.key}
                 aria-sort={sortable ? (active ? (sort!.direction === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
                 className={cn(
-                  'h-auto bg-background py-[9px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak',
+                  // `whitespace-normal` : les en-têtes et cellules peuvent passer à la ligne,
+                  // pour que le tableau se comprime sur un petit écran au lieu de forcer
+                  // un défilement horizontal.
+                  'h-auto whitespace-normal bg-background py-[9px] font-sans text-[9.5px] font-semibold uppercase tracking-[.8px] text-ifvm-text-weak',
                   paddingX(index),
                   column.align === 'right' && 'text-right',
                 )}
@@ -121,7 +124,7 @@ export function DataTable<T>({
                 <TableCell
                   key={column.key}
                   className={cn(
-                    'py-3 text-[12px]',
+                    'whitespace-normal break-words py-3 text-[12px]',
                     paddingX(index),
                     column.align === 'right' && 'text-right',
                     column.mono ? 'font-mono font-semibold' : 'font-sans font-medium',

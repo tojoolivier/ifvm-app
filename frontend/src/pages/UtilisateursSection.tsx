@@ -299,10 +299,10 @@ export function UtilisateursSection({ showCreate, onShowCreateChange }: Utilisat
   }
 
   return (
-    <div className="flex flex-col gap-[14px]">
+    <div className="flex min-w-0 flex-col gap-[14px]">
       {/* Carte d'en-tête */}
       <div className="flex flex-col gap-[9px] rounded-[11px] border border-[#e7e0cd] bg-white px-5 py-4">
-        <div className="flex items-center gap-[10px]">
+        <div className="flex flex-wrap items-center gap-[10px]">
           <h2 className="flex-1 font-sans text-[17px] font-extrabold">Utilisateurs</h2>
           <span className="font-mono text-[11px] font-medium text-ifvm-text-weak">utilisateur</span>
           <span className="rounded-full border border-ifvm-green-border bg-ifvm-green-bg px-[10px] py-1 font-sans text-[10px] font-bold text-ifvm-green-text">
