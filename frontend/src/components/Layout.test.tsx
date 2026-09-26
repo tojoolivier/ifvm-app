@@ -145,6 +145,36 @@ describe('Layout (#121)', () => {
     },
   )
 
+  /** #606, #609 : le stock de pesticides est proposé aux profils admin et chef. */
+  it.each(['admin', 'chef'])('affiche l’entrée de nav "Stock pesticides" vers /stock-pesticides pour le profil %s', async (role) => {
+    localStorage.setItem('user_role', role)
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', role, nom: 'Rasoa', prenom: 'Hery', email: 'h@t.com' } })
+      return Promise.resolve({ data: [] })
+    })
+    renderLayout()
+
+    await waitFor(() => {
+      const item = screen.getByText('Stock pesticides').closest('a')
+      expect(item).toHaveAttribute('href', '/stock-pesticides')
+    })
+  })
+
+  it.each(['verificateur', 'prospecteur', 'validation_finale'])(
+    'n’affiche pas l’entrée "Stock pesticides" au profil %s',
+    async (role) => {
+      localStorage.setItem('user_role', role)
+      mockedGet.mockImplementation((url: string) => {
+        if (url === '/users/me') return Promise.resolve({ data: { id: 'u1', role, nom: 'Rasoa', prenom: 'Hery', email: 'h@t.com' } })
+        return Promise.resolve({ data: [] })
+      })
+      renderLayout()
+
+      await screen.findByText('Rasoa', { exact: false })
+      expect(screen.queryByText('Stock pesticides')).not.toBeInTheDocument()
+    },
+  )
+
   /** #suivi-heures-de-vol : même lectorat que Traitements (aérien). */
   it('affiche l’entrée de nav "Vols", à côté de Traitements (remplace "Heures de vol")', async () => {
     renderLayout()

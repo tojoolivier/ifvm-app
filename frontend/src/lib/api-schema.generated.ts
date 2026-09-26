@@ -748,7 +748,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Mouvements Pesticide
+         * @description Journal des mouvements, du plus récent au plus ancien (#606, #609).
+         */
+        get: operations["list_mouvements_pesticide_mouvements_pesticide_get"];
         put?: never;
         /** Create Mouvement Pesticide */
         post: operations["create_mouvement_pesticide_mouvements_pesticide_post"];
@@ -7368,6 +7372,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PesticideRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mouvements_pesticide_mouvements_pesticide_get: {
+        parameters: {
+            query?: {
+                type?: ("approvisionnement" | "transfert" | "consommation") | null;
+                /** @description Mouvements qui touchent ce site : ceux qu'il porte et les transferts reçus. */
+                site_id?: string | null;
+                pesticide_id?: string | null;
+                /** @description Consommations générées par cette fiche de traitement (#609). */
+                traitement_id?: string | null;
+                /** @description Borne incluse. */
+                date_debut?: string | null;
+                /** @description Borne incluse. */
+                date_fin?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MouvementPesticideRead"][];
                 };
             };
             /** @description Validation Error */

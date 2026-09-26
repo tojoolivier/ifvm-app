@@ -708,6 +708,22 @@ class MouvementPesticideRepository(ABC):
         pass
 
     @abstractmethod
+    async def list_filtre(
+        self,
+        type: str | None = None,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+        traitement_id: uuid.UUID | None = None,
+        date_debut: date | None = None,
+        date_fin: date | None = None,
+    ) -> list[MouvementPesticide]:
+        """Journal des mouvements (lecture seule), du plus récent au plus ancien — la date du
+        mouvement d'abord, puis son horodatage de saisie. Un filtre `site_id` retient les
+        mouvements qui touchent ce site : ceux qu'il porte, et les transferts qu'il reçoit
+        (`site_destination_id`). Les bornes de date sont incluses."""
+        pass
+
+    @abstractmethod
     async def regenerer_consommation(
         self,
         traitement_id: uuid.UUID,

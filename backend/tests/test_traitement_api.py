@@ -2940,3 +2940,46 @@ async def test_le_compteur_continue_apres_un_numero_avec_sigle(
     )
     assert r2.status_code == 201, r2.text
     assert r2.json()["numero_fiche"] == "TRT-AER-2026-08-11-006"
+
+
+@pytest.mark.asyncio
+async def test_journal_retrouve_la_consommation_generee_par_la_fiche(
+    client,
+    auth_headers,
+    admin_headers,
+    db_session,
+    campagne_id,
+    utilisateur,
+    payload_traitement,
+    payload_rotation,
+    pesticide,
+    base_aerienne,
+):
+    """#609 + #606 : la consommation d'une fiche se lit dans le journal, rattachée à sa fiche."""
+    await _approvisionner(client, admin_headers, pesticide.id, base_aerienne.id, 100.0)
+    traitement_id = await _creer_traitement(
+        client, auth_headers, db_session, campagne_id, utilisateur, payload_traitement
+    )
+    await client.post(
+        f"/traitements/{traitement_id}/rotations",
+        json=payload_rotation(quantite=10.0, unite="L"),
+        headers=auth_headers,
+    )
+
+    par_fiche = await client.get(
+        f"/mouvements-pesticide?traitement_id={traitement_id}", headers=auth_headers
+    )
+
+    assert par_fiche.status_code == 200, par_fiche.text
+    lignes = par_fiche.json()
+    assert len(lignes) == 1
+    assert lignes[0]["type"] == "consommation"
+    assert lignes[0]["traitement_id"] == str(traitement_id)
+    assert lignes[0]["quantite"] == 10.0
+    assert lignes[0]["unite"] == "L"
+    assert lignes[0]["pesticide_id"] == str(pesticide.id)
+    assert lignes[0]["site_id"] == str(base_aerienne.id)
+
+    # L'approvisionnement manuel, lui, n'est rattaché à aucune fiche.
+    journal = await client.get("/mouvements-pesticide?type=approvisionnement", headers=auth_headers)
+    assert [ligne["traitement_id"] for ligne in journal.json()] == [None]

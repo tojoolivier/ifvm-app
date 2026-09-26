@@ -10,6 +10,7 @@ import { TraitementDetailPage } from './pages/TraitementDetailPage'
 import { VolsPage } from './pages/VolsPage'
 import { VolDetailPage } from './pages/VolDetailPage'
 import { ParcAeronefsPage } from './pages/ParcAeronefsPage'
+import { StockPesticidesPage } from './pages/StockPesticidesPage'
 import { NouvelleProspectionPage } from './pages/NouvelleProspectionPage'
 import { ProspectionDetailPage } from './pages/ProspectionDetailPage'
 import { SynthesesPage } from './pages/SynthesesPage'
@@ -87,6 +88,15 @@ export const routes: RouteObject[] = [
             path: '/parc-aeronefs',
             element: <ParcAeronefsPage />,
             handle: { crumb: 'Lutte', title: 'Parc aéronefs' },
+          },
+
+          // Stock de pesticides (#606, #609) : soldes par site / produit / unité et journal des
+          // mouvements. Menu réservé aux profils admin et chef ; la saisie l'est au backend
+          // (chef de base, admin).
+          {
+            path: '/stock-pesticides',
+            element: <StockPesticidesPage />,
+            handle: { crumb: 'Lutte', title: 'Stock de pesticides' },
           },
 
           // Administration (personnel, stations, équipes aériennes/terrestres —

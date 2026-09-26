@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -43,6 +43,7 @@ from app.application.referentiel_use_cases import (
     ListEquipes,
     ListerAffectationsAeronef,
     ListerAffectationsParAeronef,
+    ListerMouvementsPesticide,
     ListerPositionsSiteAerienne,
     ListLieuxAeriens,
     ListPesticides,
@@ -1596,6 +1597,34 @@ async def create_mouvement_pesticide(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"pesticide_id introuvable : {exc.args[0]}",
         ) from exc
+
+
+@router.get("/mouvements-pesticide", response_model=list[MouvementPesticideRead])
+async def list_mouvements_pesticide(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Utilisateur, Depends(get_current_user)],
+    type: Literal["approvisionnement", "transfert", "consommation"] | None = Query(default=None),
+    site_id: uuid.UUID | None = Query(
+        default=None,
+        description="Mouvements qui touchent ce site : ceux qu'il porte et les transferts reçus.",
+    ),
+    pesticide_id: uuid.UUID | None = Query(default=None),
+    traitement_id: uuid.UUID | None = Query(
+        default=None, description="Consommations générées par cette fiche de traitement (#609)."
+    ),
+    date_debut: date | None = Query(default=None, description="Borne incluse."),
+    date_fin: date | None = Query(default=None, description="Borne incluse."),
+):
+    """Journal des mouvements, du plus récent au plus ancien (#606, #609)."""
+    use_case = ListerMouvementsPesticide(MouvementPesticideRepositoryImpl(db))
+    return await use_case.execute(
+        type=type,
+        site_id=site_id,
+        pesticide_id=pesticide_id,
+        traitement_id=traitement_id,
+        date_debut=date_debut,
+        date_fin=date_fin,
+    )
 
 
 @router.get("/stock-pesticide/solde", response_model=list[SoldePesticideRead])

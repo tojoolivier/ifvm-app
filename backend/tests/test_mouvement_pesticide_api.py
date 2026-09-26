@@ -1,9 +1,22 @@
 import uuid
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_access_token
+
+
+@pytest_asyncio.fixture
+async def deuxieme_pesticide(db_session: AsyncSession):
+    from app.infrastructure.referentiel_model import PesticideModel
+
+    p = PesticideModel(id=uuid.uuid4(), code=f"PEST-{uuid.uuid4().hex[:6]}", nom="Deltamethrine")
+    db_session.add(p)
+    await db_session.commit()
+    await db_session.refresh(p)
+    return p
 
 
 @pytest.fixture
@@ -249,3 +262,180 @@ async def test_rejeu_sans_date_ne_compare_pas_la_date(
     assert premier.status_code == 201, premier.text
     assert rejeu.status_code == 201, rejeu.text
     assert rejeu.json()["date_mouvement"] == "2026-01-10"
+
+
+# --- journal des mouvements (#606, #609) : GET /mouvements-pesticide ------------------------------
+
+
+async def _enregistrer(client: AsyncClient, headers: dict, **corps) -> dict:
+    reponse = await client.post("/mouvements-pesticide", json=corps, headers=headers)
+    assert reponse.status_code == 201, reponse.text
+    return reponse.json()
+
+
+@pytest.mark.asyncio
+async def test_journal_liste_les_mouvements_du_plus_recent_au_plus_ancien(
+    client: AsyncClient, admin_headers: dict, pesticide, base_aerienne
+):
+    base = {"pesticide_id": str(pesticide.id), "site_id": str(base_aerienne.id), "unite": "L"}
+    ancien = await _enregistrer(
+        client,
+        admin_headers,
+        type="approvisionnement",
+        quantite=100,
+        date_mouvement="2026-08-01",
+        **base,
+    )
+    recent = await _enregistrer(
+        client,
+        admin_headers,
+        type="approvisionnement",
+        quantite=50,
+        date_mouvement="2026-09-01",
+        **base,
+    )
+
+    reponse = await client.get("/mouvements-pesticide", headers=admin_headers)
+
+    assert reponse.status_code == 200, reponse.text
+    assert [ligne["id"] for ligne in reponse.json()] == [recent["id"], ancien["id"]]
+
+
+@pytest.mark.asyncio
+async def test_journal_filtre_par_type(
+    client: AsyncClient, admin_headers: dict, pesticide, base_aerienne, autre_base_aerienne
+):
+    base = {"pesticide_id": str(pesticide.id), "site_id": str(base_aerienne.id), "unite": "L"}
+    await _enregistrer(client, admin_headers, type="approvisionnement", quantite=100, **base)
+    await _enregistrer(
+        client,
+        admin_headers,
+        type="transfert",
+        quantite=30,
+        site_destination_id=str(autre_base_aerienne.id),
+        **base,
+    )
+
+    reponse = await client.get("/mouvements-pesticide?type=transfert", headers=admin_headers)
+
+    assert [ligne["type"] for ligne in reponse.json()] == ["transfert"]
+
+
+@pytest.mark.asyncio
+async def test_journal_par_site_inclut_les_transferts_recus(
+    client: AsyncClient, admin_headers: dict, pesticide, base_aerienne, autre_base_aerienne
+):
+    """Le journal d'un site montre ce qu'il porte ET les transferts qui l'alimentent."""
+    base = {"pesticide_id": str(pesticide.id), "site_id": str(base_aerienne.id), "unite": "L"}
+    await _enregistrer(client, admin_headers, type="approvisionnement", quantite=100, **base)
+    await _enregistrer(
+        client,
+        admin_headers,
+        type="transfert",
+        quantite=30,
+        site_destination_id=str(autre_base_aerienne.id),
+        **base,
+    )
+
+    destination = await client.get(
+        f"/mouvements-pesticide?site_id={autre_base_aerienne.id}", headers=admin_headers
+    )
+    source = await client.get(
+        f"/mouvements-pesticide?site_id={base_aerienne.id}", headers=admin_headers
+    )
+
+    assert [ligne["type"] for ligne in destination.json()] == ["transfert"]
+    assert sorted(ligne["type"] for ligne in source.json()) == ["approvisionnement", "transfert"]
+
+
+@pytest.mark.asyncio
+async def test_journal_filtre_par_pesticide_et_par_periode(
+    client: AsyncClient, admin_headers: dict, pesticide, deuxieme_pesticide, base_aerienne
+):
+    site = {"site_id": str(base_aerienne.id), "unite": "L", "type": "approvisionnement"}
+    await _enregistrer(
+        client,
+        admin_headers,
+        pesticide_id=str(pesticide.id),
+        quantite=10,
+        date_mouvement="2026-08-01",
+        **site,
+    )
+    dans_la_periode = await _enregistrer(
+        client,
+        admin_headers,
+        pesticide_id=str(pesticide.id),
+        quantite=20,
+        date_mouvement="2026-08-15",
+        **site,
+    )
+    await _enregistrer(
+        client,
+        admin_headers,
+        pesticide_id=str(deuxieme_pesticide.id),
+        quantite=30,
+        date_mouvement="2026-08-15",
+        **site,
+    )
+    await _enregistrer(
+        client,
+        admin_headers,
+        pesticide_id=str(pesticide.id),
+        quantite=40,
+        date_mouvement="2026-09-30",
+        **site,
+    )
+
+    reponse = await client.get(
+        f"/mouvements-pesticide?pesticide_id={pesticide.id}&date_debut=2026-08-10&date_fin=2026-08-31",
+        headers=admin_headers,
+    )
+
+    assert [ligne["id"] for ligne in reponse.json()] == [dans_la_periode["id"]]
+
+
+@pytest.mark.asyncio
+async def test_journal_bornes_de_periode_incluses(
+    client: AsyncClient, admin_headers: dict, pesticide, base_aerienne
+):
+    corps = {
+        "type": "approvisionnement",
+        "pesticide_id": str(pesticide.id),
+        "site_id": str(base_aerienne.id),
+        "unite": "L",
+        "quantite": 5,
+    }
+    un = await _enregistrer(client, admin_headers, date_mouvement="2026-08-10", **corps)
+    deux = await _enregistrer(client, admin_headers, date_mouvement="2026-08-31", **corps)
+
+    reponse = await client.get(
+        "/mouvements-pesticide?date_debut=2026-08-10&date_fin=2026-08-31", headers=admin_headers
+    )
+
+    assert {ligne["id"] for ligne in reponse.json()} == {un["id"], deux["id"]}
+
+
+@pytest.mark.asyncio
+async def test_journal_vide_quand_rien_ne_correspond(client: AsyncClient, admin_headers: dict):
+    reponse = await client.get(
+        f"/mouvements-pesticide?traitement_id={uuid.uuid4()}", headers=admin_headers
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json() == []
+
+
+@pytest.mark.asyncio
+async def test_journal_type_inconnu_422(client: AsyncClient, admin_headers: dict):
+    reponse = await client.get("/mouvements-pesticide?type=peremption", headers=admin_headers)
+
+    assert reponse.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_journal_lisible_par_tout_utilisateur_authentifie_mais_pas_anonyme(
+    client: AsyncClient, auth_headers: dict
+):
+    """La saisie est réservée (chef de base, admin) ; la lecture est ouverte, comme les soldes."""
+    assert (await client.get("/mouvements-pesticide", headers=auth_headers)).status_code == 200
+    assert (await client.get("/mouvements-pesticide")).status_code in (401, 403)

@@ -1806,6 +1806,32 @@ class CreateMouvementPesticide:
             return _rejouer(existant, candidat, candidat.id, comparer_date=comparer_date)
 
 
+class ListerMouvementsPesticide:
+    """Journal des mouvements de pesticide : approvisionnements, transferts et consommations
+    (ces dernières rattachées à leur fiche de traitement, #609), filtrable (#606)."""
+
+    def __init__(self, repository: MouvementPesticideRepository):
+        self.repository = repository
+
+    async def execute(
+        self,
+        type: str | None = None,
+        site_id: uuid.UUID | None = None,
+        pesticide_id: uuid.UUID | None = None,
+        traitement_id: uuid.UUID | None = None,
+        date_debut: date | None = None,
+        date_fin: date | None = None,
+    ) -> list[MouvementPesticide]:
+        return await self.repository.list_filtre(
+            type=type,
+            site_id=site_id,
+            pesticide_id=pesticide_id,
+            traitement_id=traitement_id,
+            date_debut=date_debut,
+            date_fin=date_fin,
+        )
+
+
 class ConsulterSoldePesticide:
     """Solde par (site, pesticide, unité), calculé à la volée à partir des
     mouvements — pas de colonne dénormalisée (décision actée, #606)."""
