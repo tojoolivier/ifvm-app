@@ -111,11 +111,12 @@ async def _generer_et_valider_numero_fiche(
     date_traitement: date,
     type_libelle: str,
     numero_existant: str | None = None,
+    sigle_chef: str | None = None,
 ) -> str:
     """Le numéro fourni par le mobile est repris tel quel ; à défaut, celui de la fiche déjà
     persistée (une resynchronisation sans numéro ne doit ni en consommer un nouveau ni provoquer
     un faux conflit) ; à défaut encore, le serveur en génère un
-    (« TRT-[TERR|AER]-[Date]-[NNN] », numéro d'ordre continué par type)."""
+    (« TRT-[TERR|AER]-[Date]-[Sigle du chef]-[NNN] », numéro d'ordre continué par type)."""
     base_numero = (
         numero_fiche
         or numero_existant
@@ -123,6 +124,7 @@ async def _generer_et_valider_numero_fiche(
             date_traitement,
             await repository.prochain_numero_ordre_fiche(type_libelle),
             type_traitement=type_libelle,
+            sigle=sigle_chef,
         )
     )
     if len(base_numero) > _NUMERO_FICHE_MAX_LENGTH:
@@ -358,7 +360,11 @@ class CreateTraitementAerien:
         await _valider_equipe(self.equipe_repository, equipe_id, "aerien")
 
         base_numero = await _generer_et_valider_numero_fiche(
-            self.traitement_repository, numero_fiche, date_traitement, "Aerien"
+            self.traitement_repository,
+            numero_fiche,
+            date_traitement,
+            "Aerien",
+            sigle_chef=chef.sigle,
         )
 
         traitement = _construire_traitement_base(
@@ -564,7 +570,11 @@ class CreateTraitementTerrestre:
         await _valider_equipe(self.equipe_repository, equipe_id, "terrestre")
 
         base_numero = await _generer_et_valider_numero_fiche(
-            self.traitement_repository, numero_fiche, date_traitement, "Terrestre"
+            self.traitement_repository,
+            numero_fiche,
+            date_traitement,
+            "Terrestre",
+            sigle_chef=chef.sigle,
         )
 
         traitement = _construire_traitement_base(
@@ -1325,6 +1335,7 @@ class SyncPushTraitementAerien:
             date_traitement,
             "Aerien",
             numero_existant=existant.numero_fiche if existant is not None else None,
+            sigle_chef=chef.sigle,
         )
 
         candidat = _construire_traitement_base(
@@ -1576,6 +1587,7 @@ class SyncPushTraitementTerrestre:
             date_traitement,
             "Terrestre",
             numero_existant=existant.numero_fiche if existant is not None else None,
+            sigle_chef=chef.sigle,
         )
 
         candidat = _construire_traitement_base(

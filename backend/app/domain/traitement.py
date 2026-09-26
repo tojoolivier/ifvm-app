@@ -892,12 +892,21 @@ def code_type_numero_fiche(type_traitement: str) -> str:
     return _CODE_TYPE_NUMERO_FICHE[type_traitement]
 
 
+def normaliser_sigle(sigle: str | None) -> str:
+    """Sigle utilisable dans un numéro de fiche : lettres et chiffres seulement (un tiret ou un
+    espace brouillerait la lecture du numéro), casse conservée. Vide si absent."""
+    return "".join(c for c in (sigle or "") if c.isascii() and c.isalnum())
+
+
 def motif_numero_fiche(type_traitement: str) -> str:
-    """Expression régulière (POSIX/PCRE) d'un numéro de base de ce type ; le groupe 1 est le
-    numéro d'ordre. Un numéro suffixé par une collision (`…-001-2`) ou à l'ancien format ne
-    correspond pas."""
+    """Expression régulière (POSIX/PCRE) d'un numéro de base de ce type, avec ou sans sigle ; le
+    groupe 1 est le numéro d'ordre. Un numéro suffixé par une collision (`…-001-2`) ou à
+    l'ancien format ne correspond pas."""
     code = code_type_numero_fiche(type_traitement)
-    return rf"^{PREFIXE_NUMERO_FICHE}-{code}-\d{{4}}-\d{{2}}-\d{{2}}-(\d{{3,}})$"
+    return (
+        rf"^{PREFIXE_NUMERO_FICHE}-{code}-\d{{4}}-\d{{2}}-\d{{2}}"
+        rf"-(?:[A-Za-z0-9]+-)?(\d{{3,}})$"
+    )
 
 
 def generer_numero_fiche(
@@ -905,16 +914,22 @@ def generer_numero_fiche(
     numero_ordre: int,
     type_traitement: str = "Aerien",
     suffixe: int | None = None,
+    sigle: str | None = None,
 ) -> str:
-    """Numéro de fiche : TRT-[TERR|AER]-[Date ISO]-[Numéro d'ordre sur 3 chiffres]
-    (#numero-fiche-traitement-trt), ex. `TRT-TERR-2026-09-26-001`.
+    """Numéro de fiche : TRT-[TERR|AER]-[Date ISO]-[Sigle du chef]-[Numéro d'ordre sur 3 chiffres]
+    (#numero-fiche-traitement-trt), ex. `TRT-TERR-2026-09-26-ABC-001`.
 
-    Le numéro d'ordre ne dépend pas de la date : il continue, par type de traitement
-    (`TraitementRepository.prochain_numero_ordre_fiche`). Trois chiffres au minimum, plus au-delà de
-    999. `suffixe` (2, 3, …) n'est ajouté qu'en cas de collision.
+    Le sigle du chef concerné par la fiche s'insère entre la date et le numéro d'ordre ; il est
+    omis s'il est absent. Le numéro d'ordre ne dépend pas de la date : il continue, par type de
+    traitement (`TraitementRepository.prochain_numero_ordre_fiche`). Trois chiffres au minimum,
+    plus au-delà de 999. `suffixe` (2, 3, …) n'est ajouté qu'en cas de collision.
     """
     code = code_type_numero_fiche(type_traitement)
-    base = f"{PREFIXE_NUMERO_FICHE}-{code}-{date_traitement.isoformat()}-{numero_ordre:03d}"
+    segment_sigle = f"-{normaliser_sigle(sigle)}" if normaliser_sigle(sigle) else ""
+    base = (
+        f"{PREFIXE_NUMERO_FICHE}-{code}-{date_traitement.isoformat()}"
+        f"{segment_sigle}-{numero_ordre:03d}"
+    )
     if suffixe is None:
         return base
     return f"{base}-{suffixe}"

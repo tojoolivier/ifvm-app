@@ -96,6 +96,7 @@ class UtilisateurEquipeRepositoryImpl(UtilisateurEquipeRepository):
                 id=m.id,
                 nom=m.nom,
                 prenom=m.prenom,
+                sigle=m.sigle,
                 role=m.role,
                 pa_id=m.pa_id,
                 actif=m.actif,

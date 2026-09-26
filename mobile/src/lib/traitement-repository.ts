@@ -1,7 +1,12 @@
 import { getDb } from './prospection-db';
 import { creerOutbox } from './outbox';
 import { generateId } from './id';
-import { codeTypeNumeroFiche, composerNumeroFiche, extraireSequenceNumeroFiche } from './traitement-numero-fiche';
+import {
+  appliquerSigleAuNumeroFiche,
+  codeTypeNumeroFiche,
+  composerNumeroFiche,
+  extraireSequenceNumeroFiche,
+} from './traitement-numero-fiche';
 import { PreconditionError } from './errors';
 import { estAerienPretPourSynchro, estTerrestrePretPourSynchro } from './traitement-validation';
 
@@ -505,7 +510,7 @@ export async function genererNumeroFicheDisponible(
 
   let suffixe: number | null = null;
   for (let tentative = 0; tentative < MAX_TENTATIVES_NUMERO_FICHE; tentative++) {
-    const candidat = composerNumeroFiche(typeTraitement, dateTraitementIso, sequence, suffixe);
+    const candidat = composerNumeroFiche(typeTraitement, dateTraitementIso, sequence, { suffixe });
     const existant = await db.getFirstAsync<{ id: string }>(
       'SELECT id FROM traitement WHERE numero_fiche = ? AND (? IS NULL OR id != ?)',
       [candidat, excludeId ?? null, excludeId ?? null]
@@ -515,6 +520,51 @@ export async function genererNumeroFicheDisponible(
   }
 
   throw new Error(`Impossible de générer un numero_fiche unique de type '${typeTraitement}'`);
+}
+
+/**
+ * #numero-fiche-traitement-trt : complète le numéro de la fiche avec le SIGLE DU CHEF choisi à l'écran
+ * Équipe (chef d'équipe en terrestre, chef de base en aérien) — « TRT-TERR-2026-09-26-ABC-001 ». Le
+ * numéro est créé plus tôt (écran Références), avant que le chef soit connu : on y insère ici son
+ * sigle, ou on le retire si le nouveau chef n'en a pas. Date, numéro d'ordre et suffixe éventuel sont
+ * conservés.
+ *
+ * Sans effet (le numéro courant est renvoyé tel quel) si :
+ *   - la fiche a déjà été envoyée au serveur (`synced`, `conflict`…) : son numéro y est déjà connu,
+ *     le changer provoquerait un faux conflit à la resynchronisation ;
+ *   - le numéro est à l'ancien format (fiche antérieure) : on ne réécrit jamais un ancien numéro ;
+ *   - le numéro recomposé est déjà porté par une AUTRE fiche locale.
+ * Renvoie le numéro à jour, ou `null` si la fiche n'existe pas ou n'a pas encore de numéro.
+ */
+export async function appliquerSigleChefAuNumeroFiche(
+  id: string,
+  sigle: string | null | undefined
+): Promise<string | null> {
+  const db = await getDb();
+  const fiche = await db.getFirstAsync<{
+    numero_fiche: string | null;
+    type_traitement: TypeTraitement;
+    statut_sync: string | null;
+  }>('SELECT numero_fiche, type_traitement, statut_sync FROM traitement WHERE id = ?', [id]);
+  if (!fiche?.numero_fiche) return null;
+
+  if (fiche.statut_sync !== 'brouillon' && fiche.statut_sync !== 'local') return fiche.numero_fiche;
+
+  const nouveau = appliquerSigleAuNumeroFiche(fiche.type_traitement, fiche.numero_fiche, sigle);
+  if (nouveau === fiche.numero_fiche) return fiche.numero_fiche;
+
+  const dejaPris = await db.getFirstAsync<{ id: string }>(
+    'SELECT id FROM traitement WHERE numero_fiche = ? AND id != ?',
+    [nouveau, id]
+  );
+  if (dejaPris) return fiche.numero_fiche;
+
+  await db.runAsync('UPDATE traitement SET numero_fiche = ?, updated_at = ? WHERE id = ?', [
+    nouveau,
+    new Date().toISOString(),
+    id,
+  ]);
+  return nouveau;
 }
 
 export async function updateTraitementReference(

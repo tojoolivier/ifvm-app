@@ -183,6 +183,9 @@ class UtilisateurEquipeSyncRead(BaseModel):
     nom: str
     prenom: str
     role: str
+    # Sigle de l'agent : le numéro d'une fiche de traitement porte celui de son chef
+    # (#numero-fiche-traitement-trt) — le mobile doit le connaître hors ligne.
+    sigle: str | None = None
     pa_id: uuid.UUID | None
     actif: bool
     updated_at: datetime

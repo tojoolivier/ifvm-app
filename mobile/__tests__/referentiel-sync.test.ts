@@ -551,3 +551,31 @@ describe('pullReferentiel', () => {
     );
   });
 });
+
+// #numero-fiche-traitement-trt : le sigle des agents descend dans le cache local, pour composer le
+// numéro d'une fiche hors ligne.
+describe('pullReferentiel — sigle des utilisateurs', () => {
+  it('écrit le sigle de chaque utilisateur dans le cache local (NULL sans sigle)', async () => {
+    mockPullReferentiel.mockResolvedValue({
+      ...emptyResponse('2026-08-02T00:00:00Z'),
+      utilisateurs_equipe: {
+        upserts: [
+          { id: 'u1', nom: 'Rakoto', prenom: 'Jean', role: 'chef_equipe', sigle: 'JRK', pa_id: null, actif: true, updated_at: '2026-08-01T00:00:00Z' },
+          { id: 'u2', nom: 'Andria', prenom: 'Lova', role: 'chef_de_base', pa_id: null, actif: true, updated_at: '2026-08-01T00:00:00Z' },
+        ],
+        server_time: '2026-08-02T00:00:00Z',
+      },
+    } as any);
+
+    await pullReferentiel('token-1');
+
+    const appels = runAsync.mock.calls
+      .filter(([sql]) => String(sql).includes('INSERT INTO utilisateur_equipe'))
+      .map(([sql, params]) => [String(sql), params]);
+    expect(appels).toHaveLength(2);
+    expect(appels[0][0]).toContain('sigle = excluded.sigle');
+    expect(appels[0][1]).toEqual(['u1', 'Rakoto', 'Jean', 'chef_equipe', 'JRK', null, 1, '2026-08-01T00:00:00Z']);
+    expect(appels[1][1]).toEqual(['u2', 'Andria', 'Lova', 'chef_de_base', null, null, 1, '2026-08-01T00:00:00Z']);
+  });
+});
+

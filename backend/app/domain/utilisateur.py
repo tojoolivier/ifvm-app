@@ -14,3 +14,4 @@ class UtilisateurRef:
     # texte libre, migration 0048) : défaut "" pour ne pas casser les appelants
     # existants qui n'ont besoin que de prenom/role.
     nom: str = ""
+    sigle: str | None = None

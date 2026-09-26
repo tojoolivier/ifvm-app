@@ -47,6 +47,7 @@ from app.domain.traitement import (
     contenu_diverge,
     generer_numero_fiche,
     motif_numero_fiche,
+    normaliser_sigle,
     valider_surfaces_bloc,
 )
 from app.domain.utilisateur import UtilisateurRef
@@ -81,10 +82,38 @@ def test_numero_fiche_numero_ordre_sur_trois_chiffres_et_au_dela_de_999():
     assert generer_numero_fiche(date(2026, 8, 11), 1000) == "TRT-AER-2026-08-11-1000"
 
 
-def test_numero_fiche_ne_contient_ni_prenom_ni_sigle():
+def test_numero_fiche_ne_contient_ni_prenom_ni_annexe():
     numero = generer_numero_fiche(date(2026, 8, 11), 5, type_traitement="Terrestre")
     assert numero.startswith("TRT-TERR-")
     assert "Hery" not in numero and "ANNEXE" not in numero
+
+
+def test_numero_fiche_avec_sigle_du_chef_entre_la_date_et_le_numero_d_ordre():
+    assert (
+        generer_numero_fiche(date(2026, 8, 11), 1, type_traitement="Terrestre", sigle="ABC")
+        == "TRT-TERR-2026-08-11-ABC-001"
+    )
+    assert generer_numero_fiche(date(2026, 8, 11), 12, sigle="RH") == "TRT-AER-2026-08-11-RH-012"
+
+
+def test_numero_fiche_avec_sigle_et_suffixe():
+    assert (
+        generer_numero_fiche(date(2026, 8, 11), 1, suffixe=2, sigle="ABC")
+        == "TRT-AER-2026-08-11-ABC-001-2"
+    )
+
+
+def test_numero_fiche_sans_sigle_omet_le_segment():
+    for absent in (None, "", "   ", "-- "):
+        assert generer_numero_fiche(date(2026, 8, 11), 1, sigle=absent) == "TRT-AER-2026-08-11-001"
+
+
+def test_normaliser_sigle_garde_lettres_et_chiffres_seulement():
+    assert normaliser_sigle("ABC") == "ABC"
+    assert normaliser_sigle(" a-b c ") == "abc"
+    assert normaliser_sigle("R.H") == "RH"
+    assert normaliser_sigle("é1") == "1"
+    assert normaliser_sigle(None) == ""
 
 
 def test_motif_numero_fiche_reconnait_le_numero_de_base_du_bon_type_seulement():
@@ -93,10 +122,14 @@ def test_motif_numero_fiche_reconnait_le_numero_de_base_du_bon_type_seulement():
     motif = re.compile(motif_numero_fiche("Terrestre"))
     assert motif.match("TRT-TERR-2026-08-11-007").group(1) == "007"
     assert motif.match("TRT-TERR-2026-08-11-1000").group(1) == "1000"
+    # avec le sigle du chef entre la date et le numéro d'ordre
+    assert motif.match("TRT-TERR-2026-08-11-ABC-007").group(1) == "007"
+    assert motif.match("TRT-TERR-2026-08-11-ABC-1000").group(1) == "1000"
     # autre type, ancien format, numéro suffixé par une collision : ne comptent pas
     assert motif.match("TRT-AER-2026-08-11-007") is None
     assert motif.match("Hery-Terrestre-2026-08-11") is None
     assert motif.match("TRT-TERR-2026-08-11-007-2") is None
+    assert motif.match("TRT-TERR-2026-08-11-ABC-007-2") is None
 
 
 # ==========================================
@@ -689,6 +722,16 @@ async def test_le_numero_genere_par_le_serveur_continue_le_numero_d_ordre_du_typ
     repo.prochains_ordres["Aerien"] = 8
     traitement = await use_case.execute(**_args())
     assert traitement.numero_fiche == "TRT-AER-2026-08-11-008"
+
+
+@pytest.mark.asyncio
+async def test_le_numero_genere_par_le_serveur_porte_le_sigle_du_chef_de_base():
+    chef = UtilisateurRef(
+        id=uuid.uuid4(), prenom="Hery", nom="Rakoto", role="chef_de_base", sigle="HRK"
+    )
+    use_case, _ = _use_case(prospection=_prospection(), chef=chef)
+    traitement = await use_case.execute(**_args(chef_de_base_id=chef.id))
+    assert traitement.numero_fiche == "TRT-AER-2026-08-11-HRK-001"
 
 
 @pytest.mark.asyncio
@@ -2648,3 +2691,13 @@ async def test_sync_push_terrestre_fiche_validee_rejetee_sans_comparaison():
 
     assert repo.conflicts_marques == []
     assert existant.statut_sync == "synced"
+
+
+@pytest.mark.asyncio
+async def test_le_numero_genere_par_le_serveur_porte_le_sigle_du_chef_d_equipe():
+    chef = UtilisateurRef(
+        id=uuid.uuid4(), prenom="Hery", nom="Rakoto", role="chef_equipe", sigle="HRK"
+    )
+    use_case, _ = _use_case_terrestre(prospection=_prospection(), chef=chef)
+    traitement = await use_case.execute(**_args_terrestre(chef_equipe_id=chef.id))
+    assert traitement.numero_fiche == "TRT-TERR-2026-08-11-HRK-001"

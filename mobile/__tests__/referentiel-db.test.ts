@@ -247,7 +247,7 @@ describe('listUtilisateursByRole', () => {
     const result = await listUtilisateursByRole('chef_de_base');
 
     expect(getAllAsync).toHaveBeenCalledWith(
-      'SELECT id, nom, prenom FROM utilisateur_equipe WHERE actif = 1 AND role = ? ORDER BY nom',
+      'SELECT id, nom, prenom, sigle FROM utilisateur_equipe WHERE actif = 1 AND role = ? ORDER BY nom',
       ['chef_de_base']
     );
     expect(result).toEqual([{ id: 'u-1', nom: 'Rakoto', prenom: 'Jean' }]);

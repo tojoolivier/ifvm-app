@@ -137,6 +137,7 @@ class UtilisateurEquipe:
     nom: str = ""
     prenom: str = ""
     role: str = ""
+    sigle: str | None = None
     pa_id: uuid.UUID | None = None
     actif: bool = True
     updated_at: datetime = field(default_factory=datetime.utcnow)
