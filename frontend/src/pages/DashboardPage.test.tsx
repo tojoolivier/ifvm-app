@@ -246,7 +246,11 @@ describe('DashboardPage — maquette §1', () => {
     await waitFor(() => expect(screen.getByText('Activité récente')).toBeInTheDocument())
     expect(screen.getByText('Dernières 24 h')).toBeInTheDocument()
 
-    const lignes = screen.getAllByRole('row').slice(1)
+    // La page compte plusieurs tableaux : on cible celui de l'activité.
+    const sectionActivite = screen
+      .getByRole('heading', { name: 'Activité récente' })
+      .closest('section') as HTMLElement
+    const lignes = within(sectionActivite).getAllByRole('row').slice(1)
     expect(within(lignes[0]).getByText('PR-2026-0148-INT')).toBeInTheDocument()
     expect(within(lignes[0]).getByText('il y a 20 min')).toBeInTheDocument()
     expect(within(lignes[0]).getByText('ST-014 Ankazoabo')).toBeInTheDocument()
@@ -342,5 +346,28 @@ describe('DashboardPage — maquette §1', () => {
     expect(
       screen.getByText('Superficies infestées, traitées et protégées — Campagne 2024-2025'),
     ).toBeInTheDocument()
+  })
+
+  it('place la répartition par type juste au-dessus de l’évolution de la campagne', async () => {
+    renderPage()
+
+    const repartition = await screen.findByRole('heading', {
+      name: 'Répartition des prospections par type',
+    })
+    const evolution = screen.getByRole('heading', { name: 'Évolution de la campagne' })
+    // `compareDocumentPosition` : FOLLOWING = l'évolution vient après la répartition.
+    expect(repartition.compareDocumentPosition(evolution) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // 3 fiches dans la campagne en cours : 2 intensives, 1 extensive.
+    const section = repartition.closest('section') as HTMLElement
+    await waitFor(() =>
+      expect(within(section).getByRole('rowheader', { name: 'Intensive' })).toBeInTheDocument(),
+    )
+    expect(within(section).getByText('66,7 %')).toBeInTheDocument()
+    expect(within(section).getByText('33,3 %')).toBeInTheDocument()
+
+    // L'ancienne section carte a disparu.
+    expect(screen.queryByText('Zones suivies par région')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Carte de Madagascar/)).not.toBeInTheDocument()
   })
 })
