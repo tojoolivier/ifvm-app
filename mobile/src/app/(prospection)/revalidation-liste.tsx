@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ProspectionRead } from '@/lib/api-client';
 import {
   loadFichesARevalider,
   assurerProspectionDisponibleLocalement,
 } from '@/lib/prospection-accueil';
-import { listProspectionsARevaliderLocal, demarrerRevalidation } from '@/lib/prospection-repository';
+import {
+  listProspectionsARevaliderLocal,
+  listProspectionIdsDejaRevalideesLocalement,
+  demarrerRevalidation,
+} from '@/lib/prospection-repository';
 import { useProspectionWizardStore } from '@/lib/prospection-wizard-store';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
@@ -79,9 +83,19 @@ export default function RevalidationListeScreen() {
       criticality: 'essential',
     }).then(async (outcome) => {
       if (outcome.ok) {
+        // #revalidation-liste-exclut-origine-revalidee : le serveur n'exclut une origine qu'une
+        // fois sa revalidation SYNCHRONISÉE — complément best-effort pour celle créée à
+        // l'instant sur cet appareil, pas encore repartie en ligne.
+        const dejaRevalidees = await runTask(() => listProspectionIdsDejaRevalideesLocalement(), {
+          name: 'prospection.revalidationListe.dejaRevalidees',
+          criticality: 'best-effort',
+        });
+        const restantes = dejaRevalidees.ok
+          ? outcome.value.filter((f) => !dejaRevalidees.value.has(f.id))
+          : outcome.value;
         setHorsLigne(false);
         setErreurDeLecture(null);
-        setFiches(outcome.value);
+        setFiches(restantes);
         setLoading(false);
         return;
       }
@@ -98,9 +112,12 @@ export default function RevalidationListeScreen() {
     });
   }, [token]);
 
-  useEffect(() => {
-    charger();
-  }, [charger]);
+  // #revalidation-liste-exclut-origine-revalidee : rafraîchi à chaque prise de focus (pas
+  // seulement au montage) — sans quoi revenir de la création d'une revalidation (même pile de
+  // navigation, écran jamais démonté) laissait l'origine visible jusqu'au prochain redémarrage.
+  // Même mécanisme que (app)/index.tsx, sync.tsx, prospection.tsx, fiches.tsx et
+  // prospection-picker.tsx.
+  useFocusEffect(charger);
 
   const choisir = (fiche: FicheARevalider) =>
     run(

@@ -9,6 +9,7 @@ import {
   listValidatedProspections,
   listProspectionsDisponiblesPourTraitementLocal,
   listProspectionsARevaliderLocal,
+  listProspectionIdsDejaRevalideesLocalement,
   synchroniserStatutServeur,
   demarrerRevalidation,
   countUnsyncedProspections,
@@ -455,6 +456,27 @@ describe('listProspectionsARevaliderLocal', () => {
     // #revalidation-cree-apres-confirmation : idem, cf. le test équivalent de
     // listProspectionsDisponiblesPourTraitementLocal ci-dessus.
     expect(query).toContain("enfant.statut != 'brouillon'");
+  });
+});
+
+// #revalidation-liste-exclut-origine-revalidee
+describe('listProspectionIdsDejaRevalideesLocalement', () => {
+  it('renvoie les identifiants des origines déjà revalidées (enfant réellement créé), sans doublon', async () => {
+    getAllAsync.mockResolvedValueOnce([{ revalide_de_id: 'presp-1' }, { revalide_de_id: 'presp-2' }]);
+
+    const ids = await listProspectionIdsDejaRevalideesLocalement();
+
+    expect(ids).toEqual(new Set(['presp-1', 'presp-2']));
+    const [query] = getAllAsync.mock.calls[0];
+    expect(query).toContain('revalide_de_id IS NOT NULL');
+    // Un assistant de revalidation seulement amorcé (brouillon jamais enregistré) ne compte pas —
+    // même condition que listProspectionsARevaliderLocal (#revalidation-cree-apres-confirmation).
+    expect(query).toContain("statut != 'brouillon'");
+  });
+
+  it('renvoie un ensemble vide quand aucune fiche n’a encore été revalidée', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+    expect((await listProspectionIdsDejaRevalideesLocalement()).size).toBe(0);
   });
 });
 

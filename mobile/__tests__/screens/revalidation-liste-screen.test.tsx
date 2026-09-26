@@ -16,6 +16,16 @@ const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack, replace: jest.fn(), canGoBack: () => true }),
+  // #revalidation-liste-exclut-origine-revalidee : un montage unique — `(effect) => effect()`
+  // (utilisé ailleurs dans ce dépôt) réexécuterait l'effet à chaque rendu et boucle avec le
+  // setState de `charger` (même leçon que fiches-screen-insigne-reprise.test.tsx).
+  useFocusEffect: (effect: () => void) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const React = require('react');
+    React.useEffect(() => {
+      effect();
+    }, []);
+  },
 }));
 
 jest.mock('@/lib/prospection-accueil', () => ({
@@ -25,6 +35,7 @@ jest.mock('@/lib/prospection-accueil', () => ({
 
 jest.mock('@/lib/prospection-repository', () => ({
   listProspectionsARevaliderLocal: jest.fn(),
+  listProspectionIdsDejaRevalideesLocalement: jest.fn().mockResolvedValue(new Set()),
   demarrerRevalidation: jest.fn(),
   // Consommées par le vrai `prospection-wizard-store.ts` (non mocké) via
   // `hydrateFromDraft` — indispensable pour que l'écran suivant
@@ -50,6 +61,7 @@ beforeEach(() => {
   jest.mocked(prospectionAccueil.loadFichesARevalider).mockReset();
   jest.mocked(prospectionAccueil.assurerProspectionDisponibleLocalement).mockClear().mockResolvedValue(undefined);
   jest.mocked(prospectionRepository.listProspectionsARevaliderLocal).mockReset();
+  jest.mocked(prospectionRepository.listProspectionIdsDejaRevalideesLocalement).mockReset().mockResolvedValue(new Set());
   jest.mocked(prospectionRepository.demarrerRevalidation).mockReset().mockResolvedValue({ draftId: 'draft-1' });
   jest
     .mocked(prospectionRepository.getProspection)
@@ -106,6 +118,35 @@ describe('RevalidationListeScreen — sélection (démarre la revalidation)', ()
         })
       )
     );
+  });
+});
+
+// #revalidation-liste-exclut-origine-revalidee
+describe('RevalidationListeScreen — origine déjà revalidée sur cet appareil (pas encore synchronisée)', () => {
+  it('retire de la liste en ligne une origine déjà revalidée localement, garde les autres', async () => {
+    const AUTRE_FICHE_PERIMEE = { ...FICHE_PERIMEE, id: 'presp-autre', n_fiche: 'F-200' };
+    jest
+      .mocked(prospectionAccueil.loadFichesARevalider)
+      .mockResolvedValue([FICHE_PERIMEE, AUTRE_FICHE_PERIMEE]);
+    jest
+      .mocked(prospectionRepository.listProspectionIdsDejaRevalideesLocalement)
+      .mockResolvedValue(new Set([FICHE_PERIMEE.id]));
+
+    await render(<RevalidationListeScreen />);
+
+    expect(await screen.findByText(/F-200/)).toBeVisible();
+    expect(screen.queryByText(/F-100/)).toBeNull();
+  });
+
+  it('n’empêche jamais l’affichage : si la lecture locale échoue, la liste serveur s’affiche telle quelle', async () => {
+    jest.mocked(prospectionAccueil.loadFichesARevalider).mockResolvedValue([FICHE_PERIMEE]);
+    jest
+      .mocked(prospectionRepository.listProspectionIdsDejaRevalideesLocalement)
+      .mockRejectedValue(new Error('sqlite'));
+
+    await render(<RevalidationListeScreen />);
+
+    expect(await screen.findByText(/F-100/)).toBeVisible();
   });
 });
 
