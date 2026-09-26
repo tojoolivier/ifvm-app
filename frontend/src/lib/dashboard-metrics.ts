@@ -19,6 +19,7 @@ export interface DashboardProspection {
   statut: string
   n_fiche: string | null
   date_prospection: string
+  surface_prospectee: number | null
   surface_infestee: number | null
   created_at: string
   updated_at: string
@@ -40,12 +41,16 @@ export interface DashboardTraitement {
     pilote: string
     surface_traitee_ha?: number | null
     surface_protegee_ha?: number | null
+    /** Deux totaux séparés : chaque rotation garde son unité, jamais convertie. */
     total_pesticide_l?: number | null
+    total_pesticide_kg?: number | null
   } | null
   terrestre: {
     surface_traitee_ha?: number | null
     surface_protegee_ha?: number | null
+    /** Un seul total par fiche, dans l'unité `pesticide_unite` (colonne historique nommée `_l`). */
     total_pesticide_l?: number | null
+    pesticide_unite?: 'L' | 'kg'
     surface_atomiseur_ha?: number | null
     surface_atomiseur_autoporte_ha?: number | null
     surface_disque_rotatif_ha?: number | null
@@ -70,6 +75,10 @@ export function compteProspections(
   type: string,
 ): number {
   return prospections.filter((p) => p.type_prospection === type).length
+}
+
+export function sommeSurfaceProspectee(prospections: DashboardProspection[]): number {
+  return prospections.reduce((total, p) => total + (p.surface_prospectee ?? 0), 0)
 }
 
 export function sommeSurfaceInfestee(prospections: DashboardProspection[]): number {
@@ -105,11 +114,39 @@ export function sommeSurfaceProtegee(traitements: DashboardTraitement[]): number
   )
 }
 
-export function sommePesticides(traitements: DashboardTraitement[]): number {
-  return traitements.reduce(
-    (total, t) => total + (t.aerien?.total_pesticide_l ?? t.terrestre?.total_pesticide_l ?? 0),
-    0,
-  )
+/**
+ * Part de `partie` dans `total`, en % arrondi à une décimale ; `null` quand le
+ * total est nul, pour que l'écran dise « aucune surface » plutôt qu'un « 0 % »
+ * trompeur.
+ */
+export function pourcentage(partie: number, total: number): number | null {
+  if (total <= 0) return null
+  return Math.round((partie / total) * 1000) / 10
+}
+
+/**
+ * Pesticide consommé, en litres et en kilogrammes **sans jamais les convertir**
+ * (la densité varie selon le produit). Aérien : deux totaux déjà séparés.
+ * Terrestre : un seul total, à ranger dans L ou kg selon `pesticide_unite`.
+ */
+export function sommePesticide(traitements: DashboardTraitement[]): {
+  litres: number
+  kilos: number
+} {
+  let litres = 0
+  let kilos = 0
+  for (const t of traitements) {
+    if (t.aerien) {
+      litres += t.aerien.total_pesticide_l ?? 0
+      kilos += t.aerien.total_pesticide_kg ?? 0
+    }
+    if (t.terrestre) {
+      const total = t.terrestre.total_pesticide_l ?? 0
+      if (t.terrestre.pesticide_unite === 'kg') kilos += total
+      else litres += total
+    }
+  }
+  return { litres, kilos }
 }
 
 export interface RepartitionDashboard {

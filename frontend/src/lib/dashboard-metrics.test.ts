@@ -5,7 +5,10 @@ import {
   buildTopStations,
   compteProspections,
   formatReception,
+  pourcentage,
+  sommePesticide,
   sommeSurfaceInfestee,
+  sommeSurfaceProspectee,
   sommeSurfaceTraitee,
   tauxValidation,
   type DashboardProspection,
@@ -22,6 +25,7 @@ function prospection(over: Partial<DashboardProspection> = {}): DashboardProspec
     statut: 'validee',
     n_fiche: 'PR-2026-0148-INT',
     date_prospection: '2026-08-16',
+    surface_prospectee: 400,
     surface_infestee: 100,
     created_at: '2026-08-16T08:00:00Z',
     updated_at: '2026-08-16T08:00:00Z',
@@ -55,6 +59,47 @@ describe('compteProspections', () => {
       prospection({ id: 'c', type_prospection: 'intensive' }),
     ]
     expect(compteProspections(fiches, 'intensive')).toBe(2)
+  })
+})
+
+describe('sommeSurfaceProspectee', () => {
+  it('additionne les surfaces prospectées en ignorant les valeurs absentes', () => {
+    const fiches = [
+      prospection({ id: 'a', surface_prospectee: 250 }),
+      prospection({ id: 'b', surface_prospectee: null }),
+      prospection({ id: 'c', surface_prospectee: 50.5 }),
+    ]
+    expect(sommeSurfaceProspectee(fiches)).toBe(300.5)
+  })
+})
+
+describe('pourcentage', () => {
+  it('arrondit à une décimale', () => {
+    expect(pourcentage(1, 3)).toBe(33.3)
+    expect(pourcentage(150, 300)).toBe(50)
+  })
+
+  it('renvoie null quand le total est nul plutôt qu’un pourcentage trompeur', () => {
+    expect(pourcentage(10, 0)).toBeNull()
+  })
+})
+
+describe('sommePesticide', () => {
+  it('range le terrestre dans L ou kg selon son unité, sans jamais convertir', () => {
+    const fiches = [
+      traitement({
+        id: 'a',
+        type_traitement: 'AERIEN',
+        terrestre: null,
+        aerien: { pilote: 'Rakoto', total_pesticide_l: 1000, total_pesticide_kg: 40 },
+      }),
+      traitement({ id: 'b', terrestre: { total_pesticide_l: 60, pesticide_unite: 'L' } }),
+      // Le champ s'appelle `_l` mais porte des kg quand l'unité est « kg ».
+      traitement({ id: 'c', terrestre: { total_pesticide_l: 25, pesticide_unite: 'kg' } }),
+      // Total absent : compté pour 0, sans planter.
+      traitement({ id: 'd', terrestre: { total_pesticide_l: null, pesticide_unite: 'L' } }),
+    ]
+    expect(sommePesticide(fiches)).toEqual({ litres: 1060, kilos: 65 })
   })
 })
 
