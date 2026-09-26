@@ -1814,6 +1814,31 @@ export async function listProspectionsDisponiblesPourTraitementLocal(): Promise<
 }
 
 /**
+ * #signalement-disponible-avant-synchro : fiches de SIGNALEMENT (type `validation`) créées sur cet
+ * appareil, validées dès leur enregistrement local (`completeProspection`), mais pas encore
+ * envoyées au serveur (`statut_sync = 'local'`). Le serveur ne les connaît pas encore : la liste
+ * « Nouvelle fiche de traitement » (en ligne, entièrement serveur) ne les affichait donc qu'après
+ * synchronisation, alors que leur statut « validée » est déjà acquis.
+ *
+ * Mêmes exclusions que `listProspectionsDisponiblesPourTraitementLocal` : pas de traitement déjà
+ * rattaché. Pas de revalidation (`revalide_de_id` non nul suit la chaîne en_attente → validée, elle
+ * n'est jamais validée d'emblée) ni de fiche refusée par le serveur (`echec`). Aucune condition de
+ * péremption : une fiche non synchronisée est, par nature, récente.
+ */
+export async function listSignalementsValidesNonSynchronisesLocal(): Promise<DraftProspection[]> {
+  const db = await getDb();
+  return db.getAllAsync<DraftProspection>(
+    `SELECT * FROM prospection p
+     WHERE p.type_prospection = 'validation'
+       AND p.statut = 'validee'
+       AND p.statut_sync = 'local'
+       AND p.revalide_de_id IS NULL
+       AND NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)
+     ORDER BY p.updated_at DESC`
+  );
+}
+
+/**
  * #liste-nouveau-traitement-exclut-deja-traitees : identifiants des fiches de prospection
  * pour lesquelles une fiche de traitement existe DÉJÀ sur cet appareil — brouillon,
  * enregistrée hors ligne ou synchronisée, peu importe. Le serveur (`disponible_pour_traitement`)

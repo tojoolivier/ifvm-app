@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -11,6 +11,7 @@ import {
 import {
   listProspectionIdsAvecTraitementLocal,
   listProspectionsDisponiblesPourTraitementLocal,
+  listSignalementsValidesNonSynchronisesLocal,
 } from '@/lib/prospection-repository';
 import { NetworkError } from '@/lib/errors';
 import { useAuthStore } from '@/lib/auth-store';
@@ -70,6 +71,9 @@ export default function TraitementProspectionPickerScreen() {
   const [loading, setLoading] = useState(true);
   const [erreurDeLecture, setErreurDeLecture] = useState<unknown>(null);
   const [horsLigne, setHorsLigne] = useState(false);
+  // #signalement-disponible-avant-synchro : identifiants des fiches de la liste qui viennent du
+  // cache local (signalements créés ici, pas encore synchronisés) — déjà locales, à ne pas rapatrier.
+  const idsLocauxNonSynchronises = useRef<Set<string>>(new Set());
   const { run, isRunning: isSelectionEnCours } = useAsyncAction();
   const typeSizes = useTraitementTypeSizes();
   const theme = useTheme();
@@ -94,9 +98,23 @@ export default function TraitementProspectionPickerScreen() {
           name: 'traitement.prospectionPicker.dejaTraitees',
           criticality: 'best-effort',
         });
-        const disponibles = dejaTraitees.ok
-          ? outcome.value.filter((p) => !dejaTraitees.value.has(p.id))
-          : outcome.value;
+        // #signalement-disponible-avant-synchro : un signalement est validé dès sa création locale,
+        // mais le serveur ne le connaît qu'après synchronisation — on ajoute (en tête : ce sont les
+        // plus récentes) celles créées sur cet appareil et pas encore envoyées. Best-effort : s'il
+        // échoue, la liste serveur reste affichée telle quelle.
+        const nonSynchronises = await runTask(() => listSignalementsValidesNonSynchronisesLocal(), {
+          name: 'traitement.prospectionPicker.signalementsNonSynchronises',
+          criticality: 'best-effort',
+        });
+        const idsServeur = new Set(outcome.value.map((p) => p.id));
+        const localesAjoutees = nonSynchronises.ok
+          ? nonSynchronises.value.filter((p) => !idsServeur.has(p.id))
+          : [];
+        const nonTraitee = (p: FichePickable) => !(dejaTraitees.ok && dejaTraitees.value.has(p.id));
+        const disponibles: FichePickable[] = [...localesAjoutees, ...outcome.value].filter(nonTraitee);
+        idsLocauxNonSynchronises.current = new Set(
+          disponibles.filter((p) => !idsServeur.has(p.id)).map((p) => p.id)
+        );
         setHorsLigne(false);
         setErreurDeLecture(null);
         // Même liste (mêmes fiches, même ordre) : on garde l'état tel quel — évite un rendu
@@ -140,7 +158,7 @@ export default function TraitementProspectionPickerScreen() {
         // rien. Hors ligne, `prospection` vient déjà du cache local — inutile
         // (et l'objet n'a de toute façon pas la forme `ProspectionRead`
         // complète qu'attend `assurerProspectionDisponibleLocalement`).
-        if (!horsLigne) {
+        if (!horsLigne && !idsLocauxNonSynchronises.current.has(prospection.id)) {
           await assurerProspectionDisponibleLocalement(prospection as ProspectionRead);
         }
         router.push({

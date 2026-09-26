@@ -29,6 +29,7 @@ jest.mock('@/lib/prospection-accueil', () => ({
 jest.mock('@/lib/prospection-repository', () => ({
   listProspectionsDisponiblesPourTraitementLocal: jest.fn(),
   listProspectionIdsAvecTraitementLocal: jest.fn(),
+  listSignalementsValidesNonSynchronisesLocal: jest.fn(),
 }));
 
 const FICHE_PROPRE_AGENT = {
@@ -84,6 +85,7 @@ beforeEach(() => {
   jest.mocked(prospectionAccueil.materialiserFichesDisponibles).mockClear().mockResolvedValue(undefined);
   jest.mocked(prospectionRepository.listProspectionsDisponiblesPourTraitementLocal).mockReset();
   jest.mocked(prospectionRepository.listProspectionIdsAvecTraitementLocal).mockReset().mockResolvedValue(new Set());
+  jest.mocked(prospectionRepository.listSignalementsValidesNonSynchronisesLocal).mockReset().mockResolvedValue([]);
   useAuthStore.setState({ user: { id: 'moi' } as any, token: 'token-1' } as any);
 });
 
@@ -369,5 +371,95 @@ describe('TraitementProspectionPickerScreen — aucune fiche disponible', () => 
     await render(<TraitementProspectionPickerScreen />);
 
     expect(await screen.findByText(/Aucune fiche validée disponible/)).toBeVisible();
+  });
+});
+
+/**
+ * #signalement-disponible-avant-synchro : un signalement (type validation) est validé dès sa
+ * création locale — il doit apparaître dans la liste sans attendre d'être synchronisé (le serveur,
+ * seule source de la liste en ligne, ne le connaît pas encore).
+ */
+describe('TraitementProspectionPickerScreen — signalement créé ici, pas encore synchronisé', () => {
+  const SIGNALEMENT_LOCAL = {
+    ...FICHE_VALIDATION_SIGNALEMENT,
+    id: 'presp-signalement-local',
+    n_message: 'MSG-LOCAL-0001',
+    statut: 'validee',
+    statut_sync: 'local',
+  } as any;
+
+  it('l’affiche en tête de la liste serveur, sans attendre la synchronisation', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([FICHE_AUTRE_AGENT]);
+    jest
+      .mocked(prospectionRepository.listSignalementsValidesNonSynchronisesLocal)
+      .mockResolvedValue([SIGNALEMENT_LOCAL]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/MSG-LOCAL-0001/)).toBeVisible();
+    expect(screen.getByText(/Créée par Alice Autre/)).toBeVisible();
+    // Ordre d'affichage : le signalement local d'abord, puis la fiche serveur.
+    const titres = screen.getAllByText(/^(Signalement|Intensive) ·/);
+    expect(titres[0]).toHaveTextContent(/MSG-LOCAL-0001/);
+    expect(titres[1]).toHaveTextContent(/Intensive/);
+  });
+
+  it('n’affiche pas deux fois une fiche déjà présente dans la liste serveur (synchronisée entre-temps)', async () => {
+    jest
+      .mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement)
+      .mockResolvedValue([{ ...SIGNALEMENT_LOCAL, statut_sync: undefined }]);
+    jest
+      .mocked(prospectionRepository.listSignalementsValidesNonSynchronisesLocal)
+      .mockResolvedValue([SIGNALEMENT_LOCAL]);
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findAllByText(/MSG-LOCAL-0001/)).toHaveLength(1);
+  });
+
+  it('n’empêche jamais l’affichage : si la lecture locale échoue, la liste serveur s’affiche telle quelle', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([FICHE_AUTRE_AGENT]);
+    jest
+      .mocked(prospectionRepository.listSignalementsValidesNonSynchronisesLocal)
+      .mockRejectedValue(new Error('sqlite'));
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/Créée par Alice Autre/)).toBeVisible();
+  });
+
+  it('la sélectionner ne la rapatrie pas (déjà locale) et ouvre Références', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([]);
+    jest
+      .mocked(prospectionRepository.listSignalementsValidesNonSynchronisesLocal)
+      .mockResolvedValue([SIGNALEMENT_LOCAL]);
+
+    await render(<TraitementProspectionPickerScreen />);
+    fireEvent.press(await screen.findByText(/MSG-LOCAL-0001/));
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(traitement)/references',
+          params: expect.objectContaining({ prospectionId: 'presp-signalement-local' }),
+        })
+      )
+    );
+    expect(prospectionAccueil.assurerProspectionDisponibleLocalement).not.toHaveBeenCalled();
+  });
+
+  it('une fiche déjà traitée sur cet appareil ne réapparaît pas (traitement local)', async () => {
+    jest.mocked(prospectionAccueil.loadFichesDisponiblesPourTraitement).mockResolvedValue([FICHE_AUTRE_AGENT]);
+    jest
+      .mocked(prospectionRepository.listSignalementsValidesNonSynchronisesLocal)
+      .mockResolvedValue([SIGNALEMENT_LOCAL]);
+    jest
+      .mocked(prospectionRepository.listProspectionIdsAvecTraitementLocal)
+      .mockResolvedValue(new Set([SIGNALEMENT_LOCAL.id]));
+
+    await render(<TraitementProspectionPickerScreen />);
+
+    expect(await screen.findByText(/Créée par Alice Autre/)).toBeVisible();
+    expect(screen.queryByText(/MSG-LOCAL-0001/)).toBeNull();
   });
 });

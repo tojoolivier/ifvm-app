@@ -35,6 +35,7 @@ import {
   deleteProspection,
   derniereInterventionEquipe,
   listProspectionIdsAvecTraitementLocal,
+  listSignalementsValidesNonSynchronisesLocal,
 } from '../src/lib/prospection-repository';
 
 const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
@@ -1711,5 +1712,35 @@ describe('derniereInterventionEquipe (#641)', () => {
 
     getFirstAsync.mockResolvedValueOnce(null);
     expect(await derniereInterventionEquipe('eq-1')).toBeNull();
+  });
+});
+
+// #signalement-disponible-avant-synchro : complément local de la liste serveur « Nouvelle fiche de traitement ».
+describe('listSignalementsValidesNonSynchronisesLocal', () => {
+  it('renvoie les signalements validés créés ici et pas encore envoyés', async () => {
+    const row = { ...STORED_ROW, type_prospection: 'validation', statut: 'validee', statut_sync: 'local' };
+    getAllAsync.mockResolvedValueOnce([row]);
+
+    const result = await listSignalementsValidesNonSynchronisesLocal();
+
+    expect(result).toEqual([row]);
+    const [query] = getAllAsync.mock.calls[getAllAsync.mock.calls.length - 1];
+    expect(query).toContain("p.type_prospection = 'validation'");
+    expect(query).toContain("p.statut = 'validee'");
+    expect(query).toContain("p.statut_sync = 'local'");
+    expect(query).toContain('ORDER BY p.updated_at DESC');
+  });
+
+  it('exclut les revalidations, les fiches déjà traitées et celles refusées par le serveur', async () => {
+    getAllAsync.mockResolvedValueOnce([]);
+
+    await listSignalementsValidesNonSynchronisesLocal();
+
+    const [query] = getAllAsync.mock.calls[getAllAsync.mock.calls.length - 1];
+    expect(query).toContain('p.revalide_de_id IS NULL');
+    expect(query).toContain('NOT EXISTS (SELECT 1 FROM traitement t WHERE t.prospection_id = p.id)');
+    // statut_sync = 'local' uniquement : ni 'synced' (déjà dans la liste serveur), ni 'echec', ni 'conflict'.
+    expect(query).not.toContain("'echec'");
+    expect(query).not.toContain("'synced'");
   });
 });
