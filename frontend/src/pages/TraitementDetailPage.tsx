@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ErrorBanner } from '@/components/ui/error-banner'
+import { FicheTableau } from '@/components/FicheTableau'
 import { NavTabs } from '@/components/ui/nav-tabs'
+import { OngletsFiche, type OngletFiche } from '@/components/ui/onglets-fiche'
 import { PILL_TONES, Pill } from '@/components/ui/pill'
 import { MODE_LABELS, ROLE_LABELS, SIGNATURE_ROLES, STATUS_LABELS, TYPE_LABELS } from '@/lib/traitement-labels'
 import {
@@ -312,6 +314,8 @@ export function TraitementDetailPage() {
     enabled: !!traitement,
   })
   const [reprisePromptOuvert, setReprisePromptOuvert] = useState(false)
+  // « Fiche » (tableaux du CRT, comme le PDF) à l'ouverture ; « Données BDD » garde les cartes.
+  const [onglet, setOnglet] = useState<OngletFiche>('fiche')
   const [telechargementPdfEnCours, setTelechargementPdfEnCours] = useState(false)
   const [erreurPdf, setErreurPdf] = useState<string | null>(null)
 
@@ -541,6 +545,8 @@ export function TraitementDetailPage() {
       </header>
       {erreurPdf && <ErrorBanner label="PDF" message={erreurPdf} />}
 
+      <OngletsFiche actif={onglet} onChange={setOnglet} />
+
       {/* N° fiche prospection liée (#numero-fiche-prospection-liee) — dérivé de
           prospection_id côté backend, jamais saisi ici, toujours visible (pas
           seulement quand un snapshot de cible existe, cf. bandeau ambre plus bas). */}
@@ -567,6 +573,14 @@ export function TraitementDetailPage() {
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
+          {onglet === 'fiche' ? (
+            <FicheTableau
+              endpoint={`/traitements/${traitement.id}/fiche-html`}
+              cleVersion={`${traitement.statut}|${traitement.updated_at}`}
+              titre={`Fiche de traitement ${traitement.numero_fiche}`}
+            />
+          ) : (
+          <>
           {traitement.aerien && (
             <Carte className="overflow-hidden">
               <div className="flex items-baseline gap-3 border-b border-[#f1ecdd] px-5 py-[15px]">
@@ -861,6 +875,8 @@ export function TraitementDetailPage() {
                 />
               </div>
             </Carte>
+          )}
+          </>
           )}
         </div>
 
